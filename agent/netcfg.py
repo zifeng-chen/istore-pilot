@@ -18,7 +18,7 @@ import shutil
 import subprocess
 import time
 
-from . import sysinfo
+from . import mask, sysinfo
 
 NET_CONF = "/etc/config/network"
 DATA_DIR = "/etc/istore-agent/data"
@@ -100,11 +100,11 @@ def status() -> dict:
         raw = {}
 
     ipv4 = ""
-    mask = ""
+    netmask = ""
     peer = ""
     for a in raw.get("ipv4-address") or []:
         ipv4 = a.get("address", "")
-        mask = a.get("mask", "")
+        netmask = a.get("mask", "")
         peer = a.get("ptpaddress", "")
         break
 
@@ -134,12 +134,14 @@ def status() -> dict:
         "device": raw.get("device", ""),
         "l3_device": raw.get("l3_device", ""),
         "uptime": raw.get("uptime", 0),
-        "ipv4": ipv4,
-        "mask": mask,
-        "peer": peer,
-        "gateway": route,
-        "ipv6": ipv6,
-        "dns": dns,
+        # 运行态里的公网 / CGNAT 地址一律打码：客户端五个页面都显示它们，
+        # 与其每端各写一遍过滤，不如在出口统一处理（见 mask.py）
+        "ipv4": mask.ip(ipv4),
+        "mask": netmask,
+        "peer": mask.ip(peer),
+        "gateway": mask.ip(route),
+        "ipv6": [mask.ip(x) for x in ipv6],
+        "dns": mask.ips(dns),
         "note": "" if up else "WAN 未连接，请检查拨号账号或线路",
     }
 
@@ -279,6 +281,43 @@ def apply_wan(payload: dict) -> dict:
     }
 
 
+def wan_action(action: str) -> dict:
+    """手动重拨 / 断开 / 连接。
+
+    和 apply_wan 的区别：这里**不动配置**，所以不需要回滚守护 ——
+    最坏结果只是「还是没连上」，而改配置才需要兜底。也正因为不动配置，
+    这个操作可以随便点，用户不会因为手滑把宽带账号弄丢。
+
+    ifup 本身要 10-30 秒，不能在请求里等：PPPoE 一断，这条 HTTP 连接就没了。
+    所以命令直接 detach，客户端靠 /network/wan 的 up 字段轮询结果。
+    """
+    act = (action or "").strip().lower()
+    if act not in ("reconnect", "up", "down"):
+        return {"ok": False, "error": "不支持的操作：" + (action or "空")}
+
+    if act in ("reconnect", "down"):
+        # 已经断开时 ifdown 会返回非零，这里不当作失败
+        try:
+            sysinfo._run(["/sbin/ifdown", "wan"], timeout=20)
+        except Exception:
+            pass
+
+    if act != "down":
+        try:
+            subprocess.Popen(["/sbin/ifup", "wan"], start_new_session=True,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception as exc:
+            return {"ok": False, "error": f"启动拨号失败：{exc}"}
+
+    labels = {"reconnect": "正在重拨", "up": "正在连接", "down": "已断开 WAN"}
+    detail = {
+        "reconnect": "PPPoE 会重新协商，全家断网 10-30 秒。",
+        "up": "正在向上级设备请求地址，通常 5-10 秒。",
+        "down": "WAN 已断开，所有设备无法上网；点「连接」可恢复。",
+    }[act]
+    return {"ok": True, "action": act, "message": labels[act], "detail": detail}
+
+
 def _is_ipv4(s: str) -> bool:
     parts = s.split(".")
     return len(parts) == 4 and all(p.isdigit() and 0 <= int(p) <= 255 for p in parts)
@@ -364,7 +403,7 @@ def lan() -> dict:
     所以这里只读，改动留给网页端（或者以后做成「改完自动跳新地址」）。
     """
     ip = _uci_get("network.lan.ipaddr") or "192.168.1.1"
-    mask = _uci_get("network.lan.netmask") or "255.255.255.0"
+    netmask = _uci_get("network.lan.netmask") or "255.255.255.0"
 
     dhcp_start = _uci_get("dhcp.lan.start")
     dhcp_limit = _uci_get("dhcp.lan.limit")
@@ -392,9 +431,9 @@ def lan() -> dict:
         pass
 
     import ipaddress
-    prefix = mask
+    prefix = netmask
     try:
-        net = ipaddress.ip_network(f"{ip}/{mask}", strict=False)
+        net = ipaddress.ip_network(f"{ip}/{netmask}", strict=False)
         pool = ""
         if dhcp_start.isdigit() and dhcp_limit.isdigit():
             base = int(ipaddress.ip_address(ip))
@@ -408,7 +447,7 @@ def lan() -> dict:
 
     return {
         "ipaddr": ip,
-        "netmask": mask,
+        "netmask": netmask,
         "cidr": f"{ip}/{prefix}",
         "hosts": hosts,
         "dhcp_enabled": dhcp_ignore != "1",
@@ -417,7 +456,7 @@ def lan() -> dict:
         "dhcp_pool": pool,
         "dhcp_lease": lease_time or "",
         "dhcp_leases": leases,
-        "ipv6_prefix": ipv6,
+        "ipv6_prefix": mask.ip(ipv6),
         "note": "改管理地址会让所有设备掉线一次，App 会引导你在新地址上确认，"
                 "不确认则自动还原",
     }

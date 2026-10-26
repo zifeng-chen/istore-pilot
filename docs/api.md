@@ -74,6 +74,29 @@ curl -X POST http://192.168.100.1:8443/api/v1/login \
 | GET | `/network/lan` | LAN 明细 |
 | GET | `/network/firewall` | **只读**防火墙策略摘要（`readonly: true`） |
 | POST | `/network/wan` | 改 WAN（含 PPPoE 账号口令）。口令只回掩码，空串表示不改 |
+| POST | `/net/wan/action` | 重拨 / 断开 / 连接。**不动配置**，所以不挂回滚守护 |
+
+`POST /net/wan/action` 请求体 `{"action": "reconnect" | "down" | "up"}`，
+立刻返回 `{ok, action, message, detail}`；命令是 detach 跑的，结果靠轮询
+`GET /network/wan` 的 `status.up` 判断（PPPoE 重拨 10-30 秒）。
+
+### 地址脱敏
+
+所有**响应里**的公网 / CGNAT 地址在服务端就打了码（`agent/mask.py`），
+客户端不用各自过滤 —— 五处界面各写一遍，迟早漏一处，而漏的那次泄漏的是一张截图。
+
+| 原值 | 返回 |
+|---|---|
+| `100.70.72.34`（CGNAT） | `100.*.*.34` |
+| `218.2.2.2`（运营商 DNS） | `218.*.*.2` |
+| `240e:3a0:5656:3039:…:b7c0` | `240e:3a0:…` |
+| `240e:3a6:566b:1080::/64` | `240e:3a6:…/64` |
+| `192.168.100.243`（LAN） | 原样 |
+| `fd00::1` / `fe80::1` / `127.0.0.1` | 原样 |
+
+只对「展示用」字段生效：`POST /network/wan` 的 `ipaddr` / `netmask` / `gateway`
+（用户要编辑的静态 IP）以及设备的 `dhcp.reserved_ip`（静态绑定）保持原值，
+否则界面会把打码值回写进配置。
 
 ### 配置事务（改 LAN / DHCP）
 

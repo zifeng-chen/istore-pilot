@@ -11,7 +11,7 @@ import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import (adblock, apps, auth, cfgbak, clash, devices, hardware, lanedit,
+from . import (adblock, apps, auth, cfgbak, clash, devices, hardware, lanedit, mask,
                netapply, netcfg, power, proxy, subscriptions, sysinfo, system)
 from .config import get as cfg, load as load_cfg, save as save_cfg
 
@@ -269,6 +269,10 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/v1/network/wan":
                 self._json(netcfg.apply_wan(body))
 
+            # 手动重拨 / 断开 / 连接：不动配置，所以不挂回滚守护
+            elif path == "/api/v1/net/wan/action":
+                self._json(netcfg.wan_action(str(body.get("action", ""))))
+
             # ---- 网络改动的「待确认」事务
             # 改完配置 → 客户端重连 → 点确认，这是唯一能证明管理面没被锁死的证据。
             # 不确认就由后台守护在超时后自动回滚。
@@ -392,9 +396,10 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"clients": cached("clients", 5.0, sysinfo.clients)})
             elif path == "/api/v1/devices":
                 # 不走缓存：速率是实时值，缓存住会看到一动不动
-                self._json(devices.list_devices())
+                # 出口统一脱敏：公网 / 全局 IPv6 打码，局域网地址原样
+                self._json(mask.devices(devices.list_devices()))
             elif path == "/api/v1/devices/detail":
-                self._json(devices.detail(query.get("mac", [""])[0]))
+                self._json(mask.devices(devices.detail(query.get("mac", [""])[0])))
             elif path == "/api/v1/storage":
                 self._json({"storage": cached("storage", 10.0, sysinfo.storage)})
             elif path == "/api/v1/clash":

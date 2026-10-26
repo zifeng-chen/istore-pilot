@@ -8,6 +8,8 @@ import subprocess
 import threading
 import time
 
+from . import mask
+
 _lock = threading.Lock()
 _prev_cpu: tuple[float, float] | None = None
 _cpu_cache: tuple[float, float, list[float]] = (0.0, 0.0, [])
@@ -324,9 +326,11 @@ def interfaces() -> dict:
         items = status.get(key) or []
         return [
             {
-                "address": it.get("address"),
+                # 公网 / CGNAT 地址出站即打码，本地地址原样（见 mask.py）
+                "address": mask.ip(str(it.get("address") or "")),
                 "prefixlen": it.get("mask"),
-                "ptp": it.get("ptpaddress"),
+                # PPPoE 的对端地址就是运营商网关，和 WAN 地址一样要打码
+                "ptp": mask.ip(str(it.get("ptpaddress") or "")),
             }
             for it in items
             if isinstance(it, dict)
@@ -346,7 +350,8 @@ def interfaces() -> dict:
                 if addr["address"].startswith("fe80"):
                     continue
                 if not any(x["address"] == addr["address"] for x in ipv6):
-                    ipv6.append({"address": addr["address"], "prefixlen": addr["prefixlen"], "ptp": None})
+                    ipv6.append({"address": mask.ip(addr["address"]),
+                                 "prefixlen": addr["prefixlen"], "ptp": None})
         return {
             "label": label,
             "up": bool(status.get("up")),
@@ -356,9 +361,13 @@ def interfaces() -> dict:
             "uptime": status.get("uptime", 0),
             "ipv4": pick(status, "ipv4-address"),
             "ipv6": ipv6,
-            "prefixes": pick(status, "ipv6-prefix"),
-            "dns": status.get("dns-server", []),
-            "gateway": status.get("route", [{}])[0].get("nexthop") if status.get("route") else None,
+            "prefixes": [
+                dict(x, address=mask.ip(str(x.get("address") or "")))
+                for x in pick(status, "ipv6-prefix")
+            ],
+            "dns": [mask.ip(str(d)) for d in (status.get("dns-server") or [])],
+            "gateway": mask.ip(str(status.get("route", [{}])[0].get("nexthop") or ""))
+            if status.get("route") else None,
             "rx_bps": rate.get("rx_bps", 0.0),
             "tx_bps": rate.get("tx_bps", 0.0),
             "rx_total": rate.get("rx_total", 0.0),

@@ -19,7 +19,6 @@ import androidx.fragment.app.FragmentTransaction;
 import com.chaof.istoreos.api.Api;
 import com.chaof.istoreos.core.Session;
 import com.chaof.istoreos.ui.LoginActivity;
-import com.chaof.istoreos.ui.NetworkFragment;
 import com.chaof.istoreos.ui.OverviewFragment;
 import com.chaof.istoreos.ui.SecurityFragment;
 import com.chaof.istoreos.ui.ProxyFragment;
@@ -46,16 +45,15 @@ public class MainActivity extends BaseActivity {
 
     /** 页签顺序就是底部栏从左到右的顺序 */
     private static final int[] TAB_IDS = {
-            R.id.nav_overview, R.id.nav_network, R.id.nav_devices,
-            R.id.nav_proxy, R.id.nav_settings,
+            R.id.nav_overview, R.id.nav_devices, R.id.nav_proxy, R.id.nav_settings,
     };
-    // 「拦截」不再单独占一个页签：它和「设备」合成了一张一级页（SecurityFragment），
-    // 让出位置给一直缺独立入口的「网络」。
-    private static final String[] TAB_TITLES = {"概览", "网络", "设备", "代理", "设置"};
+    // 「网络」不再是独立页签：它大部分内容是「看一眼就走」的只读信息，
+    // 真正要动手的只有宽带配置和重拨，都收进了概览 →「配置网络」的二级页。
+    // 少一个页签，底部栏也从五个挤成一排变成四个能喘气的。
+    private static final String[] TAB_TITLES = {"概览", "设备", "代理", "设置"};
     private static final int[] TAB_ICONS = {
-            R.drawable.ic_nav_overview, R.drawable.ic_nav_network,
-            R.drawable.ic_nav_devices, R.drawable.ic_nav_proxy,
-            R.drawable.ic_nav_settings,
+            R.drawable.ic_nav_overview, R.drawable.ic_nav_devices,
+            R.drawable.ic_nav_proxy, R.drawable.ic_nav_settings,
     };
 
     private final Map<Integer, Fragment> pages = new LinkedHashMap<>();
@@ -89,7 +87,12 @@ public class MainActivity extends BaseActivity {
 
         // 深浅色切换会让 Activity 重建，把当前页签带过来
         if (savedInstanceState != null) {
-            currentId = savedInstanceState.getInt("tab", R.id.nav_overview);
+            int saved = savedInstanceState.getInt("tab", R.id.nav_overview);
+            // 老版本可能存着已经删掉的页签（比如「网络」），落到第一页更安全
+            if (indexOf(saved) < 0 || !containsTab(saved)) {
+                saved = R.id.nav_overview;
+            }
+            currentId = saved;
         }
 
         setContentView(R.layout.activity_main);
@@ -133,7 +136,11 @@ public class MainActivity extends BaseActivity {
                 return i;
             }
         }
-        return 0;
+        return -1;
+    }
+
+    private static boolean containsTab(int id) {
+        return indexOf(id) >= 0;
     }
 
     private void goLogin() {
@@ -156,9 +163,6 @@ public class MainActivity extends BaseActivity {
     }
 
     private Fragment create(int id) {
-        if (id == R.id.nav_network) {
-            return new NetworkFragment();
-        }
         if (id == R.id.nav_devices) {
             return new SecurityFragment();
         }
@@ -208,9 +212,6 @@ public class MainActivity extends BaseActivity {
 
     @NonNull
     private String titleOf(int id) {
-        if (id == R.id.nav_network) {
-            return "网络";
-        }
         if (id == R.id.nav_devices) {
             return "设备";
         }

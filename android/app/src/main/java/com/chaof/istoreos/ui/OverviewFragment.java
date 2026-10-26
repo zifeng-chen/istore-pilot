@@ -252,9 +252,9 @@ public class OverviewFragment extends BaseFragment {
 
         wanCard.addView(Ui.hairline(c));
 
-        // 「配置网络」不能只是一行绿字 —— 它是这张卡唯一可点的东西，
+        // 「网络设置」不能只是一行绿字 —— 它是这张卡唯一可点的东西，
         // 纯文字没有可点暗示，做成次级胶囊按钮（主色淡底 + 描边）才像按钮
-        TextView cfgWan = Ui.text(c, "配置网络", 14f, R.color.primary);
+        TextView cfgWan = Ui.text(c, "网络设置", 14f, R.color.primary);
         cfgWan.setGravity(Gravity.CENTER);
         cfgWan.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         GradientDrawable cfgBg = new GradientDrawable();
