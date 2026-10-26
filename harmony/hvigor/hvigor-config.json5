@@ -1,0 +1,15 @@
+{
+  "modelVersion": "6.0.0",
+  // dependencies 故意留空：hvigor 插件版本与 SDK 强绑定，
+  // 由 DevEco 首次 Sync 时按本机装的 SDK 自动补齐，手写容易对不上
+  "dependencies": {
+  },
+  "execution": {
+  },
+  "logging": {
+  },
+  "debugging": {
+  },
+  "nodeOptions": {
+  }
+}

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 浅色主题：从「iOS 中性灰」改成「带品牌绿的冷灰」。
+         纯中性灰会让界面像后台管理面板，掺一点冷调才有产品的感觉。
+         层次：app_bg（页面底）< surface_sunken（卡内嵌）< surface（卡片）< surface_hi（抬升） -->
+    <color name="ic_launcher_background">#1699ED</color>
+    <color name="app_bg">#EDF3F0</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="surface_hi">#F2F2F7</color>
+    <color name="surface_sunken">#F4F9F6</color>
+    <color name="surface_glass">#E6FFFFFF</color>
+    <color name="primary">#00A87E</color>
+    <color name="primary_dim">#007F5E</color>
+    <color name="primary_bright">#2ED3A6</color>
+    <color name="on_primary">#FFFFFF</color>
+    <!-- 顶部「一句话结论」渐变卡专用。
+         之前直接拿 primary 当渐变起点，白大字只有 3.04:1、0.66 透明的说明字
+         只有 2.08:1 —— 亮绿底上白字立不住，这才是浅色界面「糊」的主因。
+         改成深一档的品牌绿，白字稳定 5:1 以上。文字色单独定义成 hero_fg，
+         不要复用 on_primary：深色主题下 on_primary 是深墨色，压在深绿底上直接消失。 -->
+    <color name="hero_from">#00805E</color>
+    <color name="hero_to">#00553E</color>
+    <color name="hero_fg">#FFFFFF</color>
+    <!-- 渐变卡上的次要文字：不用再叠 alpha，直接给一个已经算好的颜色 -->
+    <color name="hero_fg_soft">#D9FFFFFF</color>
+    <color name="hero_stroke">#24FFFFFF</color>
+    <!-- 导航栏未选中图标：不能复用 text_secondary（#8E8E93 只有 3.22:1）。
+         图标是实心小块、尺寸又小，比正文更需要对比度补偿，
+         而且这里要的是「看得清但不着色」——选中态靠颜色+胶囊+字重三重区分。 -->
+    <color name="icon_off">#59635F</color>
+    <!-- 主色的极淡底：图标衬底、选中行、强调块。别再用 surface_hi 充数 -->
+    <color name="accent_soft">#1700A87E</color>
+    <color name="accent_soft2">#2900A87E</color>
+    <color name="danger">#FF3B30</color>
+    <color name="warn">#FF9500</color>
+    <color name="ok">#34C759</color>
+    <color name="text_primary">#000000</color>
+    <!-- 次要文字不能照抄 iOS 的 #8E8E93：那个值压在白卡上只有 3.5:1，
+         而界面里 11.5~12.5sp 的说明文字全是它，小字低对比最容易读成「糊」。
+         收到 #6F7A74 后约 4.46:1，既过 AA 又不会重到跟正文抢层次。
+         深色那套的 #93A39E 本身有 6.2:1，不需要动。 -->
+    <color name="text_secondary">#6F7A74</color>
+    <color name="text_tertiary">#C7C7CC</color>
+    <color name="divider">#DFE5E2</color>
+    <color name="track">#E1E7E4</color>
+    <!-- 分段控件专用：浅色下是「浅槽 + 白色滑块」，深色下必须反过来变成
+         「暗槽 + 略亮滑块」，否则选中的那块看着像被按下去，不是浮起来 -->
+    <color name="segment_track">#E4E9E7</color>
+    <color name="segment_thumb">#FFFFFF</color>
+    <color name="text_on_track">#4E5A56</color>
+    <color name="ripple">#10000000</color>
+    <!-- 卡片描边：浅色下是一条极细的深色轮廓 -->
+    <color name="glass_stroke">#14000000</color>
+    <!-- 骨架屏：底色比卡片深一档，高光是掠过时的那道亮 -->
+    <color name="skeleton_base">#D8E3DE</color>
+    <color name="skeleton_highlight">#F7FBF9</color>
+</resources>

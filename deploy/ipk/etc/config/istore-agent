@@ -1,0 +1,17 @@
+# iStore Pilot（iStoreOS 路由管理 App）后端服务配置
+#
+# 改完在 LuCI 里保存会自动重启服务。
+#
+# bind 说明：
+#   0.0.0.0 = 监听所有 IPv4 地址（只开 IPv4，不开 IPv6）。
+#     这是默认值，因为 LAN 管理地址可以在 App 里改——绑死某个具体 IP 时，
+#     地址一改 socket 就失效，客户端永远回不来点「确认」，改动会被自动回滚。
+#     前提：firewall 的 wan 区 input 不能是 ACCEPT（App 里「收紧公网入口」会把
+#     它改成 REJECT）。如果你的 wan 区仍是 ACCEPT，请把 bind 改成本机 LAN 地址。
+#   lan 地址（如 192.168.1.1）= 只监听内网，对外不可见，但改 LAN 地址后
+#     服务会自动退到 0.0.0.0 重新绑定，不会失联。
+
+config main 'main'
+	option enabled '1'
+	option port '8443'
+	option bind '0.0.0.0'

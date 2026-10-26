@@ -1,0 +1,20 @@
+{
+  "name": "路由管家",
+  "short_name": "路由管家",
+  "description": "iStoreOS 状态与 OpenClash 管理",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f2f3f5",
+  "theme_color": "#0a84ff",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

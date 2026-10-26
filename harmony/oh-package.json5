@@ -1,0 +1,10 @@
+{
+  "modelVersion": "6.0.0",
+  "name": "istoreos_harmony",
+  "version": "2.13.1",
+  "description": "iStore Pilot · 鸿蒙端",
+  "main": "",
+  "author": "chaof",
+  "license": "Apache-2.0",
+  "dependencies": {}
+}

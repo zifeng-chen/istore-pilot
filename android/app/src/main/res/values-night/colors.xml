@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 深色主题：纯黑 #000000 太硬，OLED 上卡片边缘会「浮不起来」。
+         改成带绿的墨色，卡片依旧比底色亮一档但底色不再是死黑。 -->
+    <color name="ic_launcher_background">#0E9F7E</color>
+    <color name="app_bg">#0A100E</color>
+    <color name="surface">#1A2421</color>
+    <color name="surface_hi">#243430</color>
+    <color name="surface_sunken">#141C1A</color>
+    <color name="surface_glass">#D91A2421</color>
+    <color name="primary">#32D7AC</color>
+    <color name="primary_dim">#17B58C</color>
+    <color name="primary_bright">#5FE7C4</color>
+    <color name="on_primary">#04241C</color>
+    <!-- 深色下不跟着用亮绿：一整块高饱和亮色糊在近黑背景上非常刺眼，
+         而且它会把页面上其他信息全部压下去。改成深绿渐变 + 白字，
+         比 surface(#1A2421) 明显更绿、更亮一档，卡片依然浮得起来。 -->
+    <color name="hero_from">#12463A</color>
+    <color name="hero_to">#0A2C25</color>
+    <color name="hero_fg">#FFFFFF</color>
+    <color name="hero_fg_soft">#D9FFFFFF</color>
+    <color name="hero_stroke">#2E5FE7C4</color>
+    <!-- 未选中图标压到 4.6:1 左右：看得清，但明显弱于带胶囊的选中项。
+         之前用 text_secondary(#93A39E) 是 6.22:1，和选中项的 6.46:1 几乎一样，
+         深色下根本分不出哪个页签是选中的。 -->
+    <color name="icon_off">#87968F</color>
+    <color name="accent_soft">#2432D7AC</color>
+    <color name="accent_soft2">#3D32D7AC</color>
+    <color name="danger">#FF453A</color>
+    <color name="warn">#FFD60A</color>
+    <color name="ok">#30D158</color>
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#93A39E</color>
+    <color name="text_tertiary">#5A6B66</color>
+    <color name="divider">#3A4A44</color>
+    <color name="track">#33423C</color>
+    <!-- 槽比卡片更暗、滑块比槽更亮，才读得出「选中是浮起来的那一块」 -->
+    <color name="segment_track">#101A17</color>
+    <color name="segment_thumb">#2E3F3A</color>
+    <color name="text_on_track">#A9B8B3</color>
+    <color name="ripple">#1FFFFFFF</color>
+    <!-- 卡片描边：深色下是一条淡淡的白边，模拟玻璃的高光 -->
+    <color name="glass_stroke">#1FFFFFFF</color>
+    <color name="skeleton_base">#26332F</color>
+    <color name="skeleton_highlight">#32423D</color>
+</resources>

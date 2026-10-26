@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 夜间：只覆盖状态栏图标颜色，其余继承基础主题 -->
+    <style name="AppTheme" parent="Theme.IStore.Base">
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

@@ -1,0 +1,257 @@
+<%
+local fs     = require "nixio.fs"
+local sys    = require "luci.sys"
+local uci    = require "luci.model.uci".cursor()
+
+local port    = uci:get("istore-agent", "main", "port") or "8443"
+local bind    = uci:get("istore-agent", "main", "bind") or "192.168.100.1"
+local enabled = uci:get_bool("istore-agent", "main", "enabled")
+
+-- 进程在不在：按启动命令匹配，不能只看 python3，路由器上可能有别的 python 进程
+local running = (sys.call("pgrep -f 'istore-agent/run.py' >/dev/null 2>&1") == 0)
+
+-- 端口通不通：这一步才是真的验证，进程活着但端口没起来也照样连不上
+local listening = (sys.call("netstat -ln 2>/dev/null | grep -q ':" .. port .. " '") == 0)
+
+local version = "—"
+local vf = io.open("/usr/lib/istore-agent/VERSION", "r")
+if vf then
+	version = vf:read("*l") or "—"
+	vf:close()
+end
+
+-- ---------------------------------------------------------------- 服务运行时长
+-- 原来这里用 `sys.exec("pgrep ...")` 拿到 PID 再拼文件路径，
+-- 但 luci.sys.exec **不会去掉结尾换行**，于是路径变成 "/proc/1234\n/stat"，
+-- io.open / cut 全部失败，页面上的运行时长永远显示「—」。
+-- 现在直接按字节解析 /proc/<pid>/stat，并且所有外部命令的输出都先裁掉空白。
+local function trim(s)
+	-- 括号很关键：string.gsub 返回两个值（结果 + 替换次数），
+	-- 直接 return 会被上层当成两个参数，tonumber(x, count) 就报 "base out of range"
+	return (tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
+-- starttime 的单位是 USER_HZ，x86_64 上是 100，别的地方可能不同，能问就问
+local function clk_tck()
+	local v = tonumber(trim(sys.exec("getconf CLK_TCK 2>/dev/null")))
+	if v and v > 0 then return v end
+	return 100
+end
+
+local function proc_age(pid)
+	local fh = io.open("/proc/" .. pid .. "/stat", "r")
+	if not fh then return nil end
+	local line = fh:read("*l") or ""
+	fh:close()
+	-- comm 字段带括号且可能含空格，必须从**最后一个**右括号往右切
+	local rest = line:match("%)%s*(.*)$")
+	if not rest then return nil end
+	local fields = {}
+	for word in rest:gmatch("%S+") do fields[#fields + 1] = word end
+	-- rest 是从第 3 个字段（state）开始的，所以第 22 个字段 starttime → fields[20]
+	local ticks = tonumber(fields[20])
+	if not ticks then return nil end
+	local up = math.floor(sys.uptime() - ticks / clk_tck())
+	if up <= 0 or up > 315360000 then return nil end
+	return up
+end
+
+local function fmt_span(sec)
+	if not sec then return nil end
+	local d  = math.floor(sec / 86400)
+	local h  = math.floor((sec % 86400) / 3600)
+	local mi = math.floor((sec % 3600) / 60)
+	if d > 0 then return string.format("%d 天 %d 小时", d, h) end
+	if h > 0 then return string.format("%d 小时 %d 分", h, mi) end
+	if mi > 0 then return string.format("%d 分钟", mi) end
+	return string.format("%d 秒", sec % 60)
+end
+
+local uptime = "—"
+if running then
+	local pid = trim(sys.exec("pgrep -f 'istore-agent/run.py' | head -1"))
+	if pid ~= "" then
+		uptime = fmt_span(proc_age(pid)) or "—"
+	end
+end
+
+-- ---------------------------------------------------------------- 初始密码
+local initial_pw = nil
+local ipf = io.open("/etc/istore-agent/INITIAL_PASSWORD", "r")
+if ipf then
+	initial_pw = trim(ipf:read("*l") or "")
+	ipf:close()
+	if initial_pw == "" then initial_pw = nil end
+end
+
+-- ---------------------------------------------------------------- 可下载的安装包
+local apk_dir = "/www/istore-agent"
+local apks = {}
+if fs.access(apk_dir) then
+	local ok, iter = pcall(fs.dir, apk_dir)
+	if ok then
+		for name in iter do
+			name = name:gsub("^%./", "")
+			if name:match("%.apk$") then
+				local st = fs.stat(apk_dir .. "/" .. name)
+				apks[#apks + 1] = {
+					name  = name,
+					size  = st and st.size or 0,
+					mtime = st and os.date("%Y-%m-%d %H:%M", st.mtime) or "",
+				}
+			end
+		end
+	end
+end
+table.sort(apks, function(a, b) return a.mtime > b.mtime end)
+%>
+
+<style>
+.ia-state { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:12px; }
+.ia-box { flex:1 1 150px; border:1px solid rgba(127,127,127,.22); border-radius:10px; padding:12px 14px; }
+.ia-box .k { font-size:11px; opacity:.6; letter-spacing:.04em; }
+.ia-box .v { font-size:17px; font-weight:600; margin-top:4px; }
+.ia-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+.ia-ok { color:#0e9f7e; } .ia-ok .ia-dot { background:#0e9f7e; }
+.ia-bad { color:#e0453a; } .ia-bad .ia-dot { background:#e0453a; }
+.ia-warn { color:#d98200; } .ia-warn .ia-dot { background:#d98200; }
+.ia-hint { font-size:12px; opacity:.65; line-height:1.7; }
+.ia-actions { margin-top:14px; display:flex; gap:8px; flex-wrap:wrap; }
+.ia-btn { display:inline-block; padding:8px 16px; border-radius:8px; background:#0e9f7e;
+	color:#fff !important; text-decoration:none !important; font-size:13px; cursor:pointer; border:none; }
+.ia-btn.ghost { background:transparent; border:1px solid rgba(127,127,127,.4); color:inherit !important; }
+
+.ia-pw { margin-top:12px; padding:10px 14px; border-radius:10px; font-size:12px;
+	border:1px solid rgba(217,130,0,.45); background:rgba(217,130,0,.08); line-height:1.8; }
+.ia-pw code { font-size:13px; font-weight:600; letter-spacing:.05em; }
+
+/* 下载弹窗：以前点「下载 App」会跳到另一个页面，手机上看完还得按返回，
+   现在原地弹一层，关掉就回到设置页 */
+.ia-mask { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:9000;
+	display:none; align-items:center; justify-content:center; padding:24px; }
+.ia-mask.on { display:flex; }
+.ia-dlg { width:100%; max-width:420px; max-height:80vh; overflow:auto; border-radius:14px;
+	background:#fff; color:#111; box-shadow:0 18px 48px rgba(0,0,0,.28); }
+body.dark .ia-dlg, [data-darkmode="true"] .ia-dlg { background:#1b1d21; color:#eee; }
+.ia-dlg h4 { margin:0; padding:16px 18px 12px; font-size:15px; border-bottom:1px solid rgba(127,127,127,.2); }
+.ia-dlg .body { padding:12px 18px 6px; }
+.ia-file { display:flex; align-items:center; gap:12px; padding:10px 0;
+	border-bottom:1px solid rgba(127,127,127,.14); }
+.ia-file:last-child { border-bottom:none; }
+.ia-file .nm { font-size:13px; font-weight:600; word-break:break-all; }
+.ia-file .mt { font-size:11px; opacity:.6; margin-top:3px; }
+.ia-file .dl { margin-left:auto; flex:none; padding:7px 14px; border-radius:8px;
+	background:#0e9f7e; color:#fff !important; text-decoration:none !important; font-size:12px; }
+.ia-dlg .foot { padding:12px 18px 16px; display:flex; gap:8px; }
+.ia-dlg .foot button { flex:1; padding:9px 0; border-radius:9px; font-size:13px;
+	border:1px solid rgba(127,127,127,.35); background:transparent; color:inherit; cursor:pointer; }
+.ia-empty { padding:18px 0; font-size:12px; opacity:.65; line-height:1.8; }
+</style>
+
+<div class="ia-state">
+	<div class="ia-box">
+		<div class="k">服务状态</div>
+		<div class="v <%= running and "ia-ok" or "ia-bad" %>">
+			<span class="ia-dot"></span><%= running and "运行中" or "已停止" %>
+		</div>
+	</div>
+	<div class="ia-box">
+		<div class="k">端口监听</div>
+		<div class="v <%= listening and "ia-ok" or (running and "ia-warn" or "ia-bad") %>">
+			<span class="ia-dot"></span><%= listening and (":" .. port) or "未监听" %>
+		</div>
+	</div>
+	<div class="ia-box">
+		<div class="k">版本</div>
+		<div class="v">v<%= version %></div>
+	</div>
+	<div class="ia-box">
+		<div class="k">运行时长</div>
+		<div class="v" style="font-size:15px"><%= uptime %></div>
+	</div>
+	<div class="ia-box">
+		<div class="k">开机自启</div>
+		<div class="v <%= enabled and "ia-ok" or "ia-warn" %>">
+			<span class="ia-dot"></span><%= enabled and "已启用" or "已关闭" %>
+		</div>
+	</div>
+</div>
+
+<% if initial_pw then %>
+<div class="ia-pw">
+	<b>初始登录密码</b><code><%= initial_pw %></code><br />
+	这是安装时自动生成的。在下面「登录密码」里改成自己的密码后，这条提示会自动消失。
+</div>
+<% end %>
+
+<div class="ia-hint">
+	手机 App 里填写的服务器地址：<b><%= bind %>:<%= port %></b>
+	<br />
+	<% if not running then %>
+		服务没有在运行。先检查上面是否已启用，然后点下面的「重启服务」。
+	<% elseif not listening then %>
+		进程在跑但端口没起来，多半是端口被占用或配置写错了，看一下系统日志。
+	<% else %>
+		一切正常。App 连不上时，先确认手机和路由器在同一个局域网。
+	<% end %>
+</div>
+
+<div class="ia-actions">
+	<button type="button" class="ia-btn" id="ia-dl-open">下载 App</button>
+	<button type="button" class="ia-btn ghost" id="ia-restart"
+		data-url="<%= luci.dispatcher.build_url("admin/services/istore_agent/restart") %>">重启服务</button>
+</div>
+
+<div class="ia-mask" id="ia-dl-mask">
+	<div class="ia-dlg">
+		<h4>下载 App 安装包</h4>
+		<div class="body">
+			<% if #apks == 0 then %>
+				<div class="ia-empty">
+					路由器上还没有安装包。<br />
+					把 .apk 上传到 /www/istore-agent/ 目录，或者用 App 的
+					「设置 → 安装包管理」上传，就会出现在这里。
+				</div>
+			<% else %>
+				<% for _, f in ipairs(apks) do %>
+					<div class="ia-file">
+						<div>
+							<div class="nm"><%= f.name %></div>
+							<div class="mt"><%= string.format("%.1f MB", (f.size or 0) / 1048576) %>
+								<% if f.mtime ~= "" then %> · <%= f.mtime %><% end %></div>
+						</div>
+						<a class="dl" href="/istore-agent/<%= f.name %>" download>下载</a>
+					</div>
+				<% end %>
+			<% end %>
+		</div>
+		<div class="foot"><button type="button" id="ia-dl-close">关闭</button></div>
+	</div>
+</div>
+
+<script type="text/javascript">
+(function () {
+	var mask = document.getElementById('ia-dl-mask');
+	var open = document.getElementById('ia-dl-open');
+	var close = document.getElementById('ia-dl-close');
+	if (open && mask) {
+		open.onclick = function () { mask.classList.add('on'); };
+	}
+	if (close && mask) {
+		close.onclick = function () { mask.classList.remove('on'); };
+	}
+	if (mask) {
+		mask.onclick = function (ev) {
+			if (ev.target === mask) mask.classList.remove('on');
+		};
+	}
+	var rst = document.getElementById('ia-restart');
+	if (rst) {
+		rst.onclick = function () {
+			if (confirm('重启 iStore Pilot 服务？App 会断开约 2 秒。')) {
+				window.location.href = rst.dataset.url;
+			}
+		};
+	}
+})();
+</script>

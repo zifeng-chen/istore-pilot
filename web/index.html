@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#f2f3f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b0c0e" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="iStore Pilot">
+<title>iStore Pilot</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="stylesheet" href="/style.css?v=6">
+</head>
+<body>
+
+<div id="login" class="login">
+  <h1>iStore Pilot</h1>
+  <p id="login-hint">连接 iStoreOS</p>
+  <input id="pwd" class="field" type="password" placeholder="管理密码" autocomplete="current-password" enterkeyhint="go">
+  <button id="login-btn" class="btn block">连接</button>
+  <div id="login-err" class="err"></div>
+</div>
+
+<header class="topbar">
+  <div style="flex:1;min-width:0">
+    <h1 id="hostname">iStoreOS</h1>
+    <div class="sub" id="hostsub">连接中…</div>
+  </div>
+  <span class="badge" id="online-badge"><span class="dot"></span><span id="online-text">在线</span></span>
+</header>
+
+<main>
+  <section class="page active" id="page-home">
+    <div class="card">
+      <div class="metrics">
+        <div class="metric"><div class="lbl">CPU</div><div class="num" id="m-cpu">–</div></div>
+        <div class="metric"><div class="lbl">内存</div><div class="num" id="m-mem">–</div></div>
+        <div class="metric"><div class="lbl">温度</div><div class="num" id="m-temp">–</div></div>
+        <div class="metric"><div class="lbl">负载</div><div class="num" id="m-load">–</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>实时流量</h2><span class="small muted" id="traffic-unit">WAN</span></div>
+      <div class="speed">
+        <div><div class="lbl">下载</div><div class="val" id="rx">–</div></div>
+        <div><div class="lbl">上传</div><div class="val" id="tx">–</div></div>
+      </div>
+      <canvas class="spark" id="spark"></canvas>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>WAN</h2><span class="small muted" id="wan-proto"></span></div>
+      <div class="row"><span class="k">IPv4</span><span class="v mono" id="wan-v4">–</span></div>
+      <div class="row"><span class="k">IPv6</span><span class="v mono" id="wan-v6">–</span></div>
+      <div class="row"><span class="k">网关</span><span class="v mono" id="wan-gw">–</span></div>
+      <div class="row"><span class="k">DNS</span><span class="v mono" id="wan-dns">–</span></div>
+      <div class="row"><span class="k">连接时长</span><span class="v" id="wan-up">–</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>网口</h2><span class="small muted" id="port-count"></span></div>
+      <div id="ports"><div class="empty">读取中…</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>存储</h2></div>
+      <div id="storage"><div class="empty">读取中…</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>系统</h2></div>
+      <div class="row"><span class="k">固件</span><span class="v" id="sys-fw">–</span></div>
+      <div class="row"><span class="k">内核</span><span class="v mono" id="sys-kernel">–</span></div>
+      <div class="row"><span class="k">处理器</span><span class="v" id="sys-cpu">–</span></div>
+      <div class="row"><span class="k">运行时长</span><span class="v" id="sys-uptime">–</span></div>
+    </div>
+  </section>
+
+  <section class="page" id="page-net">
+    <div class="card">
+      <div class="card-head"><h2>在线设备</h2><span class="small muted" id="client-count"></span></div>
+      <div id="clients"><div class="empty">读取中…</div></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>接口地址</h2></div>
+      <div id="ifaddrs"></div>
+    </div>
+  </section>
+
+  <section class="page" id="page-clash">
+    <div class="card">
+      <div class="card-head"><h2>代理后端</h2><span class="small muted" id="proxy-active"></span></div>
+      <div class="seg" id="backend-seg">
+        <button data-backend="openclash">OpenClash</button>
+        <button data-backend="passwall">Passwall</button>
+      </div>
+      <div id="backend-info"></div>
+      <p class="small muted" style="margin:8px 0 0">两者互斥运行，启动一方会自动停掉另一方，避免抢占 53 端口与转发链。</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2 id="proxy-title">OpenClash</h2>
+        <span class="badge" id="clash-badge"><span class="dot"></span><span id="clash-state">读取中</span></span>
+      </div>
+      <div class="row"><span class="k">内核</span><span class="v" id="clash-core">–</span></div>
+      <div class="row"><span class="k">节点数</span><span class="v" id="clash-nodes">–</span></div>
+      <div class="row"><span class="k">活跃连接</span><span class="v" id="clash-conns">–</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>代理模式</h2></div>
+      <div class="seg" id="mode-seg">
+        <button data-mode="rule">规则</button>
+        <button data-mode="global">全局</button>
+        <button data-mode="direct">直连</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>策略组</h2><button class="btn ghost small" id="test-all" style="padding:6px 10px">延迟测试</button></div>
+      <div id="groups"><div class="empty">读取中…</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>服务控制</h2></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn ghost" id="clash-restart" style="flex:1">重启</button>
+        <button class="btn danger" id="clash-stop" style="flex:1">停止</button>
+        <button class="btn" id="clash-start" style="flex:1">启动</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="page" id="page-settings">
+    <div class="card">
+      <div class="card-head"><h2>连接</h2></div>
+      <div class="row"><span class="k">当前地址</span><span class="v mono" id="set-addr">–</span></div>
+      <div class="row"><span class="k">网络环境</span><span class="v" id="set-env">–</span></div>
+      <div class="row"><span class="k">备用地址</span><span class="v mono" id="set-alt">未设置</span></div>
+      <p class="small muted" style="margin:10px 0 0">
+        在家自动走内网直连，出门自动走域名。两处都填好后由 App 自动选择。
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>内网地址</h2></div>
+      <input class="field" id="in-lan" placeholder="http://192.168.100.1:8443" inputmode="url">
+      <div class="card-head" style="margin-top:4px"><h2>外网地址</h2></div>
+      <input class="field" id="in-wan" placeholder="https://你的域名" inputmode="url">
+      <button class="btn block" id="save-addr">保存并重新探测</button>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>修改管理密码</h2></div>
+      <input class="field" id="pw-cur" type="password" placeholder="当前密码" autocomplete="current-password">
+      <input class="field" id="pw-new" type="password" placeholder="新密码（至少 8 位）" autocomplete="new-password">
+      <button class="btn block" id="pw-save">更新密码</button>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>广告拦截</h2><span class="badge" id="ad-badge"><span class="dot"></span><span id="ad-state">检测中</span></span></div>
+      <div class="row"><span class="k">规则条数</span><span class="v" id="ad-rules">–</span></div>
+      <div class="row"><span class="k">查询 / 拦截</span><span class="v" id="ad-stats">–</span></div>
+      <div class="row"><span class="k">DNS 归属</span><span class="v" id="ad-owner">–</span></div>
+      <div id="ad-checks"></div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn ghost" id="ad-refresh" style="flex:1">更新规则</button>
+        <button class="btn" id="ad-toggle" style="flex:1">接管全网</button>
+      </div>
+      <div id="ad-notes" class="small muted" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>电源与维护</h2></div>
+      <div id="power-actions"><div class="empty">读取中…</div></div>
+      <p class="small muted" style="margin:10px 0 0" id="power-warn"></p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>关于</h2></div>
+      <div class="row"><span class="k">客户端</span><span class="v">1.1.0</span></div>
+      <div class="row"><span class="k">服务端</span><span class="v" id="set-agent">–</span></div>
+      <button class="btn ghost block" id="logout" style="margin-top:12px">断开并清除登录</button>
+    </div>
+  </section>
+</main>
+
+<nav class="nav">
+  <a href="#home" data-page="home" class="on">
+    <span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.6"/><rect x="14" y="3" width="7" height="5" rx="1.6"/><rect x="14" y="12" width="7" height="9" rx="1.6"/><rect x="3" y="16" width="7" height="5" rx="1.6"/></svg></span>
+    概览
+  </a>
+  <a href="#net" data-page="net">
+    <span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18"/></svg></span>
+    网络
+  </a>
+  <a href="#clash" data-page="clash">
+    <span class="ic"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></span>
+    代理
+  </a>
+  <a href="#settings" data-page="settings">
+    <span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H11a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V11a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span>
+    设置
+  </a>
+</nav>
+
+<div class="toast" id="toast"></div>
+<script src="/app.js?v=8"></script>
+</body>
+</html>

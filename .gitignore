@@ -1,0 +1,56 @@
+# ================= 构建产物 =================
+dist/
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+harmony/build/
+harmony/entry/build/
+harmony/.hvigor/
+harmony/oh_modules/
+harmony/.cxx/
+ios/build/
+ios/DerivedData/
+*.hap
+*.app.zip
+*.ipa
+
+# ================= 签名与凭据（绝不入库）=================
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
+keystore.properties
+
+# ================= Python =================
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ================= 编辑器 / 系统 =================
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ================= 临时文件 =================
+.tmp_*
+*.log
+*.bak
+*.bak-*
+*.orig
+
+# ================= 截图：只提交成品 =================
+# 逐版本调试留存（v22/v23/.../fix/theme）不入库，final 与 promo 保留
+docs/screenshots/*
+!docs/screenshots/final/
+!docs/screenshots/promo/
+!docs/screenshots/0*.png
+
+# ================= WorkBuddy 本地数据 =================
+# 含项目笔记与运维记录，不入库
+.workbuddy/

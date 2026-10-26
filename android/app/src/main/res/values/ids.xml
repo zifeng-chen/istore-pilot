@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 页签 id：NavBar 是纯代码自绘的，这些 id 只用来标识当前页，不参与布局 -->
+    <item name="nav_network" type="id" />
+
+    <!-- 一级页「最近活跃」每行里要就地改写的两个 TextView。
+         用 id 找回来比重建整行便宜：3 秒一跳的速率不该让列表闪 -->
+    <item name="recent_rate" type="id" />
+    <item name="recent_amount" type="id" />
+</resources>

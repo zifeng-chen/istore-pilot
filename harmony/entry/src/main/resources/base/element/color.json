@@ -1,0 +1,136 @@
+{
+  "color": [
+    {
+      "name": "app_bg",
+      "value": "#EDF3F0"
+    },
+    {
+      "name": "surface",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "surface_hi",
+      "value": "#F2F2F7"
+    },
+    {
+      "name": "surface_sunken",
+      "value": "#F4F9F6"
+    },
+    {
+      "name": "surface_glass",
+      "value": "#E6FFFFFF"
+    },
+    {
+      "name": "primary",
+      "value": "#00A87E"
+    },
+    {
+      "name": "primary_dim",
+      "value": "#007F5E"
+    },
+    {
+      "name": "primary_bright",
+      "value": "#2ED3A6"
+    },
+    {
+      "name": "on_primary",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "hero_from",
+      "value": "#00805E"
+    },
+    {
+      "name": "hero_to",
+      "value": "#00553E"
+    },
+    {
+      "name": "hero_fg",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "hero_fg_soft",
+      "value": "#D9FFFFFF"
+    },
+    {
+      "name": "hero_stroke",
+      "value": "#24FFFFFF"
+    },
+    {
+      "name": "icon_off",
+      "value": "#59635F"
+    },
+    {
+      "name": "accent_soft",
+      "value": "#1700A87E"
+    },
+    {
+      "name": "accent_soft2",
+      "value": "#2900A87E"
+    },
+    {
+      "name": "danger",
+      "value": "#FF3B30"
+    },
+    {
+      "name": "warn",
+      "value": "#FF9500"
+    },
+    {
+      "name": "ok",
+      "value": "#34C759"
+    },
+    {
+      "name": "text_primary",
+      "value": "#000000"
+    },
+    {
+      "name": "text_secondary",
+      "value": "#6F7A74"
+    },
+    {
+      "name": "text_tertiary",
+      "value": "#C7C7CC"
+    },
+    {
+      "name": "divider",
+      "value": "#DFE5E2"
+    },
+    {
+      "name": "track",
+      "value": "#E1E7E4"
+    },
+    {
+      "name": "segment_track",
+      "value": "#E4E9E7"
+    },
+    {
+      "name": "segment_thumb",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "text_on_track",
+      "value": "#4E5A56"
+    },
+    {
+      "name": "ripple",
+      "value": "#10000000"
+    },
+    {
+      "name": "glass_stroke",
+      "value": "#14000000"
+    },
+    {
+      "name": "skeleton_base",
+      "value": "#D8E3DE"
+    },
+    {
+      "name": "skeleton_highlight",
+      "value": "#F7FBF9"
+    },
+    {
+      "name": "ic_launcher_background",
+      "value": "#0E9F7E"
+    }
+  ]
+}

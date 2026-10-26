@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>连不上路由器</title>
+<style>
+  :root{
+    --bg:#0b0f14; --card:#141a21; --line:#232c36; --text:#e8eef6;
+    --muted:#8b9aab; --blue:#0a84ff; --amber:#f5a524; --green:#30d158;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text)}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Noto Sans CJK SC",sans-serif;
+    min-height:100vh;display:flex;flex-direction:column;align-items:center;
+    padding:40px 20px 32px;gap:0;
+  }
+  .logo{width:76px;height:76px;border-radius:20px;background:var(--blue);
+        display:flex;align-items:center;justify-content:center;margin-bottom:20px}
+  h1{font-size:20px;font-weight:600;margin:0 0 8px}
+  .sub{font-size:13.5px;color:var(--muted);text-align:center;line-height:1.6;margin:0 0 22px;max-width:320px}
+  .card{width:100%;max-width:400px;background:var(--card);border:1px solid var(--line);
+        border-radius:16px;padding:16px;margin-bottom:14px}
+  label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:8px}
+  input{
+    width:100%;padding:13px 14px;font-size:15px;color:var(--text);
+    background:#0e131a;border:1px solid var(--line);border-radius:10px;outline:none;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  input:focus{border-color:var(--blue)}
+  .btns{display:flex;gap:10px;margin-top:12px}
+  button{
+    flex:1;padding:13px;font-size:15px;font-weight:500;border-radius:10px;
+    border:none;cursor:pointer;font-family:inherit;
+  }
+  .primary{background:var(--blue);color:#fff}
+  .ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
+  button:active{opacity:.75}
+  .hint{font-size:12.5px;color:var(--muted);line-height:1.75;margin:0}
+  .hint b{color:var(--text);font-weight:500}
+  .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--amber);
+       margin-right:8px;vertical-align:1px}
+  .foot{font-size:12px;color:#5d6b7a;text-align:center;margin-top:8px}
+  .toast{position:fixed;left:50%;bottom:36px;transform:translateX(-50%);
+         background:#1e2732;color:#fff;font-size:13.5px;padding:10px 18px;border-radius:20px;
+         opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<div class="logo">
+  <svg width="44" height="44" viewBox="0 0 512 512" fill="none">
+    <g stroke="#fff" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="118" y="300" width="276" height="110" rx="26"/>
+      <path d="M150 262 C206 206 306 206 362 262"/>
+      <path d="M212 186 C234 164 278 164 300 186"/>
+    </g>
+    <circle cx="170" cy="355" r="13" fill="#fff"/>
+    <circle cx="212" cy="355" r="13" fill="#7fd0ff"/>
+  </svg>
+</div>
+
+<h1>连不上路由器</h1>
+<p class="sub">页面没能加载成功。请确认手机和路由器在同一个网络，或者地址填对了。</p>
+
+<div class="card">
+  <label>路由器地址</label>
+  <input id="addr" type="text" inputmode="url" autocomplete="off"
+         autocapitalize="none" spellcheck="false" placeholder="http://192.168.100.1:8443">
+  <div class="btns">
+    <button class="ghost" id="retry">重试</button>
+    <button class="primary" id="save">保存并连接</button>
+  </div>
+</div>
+
+<div class="card">
+  <p class="hint">
+    <span class="dot"></span><b>在家里</b>：填路由器内网地址，例如 <code>http://192.168.100.1:8443</code><br>
+    <span class="dot"></span><b>在外面</b>：填你的 DDNS 域名，确保 IPv6 可用<br>
+    <span class="dot"></span>地址会自动补上 <code>http://</code>，结尾的斜杠可以省略
+  </p>
+</div>
+
+<p class="foot">也可以长按手机的返回键，随时更改地址</p>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  var input = document.getElementById('addr');
+  var toastEl = document.getElementById('toast');
+  var bridge = window.IStoreApp || null;
+
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { toastEl.classList.remove('show'); }, 1800);
+  }
+
+  // 优先用原生保存的地址；再退回上一次输入的内容，避免重连失败后输的内容丢失
+  var saved = '';
+  try { saved = localStorage.getItem('istore.app.addr') || ''; } catch (e) {}
+  var current = '';
+  try { current = bridge ? bridge.getAddress() : ''; } catch (e) {}
+  input.value = saved || current || 'http://192.168.100.1:8443';
+
+  function normalize(raw) {
+    var v = (raw || '').trim();
+    if (!v) return null;
+    if (!/^https?:\/\//i.test(v)) v = 'http://' + v;
+    v = v.replace(/\/+$/, '');
+    if (!/^https?:\/\/[^\/\s]+/i.test(v)) return null;
+    return v;
+  }
+
+  function connect() {
+    var v = normalize(input.value);
+    if (!v) { toast('地址格式不正确'); return; }
+    try { localStorage.setItem('istore.app.addr', v); } catch (e) {}
+
+    // 1) Android：走原生 JS 桥
+    if (bridge) {
+      var ok = false;
+      try { ok = bridge.setAddress(v); } catch (e) { ok = false; }
+      if (!ok) { toast('保存失败'); return; }
+      toast('正在连接…');
+      setTimeout(function () {
+        try { bridge.reload(); } catch (e) { location.href = v; }
+      }, 250);
+      return;
+    }
+
+    // 2) iOS：App 内的错误页是 file://，用自定义 scheme 交回原生保存
+    if (location.protocol === 'file:') {
+      location.href = 'istoreos://set?url=' + encodeURIComponent(v);
+      return;
+    }
+
+    // 3) 普通浏览器里打开：只能直接跳转
+    location.href = v;
+  }
+
+  document.getElementById('save').addEventListener('click', connect);
+  document.getElementById('retry').addEventListener('click', connect);
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); connect(); }
+  });
+})();
+</script>
+</body>
+</html>

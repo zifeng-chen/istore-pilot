@@ -1,0 +1,63 @@
+<%
+local fs   = require "nixio.fs"
+local uci  = require "luci.model.uci".cursor()
+local port = uci:get("istore-agent", "main", "port") or "8443"
+local dir  = "/www/istore-agent"
+
+local files = {}
+if fs.access(dir) then
+	local ok, iter = pcall(fs.dir, dir)
+	if ok then
+		for name in iter do
+			if name:match("%.apk$") then
+				-- 目录项会带一个多余的 "." 前缀，去掉
+				name = name:gsub("^%./", "")
+				local st = fs.stat(dir .. "/" .. name)
+				files[#files + 1] = {
+					name = name,
+					size = st and st.size or 0,
+					mtime = st and os.date("%Y-%m-%d %H:%M", st.mtime) or "",
+				}
+			end
+		end
+	end
+end
+table.sort(files, function(a, b) return a.mtime > b.mtime end)
+%>
+
+<style>
+.ia-apk { border:1px solid rgba(127,127,127,.22); border-radius:10px; padding:14px 16px;
+	margin-bottom:10px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.ia-apk .name { font-weight:600; font-size:14px; }
+.ia-apk .meta { font-size:12px; opacity:.6; margin-top:3px; }
+.ia-apk .btn { margin-left:auto; padding:8px 18px; border-radius:8px;
+	background:#0e9f7e; color:#fff !important; text-decoration:none !important; font-size:13px; }
+.ia-note { font-size:12px; line-height:1.8; opacity:.7; margin-top:14px; }
+</style>
+
+<% if #files == 0 then %>
+	<div class="ia-apk">
+		<div>
+			<div class="name">没有可下载的安装包</div>
+			<div class="meta">把 APK 放到路由器的 /www/istore-agent/ 目录即可出现在这里</div>
+		</div>
+	</div>
+<% else %>
+	<% for _, f in ipairs(files) do %>
+		<div class="ia-apk">
+			<div>
+				<div class="name"><%= f.name %></div>
+				<div class="meta"><%= string.format("%.1f MB", (f.size or 0) / 1048576) %>
+					<% if f.mtime ~= "" then %> · <%= f.mtime %><% end %></div>
+			</div>
+			<a class="btn" href="/istore-agent/<%= f.name %>">下载</a>
+		</div>
+	<% end %>
+<% end %>
+
+<div class="ia-note">
+	手机浏览器打开本页，点「下载」即可安装。装好后打开 App，
+	服务器地址填 <b><%= uci:get("istore-agent", "main", "bind") or "192.168.100.1" %>:<%= port %></b>
+	<br />
+	安装包已做签名，覆盖安装不会丢数据；只有卸载才会清掉登录状态。
+</div>

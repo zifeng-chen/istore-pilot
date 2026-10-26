@@ -1,0 +1,9 @@
+{
+  "name": "entry",
+  "version": "2.13.1",
+  "description": "iStore Pilot 主模块",
+  "main": "",
+  "author": "chaof",
+  "license": "Apache-2.0",
+  "dependencies": {}
+}

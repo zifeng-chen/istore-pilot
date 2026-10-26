@@ -1,0 +1,37 @@
+# 由 istoreOS 管理 App 维护（2026-10-25）
+# 目的：为「应用流量」统计提取域名，让裸 IP / IPv6 直连也能归类到具体 App
+#
+# 实测结论（Mihomo alpha-gbc76c13）：
+#   override-destination 必须为 true 才会真正嗅探。
+#   设为 false 时（哪怕只写在协议级）内核直接跳过嗅探，日志里仍是裸 IP——
+#   已用 openssl 指定 SNI 对照实测三次确认。
+#   因此没有「只嗅探不改写」的开关，只能在影响面上下功夫：
+#     - sniff 端口收窄（HTTP 只开 80，不碰 8080-8880 的非标准服务）
+#     - skip-domain 保护依赖 IP 直连的 IoT 与远程控制，避免被改写
+#   出现异常时：uci set openclash.config.enable_meta_sniffer=0 && uci commit openclash
+#                /etc/init.d/openclash restart  即可完全关闭
+sniffer:
+  enable: true
+  # 对没有域名的纯 IP 流量强制嗅探（番茄小说 / 字节系 CDN 的主流形态）
+  parse-pure-ip: true
+  # 即使已有 DNS 映射也嗅探，补齐 fake-ip 映射缺失的情况
+  force-dns-mapping: true
+  # 必需：这个内核在 false 时会跳过嗅探
+  override-destination: true
+  sniff:
+    TLS:
+      ports: [443, 8443]
+    HTTP:
+      # 只嗅探标准 80，不收 8080-8880，减少对非标准端口的干扰
+      ports: [80]
+    QUIC:
+      ports: [443]
+  # 嗅探到这些域名就丢弃结果。都是依赖 IP 直连 / 长连接的设备，避免被改写目标
+  skip-domain:
+    - Mijia Cloud
+    - dlg.io.mi.com
+    - +.oray.com
+    - +.sunlogin.net
+    - +.push.apple.com
+    - +.apple.com
+    - +.mcdn.bilivideo.cn
