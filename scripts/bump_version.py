@@ -24,6 +24,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 FILES = {
     "harmony": "harmony/AppScope/app.json5",
+    "ohpkg_root": "harmony/oh-package.json5",
+    "ohpkg_entry": "harmony/entry/oh-package.json5",
     "android": "android/app/build.gradle",
     "ios_gen": "ios/gen_project.py",
     "agent": "agent/server.py",
@@ -66,6 +68,10 @@ def write_all(name, code):
     edits = [
         ("harmony", r'"versionCode":\s*\d+', f'"versionCode": {code}'),
         ("harmony", r'"versionName":\s*"[^"]+"', f'"versionName": "{name}"'),
+        # oh-package.json5 的 version 是 hvigor 打包时写进产物清单的字段，
+        # 不跟着改会出现「app.json5 是 0.1.2、HAP 里写 2.13.1」这种自相矛盾
+        ("ohpkg_root", r'"version":\s*"[^"]+"', f'"version": "{name}"'),
+        ("ohpkg_entry", r'"version":\s*"[^"]+"', f'"version": "{name}"'),
         ("android", r"versionCode\s+\d+", f"versionCode {code}"),
         ("android", r'versionName\s+"[^"]+"', f'versionName "{name}"'),
     ]
@@ -123,7 +129,7 @@ def main():
     if not write_all(new_name, new_code):
         sys.exit("写入失败")
     print(f"✓ {name} → {new_name}   versionCode {code} → {new_code}")
-    print("  已同步：harmony/app.json5  android/build.gradle  ios/gen_project.py  agent/server.py")
+    print("  已同步：harmony/app.json5 + oh-package×2  android/build.gradle  ios/gen_project.py  agent/server.py")
 
 
 if __name__ == "__main__":
