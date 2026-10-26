@@ -50,11 +50,29 @@
   改包名会让 opkg 认为新旧两个包并存，卸旧包时会把共用的
   `/usr/lib/istore-agent/*` 一起删掉
 
+### 打包与发布
+
+- **新增 `.run` 自解压安装包**（`deploy/build_run.py`），一个文件装完，不依赖 opkg、
+  不需要联网装依赖，也不写 opkg 数据库。包体 = shell 头部 + tar.gz 载荷，
+  头部记录载荷偏移量，安装器自己 `tail -c +N` 切出来解压，Windows 上也能构建
+- `.run` 与 ipk **复用同一套暂存逻辑**，装进去的文件逐字节相同（39 个文件）
+- 安装器支持 `--check` / `--force` / `--uninstall` / `--purge` / `--no-start` / `--root`
+- **三个安全约束写进安装器**：
+  - 已有 `/etc/config/istore-agent` 一律保留，不再把 `bind` 覆盖成 `0.0.0.0`
+    （这条以前把 `:8443` 暴露到过公网）
+  - 载荷先解到 `/tmp` 验证，通过了才动系统文件；包被截断会在删除任何东西之前失败
+  - 检测到 opkg 已装时拒绝执行，需显式 `--force` 才接管 —— 两者并存会导致
+    `opkg remove` 删掉 `.run` 装的文件，而 opkg 记录仍显示「已安装」
+- **GitHub Releases 建立**：`v0.1.2` 附带 `.run`、`.ipk`、`.apk` 三种产物
+- 新增 [`docs/install.md`](docs/install.md)：两种装法对比、完整参数、装了什么文件、
+  安全边界、卸载、从 ipk 迁移、排错
+
 ### 已知问题
 
 - 从 `2.13.x` 装 `0.1.x` 的包时，opkg 会拒绝降级，需要
   `opkg install --force-downgrade` 一次，之后即可正常升级
-- 包内默认 `bind=0.0.0.0` 会覆盖现有 uci 配置，装完需按需改回 LAN 地址
+- ipk 装法仍会因 conffile 机制覆盖 `bind`（装完需按需改回 LAN 地址）；
+  **`.run` 装法已解决这个问题**
 
 ---
 

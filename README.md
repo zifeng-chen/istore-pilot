@@ -20,6 +20,52 @@
 
 ---
 
+## 快速开始
+
+到 [**Releases**](https://github.com/zifeng-chen/istore-pilot/releases) 下载，按需要选：
+
+| 文件 | 装在哪 | 说明 |
+|---|---|---|
+| `istore-pilot_x.y.z-N.run` | 路由器 | **推荐**。单文件，`sh` 一下就装完，不用 opkg、不用联网 |
+| `luci-app-istore-agent_x.y.z-N_all.ipk` | 路由器 | 传统方式，走 opkg（软件包页面上传安装） |
+| `istoreos-x.y.z.apk` | Android 手机 | 连路由器用 |
+
+路由器端，两种方式**选一种**：
+
+```sh
+# 方式 A：.run（推荐）—— 把文件传到路由器后执行
+sh istore-pilot_0.1.2-11.run --check    # 先只检查环境，不改任何文件
+sh istore-pilot_0.1.2-11.run            # 安装或升级，保留现有配置
+
+# 方式 B：ipk
+opkg update && opkg install python3
+opkg install luci-app-istore-agent_0.1.2-11_all.ipk
+```
+
+`.run` 的其它用法：
+
+```sh
+sh istore-pilot_0.1.2-11.run --uninstall   # 卸载程序，保留密码与配置
+sh istore-pilot_0.1.2-11.run --purge       # 卸载并清除全部配置
+sh istore-pilot_0.1.2-11.run --force       # 已用 opkg 装过时，改由本包接管
+```
+
+装完打开 `http://<路由器IP>:8443`。首次安装的随机密码在路由器上查看：
+
+```sh
+cat /etc/istore-agent/INITIAL_PASSWORD
+```
+
+Android：装 APK，或者直接在装好插件的路由器上下载
+`http://<路由器IP>/istore-agent/istoreos-0.1.2.apk`（插件自带这个文件）。
+
+> `.run` **不会改动任何网络、防火墙、DHCP、DNS 配置**，装的过程中现有网络不受影响。
+> 已有 `/etc/config/istore-agent` 时一律保留，不会把 `bind` 覆盖成 `0.0.0.0`。
+
+详细说明见 [`docs/install.md`](docs/install.md)。
+
+---
+
 ## 一、项目主旨
 
 路由器自带的管理后台是给「配置」用的，不是给「查看」用的。
@@ -154,9 +200,15 @@ export ROUTER_PW='<路由器 SSH 口令>'
 python deploy/deploy.py            # 开发期：直接推文件 + 重启服务
 ```
 
-正式安装走 ipk（OpenWrt 包）：
+正式安装有两条路，**装的是同一份文件**（`.run` 直接复用 `build_ipk.py` 的暂存逻辑）：
 
 ```bash
+# A. .run 自解压包（推荐，用户装就这一个文件）
+python deploy/build_run.py               # 产出 dist/istore-pilot_<版本>-<修订>.run
+python deploy/build_run.py --no-apk      # 不含 APK，小 5 MB
+python deploy/build_run.py --rev 12      # 指定修订号
+
+# B. ipk（走 opkg，可被「软件包」页面管理）
 python deploy/build_ipk.py                 # 产出 dist/luci-app-istore-agent_<版本>_all.ipk
 python deploy/build_ipk.py --with-apk      # 顺带把 APK 塞进包内，网页端可直接下载
 ROUTER_PW='...' python deploy/install_ipk.py
@@ -164,7 +216,7 @@ ROUTER_PW='...' python deploy/install_ipk.py
 
 装完在 LuCI「服务 → iStore Pilot」里能看到运行状态、改端口、下载 App。
 
-> ### ⚠️ 两件必须注意的事
+> ### ⚠️ 三件必须注意的事
 >
 > **1. 监听地址**：Agent 默认 `0.0.0.0:8443`。如果不打算走公网访问，
 > 请把 `/etc/config/istore-agent` 的 `bind` 改成 LAN 地址
@@ -172,7 +224,11 @@ ROUTER_PW='...' python deploy/install_ipk.py
 >
 > **2. 打包顺序**：`build_ipk.py` 直接从项目根 `web/` 复制前端资源。
 > 先打包后改 web，会导致包内永远是旧文件，装完还会把手工上传的新文件覆盖回去。
-> **正确顺序：改代码 → build_ipk → install_ipk。**
+> **正确顺序：改代码 → build_ipk / build_run → install。**
+>
+> **3. `.run` 与 ipk 互斥**：两种装法不能并存，否则 `opkg remove` 会把 `.run`
+> 装进去的程序文件一起删掉，而 opkg 记录里还写着「已安装」，后续升级彻底错乱。
+> `.run` 检测到 opkg 包时会拒绝执行，需要显式 `--force` 才接管。
 
 ## 八、配置与口令
 
@@ -229,6 +285,7 @@ python scripts/bump_version.py --next   # 自增并同步四处
 | 文档 | 内容 |
 |---|---|
 | [`CHANGELOG.md`](CHANGELOG.md) | 更新日志，逐版本记录 |
+| [`docs/install.md`](docs/install.md) | 路由器端安装详解：`.run` 与 ipk 两种方式、卸载、排错 |
 | [`docs/architecture.md`](docs/architecture.md) | 架构与关键设计决策、踩过的硬坑 |
 | [`docs/api.md`](docs/api.md) | Agent 接口参考 |
 | [`docs/clients.md`](docs/clients.md) | 三端打包、安装、签名、真机调试细节 |
