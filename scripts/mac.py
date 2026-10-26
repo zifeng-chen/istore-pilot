@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""从 Windows 远程操作 Mac（192.168.100.229）。
+"""从 Windows 远程操作 Mac（当前 192.168.100.227，IP 由 DHCP 分配、会变）。
 
     python scripts/mac.py run "命令"                 # 执行 shell 命令
     python scripts/mac.py put  本地文件 远端路径      # 上传单文件
@@ -8,6 +8,7 @@
     python scripts/mac.py ping                       # 连通性 + 环境自检
 
 认证优先级：SSH 密钥（~/.ssh/id_ed25519_mac）> 环境变量 MAC_PW。
+IP 变了就用 MAC_HOST=192.168.100.x 覆盖，不要改代码里的默认值猜。
 凭据不落盘。
 """
 
@@ -20,7 +21,7 @@ import sys
 
 import paramiko
 
-HOST = os.environ.get("MAC_HOST", "192.168.100.229")
+HOST = os.environ.get("MAC_HOST", "192.168.100.227")
 PORT = int(os.environ.get("MAC_PORT", "22"))
 USER = os.environ.get("MAC_USER", "chen")
 PW = os.environ.get("MAC_PW", "")
