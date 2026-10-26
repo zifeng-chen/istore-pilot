@@ -41,6 +41,12 @@
 - 回滚后 `fw_saved.json` 残留，导致 `wan→lan` 转发规则重复生效；
   旁路状态文件已纳入事务快照
 - 防火墙卡片改完仍显示旧策略，补 `cache_drop()`
+- **鸿蒙版本号回退到正确的 `0.1.2`**。`harmony/oh-package.json5` 与
+  `harmony/entry/oh-package.json5` 之前停在 `2.13.1` —— `bump_version.py` 只改了
+  `AppScope/app.json5`，漏了这两个文件，导致 HAP 清单写 `0.1.2`、`pack.info` 里写
+  `2.13.1`。现已把两者纳入 `bump_version.py`，并新增 `scripts/check_version.py`
+  一次性校验 6 处版本落脚点
+- `dist/` 里两个 `2.13.1` 的旧产物（HAP / iOS app.zip）已清除，等 Mac 重新出 0.1.2 的包
 
 ### 变更
 
@@ -73,6 +79,8 @@
   `opkg install --force-downgrade` 一次，之后即可正常升级
 - ipk 装法仍会因 conffile 机制覆盖 `bind`（装完需按需改回 LAN 地址）；
   **`.run` 装法已解决这个问题**
+- **iOS / 鸿蒙暂未进 Release**：`v0.1.2` 只挂了 `.run`、`.ipk`、`.apk`。
+  两端的未签名包需要在 Mac 上重编（DevEco + Xcode），编完会补到同一个 Release
 
 ---
 
