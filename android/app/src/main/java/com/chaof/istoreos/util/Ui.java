@@ -604,15 +604,18 @@ public final class Ui {
         LinearLayout line = row(c);
         LinearLayout.LayoutParams lineLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lineLp.topMargin = dp(c, 8);
+        lineLp.topMargin = dp(c, 9);
         line.setLayoutParams(lineLp);
 
-        TextView k = text(c, key, 15f, R.color.text_secondary);
+        // 标签降一档、值升一档：数据页是「扫值」不是「读句子」，
+        // 两者同字号同颜色时，一列 IP 里最先看到的是左边那四个字
+        TextView k = text(c, key, 13.5f, R.color.text_secondary);
         k.setSingleLine(true);
         line.addView(k, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        TextView v = value(c, val);
+        TextView v = num(c, val, 14.5f, R.color.text_primary);
+        v.setGravity(Gravity.END);
         v.setPadding(dp(c, 12), 0, 0, 0);
         v.setSingleLine(false);
         v.setMaxLines(3);
@@ -770,20 +773,11 @@ public final class Ui {
         row.setPadding(px, dp(c, 11), px, dp(c, 11));
 
         // 图标底：主色淡底（危险操作用红色淡底），图标本身用主色
-        com.chaof.istoreos.widget.Glyph g = new com.chaof.istoreos.widget.Glyph(c);
-        g.setKind(glyph);
-        g.setColor(color(c, danger ? R.color.danger : R.color.primary));
         int box = dp(c, 32);
-        GradientDrawable tile = new GradientDrawable();
-        tile.setCornerRadius(dp(c, 10));
-        int base = color(c, danger ? R.color.danger : R.color.primary);
-        tile.setColor((base & 0x00FFFFFF) | 0x1F000000);
-        LinearLayout iconWrap = row(c);
-        iconWrap.setGravity(Gravity.CENTER);
-        iconWrap.setBackground(tile);
+        LinearLayout iconWrap = glyphTile(c, glyph, 32,
+                danger ? R.color.danger : R.color.primary);
         LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(box, box);
         ilp.rightMargin = dp(c, 12);
-        iconWrap.addView(g, new LinearLayout.LayoutParams(dp(c, 19), dp(c, 19)));
         row.addView(iconWrap, ilp);
 
         LinearLayout col = column(c);
@@ -804,8 +798,19 @@ public final class Ui {
 
         TextView v = text(c, value == null ? "" : value, 13.5f, R.color.text_secondary);
         v.setPadding(dp(c, 8), 0, 0, 0);
-        v.setSingleLine(true);
         v.setGravity(Gravity.END);
+        // 值必须有宽度上限：它原来是 WRAP_CONTENT，遇到「系统版本」那种长串
+        // （iStoreOS 24.10.8 202607311 · 内核 6.6.144）会把标题挤成竖排的「系…」。
+        // 上限 170dp、允许折两行：IPv6 三十多个字符能完整显示，
+        // 再长的（系统版本）就省略 —— 完整值在详情页里能看到。
+        v.setMaxWidth(dp(c, 170));
+        v.setSingleLine(false);
+        v.setMaxLines(2);
+        v.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        if (Build.VERSION.SDK_INT >= 23) {
+            v.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE);
+            v.setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE);
+        }
         row.addView(v);
 
         if (onClick != null) {
@@ -844,19 +849,9 @@ public final class Ui {
                                          String title, String sub) {
         LinearLayout row = row(c);
         row.setPadding(dp(c, 16), 0, dp(c, 16), dp(c, 2));
-        com.chaof.istoreos.widget.Glyph g = new com.chaof.istoreos.widget.Glyph(c);
-        g.setKind(glyph);
-        g.setColor(color(c, R.color.primary));
-        LinearLayout iconWrap = row(c);
-        iconWrap.setGravity(Gravity.CENTER);
-        GradientDrawable tile = new GradientDrawable();
-        tile.setCornerRadius(dp(c, 9));
-        int base = color(c, R.color.primary);
-        tile.setColor((base & 0x00FFFFFF) | 0x1F000000);
-        iconWrap.setBackground(tile);
+        LinearLayout iconWrap = glyphTile(c, glyph, 28, R.color.primary);
         LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(dp(c, 28), dp(c, 28));
         ilp.rightMargin = dp(c, 10);
-        iconWrap.addView(g, new LinearLayout.LayoutParams(dp(c, 17), dp(c, 17)));
         row.addView(iconWrap, ilp);
 
         LinearLayout left = column(c);
@@ -878,8 +873,120 @@ public final class Ui {
         return right;
     }
 
-    // ---------------------------------------------------------------- 分段控件
+    /**
+     * 图标底块：圆角小方块 + 居中线性图标。
+     *
+     * 设置行和卡片标题各写过一遍（32dp / 28dp 两套），圆角一个 10dp 一个 9dp，
+     * 图标一个 19dp 一个 17dp —— 同一屏里两种「图标胶囊」并排时会看出来不齐。
+     * 现在按比例算：圆角 31%、图标 59%，尺寸只传外框。
+     */
+    public static LinearLayout glyphTile(Context c, int kind, int boxDp, int tintRes) {
+        com.chaof.istoreos.widget.Glyph g = new com.chaof.istoreos.widget.Glyph(c);
+        g.setKind(kind);
+        g.setColor(color(c, tintRes));
 
+        LinearLayout box = row(c);
+        box.setGravity(Gravity.CENTER);
+        GradientDrawable tile = new GradientDrawable();
+        tile.setCornerRadius(dp(c, boxDp * 0.31f));
+        int base = color(c, tintRes);
+        tile.setColor((base & 0x00FFFFFF) | 0x1F000000);
+        box.setBackground(tile);
+        int inner = Math.round(boxDp * 0.59f);
+        box.addView(g, new LinearLayout.LayoutParams(dp(c, inner), dp(c, inner)));
+        return box;
+    }
+
+    /** 行尾的小箭头。转义写 \u203A，避免源码里混进各种「› » ›」长得差不多的字符 */
+    public static TextView chevron(Context c) {
+        TextView t = text(c, "\u203A", 17f, R.color.text_tertiary);
+        t.setPadding(dp(c, 8), 0, 0, 0);
+        t.setIncludeFontPadding(false);
+        return t;
+    }
+
+    /**
+     * 卡片内部的二级标题（比如「节点」「最近活跃」）。
+     * 卡片自带 16dp 内边距时用这个，不要用 {@link #section} —— 那个是给卡片外面用的，
+     * 左边只留 6dp，塞进卡片里会比正文更靠左，看着像掉出来了。
+     */
+    public static TextView cardSubTitle(Context c, LinearLayout card, String text) {
+        TextView t = text(c, text, 11.5f, R.color.text_secondary);
+        t.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        t.setLetterSpacing(0.04f);
+        t.setPadding(dp(c, 16), dp(c, 4), dp(c, 16), dp(c, 6));
+        card.addView(t);
+        return t;
+    }
+
+    /**
+     * 带图标的「标签 + 值」行，返回右侧插槽，调用方自己往里放 TextView / 胶囊 / 分段控件。
+     *
+     * 和 {@link #settingRow} 的区别：settingRow 是「入口」（有箭头、可点、值只是状态摘要），
+     * 这个只读数据行不摆箭头，值占满右侧剩余宽度、允许折两行 ——
+     * IPv6 39 个字符在 settingRow 那种单行右对齐里会被截掉大半。
+     */
+    public static LinearLayout infoRow(Context c, LinearLayout card, int glyph,
+                                       String key, boolean first) {
+        if (!first) {
+            card.addView(hairline(c, 60));
+        }
+        LinearLayout row = row(c);
+        row.setPadding(dp(c, 16), dp(c, 10), dp(c, 16), dp(c, 10));
+
+        LinearLayout tile = glyphTile(c, glyph, 30, R.color.primary);
+        LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(dp(c, 30), dp(c, 30));
+        tlp.rightMargin = dp(c, 12);
+        row.addView(tile, tlp);
+
+        TextView k = text(c, key, 14.5f, R.color.text_primary);
+        k.setSingleLine(true);
+        row.addView(k, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        LinearLayout slot = row(c);
+        slot.setGravity(Gravity.END);
+        row.addView(slot, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        card.addView(row);
+        return slot;
+    }
+
+    /** 往 infoRow 的插槽里放一个值：等宽数字、右对齐、最多两行 */
+    public static TextView infoValue(LinearLayout slot, CharSequence s, int colorRes) {
+        Context c = slot.getContext();
+        TextView v = num(c, s, 13.5f, colorRes);
+        v.setGravity(Gravity.END);
+        v.setPadding(dp(c, 10), 0, 0, 0);
+        v.setMaxLines(2);
+        v.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        if (Build.VERSION.SDK_INT >= 23) {
+            v.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE);
+            v.setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE);
+        }
+        slot.addView(v, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return v;
+    }
+
+    /**
+     * 告警卡：浅黄描边 + 琥珀标题，用来装「要注意，但不阻止你」的内容。
+     *
+     * 不上红色：红在这个 App 里只给「会断网 / 会丢数据」的按钮，
+     * 一条防火墙风险提示用红色，用户会以为已经出事了。
+     */
+    public static Card warnCard(Context c) {
+        Card card = new Card(c);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(color(c, R.color.surface));
+        bg.setCornerRadius(dp(c, CARD_RADIUS));
+        bg.setStroke(Math.max(1, dp(c, 1.2f)), 0x66FFB454);
+        card.setBackground(bg);
+        return card;
+    }
+
+    // ---------------------------------------------------------------- 分段控件
     public interface OnSegment {
         void onPick(int index);
     }

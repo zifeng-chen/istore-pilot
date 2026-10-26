@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
@@ -15,6 +16,9 @@ import com.chaof.istoreos.SubscriptionActivity;
 import com.chaof.istoreos.api.Api;
 import com.chaof.istoreos.api.Cb;
 import com.chaof.istoreos.util.Ui;
+import com.chaof.istoreos.widget.Glyph;
+import com.chaof.istoreos.widget.Hero;
+import com.chaof.istoreos.widget.Radio;
 import com.chaof.istoreos.widget.Sheet;
 
 import org.json.JSONArray;
@@ -31,28 +35,36 @@ import java.util.Set;
  * 两者互斥，同一时刻只有一个在跑，所以先展示「谁在跑」，再展示「跑着的这个有哪些节点」。
  * 节点按分组折叠，默认只展开第一个组 —— 157 个节点全铺开是灾难。
  *
+ * 这一版重构的几处：
+ *   1. 顶部换成和概览/网络/设备同一个 {@link Hero}，四段文字：状态、后端、配置名、摘要。
+ *      以前这页的最高优先级信息（谁在跑）是第二张卡的第一行。
+ *   2. 后端不再是「两行光秃秃的文字」，改成图标块 + 名称 + 引擎节点数 + 状态胶囊，
+ *      和设置页的入口行同一套骨架。
+ *   3. 节点行的选中态从 "●/○" 字符换成自绘 {@link Radio} —— 字符会跟着字号
+ *      基线漂移，跟在 14sp 名字旁边一高一低，而且不同 ROM 的字形胖瘦不一。
+ *   4. 延迟从「裸文字 23ms」换成胶囊：绿/琥珀/红三档底色自带语义，
+ *      一列扫下来不用逐个读数字。
+ *
  * 折叠状态必须自己记住：以前用「集合为空就展开第一组」做初始化，
  * 结果把唯一展开的那个组收起来后集合归空，下一次渲染又自动展开 ——
  * 表现就是「GLOBAL 怎么点都收不起来」。现在用一个 seeded 标记，只初始化一次。
  */
 public class ProxyFragment extends BaseFragment {
 
+    private Hero hero;
+
     private LinearLayout backendBox;
     private LinearLayout modeBox;
     private TextView tvMode;
+    private TextView tvModeHint;
     private LinearLayout nodesBox;
     private TextView tvSubCount;
+    /** 「当前配置文件」那一行的值，切换后原地改文案 */
+    private TextView tvCurConfig;
+
     /** 配置文件清单，弹窗切换时直接用，不再请求一次 */
     private JSONArray configs;
     private String currentConfigPath = "";
-    /** hero 卡：谁在跑 / 跑哪份配置 / 什么模式 */
-    private View heroDot;
-    private TextView tvHeroState;
-    private TextView tvHeroBadge;
-    private TextView tvHeroTitle;
-    private TextView tvHeroMeta;
-    /** 「配置与节点」卡顶部那行显示当前启用的 yaml */
-    private TextView tvCurConfig;
 
     private String backendId = "";
     private String backendLabel = "";
@@ -77,146 +89,92 @@ public class ProxyFragment extends BaseFragment {
     protected void build(LinearLayout root) {
         Context c = ctx();
 
-        // ---------------------------------------------------------- hero
-        // 另外四页顶部都是一张深底渐变卡给结论，这里原来直接堆卡片，
-        // 进来第一眼看不到「谁在跑」，得自己往下找。
-        Ui.Card hero = Ui.gradient(c, R.color.hero_from, R.color.hero_to);
-        hero.setPadding(Ui.dp(c, 20), Ui.dp(c, 18), Ui.dp(c, 20), Ui.dp(c, 18));
-
-        LinearLayout topRow = Ui.row(c);
-        heroDot = new View(c);
-        GradientDrawable hd = new GradientDrawable();
-        hd.setShape(GradientDrawable.OVAL);
-        hd.setColor(Ui.color(c, R.color.hero_fg));
-        heroDot.setBackground(hd);
-        LinearLayout.LayoutParams hdlp = new LinearLayout.LayoutParams(
-                Ui.dp(c, 7), Ui.dp(c, 7));
-        hdlp.rightMargin = Ui.dp(c, 7);
-        topRow.addView(heroDot, hdlp);
-
-        tvHeroState = Ui.heroNote(c, "正在读取…", 1.0f);
-        tvHeroState.setTextSize(12.5f);
-        tvHeroState.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        topRow.addView(tvHeroState);
-        topRow.addView(new View(c), new LinearLayout.LayoutParams(0, 1, 1f));
-
-        tvHeroBadge = Ui.heroNote(c, "—", 0.86f);
-        tvHeroBadge.setTextSize(11f);
-        tvHeroBadge.setPadding(Ui.dp(c, 8), Ui.dp(c, 3), Ui.dp(c, 8), Ui.dp(c, 3));
-        GradientDrawable bb = new GradientDrawable();
-        bb.setCornerRadius(Ui.dp(c, 100));
-        bb.setColor(Ui.alpha(Ui.color(c, R.color.hero_fg), 0.16f));
-        tvHeroBadge.setBackground(bb);
-        topRow.addView(tvHeroBadge);
-        hero.addView(topRow);
-
-        tvHeroTitle = Ui.text(c, "—", 27f, R.color.hero_fg);
-        tvHeroTitle.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        tvHeroTitle.setIncludeFontPadding(false);
-        tvHeroTitle.setLetterSpacing(-0.02f);
-        tvHeroTitle.setMaxLines(1);
-        tvHeroTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        hlp.topMargin = Ui.dp(c, 12);
-        hero.addView(tvHeroTitle, hlp);
-
-        tvHeroMeta = Ui.heroNote(c, "读取中…", 0.86f);
-        tvHeroMeta.setPadding(0, Ui.dp(c, 5), 0, 0);
-        tvHeroMeta.setSingleLine(true);
-        tvHeroMeta.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        hero.addView(tvHeroMeta);
+        // ---------------------------------------------------------- 结论
+        hero = new Hero(c);
         root.addView(hero);
 
         // ---------------------------------------------------------- 代理后端
         Ui.Card back = Ui.card(c);
-        Ui.header(back, "代理后端", "两个插件互斥，点一行切过去");
+        back.setPadding(0, Ui.dp(c, 16), 0, Ui.dp(c, 6));
+        Ui.cardTitle(c, back, Glyph.POWER, "代理后端", "两个插件互斥，点一行切过去");
         backendBox = Ui.column(c);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.topMargin = Ui.dp(c, 8);
-        back.addView(backendBox, lp);
+        blp.topMargin = Ui.dp(c, 8);
+        back.addView(backendBox, blp);
         root.addView(back);
 
+        // ---------------------------------------------------------- 运行模式
         Ui.Card mode = Ui.card(c);
-        // 原来用 Ui.kv 把「运行模式」当键值行，标题就成了灰色小字，
-        // 跟上面「代理后端」那种白色粗体标题不一样。改成标准卡片标题，
-        // 当前值放到右上角 —— 和「节点」卡的写法统一。
-        LinearLayout modeHead = Ui.header(mode, "运行模式", "");
-        tvMode = Ui.value(c, "—");
+        mode.setPadding(0, Ui.dp(c, 16), 0, Ui.dp(c, 14));
+        LinearLayout modeHead = Ui.cardTitle(c, mode, Glyph.BOLT, "运行模式", "改完立即生效");
+        tvMode = Ui.num(c, "—", 13.5f, R.color.primary);
+        tvMode.setGravity(Gravity.END);
         modeHead.addView(tvMode);
+
         modeBox = Ui.column(c);
+        modeBox.setPadding(Ui.dp(c, 16), 0, Ui.dp(c, 16), 0);
         LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         mlp.topMargin = Ui.dp(c, 12);
         mode.addView(modeBox, mlp);
+
+        tvModeHint = Ui.text(c, "", 11.5f, R.color.text_secondary);
+        tvModeHint.setPadding(Ui.dp(c, 16), Ui.dp(c, 9), Ui.dp(c, 16), 0);
+        tvModeHint.setLineSpacing(Ui.dp(c, 2), 1f);
+        mode.addView(tvModeHint);
         root.addView(mode);
 
         // ---------------------------------------------------------- 配置与节点
-        // 订阅和节点原来是两张卡，来回翻着看很割裂：换了订阅要往下滑才知道
-        // 节点有没有跟着变。现在合成一张，最上面就是「当前用的是哪份」。
         Ui.Card combo = Ui.card(c);
-        // 标题右侧不挂数字：那位置留给订阅行的「N 条」，两边都放会重复
-        Ui.header(combo, "配置与节点", "");
+        combo.setPadding(0, Ui.dp(c, 16), 0, Ui.dp(c, 8));
+        Ui.cardTitle(c, combo, Glyph.LIST, "配置与节点", "换配置会重启内核，断网十几秒");
 
-        LinearLayout curRow = Ui.row(c);
-        curRow.setPadding(0, Ui.dp(c, 10), 0, Ui.dp(c, 10));
-        curRow.setClickable(true);
-        LinearLayout curCol = Ui.column(c);
-        TextView curLabel = Ui.text(c, "当前启用的配置文件", 11.5f, R.color.text_secondary);
-        curCol.addView(curLabel);
-        tvCurConfig = Ui.text(c, "读取中…", 15f, R.color.text_primary);
-        tvCurConfig.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        tvCurConfig.setPadding(0, Ui.dp(c, 3), 0, 0);
-        tvCurConfig.setMaxLines(1);
-        tvCurConfig.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        curCol.addView(tvCurConfig);
-        curRow.addView(curCol, new LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        curRow.addView(Ui.pill(c, "切换", R.color.primary));
-        // 换配置从「进二级页」改成「弹窗直接选」：配置文件通常就三五份，
-        // 为一次选择跳一页再跳回来太重
-        curRow.setOnClickListener(v -> showConfigPicker());
-        combo.addView(curRow, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        // 当前配置：整行可点，右侧「切换」胶囊给出明确的可操作性
+        LinearLayout cfgSlot = Ui.infoRow(c, combo, Glyph.KEY, "当前配置", true);
+        tvCurConfig = Ui.num(c, "读取中…", 13.5f, R.color.text_primary);
+        tvCurConfig.setGravity(Gravity.END);
+        tvCurConfig.setSingleLine(true);
+        tvCurConfig.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
+        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        cfgSlot.addView(tvCurConfig, clp);
+        TextView switchPill = Ui.pill(c, "切换", R.color.primary);
+        LinearLayout.LayoutParams splp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        splp.leftMargin = Ui.dp(c, 8);
+        cfgSlot.addView(switchPill, splp);
+        tapRow(cfgSlot, this::showConfigPicker);
 
-        combo.addView(Ui.divider(c));
+        // 订阅：增删改在独立页面，这里只给入口和条数
+        LinearLayout subSlot = Ui.infoRow(c, combo, Glyph.UPLOAD, "订阅管理", false);
+        tvSubCount = Ui.num(c, "", 13.5f, R.color.text_secondary);
+        subSlot.addView(tvSubCount);
+        subSlot.addView(Ui.chevron(c));
+        tapRow(subSlot, this::openSubscriptions);
 
-        // 订阅只留一行入口：增删改都在独立页面里，这里再列一遍会让这张卡长得没边
-        LinearLayout subRow = Ui.row(c);
-        subRow.setPadding(0, Ui.dp(c, 12), 0, Ui.dp(c, 12));
-        subRow.setClickable(true);
-        LinearLayout subCol = Ui.column(c);
-        TextView subTitle = Ui.text(c, "订阅管理", 15f, R.color.text_primary);
-        subTitle.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        subCol.addView(subTitle);
-        TextView subNote = Ui.text(c, "添加、修改、删除订阅地址", 11.5f, R.color.text_secondary);
-        subNote.setPadding(0, Ui.dp(c, 3), 0, 0);
-        subCol.addView(subNote);
-        subRow.addView(subCol, new LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        tvSubCount = Ui.value(c, "");
-        subRow.addView(tvSubCount);
-        TextView chevron = Ui.text(c, "›", 18f, R.color.text_tertiary);
-        chevron.setPadding(Ui.dp(c, 8), 0, 0, 0);
-        subRow.addView(chevron);
-        subRow.setOnClickListener(v -> {
-            if (backendId.isEmpty()) {
-                notice("两个代理后端都没在运行，订阅不可用");
-                return;
-            }
-            Intent it = new Intent(ctx(), SubscriptionActivity.class);
-            it.putExtra("backend", backendId);
-            startActivity(it);
-        });
-        combo.addView(subRow);
-
-        combo.addView(Ui.divider(c));
-        combo.addView(Ui.section(c, "节点"));
+        combo.addView(Ui.hairline(c, 16));
+        Ui.cardSubTitle(c, combo, "节点");
         nodesBox = Ui.column(c);
         combo.addView(nodesBox);
 
         root.addView(combo);
+    }
+
+    /** 让 infoRow 的整行可点（插槽本身只有文字宽，点空白区域也该响应） */
+    private void tapRow(LinearLayout slot, Runnable action) {
+        View row = (View) slot.getParent();
+        if (row == null) {
+            return;
+        }
+        row.setClickable(true);
+        row.setFocusable(true);
+        GradientDrawable mask = new GradientDrawable();
+        mask.setColor(0xFFFFFFFF);
+        row.setBackground(new android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(
+                        Ui.color(row.getContext(), R.color.ripple)), null, mask));
+        row.setOnClickListener(v -> action.run());
     }
 
     @Override
@@ -251,6 +209,7 @@ public class ProxyFragment extends BaseFragment {
         JSONArray arr = body.optJSONArray("backends");
         backendId = "none".equals(active) ? "" : active;
         int activeCount = 0;
+        String activeEngine = "";
 
         if (arr != null) {
             for (int i = 0; i < arr.length(); i++) {
@@ -262,23 +221,38 @@ public class ProxyFragment extends BaseFragment {
                 String label = b.optString("label", id);
                 boolean running = b.optBoolean("running", false);
                 boolean installed = b.optBoolean("installed", false);
-
-                LinearLayout line = Ui.row(c);
-                line.setPadding(0, Ui.dp(c, 8), 0, Ui.dp(c, 8));
-
-                LinearLayout col = Ui.column(c);
-                TextView name = Ui.text(c, label, 15f, R.color.text_primary);
-                name.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-                col.addView(name);
-
                 String engine = b.optString("engine", "");
                 int count = b.optInt("node_count", 0);
-                TextView sub = Ui.text(c, installed
-                                ? (engine.isEmpty() ? "" : engine) + " · " + count + " 个节点"
-                                : "未安装",
-                        12f, R.color.text_secondary);
-                sub.setPadding(0, Ui.dp(c, 3), 0, 0);
-                col.addView(sub);
+
+                if (i > 0) {
+                    backendBox.addView(Ui.hairline(c, 58));
+                }
+
+                LinearLayout line = Ui.row(c);
+                int px = Ui.dp(c, 16);
+                line.setPadding(px, Ui.dp(c, 10), px, Ui.dp(c, 10));
+
+                LinearLayout tile = Ui.glyphTile(c, Glyph.POWER, 30,
+                        running ? R.color.primary : R.color.text_secondary);
+                LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(
+                        Ui.dp(c, 30), Ui.dp(c, 30));
+                tlp.rightMargin = Ui.dp(c, 12);
+                line.addView(tile, tlp);
+
+                LinearLayout col = Ui.column(c);
+                TextView name = Ui.text(c, label, 15f,
+                        running ? R.color.text_primary : R.color.text_secondary);
+                name.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+                name.setSingleLine(true);
+                col.addView(name);
+
+                String sub = installed
+                        ? (engine.isEmpty() ? "" : engine + " · ") + count + " 个节点"
+                        : "未安装";
+                TextView subText = Ui.text(c, sub, 11.5f, R.color.text_secondary);
+                subText.setPadding(0, Ui.dp(c, 3), 0, 0);
+                subText.setSingleLine(true);
+                col.addView(subText);
 
                 line.addView(col, new LinearLayout.LayoutParams(0,
                         ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -286,7 +260,8 @@ public class ProxyFragment extends BaseFragment {
                 if (running) {
                     line.addView(Ui.pill(c, "运行中", R.color.primary));
                     backendLabel = label;
-                    activeCount = b.optInt("node_count", 0);
+                    activeCount = count;
+                    activeEngine = engine;
                 } else {
                     // 用 text_on_track 而不是 text_secondary：
                     // 灰字配 19% 灰底，在深色下「未运行」几乎读不出来
@@ -297,35 +272,47 @@ public class ProxyFragment extends BaseFragment {
                         final String fid = id;
                         final String flabel = label;
                         line.setClickable(true);
+                        line.setFocusable(true);
+                        GradientDrawable mask = new GradientDrawable();
+                        mask.setColor(0xFFFFFFFF);
+                        line.setBackground(new android.graphics.drawable.RippleDrawable(
+                                android.content.res.ColorStateList.valueOf(
+                                        Ui.color(c, R.color.ripple)), null, mask));
                         line.setOnClickListener(v -> askSwitchBackend(fid, flabel));
                     }
                 }
 
                 backendBox.addView(line);
-                if (i < arr.length() - 1) {
-                    backendBox.addView(Ui.divider(c));
-                }
             }
         }
 
         boolean none = "none".equals(active);
-        if (tvHeroState != null) {
-            tvHeroState.setText(none ? "都没在运行" : "运行中");
-            tvHeroBadge.setText(none ? "未启用" : backendLabel);
-            tvHeroTitle.setText(none ? "直连" : "—");
-            tvHeroMeta.setText(none
+        if (hero != null) {
+            hero.dot(R.color.hero_fg, none);
+            hero.state.setText(none ? "都没在运行" : "运行中");
+            hero.badge.setText(none ? "未启用" : backendLabel);
+            hero.title.setText(none ? "直连" : "—");
+            hero.note.setText(none
                     ? "两个代理后端都停着，所有流量走直连"
-                    : activeCount + " 个节点可用");
-        }
-        if (heroDot != null) {
-            GradientDrawable dot = new GradientDrawable();
-            dot.setShape(GradientDrawable.OVAL);
-            dot.setColor(Ui.alpha(Ui.color(c, R.color.hero_fg), none ? 0.45f : 1f));
-            heroDot.setBackground(dot);
+                    : join(activeEngine, activeCount + " 个节点可用", modeLabel(modeValue)));
         }
         renderMode();
         loadConfigs();
         loadSubCount();
+    }
+
+    private static String join(String... parts) {
+        StringBuilder sb = new StringBuilder();
+        for (String p : parts) {
+            if (p == null || p.isEmpty()) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append("　·　");
+            }
+            sb.append(p);
+        }
+        return sb.toString();
     }
 
     /** 装了但没跑的后端点一下切过去。互斥关系要提前说清，否则用户以为只是「启动」。 */
@@ -348,8 +335,7 @@ public class ProxyFragment extends BaseFragment {
                                 return;
                             }
                             boolean ok = data.optBoolean("ok", false);
-                            notice(ok ? label + " 已启动" : "启动失败，看日志确认",
-                                    ok);
+                            notice(ok ? label + " 已启动" : "启动失败，看日志确认", ok);
                             load(true);
                         }
 
@@ -363,7 +349,7 @@ public class ProxyFragment extends BaseFragment {
                 });
     }
 
-    /** 当前启用的 OpenClash 配置文件。切换在二级页做，这里只负责显示。 */
+    /** 当前启用的 OpenClash 配置文件。切换走弹窗，这里只负责显示。 */
     private void loadConfigs() {
         Api.get(ctx(), "/api/v1/proxy/configs", new Cb() {
             @Override
@@ -393,8 +379,8 @@ public class ProxyFragment extends BaseFragment {
                     name = "未设置";
                 }
                 tvCurConfig.setText(name);
-                if (tvHeroTitle != null && !backendId.isEmpty()) {
-                    tvHeroTitle.setText(name);
+                if (hero != null && !backendId.isEmpty()) {
+                    hero.title.setText(name);
                 }
             }
 
@@ -498,6 +484,16 @@ public class ProxyFragment extends BaseFragment {
         });
     }
 
+    private void openSubscriptions() {
+        if (backendId.isEmpty()) {
+            notice("两个代理后端都没在运行，订阅不可用");
+            return;
+        }
+        Intent it = new Intent(ctx(), SubscriptionActivity.class);
+        it.putExtra("backend", backendId);
+        startActivity(it);
+    }
+
     /** 订阅本身在独立页面维护，这张卡只要一个条数 */
     private void loadSubCount() {
         if (tvSubCount == null) {
@@ -583,6 +579,35 @@ public class ProxyFragment extends BaseFragment {
                 ? ("rule".equals(modeValue) ? 0 : ("global".equals(modeValue) ? 1 : 2))
                 : ("proxy".equals(modeValue) ? 0 : 1);
         modeBox.addView(Ui.segmented(c, labels, selected, this::pickModeAt));
+
+        if (tvModeHint != null) {
+            tvModeHint.setText(modeHint(backendId, modeValue));
+        }
+    }
+
+    /** 模式的后果，一句话说清。光有「规则/全局/直连」三个字，多数人不知道差在哪 */
+    private static String modeHint(String backend, String mode) {
+        boolean oc = "openclash".equals(backend);
+        if (oc) {
+            switch (mode == null ? "" : mode) {
+                case "rule":
+                    return "按规则分流：命中的走节点，其余直连。日常用这个。";
+                case "global":
+                    return "全部流量走当前节点，不看规则。节点选错会全家上不了网。";
+                case "direct":
+                    return "不走代理，所有流量直连。";
+                default:
+                    return "还没读到当前模式。";
+            }
+        }
+        switch (mode == null ? "" : mode) {
+            case "proxy":
+                return "按 Passwall 规则分流：命中的走节点，其余直连。";
+            case "disable":
+                return "不走代理，所有流量直连。";
+            default:
+                return "还没读到当前模式。";
+        }
     }
 
     private void renderNodes(JSONObject body) {
@@ -592,7 +617,9 @@ public class ProxyFragment extends BaseFragment {
         JSONArray groups = body.optJSONArray("groups");
         if (groups == null || groups.length() == 0) {
             String err = body.optString("error", "没有可用的节点");
-            nodesBox.addView(Ui.label(c, err));
+            TextView t = Ui.text(c, err, 13f, R.color.text_tertiary);
+            t.setPadding(Ui.dp(c, 16), Ui.dp(c, 10), Ui.dp(c, 16), Ui.dp(c, 10));
+            nodesBox.addView(t);
             return;
         }
 
@@ -634,65 +661,9 @@ public class ProxyFragment extends BaseFragment {
             boolean testing = gname.equals(testingGroup);
 
             if (i > 0) {
-                nodesBox.addView(Ui.divider(c));
+                nodesBox.addView(Ui.hairline(c, 16));
             }
-
-            LinearLayout head = Ui.row(c);
-            head.setPadding(0, Ui.dp(c, 8), 0, Ui.dp(c, 8));
-            head.setClickable(true);
-
-            TextView name = Ui.text(c, pretty(gname), 15f, R.color.text_primary);
-            name.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-            head.addView(name, new LinearLayout.LayoutParams(0,
-                    ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
-            // 当前选中的节点：只留名字，延迟单独显示
-            if (!now.isEmpty()) {
-                TextView cur = Ui.text(c, pretty(now), 12f,
-                        isPolicyName(now) ? R.color.text_secondary : R.color.primary);
-                cur.setMaxLines(1);
-                cur.setMaxEms(12);
-                cur.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                cur.setPadding(Ui.dp(c, 10), 0, 0, 0);
-                head.addView(cur);
-            } else if (g.optBoolean("now_info", false) || isInfoNode(g.optString("now", ""))) {
-                // 订阅把「剩余流量：xxx」这类信息条目塞进了节点列表，还被选成了当前项。
-                // 照实显示会让人以为流量走了个叫「剩余流量」的节点，说清楚更好。
-                TextView cur = Ui.text(c, "未选中可用节点", 11.5f, R.color.text_secondary);
-                cur.setMaxLines(1);
-                cur.setPadding(Ui.dp(c, 10), 0, 0, 0);
-                head.addView(cur);
-            }
-
-            int total = members == null ? 0 : members.length();
-            TextView arrow = Ui.text(c, (open ? "▾" : "▸") + " " + total, 12f,
-                    R.color.text_secondary);
-            arrow.setPadding(Ui.dp(c, 8), 0, 0, 0);
-            head.addView(arrow);
-
-            // ★ 测速按钮：必须在 header 之前消费点击，否则会被折叠动作吃掉
-            TextView btn = Ui.text(c, testing ? "测速中" : "测速", 12f,
-                    testing ? R.color.text_secondary : R.color.primary);
-            btn.setPadding(Ui.dp(c, 10), Ui.dp(c, 3), Ui.dp(c, 2), Ui.dp(c, 3));
-            btn.setClickable(true);
-            btn.setFocusable(true);
-            btn.setOnClickListener(v -> testGroup(gname));
-            head.addView(btn);
-
-            head.setOnClickListener(v -> {
-                if (expanded.contains(gname)) {
-                    expanded.remove(gname);
-                } else {
-                    expanded.add(gname);
-                }
-                // 折叠是纯本地动作，不用再问服务器
-                if (lastGroups != null) {
-                    renderNodes(lastGroups);
-                }
-            });
-
-            nodesBox.addView(head);
-
+            nodesBox.addView(groupHead(c, g, gname, now, members, open, testing));
             if (open && members != null) {
                 for (int k = 0; k < members.length(); k++) {
                     JSONObject m = members.optJSONObject(k);
@@ -705,6 +676,101 @@ public class ProxyFragment extends BaseFragment {
         }
 
         setRefreshing(false);
+    }
+
+    /**
+     * 分组标题，两行：
+     *
+     *   ▾ 自动选择                                    [测速]
+     *     当前 日本高速06|BGP|CTCU              57 个
+     *
+     * 原来把「分组名 + 当前节点 + 节点数 + 测速」全塞一行，中文节点名动辄十几字，
+     * 结果当前节点被压成「日本高速06|BGP|CT…」，而孤零零一个「57」也不知道是什么。
+     * 拆成两行后：名字能全显示，数字带上量词，测速还在原位。
+     *
+     * 第二行即使折叠也保留 —— 收起分组时「这组现在用哪个节点」正是最想知道的。
+     */
+    private View groupHead(Context c, JSONObject g, String gname, String now,
+                           JSONArray members, boolean open, boolean testing) {
+        LinearLayout block = Ui.column(c);
+
+        LinearLayout head = Ui.row(c);
+        head.setPadding(Ui.dp(c, 10), Ui.dp(c, 9), Ui.dp(c, 10), Ui.dp(c, 3));
+        block.addView(head);
+
+        TextView caret = Ui.text(c, open ? "\u25BE" : "\u25B8", 11f, R.color.text_secondary);
+        caret.setPadding(Ui.dp(c, 2), 0, Ui.dp(c, 6), 0);
+        head.addView(caret);
+
+        TextView name = Ui.text(c, pretty(gname), 15f, R.color.text_primary);
+        name.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        name.setSingleLine(true);
+        name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        head.addView(name, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView btn = Ui.text(c, testing ? "测速中" : "测速", 11.5f,
+                testing ? R.color.text_secondary : R.color.primary);
+        btn.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        btn.setPadding(Ui.dp(c, 9), Ui.dp(c, 4), Ui.dp(c, 9), Ui.dp(c, 4));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(Ui.dp(c, 100));
+        bg.setColor(Ui.color(c, testing ? R.color.surface_sunken : R.color.accent_soft));
+        btn.setBackground(bg);
+        // 测速按钮要在外层之前消费点击，否则会被折叠动作吃掉
+        btn.setClickable(true);
+        btn.setFocusable(true);
+        btn.setOnClickListener(v -> testGroup(gname));
+        head.addView(btn);
+
+        // ---- 第二行：当前节点 + 节点数
+        LinearLayout sub = Ui.row(c);
+        sub.setPadding(Ui.dp(c, 30), 0, Ui.dp(c, 10), Ui.dp(c, 9));
+        block.addView(sub);
+
+        String cur = pretty(now);
+        // 订阅常把「剩余流量：xxx」塞进节点列表还设成当前项，
+        // 照实显示会让人以为流量走了个叫「剩余流量」的节点，说清楚更好
+        boolean info = now.isEmpty()
+                && (g.optBoolean("now_info", false) || isInfoNode(g.optString("now", "")));
+        TextView nowText;
+        if (!cur.isEmpty()) {
+            nowText = Ui.text(c, "当前 " + cur, 11.5f,
+                    isPolicyName(cur) ? R.color.text_secondary : R.color.primary);
+        } else if (info) {
+            nowText = Ui.text(c, "未选中可用节点", 11.5f, R.color.text_secondary);
+        } else {
+            nowText = Ui.text(c, "未选择", 11.5f, R.color.text_tertiary);
+        }
+        nowText.setSingleLine(true);
+        nowText.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        sub.addView(nowText, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        int total = members == null ? 0 : members.length();
+        TextView count = Ui.num(c, total + " 个", 11.5f, R.color.text_tertiary);
+        count.setPadding(Ui.dp(c, 8), 0, 0, 0);
+        sub.addView(count);
+
+        block.setClickable(true);
+        block.setFocusable(true);
+        GradientDrawable mask = new GradientDrawable();
+        mask.setColor(0xFFFFFFFF);
+        block.setBackground(new android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(Ui.color(c, R.color.ripple)),
+                null, mask));
+        block.setOnClickListener(v -> {
+            if (expanded.contains(gname)) {
+                expanded.remove(gname);
+            } else {
+                expanded.add(gname);
+            }
+            // 折叠是纯本地动作，不用再问服务器
+            if (lastGroups != null) {
+                renderNodes(lastGroups);
+            }
+        });
+        return block;
     }
 
     /**
@@ -757,6 +823,7 @@ public class ProxyFragment extends BaseFragment {
         return false;
     }
 
+    /** 节点行：缩进一级（34dp 对齐分组名的文字起点），左侧单选点，右侧延迟胶囊 */
     private void addNodeRow(Context c, JSONObject m, String group, String current) {
         String name = m.optString("name", "");
         if (isInfoNode(name)) {
@@ -768,16 +835,20 @@ public class ProxyFragment extends BaseFragment {
         // 用灰色而不是主题绿，避免看起来像选了个正常节点
         boolean policy = isPolicyName(name);
 
-        LinearLayout line = Ui.row(c);
-        line.setPadding(Ui.dp(c, 14), Ui.dp(c, 9), Ui.dp(c, 2), Ui.dp(c, 9));
-        line.setClickable(true);
-
         int onColor = isRejectPolicy(name) ? R.color.danger
                 : (policy ? R.color.text_secondary : R.color.primary);
-        TextView dot = Ui.text(c, selected ? "●" : "○", 10f,
-                selected ? onColor : R.color.text_tertiary);
-        line.addView(dot, new LinearLayout.LayoutParams(Ui.dp(c, 18),
-                ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        LinearLayout line = Ui.row(c);
+        line.setPadding(Ui.dp(c, 34), Ui.dp(c, 8), Ui.dp(c, 16), Ui.dp(c, 8));
+        line.setClickable(true);
+        line.setFocusable(true);
+
+        Radio radio = new Radio(c, selected ? onColor : R.color.text_tertiary);
+        radio.setOn(selected);
+        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
+                Ui.dp(c, 15), Ui.dp(c, 15));
+        rlp.rightMargin = Ui.dp(c, 10);
+        line.addView(radio, rlp);
 
         TextView label = Ui.text(c, pretty(name), 14f,
                 selected ? onColor : (policy ? R.color.text_secondary : R.color.text_primary));
@@ -792,30 +863,35 @@ public class ProxyFragment extends BaseFragment {
         //   两者都没有（组节点）  → 显示「组」
         Integer fresh = tested.get(name);
         if (fresh != null) {
-            int ms = fresh;
-            TextView d = Ui.text(c, ms > 0 ? ms + "ms" : "超时", 12f, delayColor(ms));
-            d.setPadding(Ui.dp(c, 8), 0, 0, 0);
-            line.addView(d);
+            line.addView(delayChip(c, fresh, fresh > 0 ? delayColor(fresh) : R.color.danger));
         } else {
             Object delay = m.opt("delay");
             int ms = delay instanceof Number ? ((Number) delay).intValue() : -1;
             if (ms > 0) {
-                TextView d = Ui.text(c, ms + "ms", 12f, delayColor(ms));
-                d.setPadding(Ui.dp(c, 8), 0, 0, 0);
-                line.addView(d);
+                line.addView(delayChip(c, ms, delayColor(ms)));
             } else if (isGroup) {
-                TextView d = Ui.text(c, "组", 12f, R.color.text_secondary);
-                d.setPadding(Ui.dp(c, 8), 0, 0, 0);
+                TextView d = Ui.text(c, "组", 11f, R.color.text_secondary);
                 line.addView(d);
             } else {
-                TextView d = Ui.text(c, "—", 12f, R.color.text_tertiary);
-                d.setPadding(Ui.dp(c, 8), 0, 0, 0);
+                TextView d = Ui.text(c, "—", 11f, R.color.text_tertiary);
                 line.addView(d);
             }
         }
 
+        GradientDrawable mask = new GradientDrawable();
+        mask.setColor(0xFFFFFFFF);
+        line.setBackground(new android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(Ui.color(c, R.color.ripple)),
+                null, mask));
         line.setOnClickListener(v -> selectNode(group, name, true));
         nodesBox.addView(line);
+    }
+
+    /** 延迟胶囊：绿 / 琥珀 / 红三档，一列扫下来不用逐个读数字 */
+    private TextView delayChip(Context c, int ms, int colorRes) {
+        String text = ms > 0 ? ms + "ms" : "超时";
+        TextView t = Ui.pill(c, text, colorRes);
+        return t;
     }
 
     private static int delayColor(int ms) {
