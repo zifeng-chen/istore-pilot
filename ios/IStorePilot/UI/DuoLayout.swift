@@ -55,6 +55,63 @@ private struct BarGap: ViewModifier {
     }
 }
 
+/// 宽画布的两栏容器。
+///
+/// Duo 展开后可用宽度接近 870pt。原来只是把单列的卡片拉到 `contentColumn(820)`：
+/// 结果是一张卡横跨 820pt，一行字从左读到右要转头，卡片高度却没变 —— 看起来
+/// 就是「手机界面被拉长了」，不是为这块屏幕设计的版式。
+///
+/// 现在按屏幕做两件事：
+///   1. 窄屏：完全保持原来的单列顺序，一行代码都不用改行为
+///   2. 宽屏：左栏放「要读/要点的主内容」，右栏 372pt 放次级卡片；
+///      两栏各自滚动？不 —— 仍然整体滚动，否则左右会滚不同步，看着晕
+///
+/// `rightFirstInNarrow` 是给「配置在左、节点在右」这类页面用的：
+/// 宽屏右栏是配置卡，窄屏时它得排回前面，否则用户要滑到底才能改配置。
+struct DuoColumns<Left: View, Right: View>: View {
+    @Environment(\.barAxis) private var axis
+
+    /// 右栏宽度。372 是「一行放得下 20 个汉字 + 一个数值」的下限，
+    /// 再窄就会出现键值行的值被压到第二行
+    private let rightWidth: CGFloat
+    private let rightFirstInNarrow: Bool
+    private let leftContent: Left
+    private let rightContent: Right
+
+    /// 显式写 init 而不是靠成员逐个初始化：`@ViewBuilder` 要落在**参数**上才保证
+    /// 闭包里的 if / 多视图展开成 TupleView，靠属性上的 builder 推导容易在换工具链时翻车
+    init(rightWidth: CGFloat = 372,
+         rightFirstInNarrow: Bool = false,
+         @ViewBuilder left: () -> Left,
+         @ViewBuilder right: () -> Right) {
+        self.rightWidth = rightWidth
+        self.rightFirstInNarrow = rightFirstInNarrow
+        self.leftContent = left()
+        self.rightContent = right()
+    }
+
+    var body: some View {
+        if axis == .rail {
+            HStack(alignment: .top, spacing: 16) {
+                VStack(spacing: 14) { leftContent }
+                    .frame(maxWidth: .infinity, alignment: .top)
+                VStack(spacing: 14) { rightContent }
+                    .frame(width: rightWidth, alignment: .top)
+            }
+        } else {
+            VStack(spacing: 14) {
+                if rightFirstInNarrow {
+                    rightContent
+                    leftContent
+                } else {
+                    leftContent
+                    rightContent
+                }
+            }
+        }
+    }
+}
+
 /// 读当前可用尺寸。
 ///
 /// 不用 `GeometryReader` 包在外层：那会把窗口安全区吃成 0，

@@ -39,10 +39,14 @@ struct NetworkView: View {
                     if loading {
                         skeleton
                     } else {
-                        wanCard
-                        lanCard
-                        fwCard
-                        gapCard
+                        // 宽屏：宽带在左（可改、字段多），局域网/防火墙/规划在右
+                        DuoColumns {
+                            wanCard
+                        } right: {
+                            lanCard
+                            fwCard
+                            gapCard
+                        }
                     }
 
                     Color.clear.barBottomGap()

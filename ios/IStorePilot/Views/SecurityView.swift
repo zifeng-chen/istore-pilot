@@ -54,8 +54,13 @@ struct SecurityView: View {
                     if loading {
                         skeleton
                     } else {
-                        deviceCard
-                        adCard
+                        // 宽屏：左边设备、右边拦截。两块本来就是「两个系统」，
+                        // 竖着排的时候要滑过一整张卡才能看到拦截今天挡了多少
+                        DuoColumns {
+                            deviceCard
+                        } right: {
+                            adCard
+                        }
                     }
 
                     if !err.isEmpty {

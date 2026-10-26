@@ -25,9 +25,14 @@ struct OverviewView: View {
                     if loading {
                         skeleton
                     } else {
-                        systemCard
-                        portCard
-                        deviceCard
+                        // 宽屏分两栏：左栏「系统 + 网口」是主体（网口网格能摊开成三列），
+                        // 右栏只放设备摘要。窄屏还是原来的单列顺序
+                        DuoColumns {
+                            systemCard
+                            portCard
+                        } right: {
+                            deviceCard
+                        }
                     }
 
                     if !err.isEmpty {
@@ -216,8 +221,7 @@ struct OverviewView: View {
                         .font(F.caption).foregroundStyle(C.textSecondary)
                 } else {
                     LazyVGrid(columns: [
-                        GridItem(.flexible(), spacing: 9),
-                        GridItem(.flexible(), spacing: 9),
+                        GridItem(.adaptive(minimum: 168), spacing: 9),
                     ], spacing: 9) {
                         ForEach(Array(ports.enumerated()), id: \.offset) { _, p in
                             let name = p.str("name")

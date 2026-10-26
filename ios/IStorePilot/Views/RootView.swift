@@ -29,7 +29,7 @@ struct RootView: View {
                 ProxyView().opacity(tab == 3 ? 1 : 0).allowsHitTesting(tab == 3)
                 SettingsView().opacity(tab == 4 ? 1 : 0).allowsHitTesting(tab == 4)
             }
-            .contentColumn()
+            .contentColumn(axis == .rail ? 980 : 820)
 
             if axis == .rail {
                 NavRail(items: items, tab: $tab)

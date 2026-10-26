@@ -20,15 +20,20 @@ struct ProxyView: View {
             ScrollView {
                 VStack(spacing: 14) {
                     hero
-                    cfgCard
-                    if loading {
-                        Card { VStack(alignment: .leading, spacing: 10) {
-                            Bone(w: 90, h: 15); Bone(h: 10); Bone(h: 10)
-                        } }
-                    } else if groups.isEmpty {
-                        Card { EmptyHint(icon: "network.slash", text: "代理没有在运行，或者没有读到节点") }
-                    } else {
-                        groupList
+                    // 宽屏：节点在左（要点要展开，给足宽度），配置与订阅在右。
+                    // 窄屏时右栏排回前面 —— 改配置是件必须做在前面的事
+                    DuoColumns(rightFirstInNarrow: true) {
+                        if loading {
+                            Card { VStack(alignment: .leading, spacing: 10) {
+                                Bone(w: 90, h: 15); Bone(h: 10); Bone(h: 10)
+                            } }
+                        } else if groups.isEmpty {
+                            Card { EmptyHint(icon: "network.slash", text: "代理没有在运行，或者没有读到节点") }
+                        } else {
+                            groupList
+                        }
+                    } right: {
+                        cfgCard
                     }
                     if !err.isEmpty {
                         Text(err).font(F.tiny).foregroundStyle(C.danger)

@@ -40,15 +40,21 @@ struct SettingsView: View {
             ScrollView {
                 VStack(spacing: 14) {
                     hero
-                    connectCard
-                    networkCard
-                    deviceCard
-                    lookCard
-                    maintainCard
-                    uploadCard
-                    powerCard
-                    securityCard
-                    aboutCard
+                    // 宽屏两栏：左边「这台机器连得怎么样、是什么」（连接/网络/设备/外观），
+                    // 右边「能对它做什么」（维护/上传/电源/安全/关于）。
+                    // 十张卡竖着排的时候，改个密码要滑七八屏
+                    DuoColumns {
+                        connectCard
+                        networkCard
+                        deviceCard
+                        lookCard
+                    } right: {
+                        maintainCard
+                        uploadCard
+                        powerCard
+                        securityCard
+                        aboutCard
+                    }
                     Color.clear.barBottomGap()
                 }
                 .padding(.horizontal, 16)
