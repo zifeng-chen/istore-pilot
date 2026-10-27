@@ -4,11 +4,11 @@ struct RootView: View {
     @State private var tab = 0
     @State private var size: CGSize = .zero
 
-    // 「拦截」不再单独占页签：它和「设备」合成了一张一级页（SecurityView），
-    // 让出位置给一直藏在概览宽带卡后面的「网络」。
+    // 和 Android 端一致：四个页签。
+    // 「网络」不再是独立页签 —— 它大部分是只读信息，真正要动手的只有宽带配置和重拨，
+    // 都收进了概览 →「网络设置」的二级页（WanView）。
     private let items: [(String, String)] = [
         ("概览", "gauge.medium"),
-        ("网络", "antenna.radiowaves.left.and.right"),
         ("设备", "desktopcomputer"),
         ("代理", "network"),
         ("设置", "gearshape"),
@@ -24,10 +24,9 @@ struct RootView: View {
             // 切回来不用重新拉数据、滚动位置也不会跳回顶部
             ZStack {
                 OverviewView().opacity(tab == 0 ? 1 : 0).allowsHitTesting(tab == 0)
-                NetworkView().opacity(tab == 1 ? 1 : 0).allowsHitTesting(tab == 1)
-                SecurityView().opacity(tab == 2 ? 1 : 0).allowsHitTesting(tab == 2)
-                ProxyView().opacity(tab == 3 ? 1 : 0).allowsHitTesting(tab == 3)
-                SettingsView().opacity(tab == 4 ? 1 : 0).allowsHitTesting(tab == 4)
+                SecurityView().opacity(tab == 1 ? 1 : 0).allowsHitTesting(tab == 1)
+                ProxyView().opacity(tab == 2 ? 1 : 0).allowsHitTesting(tab == 2)
+                SettingsView().opacity(tab == 3 ? 1 : 0).allowsHitTesting(tab == 3)
             }
             .contentColumn(axis == .rail ? 980 : 820)
 

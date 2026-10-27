@@ -8,7 +8,6 @@ import { Bp } from '../ui/Breakpoint';
 import { NavBar } from '../ui/comp/NavBar';
 import { SideNav } from '../ui/comp/SideNav';
 import { OverviewPage } from '../ui/tabs/OverviewPage';
-import { NetworkPage } from '../ui/tabs/NetworkPage';
 import { SecurityPage } from '../ui/tabs/SecurityPage';
 import { ProxyPage } from '../ui/tabs/ProxyPage';
 import { SettingsPage } from '../ui/tabs/SettingsPage';
@@ -158,10 +157,6 @@ struct Index {
     Tabs({ barPosition: BarPosition.End, index: this.current }) {
       TabContent() {
         OverviewPage()
-      }
-
-      TabContent() {
-        NetworkPage()
       }
 
       TabContent() {

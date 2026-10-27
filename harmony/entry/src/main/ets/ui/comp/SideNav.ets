@@ -23,9 +23,9 @@ export struct SideNav {
   /** 顶部品牌区的机型名，让侧栏不是一条空白的图标列 */
   @Prop hostname: string;
 
+  // 四个页签，和手机端、Android、iOS 保持一致
   private items: RailItem[] = [
     { label: '概览', path: Ico.OVERVIEW, hint: '状态与速率' },
-    { label: '网络', path: Ico.NETWORK, hint: '宽带与内网' },
     { label: '设备', path: Ico.DEVICES, hint: '在线与拦截' },
     { label: '代理', path: Ico.PROXY, hint: '节点与分流' },
     { label: '设置', path: Ico.SETTINGS, hint: '连接与维护' }

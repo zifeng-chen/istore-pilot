@@ -1,4 +1,5 @@
 import { common } from '@kit.AbilityKit';
+import { router } from '@kit.ArkUI';
 import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
 import { Fmt } from '../../util/Fmt';
@@ -20,6 +21,9 @@ import { Card, CardHeader, Comp, Kv } from '../Comp';
  */
 @Component
 export struct NetworkPage {
+  /** 作为二级页打开时显示返回箭头（底部四个页签里没有它了） */
+  @Prop showBack: boolean = false;
+
   @State loaded: boolean = false;
   @State err: string = '';
 
@@ -58,6 +62,9 @@ export struct NetworkPage {
   @State pendToken: string = '';
   @State pendExpired: boolean = false;
 
+  @State acting: boolean = false;
+  @State actNote: string = '重拨只重建链路，不改配置；断开后点「连接」即可恢复。';
+
   @State winW: number = 360;
   @StorageProp('winW') @Watch('onWidth') winWStore: number = 360;
   @StorageProp('tab') @Watch('onTab') tab: number = 1;
@@ -67,9 +74,8 @@ export struct NetworkPage {
   aboutToAppear(): void {
     this.winW = this.winWStore;
     this.load(true);
-    if (this.tab === 1) {
-      this.startPoll();
-    }
+    // 作为二级页时它是当前页面，直接开始轮询；不再看 tab 是谁
+    this.startPoll();
   }
 
   aboutToDisappear(): void {
@@ -281,6 +287,88 @@ export struct NetworkPage {
     });
   }
 
+  /** 重拨 / 断开：不动配置，所以不需要回滚那套吓唬话 */
+  @Builder
+  actionCard() {
+    Card() {
+      CardHeader({ title: '连接操作', sub: '只动链路，不改配置' });
+      Row({ space: 10 }) {
+        Button(this.acting ? '执行中…' : '重拨')
+          .layoutWeight(1)
+          .height(38)
+          .fontSize(T.F_BODY)
+          .fontColor($r('app.color.on_primary'))
+          .backgroundColor($r('app.color.primary'))
+          .borderRadius(19)
+          .enabled(!this.acting)
+          .onClick(() => this.askAction('reconnect'));
+
+        Button(this.wanUp ? '断开' : '连接')
+          .layoutWeight(1)
+          .height(38)
+          .fontSize(T.F_BODY)
+          .fontColor($r('app.color.text_primary'))
+          .backgroundColor($r('app.color.surface_sunken'))
+          .borderRadius(19)
+          .enabled(!this.acting)
+          .onClick(() => this.askAction(this.wanUp ? 'down' : 'up'));
+      }
+      .width('100%');
+
+      Text(this.actNote)
+        .fontSize(T.F_TINY)
+        .fontColor($r('app.color.text_secondary'))
+        .width('100%')
+        .margin({ top: 10 });
+    }
+  }
+
+  private askAction(action: string): void {
+    let title: string = '重拨？';
+    let msg: string = 'PPPoE 会重新协商，全家断网 10-30 秒。不改配置，失败也不会丢宽带账号。';
+    if (action === 'down') {
+      title = '断开 WAN？';
+      msg = '断开后全家立刻上不了网，点「连接」可恢复。这个操作不改配置。';
+    } else if (action === 'up') {
+      title = '重新连接？';
+      msg = '向上级设备请求地址，通常 5-10 秒恢复。';
+    }
+    this.getUIContext().showAlertDialog({
+      title: title,
+      message: msg,
+      primaryButton: {
+        value: '确定',
+        fontColor: Pal.primary(),
+        action: () => {
+          this.doAction(action);
+        }
+      },
+      secondaryButton: {
+        value: '取消',
+        fontColor: Pal.textSecondary(),
+        action: () => {
+        }
+      }
+    });
+  }
+
+  private async doAction(action: string): Promise<void> {
+    this.acting = true;
+    this.actNote = action === 'down' ? '正在断开…' : '正在重拨…';
+    const r: ApiResult = await Api.post(this.ctx(), '/api/v1/net/wan/action', { action: action });
+    this.acting = false;
+    if (r.ok && r.data.bool('ok')) {
+      this.actNote = r.data.str('detail', '已发出指令');
+      // 拨号要 10-30 秒，页面的定时轮询会把状态带回来，这里只补一句进度
+      if (action !== 'down') {
+        this.actNote = '正在重拨，等 10-30 秒看上面的状态。';
+      }
+      this.load(false);
+    } else {
+      this.actNote = '操作失败：' + (r.ok ? r.data.str('error', '路由器没有回应') : '网络不通');
+    }
+  }
+
   @Builder
   kvRow(label: string, value: string) {
     Kv({ label: label, value: value, valueSize: T.F_BODY, accent: false });
@@ -473,6 +561,7 @@ export struct NetworkPage {
         this.pendingCard();
       }
       this.heroCard();
+      this.actionCard();
 
       if (this.err.length > 0) {
         Text('读取失败：' + this.err)
@@ -515,7 +604,15 @@ export struct NetworkPage {
   build() {
     Scroll() {
       Column() {
-        Row() {
+        Row({ space: 8 }) {
+          if (this.showBack) {
+            Text('‹')
+              .fontSize(26)
+              .fontColor($r('app.color.text_primary'))
+              .width(32)
+              .textAlign(TextAlign.Center)
+              .onClick(() => router.back());
+          }
           Text('网络')
             .fontSize(T.F_TITLE)
             .fontWeight(FontWeight.Medium)
@@ -534,6 +631,7 @@ export struct NetworkPage {
           Row({ space: T.GAP }) {
             Column({ space: T.GAP }) {
               this.heroCard();
+              this.actionCard();
               Card() {
                 CardHeader({ title: '宽带接入', sub: '对外那一根线' });
                 this.wanCardBody();

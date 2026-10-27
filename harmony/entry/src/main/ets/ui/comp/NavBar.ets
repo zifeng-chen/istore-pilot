@@ -18,9 +18,9 @@ interface NavItem {
 export struct NavBar {
   @Link current: number;
 
+  // 和 Android / iOS 一致：四个页签。「网络」并进了概览 →「网络设置」二级页
   private items: NavItem[] = [
     { label: '概览', path: Ico.OVERVIEW },
-    { label: '网络', path: Ico.NETWORK },
     { label: '设备', path: Ico.DEVICES },
     { label: '代理', path: Ico.PROXY },
     { label: '设置', path: Ico.SETTINGS }

@@ -1,4 +1,5 @@
 import { common } from '@kit.AbilityKit';
+import { router } from '@kit.ArkUI';
 import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
 import { Fmt } from '../../util/Fmt';
@@ -369,6 +370,7 @@ export struct OverviewPage {
               this.ringCard();
               this.portCard();
               this.machineCard();
+              this.netEntryCard();
             }
             .layoutWeight(1)
             .alignItems(HorizontalAlign.Start);
@@ -382,6 +384,7 @@ export struct OverviewPage {
             this.ringCard();
             this.portCard();
             this.machineCard();
+            this.netEntryCard();
           }
           .width('100%');
         }
@@ -611,6 +614,41 @@ export struct OverviewPage {
       Kv({ label: '内核', value: Fmt.orDash(this.kernel), valueSize: 0, accent: false });
       Hairline({ indent: 0 });
       Kv({ label: '在线时长', value: this.uptime, valueSize: 0, accent: false });
+    }
+  }
+
+  /** 网络设置入口：原来那个「网络」页签现在从这儿进 */
+  @Builder
+  netEntryCard() {
+    Card({ gapTop: 0, gapBottom: this.rail() ? Bp.gap(this.winW) : T.GAP }) {
+      Row({ space: 12 }) {
+        Text('⇅')
+          .fontSize(14)
+          .fontColor($r('app.color.primary'))
+          .width(30)
+          .height(30)
+          .textAlign(TextAlign.Center)
+          .borderRadius(9)
+          .backgroundColor($r('app.color.accent_soft'));
+        Column({ space: 3 }) {
+          Text('网络设置')
+            .fontSize(T.F_BODY)
+            .fontColor($r('app.color.text_primary'));
+          Text('宽带参数、重拨、局域网与防火墙')
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_secondary'));
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1);
+        Text('›')
+          .fontSize(18)
+          .fontColor($r('app.color.text_tertiary'));
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
+      .onClick(() => {
+        router.pushUrl({ url: 'pages/NetSettingsPage' });
+      });
     }
   }
 
