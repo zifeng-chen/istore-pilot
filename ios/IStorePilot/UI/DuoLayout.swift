@@ -13,11 +13,24 @@ enum BarAxis: Equatable {
     case bottom
     case rail
 
+    /// 竖条要同时满足三件事：**够宽、够高、确实是横向**。
+    ///
+    /// 只看比例会在两种真实场景上翻车：
+    ///   1. 画布接近正方（分屏、悬浮窗、合上后的外屏）—— 比例过线，但根本放不下两栏，
+    ///      硬排出来就是两根挤成一条的窄柱；
+    ///   2. 手机横过来 —— 852x393 比例过线，高度却只有 393，竖条把内容压成一条。
+    /// 所以除了 1.06 的宽高比容差，再加一道绝对尺寸门槛。
+    static let minRailWidth: CGFloat = 700
+    static let minRailHeight: CGFloat = 500
+
     /// 宽高比超过 1.06 才算横向：给键盘弹出、动态岛这类把高度挤掉一点的情况留余量，
     /// 否则差 1~2pt 就来回跳形态。
     init(size: CGSize) {
         guard size.width > 0, size.height > 0 else { self = .bottom; return }
-        self = size.width > size.height * 1.06 ? .rail : .bottom
+        let wide = size.width >= Self.minRailWidth
+        let tall = size.height >= Self.minRailHeight
+        let landscape = size.width > size.height * 1.06
+        self = (wide && tall && landscape) ? .rail : .bottom
     }
 }
 
@@ -117,9 +130,8 @@ struct DuoColumns<Left: View, Right: View>: View {
 /// 量窗口尺寸和安全区。
 ///
 /// 不用 `GeometryReader` 包在外层：那会把窗口安全区吃成 0，
-/// 背景就没法 `ignoresSafeArea` 铺到屏幕边缘了。这里放在 **background** 里，
-/// 自己再 `ignoresSafeArea()` —— 这样拿到的 `size` 是整块画布，
-/// `safeAreaInsets` 是真正的四边留白。
+/// 背景就没法 `ignoresSafeArea` 铺到屏幕边缘了。这里塞进 **background**，
+/// 既不参与外层布局，又能读到容器的安全区。
 ///
 /// 为什么要 insets：竖条形态下（折叠屏横过来）系统经常给 0 的上边距，
 /// 因为状态栏挪到了右侧那一列。导航栏和二级页的返回箭头就会被压到屏幕最上沿。
@@ -131,11 +143,15 @@ struct MetricsReader: ViewModifier {
     func body(content: Content) -> some View {
         content.background {
             GeometryReader { g in
+                // 注意：**不要**给这个 GeometryReader 加 ignoresSafeArea。
+                // 加了之后它自己就成了「忽略安全区的视图」，proxy 报出来的
+                // safeAreaInsets 全是 0 —— 拿 0 去判断「系统给没给上边距」永远为真。
+                // 不忽略时 proxy 拿到的是容器的安全区（真值），size 是安全区内尺寸，
+                // 整块画布 = 两者相加。
                 Color.clear
                     .onAppear { read(g) }
                     .onChange(of: g.size) { _ in read(g) }
             }
-            .ignoresSafeArea()
         }
     }
 
@@ -144,8 +160,10 @@ struct MetricsReader: ViewModifier {
         if insets != i {
             insets = i
         }
-        if size != g.size {
-            size = g.size
+        let full = CGSize(width: g.size.width + i.leading + i.trailing,
+                          height: g.size.height + i.top + i.bottom)
+        if size != full {
+            size = full
         }
     }
 }
