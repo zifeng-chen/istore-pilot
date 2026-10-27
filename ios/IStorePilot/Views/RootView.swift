@@ -3,6 +3,7 @@ import SwiftUI
 struct RootView: View {
     @State private var tab = 0
     @State private var size: CGSize = .zero
+    @State private var insets: EdgeInsets = EdgeInsets()
 
     // 和 Android 端一致：四个页签。
     // 「网络」不再是独立页签 —— 它大部分是只读信息，真正要动手的只有宽带配置和重拨，
@@ -16,35 +17,48 @@ struct RootView: View {
 
     private var axis: BarAxis { BarAxis(size: size) }
 
+    /// 竖条形态下系统经常不给上边距（折叠屏横过来时状态栏跑到右侧那一列去了），
+    /// 导航栏和二级页的返回箭头会被压到屏幕最上沿、贴着圆角。补一小条呼吸位。
+    private var topGuard: CGFloat {
+        axis == .rail && insets.top < 8 ? 10 : 0
+    }
+
     var body: some View {
-        ZStack(alignment: .bottom) {
-            C.appBg.ignoresSafeArea()
-
-            // 五个页面同时存在、靠透明度切换：add/hide 保状态，
-            // 切回来不用重新拉数据、滚动位置也不会跳回顶部
-            ZStack {
-                OverviewView().opacity(tab == 0 ? 1 : 0).allowsHitTesting(tab == 0)
-                SecurityView().opacity(tab == 1 ? 1 : 0).allowsHitTesting(tab == 1)
-                ProxyView().opacity(tab == 2 ? 1 : 0).allowsHitTesting(tab == 2)
-                SettingsView().opacity(tab == 3 ? 1 : 0).allowsHitTesting(tab == 3)
-            }
-            .contentColumn(axis == .rail ? 980 : 820)
-
+        Group {
             if axis == .rail {
-                NavRail(items: items, tab: $tab)
-                    .frame(width: NavRail.width)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                    // 竖条要落在系统为侧边栏预留的那 84pt 里。那片区域已经在安全区之外，
-                    // 所以只放开 trailing 这一个边 —— 上下安全区照旧生效，内容不会被顶到状态栏下面
-                    .ignoresSafeArea(edges: .trailing)
+                HStack(spacing: 0) {
+                    tabs
+                    NavRail(items: items, tab: $tab)
+                        .frame(width: NavRail.width)
+                }
             } else {
-                BottomBar(items: items, tab: $tab)
+                VStack(spacing: 0) {
+                    tabs
+                    // 材料要铺到屏幕最底下（Home 指示条那一条），
+                    // 图标本身留在安全区里 —— ignoresSafeAreaEdges 只作用于背景
+                    BottomBar(items: items, tab: $tab)
+                        .background(.regularMaterial, ignoresSafeAreaEdges: .bottom)
+                }
             }
         }
+        .padding(.top, topGuard)
+        .background(C.appBg.ignoresSafeArea())
         .environment(\.barAxis, axis)
-        .modifier(SizeReporter(size: $size))
+        .modifier(MetricsReader(size: $size, insets: $insets))
         .ignoresSafeArea(.keyboard)
         .animation(.easeInOut(duration: 0.22), value: axis)
+    }
+
+    /// 四个页面同时存在、靠透明度切换：add/hide 保状态，
+    /// 切回来不用重新拉数据、滚动位置也不会跳回顶部
+    private var tabs: some View {
+        ZStack {
+            OverviewView().opacity(tab == 0 ? 1 : 0).allowsHitTesting(tab == 0)
+            SecurityView().opacity(tab == 1 ? 1 : 0).allowsHitTesting(tab == 1)
+            ProxyView().opacity(tab == 2 ? 1 : 0).allowsHitTesting(tab == 2)
+            SettingsView().opacity(tab == 3 ? 1 : 0).allowsHitTesting(tab == 3)
+        }
+        .contentColumn(axis == .rail ? 980 : 820)
     }
 }
 
@@ -89,7 +103,6 @@ private struct BottomBar: View {
         .padding(.horizontal, 10)
         .padding(.top, 7)
         .padding(.bottom, 4)
-        .background(.regularMaterial)
         .overlay(alignment: .top) {
             Rectangle().fill(C.divider).frame(height: 0.5)
         }
@@ -98,10 +111,10 @@ private struct BottomBar: View {
 
 /// 竖排导航。宽画布（Duo 内屏展开、分屏）时替代底部横条。
 ///
-/// 为什么宽度写死 84：系统给侧边竖条预留的安全区就是 84pt，
-/// 跟它对齐，手指落点和系统自己的栏位置一致。
-/// 图标 + 文字都保留 —— 竖向是"定宽不定高"，纯文字会挤，
-/// 纯图标又认不出来，两个叠着放才读得懂。
+/// 宽度 84 跟系统给侧边竖条预留的宽度对齐，手指落点和系统自己的栏一致。
+/// 但**不要**把它塞进系统那条安全区里：折叠屏横过来时，系统的状态栏
+/// （时间 / 信号 / 电池）正好画在那一列上，塞进去会和导航项叠在一起。
+/// 现在它站在安全区之内、紧挨着那条留白，两边互不打扰。
 private struct NavRail: View {
     let items: [(String, String)]
     @Binding var tab: Int
@@ -141,7 +154,7 @@ private struct NavRail: View {
         .padding(.horizontal, 9)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.regularMaterial)
+        .background(C.surface)
         .overlay(alignment: .leading) {
             Rectangle().fill(C.divider).frame(width: 0.5)
         }

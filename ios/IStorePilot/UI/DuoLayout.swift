@@ -33,9 +33,12 @@ extension EnvironmentValues {
 }
 
 extension View {
-    /// 页面内容底部给导航条让位。
-    /// 横条要 78pt；竖条不在底部，留一点点呼吸感就够，否则一屏少两行。
-    func barBottomGap(_ height: CGFloat = 78) -> some View {
+    /// 页面内容末尾的一点呼吸感。
+    ///
+    /// 以前这个值要 78pt：底部横条是浮在内容上方的，不手动让位就会压住最后一张卡。
+    /// 现在横条参与布局（VStack 的第二个孩子），高度系统已经扣掉了，
+    /// 这里只剩「最后一张卡别贴着栏」这点作用，所以统一成 18pt。
+    func barBottomGap(_ height: CGFloat = 18) -> some View {
         modifier(BarGap(height: height))
     }
 
@@ -47,11 +50,10 @@ extension View {
 }
 
 private struct BarGap: ViewModifier {
-    @Environment(\.barAxis) private var axis
     let height: CGFloat
 
     func body(content: Content) -> some View {
-        Color.clear.frame(height: axis == .rail ? 18 : height)
+        Color.clear.frame(height: height)
     }
 }
 
@@ -112,20 +114,38 @@ struct DuoColumns<Left: View, Right: View>: View {
     }
 }
 
-/// 读当前可用尺寸。
+/// 量窗口尺寸和安全区。
 ///
 /// 不用 `GeometryReader` 包在外层：那会把窗口安全区吃成 0，
-/// 背景就没法 `ignoresSafeArea` 铺到屏幕边缘了（现在的底色是靠这个铺的）。
-/// `onGeometryChange` 不参与布局，只上报，正好。
-/// iOS 18 以下没有这个 API，但那类设备没有折叠形态，恒为横条也不需要量。
-struct SizeReporter: ViewModifier {
+/// 背景就没法 `ignoresSafeArea` 铺到屏幕边缘了。这里放在 **background** 里，
+/// 自己再 `ignoresSafeArea()` —— 这样拿到的 `size` 是整块画布，
+/// `safeAreaInsets` 是真正的四边留白。
+///
+/// 为什么要 insets：竖条形态下（折叠屏横过来）系统经常给 0 的上边距，
+/// 因为状态栏挪到了右侧那一列。导航栏和二级页的返回箭头就会被压到屏幕最上沿。
+/// 拿到 insets 才能判断「该不该自己补一条呼吸位」。
+struct MetricsReader: ViewModifier {
     @Binding var size: CGSize
+    @Binding var insets: EdgeInsets
 
     func body(content: Content) -> some View {
-        if #available(iOS 18.0, *) {
-            content.onGeometryChange(for: CGSize.self) { $0.size } action: { size = $0 }
-        } else {
-            content
+        content.background {
+            GeometryReader { g in
+                Color.clear
+                    .onAppear { read(g) }
+                    .onChange(of: g.size) { _ in read(g) }
+            }
+            .ignoresSafeArea()
+        }
+    }
+
+    private func read(_ g: GeometryProxy) {
+        let i = g.safeAreaInsets
+        if insets != i {
+            insets = i
+        }
+        if size != g.size {
+            size = g.size
         }
     }
 }

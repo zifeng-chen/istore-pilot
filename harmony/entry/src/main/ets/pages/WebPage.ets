@@ -3,7 +3,9 @@ import { router } from '@kit.ArkUI';
 import { webview } from '@kit.ArkWeb';
 import { Api, ApiResult } from '../api/Api';
 import { Session } from '../core/Session';
-import { T } from '../ui/Theme';
+import { Pal, T } from '../ui/Theme';
+import { GlyphIcon } from '../ui/Comp';
+import { Glyph } from '../ui/comp/Icons';
 
 /**
  * 内置浏览器：路由器网页端（LuCI）。对应 Android 的 WebActivity 与 iOS 的 WebScreen。
@@ -130,12 +132,14 @@ struct WebPage {
   build() {
     Column() {
       Row({ space: 8 }) {
-        Text('‹')
-          .fontSize(26)
-          .fontColor($r('app.color.text_primary'))
-          .width(32)
-          .textAlign(TextAlign.Center)
-          .onClick(() => this.close());
+        Stack() {
+          GlyphIcon({ kind: Glyph.CHEVRON_LEFT, color: Pal.textPrimary(),
+            side: 19, lineWidth: 2.2 });
+        }
+        .width(34)
+        .height(34)
+        .alignContent(Alignment.Center)
+        .onClick(() => this.close());
         Column({ space: 2 }) {
           Text('路由器网页端')
             .fontSize(T.F_BODY)

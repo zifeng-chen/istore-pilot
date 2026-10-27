@@ -5,7 +5,8 @@ import { J } from '../../core/Json';
 import { Fmt } from '../../util/Fmt';
 import { Pal, T } from '../Theme';
 import { Bp } from '../Breakpoint';
-import { Card, CardHeader, Comp, Kv } from '../Comp';
+import { Card, CardHeader, Comp, GlyphIcon, Kv } from '../Comp';
+import { Glyph } from '../comp/Icons';
 
 /**
  * 网络：这台路由器「怎么上网、内网怎么分、谁能进来」。
@@ -794,9 +795,8 @@ export struct NetworkPage {
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1);
-        Text('›')
-          .fontSize(18)
-          .fontColor($r('app.color.text_tertiary'));
+        GlyphIcon({ kind: Glyph.CHEVRON, color: Pal.textTertiary(),
+          side: 14, lineWidth: 1.9 });
       }
       .width('100%')
       .alignItems(VerticalAlign.Center)
@@ -861,12 +861,14 @@ export struct NetworkPage {
       Column() {
         Row({ space: 8 }) {
           if (this.showBack) {
-            Text('‹')
-              .fontSize(26)
-              .fontColor($r('app.color.text_primary'))
-              .width(32)
-              .textAlign(TextAlign.Center)
-              .onClick(() => router.back());
+            Stack() {
+              GlyphIcon({ kind: Glyph.CHEVRON_LEFT, color: Pal.textPrimary(),
+                side: 19, lineWidth: 2.2 });
+            }
+            .width(34)
+            .height(34)
+            .alignContent(Alignment.Center)
+            .onClick(() => router.back());
           }
           Text('网络')
             .fontSize(T.F_TITLE)

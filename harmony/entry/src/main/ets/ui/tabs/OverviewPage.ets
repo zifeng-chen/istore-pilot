@@ -5,7 +5,8 @@ import { J } from '../../core/Json';
 import { Fmt } from '../../util/Fmt';
 import { Bp } from '../Breakpoint';
 import { Pal, T } from '../Theme';
-import { Card, CardHeader, Hairline, Kv, Pill } from '../Comp';
+import { Card, CardHeader, GlyphIcon, Hairline, Kv, Pill } from '../Comp';
+import { Glyph } from '../comp/Icons';
 import { Ring } from '../comp/Ring';
 import { TrendChart } from '../comp/TrendChart';
 import { PortTile } from '../comp/PortTile';
@@ -622,14 +623,14 @@ export struct OverviewPage {
   netEntryCard() {
     Card({ gapTop: 0, gapBottom: this.rail() ? Bp.gap(this.winW) : T.GAP }) {
       Row({ space: 12 }) {
-        Text('⇅')
-          .fontSize(14)
-          .fontColor($r('app.color.primary'))
-          .width(30)
-          .height(30)
-          .textAlign(TextAlign.Center)
-          .borderRadius(9)
-          .backgroundColor($r('app.color.accent_soft'));
+        Stack() {
+          GlyphIcon({ kind: Glyph.SWAP, color: Pal.primary(), side: 17, lineWidth: 1.7 });
+        }
+        .width(30)
+        .height(30)
+        .borderRadius(9)
+        .backgroundColor($r('app.color.accent_soft'))
+        .alignContent(Alignment.Center);
         Column({ space: 3 }) {
           Text('网络设置')
             .fontSize(T.F_BODY)
@@ -640,9 +641,8 @@ export struct OverviewPage {
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1);
-        Text('›')
-          .fontSize(18)
-          .fontColor($r('app.color.text_tertiary'));
+        GlyphIcon({ kind: Glyph.CHEVRON, color: Pal.textTertiary(),
+          side: 14, lineWidth: 1.9 });
       }
       .width('100%')
       .alignItems(VerticalAlign.Center)
