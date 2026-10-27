@@ -9,6 +9,7 @@ struct OverviewView: View {
     @State private var goHardware = false
     @State private var goWan = false
     @State private var detail: PortDetail?
+    @Environment(\.barAxis) private var axis
 
     /// 每个网口最近 32 次采样，约 1 分半。
     /// 放这里而不是 PortTile 内部：tile 是 struct，每帧重建，存不住历史。
@@ -24,15 +25,22 @@ struct OverviewView: View {
 
                     if loading {
                         skeleton
-                    } else {
-                        // 宽屏分两栏：左栏「系统 + 网口」是主体（网口网格能摊开成三列），
-                        // 右栏只放设备摘要。窄屏还是原来的单列顺序
+                    } else if axis == .rail {
+                        // 宽屏：上面「系统状态 | 局域网设备」两栏，网口单独占一整行。
+                        // 网口挤在左栏里只有 479pt，6 个口得两两排成三行；
+                        // 摊成整行后一行能看全，拔插网线时不用来回扫
                         DuoColumns {
                             systemCard
-                            portCard
                         } right: {
                             deviceCard
                         }
+                        portCard(tileMin: 120)
+                    } else {
+                        // 窄屏维持原来的单列顺序。156 是手机上排两张的下限：
+                        // 402pt 的机器内容宽 334，再大就只能排一张，六个口要滑六屏
+                        systemCard
+                        portCard(tileMin: 156)
+                        deviceCard
                     }
 
                     if !err.isEmpty {
@@ -202,7 +210,9 @@ struct OverviewView: View {
     ///
     /// 原来这张卡只画了 WAN / LAN 两个「逻辑接口」，看不到六个口各自的状态 ——
     /// 插错口、某个口协商成百兆、某个口一直空着，从原来那两行里完全读不出来。
-    private var portCard: some View {
+    /// - Parameter tileMin: 单张网口卡的最小宽度。整行铺开时给 120（6 个口一行），
+    ///   窄屏给 156（手机上两张并排）
+    private func portCard(tileMin: CGFloat) -> some View {
         let ports = (d.obj("network")?.objs("ports") ?? []).sorted { a, b in
             let wa = a.str("role") == "wan"
             let wb = b.str("role") == "wan"
@@ -221,7 +231,7 @@ struct OverviewView: View {
                         .font(F.caption).foregroundStyle(C.textSecondary)
                 } else {
                     LazyVGrid(columns: [
-                        GridItem(.adaptive(minimum: 168), spacing: 9),
+                        GridItem(.adaptive(minimum: tileMin), spacing: 9),
                     ], spacing: 9) {
                         ForEach(Array(ports.enumerated()), id: \.offset) { _, p in
                             let name = p.str("name")

@@ -164,6 +164,9 @@ struct PortTile: View {
                     .font(.system(size: 11.5))
                     .foregroundStyle(C.textSecondary)
                     .lineLimit(1)
+                    // 摊成整行六个之后每张只有 126pt，
+                    // 「WAN · 已连接」正好卡在临界，给一点缩放余量别截断
+                    .minimumScaleFactor(0.82)
                     .padding(.top, 3)
 
                 MiniSpark(values: hist, color: up ? C.primary : C.textTertiary, active: up)
