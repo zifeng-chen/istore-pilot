@@ -62,6 +62,20 @@ export struct NetworkPage {
   @State pendToken: string = '';
   @State pendExpired: boolean = false;
 
+  // 宽带参数（编辑用）：只在第一次拿到配置时灌一次，之后以用户输入为准
+  @State protoKey: string = 'pppoe';
+  @State protoKeys: string[] = [];
+  @State protoLabels: string[] = [];
+  @State inUser: string = '';
+  @State inPass: string = '';
+  @State inIp: string = '';
+  @State inMask: string = '255.255.255.0';
+  @State inGw: string = '';
+  @State inDns: string = '';
+  @State inMtu: string = '';
+  @State savingWan: boolean = false;
+  private cfgFilled: boolean = false;
+
   @State acting: boolean = false;
   @State actNote: string = '重拨只重建链路，不改配置；断开后点「连接」即可恢复。';
 
@@ -166,6 +180,32 @@ export struct NetworkPage {
     this.account = cfg.str('username', '');
     this.gateway = st.str('gateway', '');
     this.uptime = st.num('uptime', 0);
+
+    if (!this.cfgFilled) {
+      this.protoKey = cfg.str('proto', 'pppoe');
+      this.inUser = cfg.str('username', '');
+      this.inIp = cfg.str('ipaddr', '');
+      const mask: string = cfg.str('netmask', '');
+      this.inMask = mask.length > 0 ? mask : '255.255.255.0';
+      this.inGw = cfg.str('gateway', '');
+      this.inMtu = cfg.str('mtu', '');
+      this.inDns = cfg.strs('dns').join(' ');
+
+      const protos: J[] = cfg.arr('protos');
+      const keys: string[] = [];
+      const labels: string[] = [];
+      for (let i = 0; i < protos.length; i++) {
+        const k: string = protos[i].str('key', '');
+        if (k.length === 0) {
+          continue;
+        }
+        keys.push(k);
+        labels.push(this.shortProto(k, protos[i].str('label', k)));
+      }
+      this.protoKeys = keys;
+      this.protoLabels = labels;
+      this.cfgFilled = true;
+    }
 
     const parts: string[] = st.strs('dns');
     this.dns = parts.slice(0, 3).join('  ');
@@ -369,6 +409,183 @@ export struct NetworkPage {
     }
   }
 
+  // ---------------------------------------------------------------- 宽带参数
+
+  /** 分段控件只有 1/3 屏宽，「自动获取（DHCP）」这种标签必被截断 */
+  private shortProto(key: string, fallback: string): string {
+    if (key === 'pppoe') {
+      return 'PPPoE';
+    }
+    if (key === 'dhcp') {
+      return 'DHCP';
+    }
+    if (key === 'static') {
+      return '静态 IP';
+    }
+    return fallback;
+  }
+
+  @Builder
+  fieldRow(label: string, value: string, hint: string, secret: boolean,
+           onChange: (v: string) => void) {
+    Row({ space: 12 }) {
+      Text(label)
+        .fontSize(T.F_BODY)
+        .fontColor($r('app.color.text_primary'))
+        .width(84)
+        .textAlign(TextAlign.Start);
+      TextInput({ text: value, placeholder: hint })
+        .type(secret ? InputType.Password : InputType.Normal)
+        .fontSize(T.F_BODY)
+        .textAlign(TextAlign.End)
+        .backgroundColor(Color.Transparent)
+        .layoutWeight(1)
+        .onChange((v: string) => {
+          onChange(v);
+        });
+    }
+    .width('100%')
+    .height(46)
+    .alignItems(VerticalAlign.Center);
+  }
+
+  /** 接入配置：和 Android / iOS 同一套字段（账号口令、静态 IP、DNS、MTU） */
+  @Builder
+  wanEditCard() {
+    Card() {
+      CardHeader({ title: '接入配置', sub: '保存后立即重新拨号' });
+
+      Row({ space: 8 }) {
+        ForEach(this.protoKeys, (k: string, i: number) => {
+          Text(this.protoLabels[i])
+            .fontSize(T.F_SUB)
+            .fontColor(this.protoKey === k
+              ? $r('app.color.primary')
+              : $r('app.color.text_secondary'))
+            .textAlign(TextAlign.Center)
+            .height(34)
+            .borderRadius(17)
+            .layoutWeight(1)
+            .backgroundColor(this.protoKey === k
+              ? $r('app.color.accent_soft2')
+              : $r('app.color.surface_hi'))
+            .onClick(() => {
+              this.protoKey = k;
+            });
+        }, (k: string) => k);
+      }
+      .width('100%')
+      .margin({ top: 10 });
+
+      if (this.protoKey === 'pppoe') {
+        this.fieldRow('宽带账号', this.inUser, '运营商给的账号', false, (v: string) => {
+          this.inUser = v;
+        });
+        this.fieldRow('宽带密码', this.inPass, '留空则保持不变', true, (v: string) => {
+          this.inPass = v;
+        });
+      } else if (this.protoKey === 'static') {
+        this.fieldRow('IP 地址', this.inIp, '192.168.1.2', false, (v: string) => {
+          this.inIp = v;
+        });
+        this.fieldRow('子网掩码', this.inMask, '255.255.255.0', false, (v: string) => {
+          this.inMask = v;
+        });
+        this.fieldRow('默认网关', this.inGw, '192.168.1.1', false, (v: string) => {
+          this.inGw = v;
+        });
+      }
+
+      this.fieldRow('DNS', this.inDns, '留空用运营商下发', false, (v: string) => {
+        this.inDns = v;
+      });
+      this.fieldRow('MTU', this.inMtu, '留空用默认 1492', false, (v: string) => {
+        this.inMtu = v;
+      });
+
+      Text('密码留空表示沿用路由器里存着的那一个 —— 界面只显示掩码，把掩码提交回去会覆盖真密码。')
+        .fontSize(T.F_TINY)
+        .fontColor($r('app.color.text_secondary'))
+        .width('100%')
+        .margin({ top: 4 });
+
+      Button(this.savingWan ? '正在应用…' : '保存并重新拨号')
+        .width('100%')
+        .height(42)
+        .fontSize(T.F_BODY)
+        .fontColor($r('app.color.on_primary'))
+        .backgroundColor($r('app.color.primary'))
+        .borderRadius(12)
+        .margin({ top: 12 })
+        .enabled(!this.savingWan)
+        .onClick(() => this.askSaveWan());
+    }
+  }
+
+  private askSaveWan(): void {
+    this.getUIContext().showAlertDialog({
+      title: '保存并重新拨号？',
+      message: '会立即重新拨号，全家断网 10-30 秒；90 秒内上不了网，路由器会自动还原成现在的配置。',
+      primaryButton: {
+        value: '保存并重拨',
+        fontColor: Pal.primary(),
+        action: () => {
+          this.saveWan();
+        }
+      },
+      secondaryButton: {
+        value: '取消',
+        fontColor: Pal.textSecondary(),
+        action: () => {
+        }
+      }
+    });
+  }
+
+  private async saveWan(): Promise<void> {
+    const body: Record<string, Object> = { 'proto': this.protoKey };
+    if (this.protoKey === 'pppoe') {
+      if (this.inUser.trim().length === 0) {
+        this.toast('请填写宽带账号');
+        return;
+      }
+      body['username'] = this.inUser.trim();
+      if (this.inPass.length > 0) {
+        body['password'] = this.inPass;
+      }
+    } else if (this.protoKey === 'static') {
+      if (this.inIp.trim().length === 0) {
+        this.toast('请填写 IP 地址');
+        return;
+      }
+      body['ipaddr'] = this.inIp.trim();
+      body['netmask'] = this.inMask.trim();
+      body['gateway'] = this.inGw.trim();
+    }
+
+    const dnsList: string[] = this.inDns.trim().split(/[\s,;]+/).filter((x: string) => x.length > 0);
+    if (dnsList.length > 0) {
+      body['dns'] = dnsList;
+      body['peerdns'] = false;
+    }
+    if (this.inMtu.trim().length > 0) {
+      body['mtu'] = this.inMtu.trim();
+    }
+
+    this.savingWan = true;
+    const r: ApiResult = await Api.post(this.ctx(), '/api/v1/network/wan', body);
+    this.savingWan = false;
+    if (r.ok && r.data.bool('ok', false)) {
+      this.inPass = '';
+      this.cfgFilled = false;    // 让下一次刷新把服务端的新配置读回来
+      this.actNote = r.data.str('detail', '配置已保存，正在重拨');
+      this.toast('已保存，正在重新拨号');
+      this.load(false);
+    } else {
+      this.toast('保存失败：' + (r.ok ? r.data.str('error', '路由器没有回应') : r.error));
+    }
+  }
+
   @Builder
   kvRow(label: string, value: string) {
     Kv({ label: label, value: value, valueSize: T.F_BODY, accent: false });
@@ -562,6 +779,7 @@ export struct NetworkPage {
       }
       this.heroCard();
       this.actionCard();
+      this.wanEditCard();
 
       if (this.err.length > 0) {
         Text('读取失败：' + this.err)
@@ -632,6 +850,7 @@ export struct NetworkPage {
             Column({ space: T.GAP }) {
               this.heroCard();
               this.actionCard();
+              this.wanEditCard();
               Card() {
                 CardHeader({ title: '宽带接入', sub: '对外那一根线' });
                 this.wanCardBody();

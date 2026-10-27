@@ -3,7 +3,7 @@ import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
 import { Bp } from '../Breakpoint';
 import { Pal, T } from '../Theme';
-import { Card, CardHeader, GroupBox, Hairline, Pill } from '../Comp';
+import { Card, CardHeader, Comp, GroupBox, Hairline, Pill } from '../Comp';
 import { Ico } from '../comp/Icons';
 
 interface Backend {
@@ -46,6 +46,8 @@ export struct ProxyPage {
   @State mode: string = '';
   @State expanded: string = '';
   @State busy: string = '';
+  /** 正在测速的分组名，空串表示空闲 */
+  @State testingGroup: string = '';
   @State toast: string = '';
   @State loaded: boolean = false;
 
@@ -182,6 +184,59 @@ export struct ProxyPage {
         this.mode = m;
       }
     }
+  }
+
+  /** 延迟三档配色：绿 <150 / 琥珀 <350 / 红 */
+  private delayHex(ms: number): string {
+    if (ms <= 0) {
+      return '#8E8E93';
+    }
+    if (ms < 150) {
+      return '#34C759';
+    }
+    if (ms < 350) {
+      return '#FF9500';
+    }
+    return '#FF3B30';
+  }
+
+  /** 整组测速：OpenClash 由内核并发打完，Passwall 走并发 TCP 探测 */
+  private async testGroup(name: string): Promise<void> {
+    if (this.testingGroup.length > 0) {
+      this.toast = '正在测速，稍等';
+      return;
+    }
+    this.testingGroup = name;
+    const body: Record<string, Object> = { 'group': name, 'timeout': 3000 };
+    const r: ApiResult = await Api.post(this.ctx(), '/api/v1/proxy/delays', body);
+    this.testingGroup = '';
+    if (!r.ok || !r.data.bool('ok', false)) {
+      this.toast = '测速失败：' + (r.ok ? r.data.str('error', '没有结果') : r.error);
+      return;
+    }
+    const delays: Record<string, number> = r.data.numMap('delays');
+    const next: NodeGroup[] = [];
+    let ok: number = 0;
+    for (let i = 0; i < this.groups.length; i++) {
+      const g: NodeGroup = this.groups[i];
+      const members: NodeItem[] = [];
+      for (let k = 0; k < g.members.length; k++) {
+        const m: NodeItem = g.members[k];
+        const ms: number | undefined = delays[m.name];
+        if (ms !== undefined && ms > 0) {
+          ok = ok + 1;
+        }
+        members.push({
+          name: m.name,
+          type: m.type,
+          group: m.group,
+          delay: ms === undefined ? m.delay : ms
+        });
+      }
+      next.push({ name: g.name, now: g.now, type: g.type, members: members });
+    }
+    this.groups = next;
+    this.toast = ok > 0 ? ('测速完成：' + ok + ' 个节点可达') : '测速完成，没有可用结果';
   }
 
   private async pickNode(group: string, name: string): Promise<void> {
@@ -364,8 +419,25 @@ export struct ProxyPage {
                   .margin({ top: 2 });
               }
               .alignItems(HorizontalAlign.Start)
-              .layoutWeight(1);
+              .layoutWeight(1)
+              .onClick(() => {
+                this.expanded = this.expanded === g.name ? '' : g.name;
+              });
 
+              Text(this.testingGroup === g.name ? '测速中' : '测速')
+                .fontSize(T.F_TINY)
+                .fontColor(this.testingGroup === g.name
+                  ? $r('app.color.text_secondary')
+                  : $r('app.color.primary'))
+                .padding({ left: 9, right: 9, top: 4, bottom: 4 })
+                .borderRadius(99)
+                .backgroundColor(this.testingGroup === g.name
+                  ? $r('app.color.surface_sunken')
+                  : $r('app.color.accent_soft'))
+                .margin({ right: 8 })
+                .onClick(() => {
+                  this.testGroup(g.name);
+                });
               Text(g.members.length + ' 个')
                 .fontSize(T.F_TINY)
                 .fontColor($r('app.color.text_tertiary'));
@@ -381,16 +453,32 @@ export struct ProxyPage {
             }
             .width('100%')
             .padding({ left: 16, right: 14, top: 12, bottom: 12 })
-            .alignItems(VerticalAlign.Center)
-            .onClick(() => {
-              this.expanded = this.expanded === g.name ? '' : g.name;
-            });
+            .alignItems(VerticalAlign.Center);
 
             if (this.expanded === g.name) {
               ForEach(g.members, (m: NodeItem, mi: number) => {
                 Column() {
                   Hairline({ indent: 16 });
-                  Row() {
+                  Row({ space: 10 }) {
+                    Stack() {
+                      Circle()
+                        .width(15)
+                        .height(15)
+                        .fill(Color.Transparent)
+                        .stroke(m.name === g.now
+                          ? $r('app.color.primary')
+                          : $r('app.color.text_tertiary'))
+                        .strokeWidth(1.4);
+                      if (m.name === g.now) {
+                        Circle()
+                          .width(7)
+                          .height(7)
+                          .fill($r('app.color.primary'));
+                      }
+                    }
+                    .width(15)
+                    .height(15);
+
                     Text(m.name)
                       .fontSize(T.F_BODY)
                       .fontColor(m.name === g.now
@@ -399,21 +487,27 @@ export struct ProxyPage {
                       .maxLines(1)
                       .textOverflow({ overflow: TextOverflow.Ellipsis })
                       .layoutWeight(1);
+
                     if (this.busy === g.name + '/' + m.name) {
                       Text('切换中…')
                         .fontSize(T.F_TINY)
                         .fontColor($r('app.color.text_secondary'));
+                    } else if (m.delay > 0) {
+                      Text(m.delay + 'ms')
+                        .fontSize(T.F_TINY)
+                        .fontColor(this.delayHex(m.delay))
+                        .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                        .borderRadius(99)
+                        .backgroundColor(Comp.alpha(this.delayHex(m.delay), 0.16))
+                        .fontFeature("\"tnum\" on");
                     } else if (m.name === g.now) {
                       Text('使用中')
                         .fontSize(T.F_TINY)
                         .fontColor($r('app.color.primary'));
-                    } else if (m.delay > 0) {
-                      Text(m.delay + 'ms')
+                    } else {
+                      Text('—')
                         .fontSize(T.F_TINY)
-                        .fontColor(m.delay > 500
-                          ? $r('app.color.warn')
-                          : $r('app.color.text_secondary'))
-                        .fontFeature("\"tnum\" on");
+                        .fontColor($r('app.color.text_tertiary'));
                     }
                   }
                   .width('100%')

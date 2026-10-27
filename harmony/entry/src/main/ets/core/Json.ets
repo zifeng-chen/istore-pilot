@@ -46,6 +46,24 @@ export class J {
     return v !== undefined && v !== null;
   }
 
+  /** 数字字典：测速结果是 { '节点名': 123 } 这种形态，用 Object.keys 摊平 */
+  numMap(key: string): Record<string, number> {
+    const out: Record<string, number> = {};
+    const v: Object = this.d[key];
+    if (v === null || v === undefined || typeof v !== 'object' || Array.isArray(v)) {
+      return out;
+    }
+    const m = v as Record<string, Object>;
+    const ks: string[] = Object.keys(m);
+    for (let i = 0; i < ks.length; i++) {
+      const n: number = Number(m[ks[i]]);
+      if (!isNaN(n)) {
+        out[ks[i]] = n;
+      }
+    }
+    return out;
+  }
+
   /** 字符串数组：Agent 很多字段是 ['1.1.1.1','8.8.8.8'] 这种裸数组 */
   strs(key: string): string[] {
     const out: string[] = [];
