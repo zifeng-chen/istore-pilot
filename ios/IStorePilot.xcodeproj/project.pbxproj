@@ -20,7 +20,6 @@
 		8326BC4E76E5A7A588F1F19D /* DevicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A83ABDDD7AF702729432E5A4 /* DevicesView.swift */; };
 		A4DCFDEA21DE759A061DF4B8 /* HardwareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E72FF4A6E354ECDC83F63E6A /* HardwareView.swift */; };
 		0331A1C96AD6B358A06DED5D /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6E05E9FB97BD3EB0D7192D6 /* LoginView.swift */; };
-		79E09342E19F784F08A99DF1 /* NetworkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436F1BCBB16AADAB909A2D56 /* NetworkView.swift */; };
 		DB24197F85DADFE5927B9A02 /* OverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88B20C7E3C7E4C3456BDCE8F /* OverviewView.swift */; };
 		A8A541E12BA0BA9560A2C9DF /* PortGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FA654E1DF675A1C07D45599 /* PortGrid.swift */; };
 		243A47E8852A710134D76248 /* ProxyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 977B4FFC4F44A2BE909D7AD2 /* ProxyView.swift */; };
@@ -31,6 +30,7 @@
 		1BC53BBB8B21593C1AE1CE72 /* ShieldView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 150EB0DFE8E999B664C07F65 /* ShieldView.swift */; };
 		4E21CDE0FD4AC5C38DA65173 /* SubscriptionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43B4B2314B8863BA165949FE /* SubscriptionView.swift */; };
 		DD070E13F7A4E7EEE750AC30 /* WanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9DA8F1F8A1A03A3383D5AC7 /* WanView.swift */; };
+		D4692AF28EDA53986B652E4D /* WebScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D263E9A99AA24127CB8D05B /* WebScreen.swift */; };
 		2755BBBD5E5A921DF8DF8205 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D109F37748E7ABA8A24F6CE2 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -48,7 +48,6 @@
 		A83ABDDD7AF702729432E5A4 /* DevicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevicesView.swift; sourceTree = "<group>"; };
 		E72FF4A6E354ECDC83F63E6A /* HardwareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardwareView.swift; sourceTree = "<group>"; };
 		A6E05E9FB97BD3EB0D7192D6 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
-		436F1BCBB16AADAB909A2D56 /* NetworkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkView.swift; sourceTree = "<group>"; };
 		88B20C7E3C7E4C3456BDCE8F /* OverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewView.swift; sourceTree = "<group>"; };
 		2FA654E1DF675A1C07D45599 /* PortGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortGrid.swift; sourceTree = "<group>"; };
 		977B4FFC4F44A2BE909D7AD2 /* ProxyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyView.swift; sourceTree = "<group>"; };
@@ -59,6 +58,7 @@
 		150EB0DFE8E999B664C07F65 /* ShieldView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShieldView.swift; sourceTree = "<group>"; };
 		43B4B2314B8863BA165949FE /* SubscriptionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionView.swift; sourceTree = "<group>"; };
 		C9DA8F1F8A1A03A3383D5AC7 /* WanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WanView.swift; sourceTree = "<group>"; };
+		9D263E9A99AA24127CB8D05B /* WebScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebScreen.swift; sourceTree = "<group>"; };
 		D109F37748E7ABA8A24F6CE2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		7F924B3C9E0A1C06AE4FBE0A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		92D098F8A1930D887B48048F /* IStorePilot.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = IStorePilot.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -133,7 +133,6 @@
 				A83ABDDD7AF702729432E5A4 /* DevicesView.swift */,
 				E72FF4A6E354ECDC83F63E6A /* HardwareView.swift */,
 				A6E05E9FB97BD3EB0D7192D6 /* LoginView.swift */,
-				436F1BCBB16AADAB909A2D56 /* NetworkView.swift */,
 				88B20C7E3C7E4C3456BDCE8F /* OverviewView.swift */,
 				2FA654E1DF675A1C07D45599 /* PortGrid.swift */,
 				977B4FFC4F44A2BE909D7AD2 /* ProxyView.swift */,
@@ -144,6 +143,7 @@
 				150EB0DFE8E999B664C07F65 /* ShieldView.swift */,
 				43B4B2314B8863BA165949FE /* SubscriptionView.swift */,
 				C9DA8F1F8A1A03A3383D5AC7 /* WanView.swift */,
+				9D263E9A99AA24127CB8D05B /* WebScreen.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -230,7 +230,6 @@
 				8326BC4E76E5A7A588F1F19D /* DevicesView.swift in Sources */,
 				A4DCFDEA21DE759A061DF4B8 /* HardwareView.swift in Sources */,
 				0331A1C96AD6B358A06DED5D /* LoginView.swift in Sources */,
-				79E09342E19F784F08A99DF1 /* NetworkView.swift in Sources */,
 				DB24197F85DADFE5927B9A02 /* OverviewView.swift in Sources */,
 				A8A541E12BA0BA9560A2C9DF /* PortGrid.swift in Sources */,
 				243A47E8852A710134D76248 /* ProxyView.swift in Sources */,
@@ -241,6 +240,7 @@
 				1BC53BBB8B21593C1AE1CE72 /* ShieldView.swift in Sources */,
 				4E21CDE0FD4AC5C38DA65173 /* SubscriptionView.swift in Sources */,
 				DD070E13F7A4E7EEE750AC30 /* WanView.swift in Sources */,
+				D4692AF28EDA53986B652E4D /* WebScreen.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

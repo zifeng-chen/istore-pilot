@@ -75,10 +75,51 @@ curl -X POST http://192.168.100.1:8443/api/v1/login \
 | GET | `/network/firewall` | **只读**防火墙策略摘要（`readonly: true`） |
 | POST | `/network/wan` | 改 WAN（含 PPPoE 账号口令）。口令只回掩码，空串表示不改 |
 | POST | `/net/wan/action` | 重拨 / 断开 / 连接。**不动配置**，所以不挂回滚守护 |
+| GET | `/luci/session` | 给内置 WebView 的 LuCI 免密通行证（见下） |
 
 `POST /net/wan/action` 请求体 `{"action": "reconnect" | "down" | "up"}`，
 立刻返回 `{ok, action, message, detail}`；命令是 detach 跑的，结果靠轮询
 `GET /network/wan` 的 `status.up` 判断（PPPoE 重拨 10-30 秒）。
+
+### LuCI 免密通行证
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/luci/session` | Agent 代登录一次 LuCI，返回可直接塞进 WebView 的 cookie |
+
+响应：
+
+```json
+{
+  "ok": true,
+  "url": "http://192.168.100.1/cgi-bin/luci/",
+  "host": "192.168.100.1",
+  "scheme": "http",
+  "cookie_name": "sysauth_http",
+  "cookie_value": "96bd513b…",
+  "cookie_path": "/",
+  "ttl": 1500
+}
+```
+
+为什么要服务端代登录：LuCI 的登录态是 uhttpd 在 `POST /cgi-bin/luci/` 之后下发的
+`sysauth_http` cookie。App 里点「路由器网页端」，WebView 第一次打开必然是登录页，
+用户得把同一个 root 口令再敲一遍 —— 而 App 早就用它登录过 Agent 了。
+Agent 就跑在这台机器上、还是 root，直接替它登一次，**口令不出路由器**，
+客户端只拿到一个会话 id（和浏览器里那个一样，3600 秒过期、可随时被顶掉）。
+
+口令来源按优先级：
+
+1. 用户通过 App 改过 root 口令 —— 新口令只在 Agent 内存里记着（`/system/root_password` 成功后写入）
+2. `config.json` 的 `luci.password`
+3. `config.json` 的 `auth.password`（本项目默认：全站一个口令，什么都不用配）
+
+拿不到（口令不一致 / uhttpd 关了 http）时返回 `{ok: false, error, url}`，
+客户端应当**照样打开 `url`**，退回「用户自己登一次」。
+
+`host` 取自请求的 `Host` 头（去端口），所以换网段或用 IPv6 访问都不会拼错地址。
+会话缓存 25 分钟，且**每次发出去之前会探一次活** —— LuCI 的会话会因为超时、
+后端重启、或者在网页端点了「退出」而失效，缓存里那张就是作废的通行证。
 
 ### 地址脱敏
 

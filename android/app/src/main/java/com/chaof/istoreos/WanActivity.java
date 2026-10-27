@@ -305,20 +305,11 @@ public class WanActivity extends BaseActivity {
     }
 
     private void openLuci() {
-        try {
-            String host = Session.base(this).replaceFirst("^https?://", "");
-            int slash = host.indexOf('/');
-            if (slash > 0) {
-                host = host.substring(0, slash);
-            }
-            int colon = host.lastIndexOf(':');
-            if (colon > 0) {
-                host = host.substring(0, colon);
-            }
-            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("http://" + host + "/")));
-        } catch (Exception e) {
-            Toast.makeText(this, "这台机器上没有能打开网页的浏览器", Toast.LENGTH_SHORT).show();
-        }
+        // 走内置浏览器：Agent 会代登录一次 LuCI，WebView 里直接是后台首页。
+        // 交给系统浏览器的话，用户还得在那边再输一遍口令。
+        Intent it = new Intent(this, WebActivity.class);
+        it.putExtra(WebActivity.EXTRA_TITLE, "路由器网页端");
+        startActivity(it);
     }
 
     // ---------------------------------------------------------------- 数据

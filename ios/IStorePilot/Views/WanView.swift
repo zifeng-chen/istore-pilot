@@ -27,6 +27,9 @@ struct WanView: View {
     @State private var mtu = ""
     @State private var filled = false
 
+    /// 内置浏览器（路由器网页端）
+    @State private var showWeb = false
+
     /// 重拨/断开后的提示行
     @State private var actNote = "重拨只重建链路，不改配置；断开后点「连接」即可恢复。"
     @State private var acting = false
@@ -69,6 +72,9 @@ struct WanView: View {
         .navigationTitle("网络")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
+        .sheet(isPresented: $showWeb) {
+            WebScreen()
+        }
         .alert(item: $popup) { p in
             Alert(title: Text(p.title), message: Text(p.body),
                   dismissButton: .default(Text("好")))
@@ -540,15 +546,10 @@ struct WanView: View {
         }
     }
 
-    /// LuCI 在 80，Agent 在 8443 —— 直接拿 Session.base 会打开 API 端口，浏览器里是一坨 JSON
+    /// 走内置浏览器：Agent 会代登录一次 LuCI，WKWebView 里直接是后台首页。
+    /// 交给 Safari 的话，用户还得在那边再输一遍口令。
     private func openLuci() {
-        var host = Session.base.replacingOccurrences(of: "http://", with: "")
-            .replacingOccurrences(of: "https://", with: "")
-        if let slash = host.firstIndex(of: "/") { host = String(host[..<slash]) }
-        if let colon = host.lastIndex(of: ":") { host = String(host[..<colon]) }
-        if let url = URL(string: "http://\(host)/") {
-            UIApplication.shared.open(url)
-        }
+        showWeb = true
     }
 
     // MARK: - 动作

@@ -39,6 +39,13 @@ def defaults() -> dict:
             "api_port": 3000,
         },
         "sample": {"interval": 60, "retain_days": 7},
+        "luci": {
+            # App 内置浏览器打开网页端时要免密进后台，Agent 会拿这个口令
+            # 代登录一次 LuCI（见 luci.py）。
+            # 留空 = 用下面 auth.password（全站同一个口令的部署什么都不用填）；
+            # 只有「路由器 root 口令 ≠ App 登录口令」时才需要在这里写。
+            "password": os.environ.get("AGENT_LUCI_PASSWORD", ""),
+        },
     }
 
 

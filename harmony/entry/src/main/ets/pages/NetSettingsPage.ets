@@ -1,4 +1,3 @@
-import { router } from '@kit.AbilityKit';
 import { NetworkPage } from '../ui/tabs/NetworkPage';
 
 /**

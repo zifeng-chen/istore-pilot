@@ -395,9 +395,10 @@ export struct NetworkPage {
   private async doAction(action: string): Promise<void> {
     this.acting = true;
     this.actNote = action === 'down' ? '正在断开…' : '正在重拨…';
-    const r: ApiResult = await Api.post(this.ctx(), '/api/v1/net/wan/action', { action: action });
+    const body: Record<string, Object> = { 'action': action };
+    const r: ApiResult = await Api.post(this.ctx(), '/api/v1/net/wan/action', body);
     this.acting = false;
-    if (r.ok && r.data.bool('ok')) {
+    if (r.ok && r.data.bool('ok', false)) {
       this.actNote = r.data.str('detail', '已发出指令');
       // 拨号要 10-30 秒，页面的定时轮询会把状态带回来，这里只补一句进度
       if (action !== 'down') {
@@ -771,6 +772,40 @@ export struct NetworkPage {
     this.getUIContext().getPromptAction().showToast({ message: msg, duration: 2200 });
   }
 
+  /** 网页端入口：LuCI 里那些「改网段、端口转发、DDNS」App 不碰，但得有个门 */
+  @Builder
+  webEntry() {
+    Card({ gapTop: 0, gapBottom: 0 }) {
+      Row({ space: 12 }) {
+        Text('🌐')
+          .fontSize(15)
+          .width(30)
+          .height(30)
+          .textAlign(TextAlign.Center)
+          .borderRadius(9)
+          .backgroundColor($r('app.color.accent_soft'));
+        Column({ space: 3 }) {
+          Text('路由器网页端')
+            .fontSize(T.F_BODY)
+            .fontColor($r('app.color.text_primary'));
+          Text('改网段、端口转发、DDNS（App 内打开，已免登）')
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_secondary'));
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1);
+        Text('›')
+          .fontSize(18)
+          .fontColor($r('app.color.text_tertiary'));
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
+      .onClick(() => {
+        router.pushUrl({ url: 'pages/WebPage' });
+      });
+    }
+  }
+
   @Builder
   pageBody() {
     Column({ space: T.GAP }) {
@@ -815,6 +850,8 @@ export struct NetworkPage {
         CardHeader({ title: '防火墙', sub: '谁能从外面进来' });
         this.fwCardBody();
       }
+
+      this.webEntry();
     }
     .width('100%');
   }

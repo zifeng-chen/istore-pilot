@@ -11,8 +11,8 @@ import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import (adblock, apps, auth, cfgbak, clash, devices, hardware, lanedit, mask,
-               netapply, netcfg, power, proxy, subscriptions, sysinfo, system)
+from . import (adblock, apps, auth, cfgbak, clash, devices, hardware, lanedit, luci,
+               mask, netapply, netcfg, power, proxy, subscriptions, sysinfo, system)
 from .config import get as cfg, load as load_cfg, save as save_cfg
 
 WEB_ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web")
@@ -115,6 +115,20 @@ class Handler(BaseHTTPRequestHandler):
     def _client_ip(self) -> str:
         return self.client_address[0] if self.client_address else "?"
 
+    def _host_only(self) -> str:
+        """客户端访问我们时用的主机名/IP（去掉端口），用来拼 LuCI 的地址。
+
+        不能写死 192.168.100.1：换了网段、或者走 IPv6 的时候，那个地址是错的。
+        客户端是拿哪个地址连上的我们，就说明它能连通哪个地址。
+        """
+        raw = (self.headers.get("Host", "") or "").strip()
+        if not raw:
+            return ""
+        if raw.startswith("["):                 # [240e::1]:8443
+            end = raw.find("]")
+            return raw[1:end] if end > 0 else raw
+        return raw.rsplit(":", 1)[0] if raw.count(":") == 1 else raw
+
     # ------------------------------------------------------------ 路由分发
 
     def do_OPTIONS(self):
@@ -216,8 +230,13 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/v1/system/uploads/delete":
                 self._json(system.remove_upload(str(body.get("name", ""))))
             elif path == "/api/v1/system/root_password":
-                self._json(system.root_password(
-                    str(body.get("current", "")), str(body.get("new", ""))))
+                result = system.root_password(
+                    str(body.get("current", "")), str(body.get("new", "")))
+                if result.get("ok"):
+                    # root 口令变了，LuCI 免密登录要跟着换钥匙，否则下次打开
+                    # 网页端会掉回登录页（用户会以为是 App 坏了）
+                    luci.remember(str(body.get("new", "")))
+                self._json(result)
             elif path == "/api/v1/system/update":
                 action = str(body.get("action", "status"))
                 if action == "check":
@@ -370,6 +389,10 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(netcfg.overview())
             elif path == "/api/v1/network/lan":
                 self._json(netcfg.lan())
+            elif path == "/api/v1/luci/session":
+                # 给内置 WebView 的免密通行证：Agent 代登录一次 LuCI，
+                # 把 sysauth_http 这个 cookie 交给客户端（口令不出路由器）
+                self._json(luci.ticket(self._host_only()))
             elif path == "/api/v1/network/firewall":
                 # cached() 返回的是同一个对象，直接往上写会污染缓存，所以先拷一层
                 base = dict(cached("firewall", 10.0, netcfg.firewall))
