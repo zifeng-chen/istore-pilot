@@ -106,6 +106,13 @@ def api(method: str, path: str, tok: str, body: dict | None = None):
             return exc.code, {"message": payload.decode("utf-8", "replace")}
 
 
+def patch_body(release_id: int, body: str, tok: str) -> int:
+    """改已发布 Release 的正文。PATCH 只认数字 id，用 /tags/ 会 404。"""
+    status, _ = api("PATCH", "/repos/%s/releases/%d" % (REPO, release_id), tok,
+                    {"body": body})
+    return status
+
+
 def upload(release_id: int, path: str, tok: str) -> tuple[int, dict]:
     name = os.path.basename(path)
     size = os.path.getsize(path)
@@ -163,15 +170,23 @@ def build_run(dry: bool) -> int:
 
 def notes_for(tag: str, ver: str, full: str) -> str:
     """Release 正文：本次提交列表 + 下载表 + 安装说明。"""
+    # 上一个 release tag（要把本次的 tag 自己排除，否则区间为空）
     last = ""
     try:
-        tags = sh(["git", "tag", "--sort=-creatordate"]).stdout.split()
+        tags = [t for t in sh(["git", "tag", "--sort=-creatordate"]).stdout.split() if t != tag]
         last = tags[0] if tags else ""
     except subprocess.CalledProcessError:
         pass
 
     rng = "%s..HEAD" % last if last else "HEAD"
-    lines = [ln for ln in sh(["git", "log", "--no-merges", "--pretty=- %s", rng]).stdout.splitlines() if ln.strip()]
+    lines = []
+    for ln in sh(["git", "log", "--no-merges", "--pretty=- %s", rng]).stdout.splitlines():
+        if not ln.strip():
+            continue
+        # 发布提交本身不算"更新"
+        if ln.startswith("- release:"):
+            continue
+        lines.append(ln)
     if not lines:
         log = "- 维护性更新"
     elif len(lines) > 12:
@@ -303,6 +318,11 @@ def main() -> int:
         todo = [p for p in assets if os.path.basename(p) not in have]
         if not todo:
             print("  Release %s 已存在且资产齐全：%s" % (tag, rel.get("html_url")))
+            if "--update-notes" in args and not dry:
+                body = (open(notes_file, encoding="utf-8").read() if notes_file
+                        else notes_for(tag, ver, full))
+                code = patch_body(rel["id"], body, tok)
+                print("  正文已更新：HTTP %s" % code)
             return 0
         print("  Release %s 已存在，补传 %d 个缺失资产" % (tag, len(todo)))
         assets = todo
