@@ -24,6 +24,7 @@
 from __future__ import annotations
 
 import gzip
+import ipaddress
 import json
 import os
 import re
@@ -244,16 +245,10 @@ def ip_mac_map() -> dict[str, str]:
     now = time.monotonic()
     if _ip_mac_cache and now - _ip_mac_ts < 10.0:
         return _ip_mac_cache
-    mapping: dict[str, str] = {}
     try:
-        for mac, info in _neigh().items():
-            if info.get("ip") and ":" not in info["ip"]:
-                mapping[info["ip"]] = mac
-        for mac, info in _leases().items():
-            if info.get("ip"):
-                mapping.setdefault(info["ip"], mac)
+        mapping = _addr_mac_map()
     except Exception:
-        pass
+        mapping = {}
     if mapping:
         _ip_mac_cache = mapping
         _ip_mac_ts = now
@@ -354,6 +349,11 @@ _VENDOR_CN = {
 # 主机名特征 → (品牌, 类型, 型号)。**顺序即优先级**，先匹配到的赢。
 # 型号留空表示用主机名清洗后的结果。
 _HOST_RULES: list[tuple[tuple[str, ...], str, str, str]] = [
+    # ---- 苹果：Mac 的主机名是「xxx-MacBook-Pro」这种，型号在后面
+    (("macbook", "mac-book", "imac", "macmini", "mac-mini", "macstudio",
+      "mac-studio", "macpro", "mac-pro"), "苹果", "电脑", ""),
+    (("iphone",), "苹果", "手机", ""),
+    (("ipad",), "苹果", "平板", ""),
     # ---- 手机 / 平板 / 电脑：主机名前缀就是型号
     (("pfem10", "find-x", "find x"), "OPPO", "手机", ""),
     (("hege-", "hbn-al", "mao-al", "mro-w", "nova-", "mate-"), "华为", "手机", ""),
@@ -499,11 +499,15 @@ def identify(mac: str, hostname: str) -> dict:
         if brand:
             model = _model(host, brand)
 
+    # 「随机 MAC / 私有地址」不是品牌，是「查不到厂商」：这种情况下
+    # 品牌留空，让上层用「私有地址」做说明，标题退回 IP —— 一排
+    # 「随机 MAC」既分不清是谁，也没告诉你任何信息
+    private = (raw == "随机 MAC" and not brand)
     if not brand:
-        brand = raw or "未知"
+        brand = "" if private else (raw or "未知")
     if not kind:
         kind = _guess_type(brand, low)
-    return {"brand": brand, "type": kind, "model": model}
+    return {"brand": brand, "type": kind, "model": model, "private": private}
 
 
 _TYPE_BY_BRAND = {
@@ -540,6 +544,52 @@ _HEX_TAIL = re.compile(r"[0-9a-f]{8,}$|(-[0-9a-f]{2}){2,}$", re.IGNORECASE)
 
 # 这些设备类型用型号当名字才有信息量（X300 Ultra、75Q9L Pro）
 _MODEL_TYPES = {"手机", "平板", "电脑", "电视", "电视盒子", "NAS", "存储", "服务器"}
+
+
+def _guess_access(mac: str, dev_type: str, hostname: str) -> dict:
+    """推测「这台设备是插网线还是连 WiFi」。
+
+    为什么只能"推测"
+    -----------------
+    软路由**看不到**这个事实。AP 是桥接模式，无线和有线都桥到同一根网线：
+    `brctl showmacs br-lan` 里 50 多个 MAC 全部落在同一个 port，上游只看到
+    "一个以太网帧从 port 1 进来"。真正的关联信息只存在 AP 的 802.11 表里。
+
+    所以这里只给旁证，字段带 `source: "guess"`，界面必须标「推测」：
+      1. 私有 MAC（第一字节 bit1）—— 手机/平板的「私有 Wi-Fi 地址」，
+         有线几乎不会随机化 MAC，这条最硬
+      2. 设备类型 —— 插座、灯具、空调这类根本没有网口，只能是无线
+      3. 电脑/NAS/网络设备 —— 两种都可能，给个低置信度的"有线"
+    接入方式在 UI 上是个**参考**，不能拿去当计费或限速的依据。
+    """
+    reason = ""
+    try:
+        first = int((mac or "00").split(":")[0], 16)
+    except (ValueError, IndexError):
+        first = 0
+    if first & 0x02:
+        return {"type": "wifi", "reason": "私有 MAC", "conf": "high", "source": "guess"}
+
+    if dev_type in _WIFI_ONLY:
+        # 这些设备压根没做网口，连上就只能是无线
+        return {"type": "wifi", "reason": dev_type + "无网口", "conf": "high", "source": "guess"}
+    if dev_type in _WIFI_LIKELY:
+        return {"type": "wifi", "reason": dev_type + "通常无线", "conf": "medium", "source": "guess"}
+    if dev_type in _WIRED_LIKELY:
+        return {"type": "wired", "reason": dev_type + "通常有线", "conf": "low", "source": "guess"}
+    host = (hostname or "").lower()
+    if "tv" in host or "box" in host:
+        return {"type": "unknown", "reason": "电视盒两种接法都常见", "conf": "low", "source": "guess"}
+    return {"type": "unknown", "reason": "", "conf": "low", "source": "guess"}
+
+
+#: 没有网口的品类：连上就只能是无线
+_WIFI_ONLY = {"插座", "灯具", "空调", "厨电", "扫地机", "门锁", "净水器",
+              "传感器", "智能家居", "家电", "小家电", "4G 模组"}
+#: 通常无线，但存在有线版本
+_WIFI_LIKELY = {"手机", "平板", "摄像头", "音箱", "苹果设备", "华为设备"}
+#: 通常是插线的（置信度仍然低 —— 笔记本也是「电脑」）
+_WIRED_LIKELY = {"电脑", "NAS", "存储", "服务器", "网络设备", "单板机", "打印机"}
 
 
 def _display(host: str, who: dict) -> str:
@@ -806,6 +856,90 @@ def _is_private(ip: str) -> bool:
     return False
 
 
+_LAN_NETS: list = []
+_LAN_NETS_TS = 0.0
+_LAN_NETS_TTL = 30.0
+
+
+def _lan_networks() -> list:
+    """br-lan 上的网段（IPv4 + IPv6 前缀），缓存 30 秒。
+
+    判断「这个地址是不是内网设备」不能只看 10./172.16./192.168.：
+    IPv6 下设备拿到的是运营商下发的全局地址（240e:…），字面上跟公网地址
+    一模一样，唯一的依据是它落在 br-lan 的前缀里。
+    早期版本只认 IPv4 私网，于是所有 IPv6 连接都被当成「公网↔公网」整段
+    丢掉——表现就是设备上下行明显偏小、应用流量长期不动。
+    """
+    global _LAN_NETS, _LAN_NETS_TS
+    now = time.monotonic()
+    if _LAN_NETS and now - _LAN_NETS_TS < _LAN_NETS_TTL:
+        return _LAN_NETS
+    nets: list = []
+    code, out, _ = _run(["ip", "-j", "addr", "show", "dev", "br-lan"])
+    if code == 0 and out.strip():
+        try:
+            for item in json.loads(out):
+                for info in item.get("addr_info") or []:
+                    local = info.get("local") or ""
+                    plen = info.get("prefixlen")
+                    if not local or plen is None:
+                        continue
+                    try:
+                        nets.append(ipaddress.ip_network(f"{local}/{plen}", strict=False))
+                    except ValueError:
+                        continue
+        except (ValueError, TypeError):
+            nets = []
+    if nets:
+        _LAN_NETS = nets
+        _LAN_NETS_TS = now
+        return _LAN_NETS
+    if _LAN_NETS:
+        return _LAN_NETS
+    # 取不到接口信息（ip 命令缺 -j、容器里没有 br-lan）时退回经验网段，
+    # 至少不会把整台机器算成公网
+    return [ipaddress.ip_network("192.168.0.0/16"),
+            ipaddress.ip_network("10.0.0.0/8"),
+            ipaddress.ip_network("172.16.0.0/12")]
+
+
+def _is_lan_addr(ip: str) -> bool:
+    """地址是否属于内网侧（含 IPv6）。判断方向全靠它。"""
+    if not ip:
+        return False
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    for net in _lan_networks():
+        if addr.version == net.version and addr in net:
+            return True
+    if addr.version == 4:
+        return _is_private(ip)
+    # 没有前缀信息时的兜底：ULA / 链路本地一定在内网
+    return addr.is_private or addr.is_link_local
+
+
+def _addr_mac_map() -> dict[str, str]:
+    """内网地址 → MAC，IPv4 与全局 IPv6 都收。
+
+    只收 IPv4 会让走 IPv6 的连接找不到归属设备，那部分流量在
+    「设备详情 → 应用流量」里会彻底消失。
+    """
+    mapping: dict[str, str] = {}
+    for mac, info in _neigh().items():
+        for key in ("ipv4", "ipv6"):
+            addr = info.get(key) or ""
+            if addr:
+                mapping[addr] = mac
+        if info.get("ip"):
+            mapping.setdefault(info["ip"], mac)
+    for mac, info in _leases().items():
+        if info.get("ip"):
+            mapping.setdefault(info["ip"], mac)
+    return mapping
+
+
 def _sample_once() -> None:
     """采一次流量，按设备累加。用字节差值而不是瞬时值，避免连接断开的抖动。"""
     global _prev_sample_ts
@@ -814,13 +948,7 @@ def _sample_once() -> None:
     dt = now - _prev_sample_ts if not first else 0.0
     _prev_sample_ts = now
 
-    ip_mac: dict[str, str] = {}
-    for mac, info in _neigh().items():
-        if info["ip"]:
-            ip_mac[info["ip"]] = mac
-    for mac, info in _leases().items():
-        if info["ip"]:
-            ip_mac.setdefault(info["ip"], mac)
+    ip_mac = _addr_mac_map()
 
     flows = _conntrack()
     alive: set[str] = set()
@@ -845,9 +973,9 @@ def _sample_once() -> None:
         # 分清"内网设备自己发出"和"发往内网设备"两个方向：
         # 只有前者增长才算设备活着。后者在设备离线后仍会被内核重传而持续增长，
         # 拿它当在线证据等于把断网的设备永久钉在在线状态。
-        if _is_private(sip):
+        if _is_lan_addr(sip):
             inner, out_bytes, in_bytes = sip, d_fwd, d_rev
-        elif _is_private(dip):
+        elif _is_lan_addr(dip):
             inner, out_bytes, in_bytes = dip, d_rev, d_fwd
         else:
             continue
@@ -1002,6 +1130,16 @@ def _build() -> list[dict]:
     """把各数据源合并成设备列表。租约、邻居表、静态绑定任一出现的设备都算。"""
     _ensure_sampler()
 
+    # 接入设备表来自 AP（有线/无线只有它知道），后台线程刷新，这里只读缓存。
+    # ap 这层是适配器：换了厂商、没配、口令错，都只会退回空表 → 按类型推断
+    from . import ap as ap_mod
+
+    ap_mod.ensure()
+    ap_map = ap_mod.access_map()
+    # 有节点没读到（比如 Mesh 从节点）时，主节点会把「经从节点接入」的无线
+    # 设备也报成 eth1，这时候它说的「有线」不能当真
+    ap_complete = not (ap_mod.status().get("errors") or {})
+
     neigh = _neigh()
     leases = _leases()
     hosts = _hosts_file()
@@ -1071,16 +1209,45 @@ def _build() -> list[dict]:
         # 备注名是用户自己写的，识别品牌时也拿它当线索：
         # 有人把「绿联nas」当备注，而它 DHCP 主机名是空的，只看主机名会认成格力
         who = identify(mac, hostname or alias)
+        # 接入方式只能推测（AP 桥接，无线/有线在上游长得一样），见 _guess_access
+        access_guess = _guess_access(mac, who.get("type") or "", hostname)
+        ap_row = ap_map.get(mac)
+        if ap_row:
+            kind = ap_row.get("type", "unknown")
+            base = {
+                "band": ap_row.get("band", ""),
+                "reason": "AP 报表" + (" · " + ap_row["iface"] if ap_row.get("iface") else ""),
+                "conf": "high",
+                "source": "ap",
+                "ap": ap_row.get("ap", ""),
+            }
+            if kind == "wired" and not ap_complete:
+                # 主节点把「经从节点接入」的无线客户端也报成 eth1，
+                # 从节点又读不到，这时它的「有线」不可信 —— 退回按设备类型推断
+                if access_guess["type"] in ("wifi", "wired"):
+                    access_guess = dict(base, type=access_guess["type"], band="",
+                                        conf="medium", reason="从节点未读到，按设备类型推断")
+                else:
+                    access_guess = dict(base, type="unknown", conf="low",
+                                        reason="从节点未读到，有线/无线无法确认")
+            else:
+                # AP 的表是事实：source=ap，界面不再写「推测」
+                access_guess = dict(base, type=kind)
         devices.append(
             {
                 "mac": mac,
                 "ip": ip,
+                # 同一台设备往往同时有 IPv4 和全局 IPv6：连接明细、域名归属
+                # 都要按全部地址去匹配，只认主地址会漏掉走 IPv6 的那一半
+                "ips": sorted({a for a in (ip, nb.get("ipv4"), nb.get("ipv6"),
+                                           lease.get("ip"), static.get("ip")) if a}),
                 "hostname": hostname,
                 "alias": alias,
-                "label": alias or _display(hostname, who),
-                "vendor": who["brand"],
+                "label": alias or _display(hostname, who) if (hostname or alias) else "",
+                "vendor": who["brand"] or ("私有地址" if who.get("private") else "未知"),
                 "model": who["model"],
                 "type": who["type"],
+                "access": access_guess,
                 # OUI 原始名留着备查：品牌判断错了要能追到来源
                 "vendor_raw": _vendor_raw(mac),
                 "online": online,
@@ -1125,11 +1292,15 @@ def _build() -> list[dict]:
 
 
 def list_devices() -> dict:
+    from . import ap as ap_mod
+
     items = _build()
     online = [d for d in items if d["online"]]
     ranked = sorted(online, key=lambda d: -d["net"]["avg_bps"])[:5]
     return {
         "devices": items,
+        # 接入方式的数据源状态：没配 AP 时会带 disabled + 原因
+        "ap": ap_mod.status(),
         "summary": {
             "total": len(items),
             "online": len(online),
@@ -1166,12 +1337,15 @@ def _clean_chain(chains: list) -> str:
     return ""
 
 
-def _domains_for(ip: str) -> tuple[list[dict], str]:
+def _domains_for(ips: set[str]) -> tuple[list[dict], str]:
     """查这台设备正在访问哪些域名。
 
     开了 OpenClash 之后 conntrack 里全是 198.18.x.x 这类 fake-ip，光看 IP
     等于什么都没说。Clash 的连接列表里带真实域名，按来源 IP 过滤就能还原。
     Passwall 没有运行时接口，这种情况下只能返回空并说明原因。
+
+    ``ips`` 必须是设备的**全部**地址：只按 IPv4 过滤的话，走 IPv6 的那部分
+    连接（国内 App 默认优先 IPv6）在域名列表里一条都不会出现。
     """
     from . import clash as clash_mod
 
@@ -1184,7 +1358,7 @@ def _domains_for(ip: str) -> tuple[list[dict], str]:
 
     grouped: dict[str, dict] = {}
     for conn in data.get("connections") or []:
-        if conn.get("source") != ip:
+        if conn.get("source") not in ips:
             continue
         host = (conn.get("host") or "").strip()
         if not host:
@@ -1222,11 +1396,14 @@ def detail(mac: str) -> dict:
         return {"error": "没有这台设备", "mac": mac}
 
     ip = target["ip"]
-    flows = [f for f in _conntrack() if f["sip"] == ip or f["dip"] == ip]
+    ips = {a for a in (target.get("ips") or []) if a}
+    if ip:
+        ips.add(ip)
+    flows = [f for f in _conntrack() if f["sip"] in ips or f["dip"] in ips]
 
     peers = []
     for flow in flows:
-        outbound = flow["sip"] == ip
+        outbound = flow["sip"] in ips
         peer_ip = flow["dip"] if outbound else flow["sip"]
         peer_port = flow["dport"] if outbound else flow["sport"]
         hint = _PORT_HINT.get(peer_port, "")
@@ -1257,7 +1434,7 @@ def detail(mac: str) -> dict:
             grouped[key] = item
     top_peers = sorted(grouped.values(), key=lambda p: p["up"] + p["down"], reverse=True)[:12]
 
-    domains, domains_source = _domains_for(ip) if ip else ([], "none")
+    domains, domains_source = _domains_for(ips) if ips else ([], "none")
 
     # 这台设备到底是谁在吃流量：按来源地址归过类的应用明细（累计）
     from . import apps as apps_mod

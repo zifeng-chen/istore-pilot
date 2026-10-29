@@ -75,8 +75,13 @@ _RULES: list[tuple[tuple[str, ...], str, str]] = [
       "apmplus", "gator.volces", "log-api", "rmonitor", "mdt.qq.com", "eve.mdt"),
      "遥测 / 统计", "统计"),
     # ---------------------------------------------------------- 视频
-    # 番茄小说：正文只有几十 KB，视频才是大头，域名特征全在 CDN 上
+    # 番茄小说：正文只有几十 KB，视频才是大头，域名特征全在 CDN 上。
+    # 注意 novelfm 这一族（novelfm.com / novelfmvod.com / novelfmpic.com）
+    # 就是番茄小说的 CDN —— 早期把 novelfm 归成了「阅读 / 小说」，
+    # 结果用户边看视频边刷应用榜，番茄小说那一行几乎不动，流量全跑到
+    # 别的桶里去了。
     (("fanqienovel", "fanqie", "fqnovel", "fqimg", "qznovel", "novelvod",
+      "novelfm", "novelfmvod", "novelfmpic", "novelfm-sign",
       "reading-video", "novelpic"), "番茄小说", "视频"),
     (("v.qq.com", "vv.video.qq", "video.qq.com", "tc.qq.com"), "腾讯视频", "视频"),
     (("iqiyi", "qiyipic", "71.am", "iqiyiimg"), "爱奇艺", "视频"),
@@ -115,7 +120,6 @@ _RULES: list[tuple[tuple[str, ...], str, str]] = [
     (("migu",), "咪咕", "音频"),
     (("spotify", "scdn.co"), "Spotify", "音频"),
     (("qidian", "zongheng", "qimao"), "起点 / 七猫", "阅读"),
-    (("novelfm",), "阅读 / 小说", "阅读"),
     # ---------------------------------------------------------- 游戏
     (("steamcontent", "steamstatic", "steampowered", "steamcommunity"), "Steam", "游戏"),
     (("epicgames", "unrealengine"), "Epic", "游戏"),
@@ -148,7 +152,10 @@ _RULES: list[tuple[tuple[str, ...], str, str]] = [
     (("vivo.com", "iqoo"), "vivo 手机服务", "智能家居"),
     (("oppomobile", "coloros", "heytap"), "OPPO / 欢太", "智能家居"),
     (("mijia", "mi.com", "xiaomi", "miui", "miot"), "小米 / 米家", "智能家居"),
-    (("dbankcloud", "dbankcdn", "hicloud", "huawei", "hihonor", "allawn"), "华为 / 荣耀", "智能家居"),
+    # 华为和荣耀现在各是一个品牌：合成一条只能配一个图标，
+    # 荣耀用户看到的永远是华为的标
+    (("hihonor", "honor"), "荣耀", "智能家居"),
+    (("dbankcloud", "dbankcdn", "hicloud", "huawei", "vmall", "allawn"), "华为", "智能家居"),
     (("midea",), "美的", "智能家居"),
     (("haier",), "海尔", "智能家居"),
     (("hisense", "tcl", "skyworth", "changhong"), "电视厂商", "智能家居"),
@@ -168,13 +175,18 @@ _RULES: list[tuple[tuple[str, ...], str, str]] = [
     (("ntp.org", "time.nist", "pool.ntp"), "时间同步", "系统"),
     (("bdstatic", "baidu.com", "bdurl"), "百度", "搜索"),
     (("quark", "uc.cn", "ucweb"), "夸克 / UC", "搜索"),
-    (("tencent.com", "myqcloud", "tencent-cloud", "gtimg"), "腾讯服务", "系统"),
+    (("tencent.com", "myqcloud", "tencent-cloud", "gtimg"), "腾讯", "系统"),
     (("163.com", "126.net", "netease", "youdao"), "网易", "系统"),
 ]
 
 # 应用名 → 分类。账本里只存流量不存分类，历史条目（尤其被 _canonical 重新
 # 归类的）要靠这张表补回分类，否则界面上的图标只能拿到「其他」。
 _NAME_CATEGORY = {name: cat for _, name, cat in _RULES}
+
+# 运营商的 AS 名不是「应用」。裸 IP 反查回来的「中国移动」「中国电信」
+# 会把真正的应用挤下去（一台手机光「中国移动」就能占几百 MB 的榜首），
+# 对用户却毫无信息量 —— 统一退回「IP 直连」。
+_CARRIER = {"中国移动", "中国电信", "中国联通", "教育网"}
 
 _lock = threading.Lock()
 _geo_cache: dict | None = None
@@ -193,8 +205,15 @@ _LEGACY = {
     "抖音 / 字节": "抖音",
     "爱奇艺 / 腾讯视频": "腾讯视频",
     "地图导航": "高德地图",
+    "华为 / 荣耀": "华为",
+    "腾讯服务": "腾讯",
     "音乐": "网易云音乐",
     "小米 / 米家": "小米 / 米家",
+    "阅读 / 小说": "番茄小说",
+    "中国移动": IP_ONLY,
+    "中国电信": IP_ONLY,
+    "中国联通": IP_ONLY,
+    "教育网": IP_ONLY,
 }
 
 # 落盘的账本：total = 累计，days = 按天（YYYY-MM-DD）
@@ -318,6 +337,9 @@ MAX_DEV_APPS = 24
 _dev: dict[str, dict[str, list[float]]] = {}
 _dev_dirty = False
 _dev_last_save = 0.0
+# (mac, 应用名) -> 本轮速率。账本存的是累计字节，界面上一动不动像是坏了；
+# 事实是累计值本来就不会每秒跳，得单独给一份「此刻多快」。
+_dev_rate: dict[tuple[str, str], tuple[float, float]] = {}
 _ip_mac_cache: dict[str, str] = {}
 _ip_mac_ts = 0.0
 
@@ -339,7 +361,12 @@ def _dev_load() -> None:
         names: dict[str, list[float]] = {}
         for name, val in apps.items():
             if isinstance(val, list) and len(val) == 2:
-                names[_canonical(name)] = [float(val[0]), float(val[1])]
+                # 必须累加：多条旧名字会归到同一个新名字上
+                # （中国移动/中国电信/… 全部并进「IP 直连」），
+                # 直接赋值会让先处理到的那几条凭空消失
+                slot = names.setdefault(_canonical(name), [0.0, 0.0])
+                slot[0] += float(val[0])
+                slot[1] += float(val[1])
         if names:
             out[str(mac).lower()] = names
     _dev = out
@@ -389,20 +416,31 @@ def _ip_mac() -> dict[str, str]:
 
 
 def by_device(mac: str) -> list[dict]:
-    """某台设备用过的应用与流量（累计），按用量降序。"""
+    """某台设备用过的应用与流量（累计），按用量降序。
+
+    ``up_bps`` / ``down_bps`` 是**上一个采样窗口**的速率，只有此刻真的在跑
+    的应用才非零。没有这两项，界面只能显示累计字节，边看视频边刷新的
+    时候数字像冻住了一样。
+    """
     key = (mac or "").lower().replace("-", ":")
     apps = _dev.get(key) or {}
+    rates = _dev_rate
     out = []
     for name, (up, down) in apps.items():
         if up + down < 1024:      # 只有握手包的应用不值得占一行
             continue
+        up_bps, down_bps = rates.get((key, name), (0.0, 0.0))
         out.append({
             "name": name,
             "category": _NAME_CATEGORY.get(name, "其他"),
             "up": int(up),
             "down": int(down),
             "total": int(up + down),
+            "up_bps": round(up_bps, 1),
+            "down_bps": round(down_bps, 1),
         })
+    # 排序仍以累计用量为准：按速率排会让整张榜每 3 秒重排一次，看不清
+    # 到底是谁在用。速率作为每一项的附加信息交给界面显示
     out.sort(key=lambda x: -x["total"])
     return out[:MAX_DEV_APPS]
 
@@ -478,7 +516,7 @@ def _match(host: str) -> tuple[str, str]:
         # 阿里云的 39.101.x 这类一眼就认出来。反查是异步的，第一轮先按
         # 「IP 直连」记，后台查完下一轮自然归到新桶里
         label = asn.peek(host)
-        if label:
+        if label and label not in _CARRIER:
             return label, "网络"
         asn.enqueue(host)
         return IP_ONLY, "其他"
@@ -504,7 +542,7 @@ def _match(host: str) -> tuple[str, str]:
 
 
 def _sample_once() -> None:
-    global _prev, _acc, _last_ts, _last_error, _totals, _dev_dirty, _dev
+    global _prev, _acc, _last_ts, _last_error, _totals, _dev_dirty, _dev, _dev_rate
     data = clash.connections()
     if data.get("error"):
         _last_error = str(data["error"])
@@ -593,9 +631,15 @@ def _sample_once() -> None:
     # 本轮没有连接的先归零速率，避免残留数字看起来还在跑
     for name in list(_rate.keys()):
         _rate[name] = (0.0, 0.0)
+    fresh: dict[tuple[str, str], tuple[float, float]] = {}
     if dt > 0.2:
         for name, slot in step.items():
             _rate[name] = (slot["up"] / dt, slot["down"] / dt)
+        for mac, names in dev_step.items():
+            for name, val in names.items():
+                if val[0] or val[1]:
+                    fresh[(mac, name)] = (val[0] / dt, val[1] / dt)
+    _dev_rate = fresh
 
     # 每台设备的应用明细：只增不减，重启后靠文件续上
     for mac, names in dev_step.items():

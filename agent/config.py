@@ -46,6 +46,18 @@ def defaults() -> dict:
             # 只有「路由器 root 口令 ≠ App 登录口令」时才需要在这里写。
             "password": os.environ.get("AGENT_LUCI_PASSWORD", ""),
         },
+        "ap": {
+            # 中兴 AP 的接入设备表 —— 「有线还是无线」只有 AP 自己知道，
+            # 详情见 zte.py。口令只存在这台路由器的 config.json 里（0600），
+            # 不进仓库、不上传。
+            "enabled": False,
+            # 接入设备表的驱动：目前只有 zte（中兴 ZXSLC 系列）。
+            # 换成别家 AP 时，写一个新驱动并在 agent/ap.py 的 DRIVERS 里登记
+            "driver": "zte",
+            "user": "admin",
+            "password": os.environ.get("AGENT_AP_PASSWORD", ""),
+            "hosts": [],
+        },
     }
 
 

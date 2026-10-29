@@ -19,7 +19,7 @@ WEB_ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 START_TS = time.time()
 
 # Agent 自身版本：随 ipk 一起发版，硬件详情页与「关于」都会显示
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 
 _cache_lock = threading.Lock()
 _cache: dict[str, tuple[float, object]] = {}
@@ -284,6 +284,10 @@ class Handler(BaseHTTPRequestHandler):
                     self._json(adblock.set_interval(body.get("interval", 24)))
             elif path == "/api/v1/adblock/service":
                 self._json(adblock.service(str(body.get("action", ""))))
+            elif path == "/api/v1/adblock/install":
+                # 一键安装：必须带 confirm=install，跑在后台线程里，
+                # 这个接口只负责「受理」，进度靠 GET 同一个路径查
+                self._json(adblock.install(str(body.get("confirm", ""))))
 
             elif path == "/api/v1/network/wan":
                 self._json(netcfg.apply_wan(body))
@@ -469,6 +473,9 @@ class Handler(BaseHTTPRequestHandler):
             # ---- 广告拦截
             elif path == "/api/v1/adblock":
                 self._json(cached("adblock_status", 2.0, adblock.status))
+            elif path == "/api/v1/adblock/install":
+                # 安装进度：1 秒一跳，不走缓存（装了才会用到，平时成本为零）
+                self._json(adblock.install_status())
             elif path == "/api/v1/adblock/preflight":
                 self._json(adblock.preflight())
             elif path == "/api/v1/adblock/verify":
@@ -593,6 +600,12 @@ def serve():
     # 上次改完配置没确认就重启了：清掉残留状态，否则界面永远显示「等待确认」
     try:
         netapply.boot_check()
+    except Exception:
+        pass
+    # DNS 兜底巡检：接管后 AGH 起不来时，把 53 还给 dnsmasq。
+    # 放在开机这里起，而不是等 App 来读状态 —— 断网时 App 恰恰是最晚知道的
+    try:
+        adblock.ensure_watchdog()
     except Exception:
         pass
 

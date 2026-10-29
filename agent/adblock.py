@@ -33,11 +33,16 @@ from __future__ import annotations
 import base64
 import json
 import os
+import platform
 import random
 import re
+import shutil
 import socket
+import ssl
 import struct
 import subprocess
+import tarfile
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -47,7 +52,20 @@ from .config import get as cfg
 
 AGH_BIN = "/usr/bin/AdGuardHome/AdGuardHome"
 AGH_YAML = "/etc/AdGuardHome.yaml"
-SS53 = 5353
+AGH_UCI = "/etc/config/AdGuardHome"
+
+#: 一键安装要落的目录（与 LuCI 插件约定的一致）
+AGH_DIR = "/usr/bin/AdGuardHome"
+AGH_WORKDIR = "/etc/AdGuardHome"
+AGH_WEB_PORT = 3000
+AGH_TARBALL = ("https://static.adtidy.org/adguardhome/release/"
+               "AdGuardHome_linux_{arch}.tar.gz")
+
+#: 观察模式的候选端口。
+#: 5353 基本都被 avahi（mDNS）占着、5355 被 wsdd2 占着，写死会导致
+#: 「装完启不来」或「退出接管后进程起不来」——实测这台机器两个都占。
+#: 所以每次现挑一个空闲的，写进 yaml 之后一直沿用
+OBSERVE_PORTS = (5357, 5356, 5358, 5359, 15353)
 
 # 接管时 AGH 要接住所有来源地址：nft 把 LAN/UDP 的 53 一律 redirect 到本机
 BIND_ALL = ["0.0.0.0", "::"]
@@ -102,7 +120,36 @@ def _api(path: str, method: str = "GET", body: dict | None = None, timeout: floa
 
 
 def _installed() -> bool:
-    return os.path.exists(AGH_BIN)
+    """本体在不在。
+
+    只看二进制会漏掉「包装了但没跑过、二进制还没解出来」的中间态，
+    所以 uci 配置文件也算一条证据 —— 那种情况下 running 自然是 false，
+    界面会显示「未运行」而不是「未安装」，让人知道该去启动而不是去装。
+    """
+    return os.path.exists(AGH_BIN) or os.path.exists(AGH_UCI)
+
+
+#: 未安装时所有动作接口的统一回复。客户端可以只认 ok/installed 两个字段，
+#: 不必去解析文案。
+def _not_installed(**extra) -> dict:
+    out = {
+        "ok": False,
+        "installed": False,
+        "running": False,
+        "error": "AdGuard Home 未安装",
+        "hint": "在路由器网页端的「软件包」里装 luci-app-adguardhome，装完回到这一页",
+        "install": _install_info(),
+    }
+    out.update(extra)
+    return out
+
+
+def _install_info() -> dict:
+    """装它的入口。App 里点「去安装」直接打开这个 LuCI 页面。"""
+    return {
+        "package": "luci-app-adguardhome",
+        "luci_path": "/cgi-bin/luci/admin/system/package-manager",
+    }
 
 
 def _running() -> bool:
@@ -157,6 +204,33 @@ def _dns_settings(text: str) -> dict:
             if line.strip() and not line.strip().startswith("#"):
                 list_key = ""
     return out
+
+
+def _port_free(port: int) -> bool:
+    """UDP 能不能绑上。只看 127.0.0.1 —— 观察模式就绑这个地址。"""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.bind(("127.0.0.1", port))
+        return True
+    except OSError:
+        return False
+    finally:
+        s.close()
+
+
+def _observe_port() -> int:
+    """观察模式用哪个端口：yaml 里已有且还能绑就沿用，否则挑一个空闲的。
+
+    不能写死 5353：那台机器上 avahi 占 5353、wsdd2 占 5355，
+    「退出接管」时 AGH 会 bind 失败直接不启动（DNS 没事，但拦截停摆）。
+    """
+    cur = _dns_settings(_read_yaml())["port"]
+    if cur and cur not in (0, 53) and _port_free(cur):
+        return cur
+    for p in OBSERVE_PORTS:
+        if _port_free(p):
+            return p
+    return OBSERVE_PORTS[0]
 
 
 def _patch_yaml(port=None, hosts=None, aaaa=None, upstream=None) -> bool:
@@ -680,6 +754,7 @@ def top(limit: int = 5) -> dict:
 
 
 def status() -> dict:
+    ensure_watchdog()
     installed = _installed()
     running = _running()
     dns_cfg = _dns_settings(_read_yaml()) if installed else _dns_settings("")
@@ -699,6 +774,8 @@ def status() -> dict:
     return {
         "installed": installed,
         "running": running,
+        # 没装的时候界面要用它拼「去安装」的入口；装了也照给，成本为零
+        "install": _install_info(),
         "mode": mode,
         "mode_label": {"stopped": "未运行", "observe": "观察模式", "takeover": "已接管全网"}.get(mode, mode),
         "listening": dns_cfg,
@@ -708,6 +785,8 @@ def status() -> dict:
         "filters": filters,
         "stats": stats,
         "web_port": int(_conf().get("api_port", 3000)),
+        # 兜底巡检：接管后 AGH 一崩，53 会没人应答，巡检会把 dnsmasq 放回去
+        "guard": guard_status(),
     }
 
 
@@ -728,6 +807,92 @@ def _restore_dnsmasq(port: int = 53):
     _run(["/etc/init.d/dnsmasq", "restart"], timeout=60)
 
 
+# --------------------------------------------------------------- DNS 兜底巡检
+#
+# 接管之后 AGH 是 53 的唯一入口，而且 `dhcp.port=5354` 是持久化配置：
+# AGH 一崩、被禁用、升级失败，全家 DNS 就没有人应答，重启也不会自己好。
+# 这段巡检只在「53 完全没人监听」时才动手 —— 目标不是保住拦截，是保住网。
+
+_WATCH = {
+    "started": False,
+    "busy_until": 0.0,     # 接管/回滚进行中，别插手
+    "checks": 0,
+    "heals": [],           # 最近几次自愈，给界面看
+    "healed_at": 0.0,
+    "reason": "",
+}
+_WATCH_LOG = "/tmp/istore-agent-agh-guard.log"
+
+
+def _guard_log(text: str):
+    line = time.strftime("%Y-%m-%d %H:%M:%S ") + text + "\n"
+    try:
+        with open(_WATCH_LOG, "a", encoding="utf-8") as fh:
+            fh.write(line)
+    except OSError:
+        pass
+
+
+def _heal_dns(reason: str) -> bool:
+    """把 53 还给 dnsmasq。拦截会断，但至少域名还能解析。"""
+    _guard_log("触发自愈：" + reason)
+    _restore_dnsmasq(53)
+    holder = _listening_53()
+    ok = "dnsmasq" in holder.lower()
+    if ok:
+        # 顺手把 AGH 的 yaml 改成观察端口：否则它下次启动还会想抢 53，
+        # 抢不到就起不来，界面又变成「未运行」让人以为坏了
+        try:
+            _patch_yaml(port=_observe_port(), hosts=["127.0.0.1"])
+        except Exception:
+            pass
+        _WATCH["healed_at"] = time.time()
+        _WATCH["reason"] = reason
+        _WATCH["heals"] = (_WATCH["heals"] + [{"ts": int(time.time()), "reason": reason}])[-5:]
+        _guard_log("已把 dnsmasq 放回 53，当前持有者：" + (holder or "(空)"))
+    else:
+        _guard_log("自愈失败，53 持有者：" + (holder or "(空)"))
+    return ok
+
+
+def _watch_loop():
+    while True:
+        time.sleep(12)
+        try:
+            if time.time() < _WATCH["busy_until"]:
+                continue
+            if not _installed():
+                continue
+            _WATCH["checks"] += 1
+            if _dnsmasq_port() == 53:
+                continue                     # dnsmasq 还在 53，一切正常
+            holder = _listening_53()
+            if holder:
+                continue                     # 有人应答（正常接管就是 AGH），别动
+            _heal_dns("53 无人监听（dnsmasq 已挪到 %s）" % _dnsmasq_port())
+        except Exception as exc:  # noqa: BLE001 —— 巡检自己不能把 Agent 带崩
+            _guard_log("巡检异常：" + str(exc))
+
+
+def ensure_watchdog():
+    """起巡检线程。重复调用安全，服务启动和每次读状态都会调一次。"""
+    if _WATCH["started"]:
+        return
+    _WATCH["started"] = True
+    threading.Thread(target=_watch_loop, name="agh-guard", daemon=True).start()
+
+
+def guard_status() -> dict:
+    return {
+        "enabled": True,
+        "checks": _WATCH["checks"],
+        "healed_at": int(_WATCH["healed_at"]),
+        "reason": _WATCH["reason"],
+        "count": len(_WATCH["heals"]),
+        "recent": list(_WATCH["heals"]),
+    }
+
+
 def takeover() -> dict:
     """接管：AGH 上 53，dnsmasq 只留 DHCP。
 
@@ -735,6 +900,9 @@ def takeover() -> dict:
     """
     if not _installed():
         return {"ok": False, "error": "AdGuard Home 未安装"}
+
+    # 接管过程中 53 会短暂空着，这期间巡检不能插手
+    _WATCH["busy_until"] = time.time() + 30
 
     upstream, upstream_note = _pick_upstream()
     # 本地域名单独转发给 dnsmasq：NAS、打印机、静态绑定这些不能因为接管就失联
@@ -749,7 +917,7 @@ def takeover() -> dict:
     # 2. dnsmasq 让出 53，挪到 5354 继续做本地解析（DHCP 完全不受影响）
     code, out = _run(["uci", "set", f"dhcp.@dnsmasq[0].port={LOCAL_DNS_PORT}"], timeout=5)
     if code != 0:
-        _write_dns_settings(SS53, ["127.0.0.1"])
+        _write_dns_settings(_observe_port(), ["127.0.0.1"])
         return {"ok": False, "error": f"设置 dnsmasq 端口失败: {out.strip()}"}
     _run(["uci", "commit", "dhcp"], timeout=5)
     _run(["/etc/init.d/dnsmasq", "restart"], timeout=60)
@@ -760,7 +928,7 @@ def takeover() -> dict:
     time.sleep(3)
 
     def rollback(reason: str, extra: dict | None = None) -> dict:
-        _write_dns_settings(SS53, ["127.0.0.1"])
+        _write_dns_settings(_observe_port(), ["127.0.0.1"])
         _restore_dnsmasq(53)
         _run(["/etc/init.d/AdGuardHome", "restart"], timeout=90)
         return {
@@ -797,8 +965,9 @@ def release() -> dict:
     if not _installed():
         return {"ok": False, "error": "AdGuard Home 未安装"}
 
+    _WATCH["busy_until"] = time.time() + 30
     up = _dnsmasq_upstream()
-    _patch_yaml(port=SS53, hosts=["127.0.0.1"], upstream=[up] if up else None)
+    _patch_yaml(port=_observe_port(), hosts=["127.0.0.1"], upstream=[up] if up else None)
     _restore_dnsmasq(53)
     _run(["/etc/init.d/AdGuardHome", "restart"], timeout=90)
     time.sleep(2)
@@ -835,6 +1004,9 @@ def refresh_rules() -> dict:
     AGH 自己也会按 ``filters_update_interval`` 定时拉取，这里是「现在就来一次」，
     两个入口共用同一条链路，所以手动更新完自动更新的计时也会一起重置。
     """
+    if not _installed():
+        return _not_installed()
+
     before = rules()
     res = _api("/filtering/refresh", "POST", {"whitelist": False}, timeout=180)
     if isinstance(res, dict) and "__error" in res:
@@ -893,6 +1065,9 @@ def rules() -> dict:
     本机出厂值是 24 小时，也就是**每天自动更新一次**，App 里那个按钮
     只是「等不及了现在就来一次」，不是唯一入口。
     """
+    if not _installed():
+        return _not_installed()
+
     data = _api("/filtering/status")
     if isinstance(data, dict) and "__error" in data:
         return {"ok": False, "error": data["__error"], "lists": [],
@@ -959,6 +1134,9 @@ def rules() -> dict:
 
 def set_interval(hours: int) -> dict:
     """改自动更新间隔。0 = 关闭自动更新。"""
+    if not _installed():
+        return _not_installed()
+
     try:
         hours = int(hours)
     except (TypeError, ValueError):
@@ -1036,8 +1214,23 @@ def toggle_list(list_id: int, enabled: bool) -> dict:
 
 
 def service(action: str) -> dict:
+    if not _installed():
+        return _not_installed()
+
     if action not in {"start", "stop", "restart"}:
         return {"ok": False, "error": "invalid action"}
+
+    # 接管状态下 AGH 就是 53 的唯一应答者，停服 = 全屋断网。
+    # 这个按钮客户端没做，但接口是开着口的，这里先堵死。
+    if action == "stop":
+        st = status()
+        if st["mode"] == "takeover":
+            return {
+                "ok": False,
+                "need_release": True,
+                "error": "正在接管全网 DNS，停服会让全屋无法解析域名。请先「退出接管」。",
+            }
+
     code, out = _run(["/etc/init.d/AdGuardHome", action], timeout=120)
     return {"ok": code == 0, "action": action, "output": out[-400:]}
 
@@ -1148,3 +1341,242 @@ def preflight() -> dict:
             "被拦的域名返回 0.0.0.0，连接不会建立，不占带宽",
         ],
     }
+
+
+# --------------------------------------------------------------- 一键安装
+#
+# 为什么要让 Agent 代劳：用户要的是「在 App 里点两下就能用」，而不是
+# 「跳到一个网页版 opkg 界面自己找包」。这里把三条命令 + 一次下载收敛成
+# 一个后台任务，全程不碰 DNS：
+#   1. opkg 装 LuCI 插件（失败不致命，只有界面依赖它）
+#   2. 从 static.adtidy.org 拉本体（GitHub 在这台机器上不通）
+#   3. 先以「观察模式」起来：只绑 127.0.0.1 + 空闲端口，53 留给 dnsmasq
+# 接管仍然是用户另外点的一步，因为那一步会动全家的 DNS。
+
+_INST = {
+    "running": False, "pct": 0, "step": "", "ok": False, "done": False,
+    "error": "", "log": [], "ts": 0.0,
+}
+_INST_LOCK = threading.Lock()
+
+
+def install_status() -> dict:
+    with _INST_LOCK:
+        snap = dict(_INST)
+        snap["log"] = list(_INST["log"])
+    return snap
+
+
+def _step(pct: int, text: str):
+    with _INST_LOCK:
+        _INST["pct"] = pct
+        _INST["step"] = text
+        _INST["ts"] = time.time()
+        _INST["log"] = (_INST["log"] + [time.strftime("%H:%M:%S ") + text])[-10:]
+
+
+def _arch() -> str:
+    machine = (platform.machine() or "").lower()
+    return {
+        "x86_64": "amd64", "amd64": "amd64",
+        "aarch64": "arm64", "arm64": "arm64",
+        "armv7l": "armv7", "armv6l": "armv6",
+        "mips": "mips_softfloat", "mips64": "mips64_softfloat",
+    }.get(machine, "")
+
+
+def _fetch(url: str, dst: str, timeout: int = 120):
+    """下载到 dst。证书链不全的自定义固件退回不校验 —— 反正校验了也没用。"""
+    req = urllib.request.Request(url, headers={"User-Agent": "istore-pilot"})
+    try:
+        resp = urllib.request.urlopen(req, timeout=timeout)
+    except urllib.error.URLError as exc:
+        if "CERTIFICATE" not in str(exc).upper():
+            raise
+        resp = urllib.request.urlopen(req, timeout=timeout,
+                                      context=ssl._create_unverified_context())
+    with resp, open(dst, "wb") as fh:
+        shutil.copyfileobj(resp, fh)
+
+
+def _install_binary(tar_path: str):
+    stage = "/tmp/agh_stage"
+    shutil.rmtree(stage, ignore_errors=True)
+    os.makedirs(stage, exist_ok=True)
+    with tarfile.open(tar_path, "r:gz") as tf:
+        tf.extractall(stage)
+    src = os.path.join(stage, "AdGuardHome")
+    if not os.path.isdir(src) or not os.path.exists(os.path.join(src, "AdGuardHome")):
+        raise RuntimeError("压缩包里没有 AdGuardHome 目录")
+    if os.path.exists(AGH_DIR):
+        shutil.move(AGH_DIR, AGH_DIR + ".old." + str(int(time.time())))
+    shutil.move(src, AGH_DIR)
+    os.chmod(os.path.join(AGH_DIR, "AdGuardHome"), 0o755)
+
+
+def _ensure_uci():
+    """没配置就写一份最小的。字段名照 LuCI 插件的读法，别自己发明。"""
+    if os.path.exists(AGH_UCI):
+        return
+    os.makedirs(os.path.dirname(AGH_UCI), exist_ok=True)
+    with open(AGH_UCI, "w", encoding="utf-8") as fh:
+        fh.write(
+            "\nconfig AdGuardHome 'AdGuardHome'\n"
+            "\toption enabled '0'\n"
+            "\toption httpport '%d'\n"
+            "\toption redirect 'none'\n"
+            "\toption configpath '%s'\n"
+            "\toption workdir '%s'\n"
+            "\toption logfile '/tmp/AdGuardHome.log'\n"
+            "\toption verbose '0'\n"
+            "\toption binpath '%s'\n"
+            "\toption waitonboot '0'\n\n" % (AGH_WEB_PORT, AGH_YAML, AGH_WORKDIR, AGH_BIN))
+
+
+def _web_ready(seconds: int = 45) -> bool:
+    url = "http://127.0.0.1:%d/control/install/get_addresses" % AGH_WEB_PORT
+    for _ in range(seconds):
+        try:
+            with urllib.request.urlopen(url, timeout=3) as resp:
+                if resp.status == 200:
+                    return True
+        except Exception:
+            pass
+        time.sleep(1)
+    return False
+
+
+def _configure_initial() -> dict:
+    """走产品自带的初始化向导：设管理员密码 + 绑 127.0.0.1 + 观察端口。
+
+    自己拼 yaml 风险太高（schema_version、bcrypt 都绕不开），
+    这个接口是 AGH 自己在首次启动时用的那条路。
+    """
+    password = str(_conf().get("password") or cfg("adguard.password") or cfg("auth.password") or "")
+    if not password:
+        raise RuntimeError("没有可用的管理密码，无法初始化")
+    port = _observe_port()
+    body = {
+        "web": {"ip": "127.0.0.1", "port": AGH_WEB_PORT},
+        "dns": {"ip": "127.0.0.1", "port": port},
+        "username": "admin",
+        "password": password,
+    }
+    url = "http://127.0.0.1:%d/control/install/configure" % AGH_WEB_PORT
+    req = urllib.request.Request(url, data=json.dumps(body).encode(),
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=40) as resp:
+        if resp.status != 200:
+            raise RuntimeError("初始化配置失败 HTTP %s" % resp.status)
+    _run(["uci", "set", "AdGuardHome.AdGuardHome.enabled=1"], timeout=5)
+    _run(["uci", "commit", "AdGuardHome"], timeout=5)
+    return {"port": port, "web": AGH_WEB_PORT, "user": "admin", "password": password}
+
+
+#: 装完自动订阅这份规则（国内维护，中文广告覆盖好，约 10 万条）
+RULE_URL = "https://anti-ad.net/adguard.txt"
+RULE_NAME = "anti-AD"
+
+
+def _configure_rules(user: str, password: str) -> str:
+    """给新装的实例加上规则订阅。失败只记一条警告 —— 规则可以后再加，装不能回滚。"""
+    auth = base64.b64encode(("%s:%s" % (user, password)).encode()).decode()
+    base = "http://127.0.0.1:%d" % AGH_WEB_PORT
+
+    def post(path: str, body: dict) -> int:
+        req = urllib.request.Request(
+            base + path, data=json.dumps(body).encode(),
+            headers={"Content-Type": "application/json",
+                     "Authorization": "Basic " + auth})
+        with urllib.request.urlopen(req, timeout=40) as resp:
+            return resp.status
+
+    try:
+        post("/control/filtering/add_url",
+             {"name": RULE_NAME, "url": RULE_URL, "whitelist": False})
+        post("/control/filtering/config", {"interval": 24})
+        return ""
+    except Exception as exc:  # noqa: BLE001
+        return "规则订阅没加上：" + str(exc)
+
+
+def _install_worker():
+    try:
+        _step(4, "检查软件源")
+        _run(["opkg", "update"], timeout=150)
+
+        _step(12, "安装 LuCI 插件（可选）")
+        code, out = _run(["opkg", "install", "luci-app-adguardhome"], timeout=300)
+        pkg_warn = "" if code == 0 else out.strip()[-120:]
+
+        _step(28, "下载 AdGuard Home 本体")
+        arch = _arch()
+        if not arch:
+            raise RuntimeError("不支持的 CPU 架构：" + (platform.machine() or "未知"))
+        tar_path = "/tmp/AdGuardHome_linux_%s.tar.gz" % arch
+        _fetch(AGH_TARBALL.format(arch=arch), tar_path)
+        size = os.path.getsize(tar_path)
+        if size < 3 * 1024 * 1024:
+            raise RuntimeError("下载文件异常（只有 %d 字节）" % size)
+
+        _step(55, "解包到 " + AGH_DIR)
+        _install_binary(tar_path)
+
+        _step(68, "准备运行目录")
+        os.makedirs(AGH_WORKDIR, exist_ok=True)
+        try:
+            os.chmod(AGH_WORKDIR, 0o700)
+        except OSError:
+            pass
+        _ensure_uci()
+
+        _step(76, "启动 AdGuard Home")
+        if os.path.exists("/etc/init.d/AdGuardHome"):
+            _run(["/etc/init.d/AdGuardHome", "enable"], timeout=30)
+            _run(["/etc/init.d/AdGuardHome", "start"], timeout=90)
+        else:
+            subprocess.Popen(
+                [AGH_BIN, "-c", AGH_YAML, "-w", AGH_WORKDIR,
+                 "--no-check-update", "--web-addr", "127.0.0.1:%d" % AGH_WEB_PORT],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                start_new_session=True)
+
+        _step(84, "等待 Web 服务就绪")
+        if not _web_ready(45):
+            raise RuntimeError("Web 端口 %d 没起来，看 /tmp/AdGuardHome.log" % AGH_WEB_PORT)
+
+        _step(92, "写入初始配置（观察模式）")
+        info = _configure_initial()
+
+        _step(96, "添加拦截规则")
+        rule_warn = _configure_rules(info["user"], info["password"])
+
+        _step(100, "完成")
+        with _INST_LOCK:
+            _INST.update(running=False, done=True, ok=True, step="已安装并启动（观察模式）",
+                         error="", pct=100)
+            if pkg_warn:
+                _INST["log"] = (_INST["log"] + ["LuCI 插件安装失败：" + pkg_warn])[-10:]
+            if rule_warn:
+                _INST["log"] = (_INST["log"] + [rule_warn])[-10:]
+            _INST["port"] = info["port"]
+    except Exception as exc:  # noqa: BLE001 —— 任何一步失败都要把原因带回 App
+        with _INST_LOCK:
+            _INST.update(running=False, done=True, ok=False,
+                         error=str(exc), step="安装失败")
+
+
+def install(confirm: str = "") -> dict:
+    """启动一键安装（后台跑，接口立刻返回）。必须带 confirm=install。"""
+    if confirm != "install":
+        return {"ok": False, "error": "安装需要二次确认：confirm=install",
+                "installed": _installed()}
+    if _installed():
+        return {"ok": False, "installed": True, "error": "AdGuard Home 已经安装"}
+    with _INST_LOCK:
+        if _INST["running"]:
+            return {"ok": True, "accepted": True, "already": True, "state": install_status()}
+        _INST.update(running=True, done=False, ok=False, pct=0,
+                     step="准备中", error="", log=[], ts=time.time())
+    threading.Thread(target=_install_worker, name="agh-install", daemon=True).start()
+    return {"ok": True, "accepted": True, "state": install_status()}
