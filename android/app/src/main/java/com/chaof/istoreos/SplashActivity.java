@@ -1,5 +1,8 @@
 package com.chaof.istoreos;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Typeface;
@@ -7,6 +10,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -17,36 +21,64 @@ import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 
+import com.chaof.istoreos.api.Api;
+import com.chaof.istoreos.api.Cb;
+import com.chaof.istoreos.core.Session;
 import com.chaof.istoreos.util.Ui;
 
+import org.json.JSONObject;
+
 /**
- * 启动页：3 秒的品牌时间。
+ * 启动页：品牌展示 + 一次真实的连通性检查。
  *
- * 之前点开 App 是先闪一下白底再进首页，什么也没说。现在停 3 秒把
- * 「这是什么 App」讲清楚 —— 深绿渐变（和首页 hero 同一套色）、
- * 图标落位 + 名字淡入，底部一行「正在读取路由器…」。
+ * 上一版的进度条其实是一条静态的线 —— 没有任何动画，停留时间是写死的 3 秒。
+ * 这一版把进度分成三段，每段都有明确的触发条件：
  *
- * 为什么不做跳过：3 秒是刻意的，够看清但不至于烦。真正的加载
- * （登录态、主机名）都发生在 MainActivity 里，这里不占那点时间。
+ *   0 → 30%   启动（固定 380ms）
+ *   30 → 82%  正在连接路由器（拉一次 /api/v1/overview，慢速逼近表示在等）
+ *   82 → 100% 请求回来（成功或失败）后收尾
+ *
+ * 三条约束：
+ *   - 最短停 MIN_STAY_MS：不到 1.4s 就跳走，品牌页会来不及看清
+ *   - 最长等 NET_TIMEOUT_MS：超时先把人放进界面，错误由首页自己显示
+ *   - 请求的是首页首屏要用的那个接口，等于顺手预热缓存，进主页不用再转圈
  */
 public class SplashActivity extends Activity {
 
-    private static final long STAY_MS = 3000L;
+    /** 品牌最短停留：低于这个时长会成为"闪一下"的观感 */
+    private static final long MIN_STAY_MS = 1400L;
+    /** 等路由器响应的上限：超了先放人进界面，不把人卡在启动页 */
+    private static final long NET_TIMEOUT_MS = 2600L;
+    /** 收尾动画时长 */
+    private static final long OUTRO_MS = 420L;
+    /** 拿到结果后走完剩下距离的时长：短一点，"满格 + 准备就绪"才看得清楚 */
+    private static final long FINISH_MS = 240L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private final Runnable go = new Runnable() {
+    private final long createdAt = SystemClock.uptimeMillis();
+
+    private View fill;
+    private TextView tip;
+    private ValueAnimator anim;
+
+    /** 已经收尾（成功/失败/超时，只认第一次） */
+    private boolean settled;
+    /** 已经开始跳转，防止重复 startActivity */
+    private boolean leaving;
+    /** 请求失败过：收尾时不要用"准备就绪"盖掉错误提示 */
+    private boolean errorShown;
+
+    private final Runnable timeout = new Runnable() {
         @Override
         public void run() {
-            startActivity(new Intent(SplashActivity.this, MainActivity.class));
-            // 淡入淡出：启动页和首页之间不要出现一眼白底
-            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
-            finish();
+            settle();
         }
     };
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         // 状态栏/导航栏跟着卡片走：默认是白底，会在深绿上面留一条白边
         getWindow().setStatusBarColor(Ui.color(this, R.color.hero_from));
         getWindow().setNavigationBarColor(Ui.color(this, R.color.hero_from));
@@ -62,9 +94,8 @@ public class SplashActivity extends Activity {
         ImageView logo = new ImageView(this);
         logo.setImageResource(R.mipmap.ic_launcher);
         logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(
-                Ui.dp(this, 88), Ui.dp(this, 88));
-        root.addView(logo, llp);
+        root.addView(logo, new LinearLayout.LayoutParams(
+                Ui.dp(this, 88), Ui.dp(this, 88)));
 
         TextView name = new TextView(this);
         name.setText("iStore Pilot");
@@ -88,7 +119,7 @@ public class SplashActivity extends Activity {
         tlp.topMargin = Ui.dp(this, 8);
         root.addView(tagline, tlp);
 
-        // 底部：一行提示 + 一条会自己走的细线（纯装饰，不代表真实进度）
+        // 底部：一条会真正走的进度条 + 一行状态
         LinearLayout foot = new LinearLayout(this);
         foot.setOrientation(LinearLayout.VERTICAL);
         foot.setGravity(Gravity.CENTER);
@@ -97,15 +128,26 @@ public class SplashActivity extends Activity {
         flp.topMargin = Ui.dp(this, 46);
         root.addView(foot, flp);
 
-        View line = new View(this);
-        GradientDrawable lbg = new GradientDrawable();
-        lbg.setCornerRadius(Ui.dp(this, 2));
-        lbg.setColor(Ui.alpha(Ui.color(this, R.color.hero_fg), 0.22f));
-        line.setBackground(lbg);
-        foot.addView(line, new LinearLayout.LayoutParams(Ui.dp(this, 96), Ui.dp(this, 3)));
+        LinearLayout track = new LinearLayout(this);
+        GradientDrawable tbg = new GradientDrawable();
+        tbg.setCornerRadius(Ui.dp(this, 2));
+        tbg.setColor(Ui.alpha(Ui.color(this, R.color.hero_fg), 0.22f));
+        track.setBackground(tbg);
+        foot.addView(track, new LinearLayout.LayoutParams(Ui.dp(this, 96), Ui.dp(this, 3)));
 
-        TextView tip = new TextView(this);
-        tip.setText("正在读取路由器…");
+        // 填充块宽度撑满轨道，用 scaleX 表示进度：不触发 layout，60fps 很稳
+        fill = new View(this);
+        GradientDrawable fbg = new GradientDrawable();
+        fbg.setCornerRadius(Ui.dp(this, 2));
+        fbg.setColor(Ui.color(this, R.color.hero_fg));
+        fill.setBackground(fbg);
+        fill.setPivotX(0f);
+        fill.setScaleX(0f);
+        track.addView(fill, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        tip = new TextView(this);
+        tip.setText("正在启动…");
         tip.setTextSize(11.5f);
         tip.setTextColor(Ui.alpha(Ui.color(this, R.color.hero_fg), 0.6f));
         LinearLayout.LayoutParams tiplp = new LinearLayout.LayoutParams(
@@ -127,12 +169,130 @@ public class SplashActivity extends Activity {
         name.animate().alpha(1f).setStartDelay(120).setDuration(380).start();
         tagline.animate().alpha(1f).setStartDelay(220).setDuration(380).start();
 
-        handler.postDelayed(go, STAY_MS);
+        startFlow();
+    }
+
+    // ---------------------------------------------------------------- 进度
+
+    private void startFlow() {
+        // 第一段：固定推进到 30%，只表示"已经起来了"
+        step("正在启动…", 0.30f, 380, new Runnable() {
+            @Override
+            public void run() {
+                if (!Session.ready(SplashActivity.this)) {
+                    // 没地址 / 令牌过期：MainActivity 自己会跳登录页，这里不用等网络
+                    step("准备就绪", 1f, 520, SplashActivity.this::enter);
+                    return;
+                }
+                probe();
+            }
+        });
+    }
+
+    private void probe() {
+        tip.setText("正在连接路由器…");
+        // 慢速逼近 82%：真实耗时不可知，停在"快好了"比乱跳诚实
+        step(null, 0.82f, 900, null);
+        handler.postDelayed(timeout, NET_TIMEOUT_MS);
+
+        Api.get(this, "/api/v1/overview", new Cb() {
+            @Override
+            public void onData(JSONObject data, boolean fromCache) {
+                settle();
+            }
+
+            @Override
+            public void onError(String message) {
+                if (!settled) {
+                    // 连不上也让人进界面，首页会显示具体错误，比卡在这里好
+                    errorShown = true;
+                    tip.setText("路由器暂时没响应，先进入界面");
+                }
+                settle();
+            }
+        });
+    }
+
+    /** 收尾：只认第一次（请求成功、请求失败、超时三者抢跑） */
+    private void settle() {
+        if (settled) {
+            return;
+        }
+        settled = true;
+        handler.removeCallbacks(timeout);
+
+        // 先快速走满，再让"满格 + 准备就绪"停到最短停留时间——
+        // 比"到 100% 还写着正在连接"清楚，也不会出现 70% 就说准备好了
+        if (!errorShown) {
+            tip.setText("准备就绪");
+        }
+        step(null, 1f, FINISH_MS, this::enter);
+    }
+
+    /**
+     * 推进到某个比例。text 为 null 表示保留当前文案。
+     * 先摘监听再 cancel，否则 cancel 也会触发 onAnimationEnd，把收尾逻辑提前叫起来。
+     */
+    private void step(String text, float target, long duration, @Nullable final Runnable then) {
+        if (text != null) {
+            tip.setText(text);
+        }
+        if (anim != null) {
+            anim.removeAllListeners();
+            anim.cancel();
+        }
+        anim = ValueAnimator.ofFloat(fill.getScaleX(), target);
+        anim.setDuration(duration);
+        anim.setInterpolator(new DecelerateInterpolator());
+        anim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator a) {
+                fill.setScaleX((float) a.getAnimatedValue());
+            }
+        });
+        if (then != null) {
+            anim.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator a) {
+                    then.run();
+                }
+            });
+        }
+        anim.start();
+    }
+
+    // ---------------------------------------------------------------- 跳转
+
+    /** 满足最短停留后才跳，避免"闪一下" */
+    private void enter() {
+        if (leaving) {
+            return;
+        }
+        leaving = true;
+        long wait = createdAt + MIN_STAY_MS - SystemClock.uptimeMillis();
+        if (wait > 0) {
+            handler.postDelayed(this::doEnter, wait);
+        } else {
+            doEnter();
+        }
+    }
+
+    private void doEnter() {
+        if (isFinishing()) {
+            return;
+        }
+        startActivity(new Intent(this, MainActivity.class));
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+        finish();
     }
 
     @Override
     protected void onDestroy() {
-        handler.removeCallbacks(go);
+        handler.removeCallbacksAndMessages(null);
+        if (anim != null) {
+            anim.removeAllListeners();
+            anim.cancel();
+        }
         super.onDestroy();
     }
 }
