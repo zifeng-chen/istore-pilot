@@ -25,7 +25,7 @@
 
 ```bash
 # 电脑上，用 scp
-scp istore-pilot_0.1.2-11.run root@192.168.100.1:/tmp/
+scp istore-pilot_0.1.2-11.run root@192.168.1.1:/tmp/
 
 # 或者在路由器上直接下载（需要能访问 GitHub）
 wget -O /tmp/pilot.run https://github.com/zifeng-chen/istore-pilot/releases/latest/download/istore-pilot_0.1.2-11.run

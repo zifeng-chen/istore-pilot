@@ -35,7 +35,7 @@
 ### 登录
 
 ```bash
-curl -X POST http://192.168.100.1:8443/api/v1/login \
+curl -X POST http://192.168.1.1:8443/api/v1/login \
      -H "Content-Type: application/json" \
      -d '{"password":"<口令>"}'
 ```
@@ -92,8 +92,8 @@ curl -X POST http://192.168.100.1:8443/api/v1/login \
 ```json
 {
   "ok": true,
-  "url": "http://192.168.100.1/cgi-bin/luci/",
-  "host": "192.168.100.1",
+  "url": "http://192.168.1.1/cgi-bin/luci/",
+  "host": "192.168.1.1",
   "scheme": "http",
   "cookie_name": "sysauth_http",
   "cookie_value": "96bd513b…",
@@ -128,11 +128,11 @@ Agent 就跑在这台机器上、还是 root，直接替它登一次，**口令�
 
 | 原值 | 返回 |
 |---|---|
-| `100.70.72.34`（CGNAT） | `100.*.*.34` |
+| `100.64.0.1`（CGNAT） | `100.*.*.34` |
 | `218.2.2.2`（运营商 DNS） | `218.*.*.2` |
-| `240e:3a0:5656:3039:…:b7c0` | `240e:3a0:…` |
-| `240e:3a6:566b:1080::/64` | `240e:3a6:…/64` |
-| `192.168.100.243`（LAN） | 原样 |
+| 完整 IPv6 地址 | 只留前两段（运营商前缀），其余打码 |
+| IPv6 网段 `/64` | 同上，保留 `::/64` 前缀长度 |
+| `192.168.1.243`（LAN） | 原样 |
 | `fd00::1` / `fe80::1` / `127.0.0.1` | 原样 |
 
 只对「展示用」字段生效：`POST /network/wan` 的 `ipaddr` / `netmask` / `gateway`
@@ -155,7 +155,7 @@ Agent 就跑在这台机器上、还是 root，直接替它登一次，**口令�
 
 ```json
 {
-  "ip": "192.168.100.1",
+  "ip": "192.168.1.1",
   "mask": "255.255.255.0",
   "dhcp_enabled": true,
   "pool_start": 100,
@@ -203,7 +203,7 @@ Agent 就跑在这台机器上、还是 root，直接替它登一次，**口令�
             "source": "ap|guess",
             "conf": "high|medium|low",
             "reason": "AP 报表 · wlan4",
-            "ap": "192.168.100.165" }
+            "ap": "192.168.1.165" }
 ```
 
 `source=ap + conf=high` 是**事实**：Agent 登录 AP 读它的接入设备表。其余都是推断，
@@ -320,7 +320,7 @@ OpenClash 专用接口，保留兼容。新代码请用 `/proxy/*`。
 ## 示例
 
 ```bash
-BASE=http://192.168.100.1:8443/api/v1
+BASE=http://192.168.1.1:8443/api/v1
 
 TOKEN=$(curl -s -X POST $BASE/login \
   -H 'Content-Type: application/json' \

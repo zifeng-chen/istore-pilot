@@ -32,7 +32,7 @@
 
 ```bash
 ADB="/c/Users/chaof/AppData/Local/Android/Sdk/platform-tools/adb.exe"
-"$ADB" connect 192.168.100.131:5555
+"$ADB" connect 192.168.1.131:5555
 "$ADB" install -r dist/istoreos-2.1.2.apk
 ```
 
@@ -40,8 +40,8 @@ ADB="/c/Users/chaof/AppData/Local/Android/Sdk/platform-tools/adb.exe"
 
 ```bash
 # 手机上：开发者选项 → 无线调试 → 使用配对码配对设备
-"$ADB" pair 192.168.100.131:<配对端口> <6位配对码>
-"$ADB" connect 192.168.100.131:<连接端口>   # 配对完显示的那个端口
+"$ADB" pair 192.168.1.131:<配对端口> <6位配对码>
+"$ADB" connect 192.168.1.131:<连接端口>   # 配对完显示的那个端口
 ```
 
 配好之后执行一次 `adb tcpip 5555`，以后固定连 5555，不用再配对（重启手机后要重做一次）。
@@ -62,7 +62,7 @@ http://<电脑IP>:8899/istoreos-2.1.2.apk
 
 | 项 | 值 |
 |---|---|
-| 地址 | `192.168.100.1:8443`（外网填 DDNS 域名，后面同样加 `:8443`） |
+| 地址 | `192.168.1.1:8443`（外网填 DDNS 域名，后面同样加 `:8443`） |
 | 密码 | 路由器后台控制密码（不在此文档记录） |
 | 令牌 | 7 天有效，之后打开免登录 |
 

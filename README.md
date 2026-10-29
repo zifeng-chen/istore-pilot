@@ -220,7 +220,7 @@ ROUTER_PW='...' python deploy/install_ipk.py
 >
 > **1. 监听地址**：Agent 默认 `0.0.0.0:8443`。如果不打算走公网访问，
 > 请把 `/etc/config/istore-agent` 的 `bind` 改成 LAN 地址
-> （例如 `192.168.100.1`），避免管理面暴露在 WAN / IPv6 公网侧。
+> （例如 `192.168.1.1`），避免管理面暴露在 WAN / IPv6 公网侧。
 >
 > **2. 打包顺序**：`build_ipk.py` 直接从项目根 `web/` 复制前端资源。
 > 先打包后改 web，会导致包内永远是旧文件，装完还会把手工上传的新文件覆盖回去。
@@ -264,7 +264,7 @@ Agent 自己的配置文件在 `/etc/istore-agent/config.json`，可用
   "driver": "zte",                  // 目前只有 zte（中兴 ZXSLC 系列）
   "user": "admin",
   "password": "你的 AP 管理口令",
-  "hosts": ["192.168.100.165"]      // Mesh 的话把主、从都写进来
+  "hosts": ["192.168.1.165"]      // Mesh 的话把主、从都写进来
 }
 ```
 

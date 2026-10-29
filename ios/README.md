@@ -63,7 +63,7 @@ IStorePilot/
 
 ## 几个必须知道的点
 
-- **ATS 必须放开**：Agent 监听 `http://192.168.100.1:8443`，不放开
+- **ATS 必须放开**：Agent 监听 `http://192.168.1.1:8443`，不放开
   `NSAllowsArbitraryLoads` 的话所有请求在到达路由器之前就被系统拦了。
 - **本地网络权限**：iOS 14+ 第一次访问局域网 IP 会弹权限框，文案在
   `NSLocalNetworkUsageDescription`。用户点了拒绝得去系统设置里手动开。

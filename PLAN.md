@@ -34,12 +34,12 @@
 | 项 | 值 |
 |---|---|
 | WAN 类型 | PPPoE |
-| WAN IPv4 | `100.70.72.34`（**CGNAT，不是公网 IPv4**） |
-| WAN IPv6 | `240e:3a0:5656:3039:78af:4be8:704a:c3f6/64`（动态） |
-| LAN | `br-lan 192.168.100.1/24` |
-| LAN IPv6 | `240e:3a6:566b:1080::1/64`（PD 独立前缀） |
+| WAN IPv4 | `100.64.0.1`（**CGNAT，不是公网 IPv4**） |
+| WAN IPv6 | `240e:xxxx:xxxx:xxxx::/64`（动态） |
+| LAN | `br-lan 192.168.1.1/24` |
+| LAN IPv6 | `240e:xxxx:xxxx:xxxx::1/64`（PD 独立前缀） |
 | DNS | `218.2.2.2 / 218.4.4.4` |
-| 在线设备 | 49 台（AppleTV、米家设备、OPPO 手机等） |
+| 在线设备 | N 台（电视盒子、智能家居设备、手机等） |
 
 > 结论：**外网访问只能走 IPv6**，IPv4 在运营商 CGNAT 后面无法映射。这决定了后续所有外网方案必须围绕 IPv6 + DDNS。
 
@@ -55,11 +55,10 @@
 | SMB / NFS | 445 / 2049 | 文件共享 |
 | linkease / dnetd / unetd | 8897 | 易有云与异地组网 |
 
-**OpenClash 关键配置**：`enable=1`、`en_mode=fake-ip`、`core_type=Meta`、`cn_port=9090`、`external-controller=0.0.0.0:9090`、订阅 `良心云.yaml`、4 个策略组 / 63 个节点 / 日常数百条连接。
+**OpenClash 关键配置**：`enable=1`、`en_mode=fake-ip`、`core_type=Meta`、`cn_port=9090`、`external-controller=0.0.0.0:9090`、订阅一份自建配置、若干策略组 / 数十个节点 / 日常数百条连接。
 
 **Passwall（已装、已配置、未启用）**：`@global[0].enabled=0`，DNS 分流用 `chinadns-ng`，
-**158 个 Xray 节点**，按订阅来源分 3 组（星云 55 / 我的良心云 57 / 良心云 46），
-当前指向 `🇯🇵 日本-2A`。与 OpenClash 互斥，启动一个必须停另一个。
+**一百多个 Xray 节点**，按订阅来源分 3 组，默认指向某个日本节点。与 OpenClash 互斥，启动一个必须停另一个。
 
 ---
 
@@ -87,7 +86,9 @@ nftables 的 `input` 钩子 `policy accept`，WAN 区策略也是 ACCEPT，另�
 | Clash 9090 | 拿到 secret 即可随意改代理配置 |
 | SMB 445 / NFS 2049 | 局域网文件共享被公网直接访问 |
 
-用户明确说过「没有把 OpenClash 管理页端口放出来」，但实际上 `external-controller=0.0.0.0:9090` 配合全开的 WAN input，**它本来就是可达的**，只是从内网测不到（路由表里 `240e:3a0:...::/64` 是 `unreachable dev lo`，内网回环路径被挡住，造成了「没开放」的错觉）。
+要特别留意 `external-controller=0.0.0.0:9090`：只要 WAN 区 input 是 ACCEPT，
+它就是可达的。而且**从内网往往测不出来** —— IPv6 路由表里运营商前缀指向
+`unreachable dev lo`，回环路径被挡住，很容易造成「没对外开放」的错觉。
 
 **建议**：把 WAN 区 input 改回 `REJECT`，只按需放行特定端口。这件事不影响日常使用，但能一次性关掉上述全部缺口。已列入待办，等用户确认后执行。
 
@@ -103,7 +104,7 @@ nftables 的 `input` 钩子 `policy accept`，WAN 区策略也是 ACCEPT，另�
 /etc/init.d/istore-agent        # procd 托管，开机自启
 ```
 
-- 监听 `192.168.100.1:8443`（**仅局域网地址**，未对公网开放）
+- 监听 `192.168.1.1:8443`（**仅局域网地址**，未对公网开放）
 - 纯 Python 3.11 标准库，**零第三方依赖**，不需要交叉编译
 - 不改动 iStoreOS 任何现有配置，不占 80/443，不影响现有网页端
 
@@ -174,7 +175,7 @@ nftables 的 `input` 钩子 `policy accept`，WAN 区策略也是 ACCEPT，另�
 
 | 场景 | 域名解析结果 |
 |---|---|
-| 家里（走路由器 DNS） | `192.168.100.1`（内网地址） |
+| 家里（走路由器 DNS） | `192.168.1.1`（内网地址） |
 | 外面（走运营商 DNS） | 公网 IPv6 |
 
 这样一个域名两端都通，Let's Encrypt 证书也天然匹配，App 不需要任何切换逻辑。
@@ -183,7 +184,7 @@ nftables 的 `input` 钩子 `policy accept`，WAN 区策略也是 ACCEPT，另�
 
 手机可能开了加密 DNS（DoH / 私人 DNS）绕过路由器 DNS，所以 App 必须自己也能选路：
 
-1. 保存两个地址：内网 `http://192.168.100.1:8443`、外网 `https://域名`
+1. 保存两个地址：内网 `http://192.168.1.1:8443`、外网 `https://域名`
 2. 启动时并发探测 `/api/v1/ping`（1.5 秒超时），**取响应最快的**
 3. 当前地址仍可用时保持不变，避免每次刷新都跳
 4. 网络切换（Wi-Fi ↔ 蜂窝）、App 回到前台时重新探测
@@ -211,7 +212,7 @@ nftables 的 `input` 钩子 `policy accept`，WAN 区策略也是 ACCEPT，另�
 **推荐 A**：Agent 已经完整代理了 Clash 的全部操作（切换节点、模式、连接、延迟、启停），外网只需要放行 8443 一个端口。同时把 `external-controller` 从 `0.0.0.0:9090` 改为 `127.0.0.1:9090`，堵掉直连通道。
 
 开启外网的步骤（等用户确认）：
-1. 绑定地址从 `192.168.100.1` 改为 `0.0.0.0`
+1. 绑定地址从 `192.168.1.1` 改为 `0.0.0.0`
 2. 配好域名 + HTTPS 证书
 3. 防火墙只放行 8443 的 IPv6 入站，其余 WAN 入站全部 REJECT
 
@@ -219,7 +220,7 @@ nftables 的 `input` 钩子 `policy accept`，WAN 区策略也是 ACCEPT，另�
 
 ## 六、双代理后端：OpenClash 与 Passwall
 
-实测发现两个插件**都装了**：OpenClash 在跑（`config.enable=1`），Passwall 配好了 158 个
+实测发现两个插件**都装了**：OpenClash 在跑（`config.enable=1`），Passwall 配好了一百多个
 Xray 节点但 `@global[0].enabled=0` 没启用。所以 App 不能写死 OpenClash。
 
 两者差异极大，不能共用一套调用：
@@ -279,14 +280,14 @@ App 设置页有「接管全网 / 退出接管」按钮，一键切换。
 
 | 项 | 值 | 说明 |
 |---|---|---|
-| 地址 | `http://192.168.100.1:3000` | **只绑局域网 IPv4**，不监听 IPv6 |
+| 地址 | `http://192.168.1.1:3000` | **只绑局域网 IPv4**，不监听 IPv6 |
 | 账号 | `admin` | |
 | 密码 | 与 iStoreOS 相同 | AGH 只存 bcrypt 哈希，改密码要改 yaml 的 `users.password` |
 | Agent 侧 | `/etc/istore-agent/config.json` 的 `adguard` 段 | 含 `api_host` / `api_port` / `password` |
 
 > 管理口初始误配为 `0.0.0.0:3000`，AGH 会同时监听 `:::3000`，在当前
 > `wan input=ACCEPT` 下等于把拦截器的管理面板挂到公网 IPv6 上。已收敛为
-> `192.168.100.1:3000`（纯 IPv4），实测 `netstat` 只剩 5353 与 3000 两个内网监听。
+> `192.168.1.1:3000`（纯 IPv4），实测 `netstat` 只剩 5353 与 3000 两个内网监听。
 >
 > 连带坑：管理口一旦不绑 0.0.0.0，Agent 里写死的 `127.0.0.1:3000` 就连不上，
 > 表现为体检「拦截规则已加载」突然变 0 条。已改为读 `adguard.api_host`。
