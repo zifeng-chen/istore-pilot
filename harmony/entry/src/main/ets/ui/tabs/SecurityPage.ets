@@ -262,6 +262,11 @@ export struct SecurityPage {
     }
   }
 
+  /** 一次都没成功取到设备表：这时所有计数都是「未知」而不是 0 */
+  private neverLoaded(): boolean {
+    return this.err.length > 0 && this.total === 0 && this.online === 0;
+  }
+
   private openSub(n: number, filter: number): void {
     this.subFilter = filter;
     this.sub = n;
@@ -352,16 +357,20 @@ export struct SecurityPage {
       // 三格和安卓对齐：设备在线 / 今日拦截 / 实时流量。
       // 原来只有一行「46 台设备在线」，hero 空得慌，也没用上已经取到的拦截数和速率
       Row() {
-        HeroStat({ label: '设备在线', value: this.online.toString() }).layoutWeight(1)
-        HeroStat({ label: '今日拦截', value: Fmt.count(this.adBlocked) }).layoutWeight(1)
-        HeroStat({ label: '实时流量', value: Fmt.bps(this.liveBps) }).layoutWeight(1)
+        // 从没取到过数据时显示「—」而不是 0：0 台在线和「不知道」是两件事，
+        // 尤其在断网时，一排 0 会让人以为家里设备全掉线了
+        HeroStat({ label: '设备在线', value: this.neverLoaded() ? '—' : this.online.toString() }).layoutWeight(1)
+        HeroStat({ label: '今日拦截', value: this.neverLoaded() ? '—' : Fmt.count(this.adBlocked) }).layoutWeight(1)
+        HeroStat({ label: '实时流量', value: this.neverLoaded() ? '—' : Fmt.bps(this.liveBps) }).layoutWeight(1)
       }
       .width('100%')
       .margin({ top: 14 });
 
-      Text(this.blocked > 0
-        ? '共 ' + this.total + ' 台  ·  ' + this.blocked + ' 台已禁网'
-        : '共 ' + this.total + ' 台')
+      Text(this.neverLoaded()
+        ? '连不上路由器，暂无设备数据'
+        : (this.blocked > 0
+          ? '共 ' + this.total + ' 台  ·  ' + this.blocked + ' 台已禁网'
+          : '共 ' + this.total + ' 台'))
         .fontSize(12)
         .fontColor($r('app.color.hero_fg'))
         .opacity(0.8)
@@ -465,9 +474,12 @@ export struct SecurityPage {
       CardTitle({ glyph: Glyph.LINK, title: '设备', sub: '点数字进清单，点行看详情' });
 
       Row() {
-        StatCell({ label: '在线', value: this.online, tone: Pal.primary(), filter: 1, onTap: () => { this.openSub(1, 1); } }).layoutWeight(1);
-        StatCell({ label: '离线', value: this.offline(), tone: Pal.textPrimary(), filter: 2, onTap: () => { this.openSub(1, 2); } }).layoutWeight(1);
-        StatCell({ label: '已禁网', value: this.blocked, tone: Pal.danger(), filter: 0, onTap: () => { this.openSub(1, 0); } }).layoutWeight(1);
+        StatCell({ label: '在线', value: this.online, unknown: this.neverLoaded(), tone: Pal.primary(), filter: 1, onTap: () => { this.openSub(1, 1); } }).layoutWeight(1);
+        StatCell({ label: '离线', value: this.offline(), unknown: this.neverLoaded(), tone: Pal.textPrimary(), filter: 2, onTap: () => { this.openSub(1, 2); } }).layoutWeight(1);
+        // 0 台禁网时标红只会让人以为出事了；有数才用危险色
+        StatCell({ label: '已禁网', value: this.blocked, unknown: this.neverLoaded(),
+          tone: this.blocked > 0 ? Pal.danger() : Pal.textTertiary(),
+          filter: 0, onTap: () => { this.openSub(1, 0); } }).layoutWeight(1);
       }
       .width('100%')
       .margin({ top: 12, bottom: 8 });
@@ -503,22 +515,27 @@ export struct SecurityPage {
       CardTitle({
         glyph: Glyph.BOLT,
         title: '应用流量',
-        sub: (this.appDays > 1 ? '近 ' + this.appDays + ' 天 · ' : '') + '共 ' + Fmt.bytes(this.appTotalBytes)
+        sub: this.appTotalBytes > 0
+          ? (this.appDays > 1 ? '近 ' + this.appDays + ' 天 · ' : '') + '共 ' + Fmt.bytes(this.appTotalBytes)
+          : '统计中'
       }) {
-        // 不用 Text('›')：这个字符依赖系统字体，换机型可能变方框，走路径图标
-        Row({ space: 2 }) {
-          Text('全部 ' + this.appRows.length + ' 个')
-            .fontSize(T.F_TINY)
-            .fontColor($r('app.color.primary'));
-          LineIcon({ path: Ico.CHEVRON, color: Pal.primary(), side: 12, lineWidth: 1.6 });
+        // 没有数据时不摆「全部 0 个 ›」——那是三处一起说「零」，看着像坏了
+        if (this.appRows.length > 0) {
+          // 不用 Text('›')：这个字符依赖系统字体，换机型可能变方框，走路径图标
+          Row({ space: 2 }) {
+            Text('全部 ' + this.appRows.length + ' 个')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.primary'));
+            LineIcon({ path: Ico.CHEVRON, color: Pal.primary(), side: 12, lineWidth: 1.6 });
+          }
+          .alignItems(VerticalAlign.Center);
         }
-        .alignItems(VerticalAlign.Center);
       }
 
       Hairline({ indent: 0 });
 
       if (this.appRows.length === 0) {
-        Text('正在统计…')
+        Text('路由器按访问的域名归类 App，采样到之后这里会出排行')
           .fontSize(T.F_TINY)
           .fontColor($r('app.color.text_secondary'))
           .width('100%')
@@ -937,7 +954,7 @@ export struct SecurityPage {
               .fontWeight(FontWeight.Medium)
               .fontColor($r('app.color.text_primary'))
               .layoutWeight(1);
-            Text(this.online + ' 在线 / ' + this.total + ' 台')
+            Text(this.neverLoaded() ? '未连接' : this.online + ' 在线 / ' + this.total + ' 台')
               .fontSize(T.F_TINY)
               .fontColor($r('app.color.text_secondary'));
           }
@@ -1003,14 +1020,17 @@ struct StatCell {
   @Prop value: number = 0;
   @Prop tone: string = '';
   @Prop filter: number = 0;
+  /** 一次都没取到数据时显示「—」，别把「不知道」画成 0 */
+  @Prop unknown: boolean = false;
   onTap: () => void = () => {};
 
   build() {
     Column() {
-      Text(this.value.toString())
-        .fontSize(25)
+      // 未知态用统一浅灰、小一号：三个彩色长横杠看起来像排版坏了
+      Text(this.unknown ? '—' : this.value.toString())
+        .fontSize(this.unknown ? 20 : 25)
         .fontWeight(FontWeight.Medium)
-        .fontColor(this.tone)
+        .fontColor(this.unknown ? $r('app.color.text_tertiary') : this.tone)
         .fontFeature("\"tnum\" on");
       Text(this.label)
         .fontSize(T.F_TINY)

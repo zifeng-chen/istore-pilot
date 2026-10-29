@@ -385,13 +385,18 @@ export struct ProxyPage {
   modeCard() {
     Card({ gapTop: T.GAP }) {
       CardTitle({ glyph: Glyph.BOLT, title: '运行模式', sub: '规则模式按域名分流，全局模式全部走代理' });
-      Row({ space: 6 }) {
+      // 分段控件必须有「槽」：选中项原来用纯白做底，而卡片也是白的，
+      // 三个选项看起来一模一样，根本看不出当前是规则还是全局
+      Row({ space: 4 }) {
         this.modeChip('rule', '规则');
         this.modeChip('global', '全局');
         this.modeChip('direct', '直连');
       }
       .width('100%')
-      .margin({ top: 10 });
+      .padding(3)
+      .borderRadius(15)
+      .backgroundColor($r('app.color.surface_hi'))
+      .margin({ top: 12 });
     }
   }
 
@@ -524,14 +529,33 @@ export struct ProxyPage {
         }
       }, (g: NodeGroup) => g.name + '|' + g.now + '|' + g.members.length);
     } else if (this.loaded) {
+      // 这里原来一律写「没有正在运行的代理后端」，可上面的卡片明明显示「运行中 ·
+      // 63 节点」—— 自相矛盾。分成两种：后端在跑但分组没读到，和后端确实没跑。
       Card({ gapTop: this.rail() ? 0 : T.GAP }) {
-        Text('没有正在运行的代理后端')
-          .fontSize(T.F_BODY)
+        Text(this.anyRunning() ? '节点分组还没读取到' : '没有正在运行的代理后端')
+          .fontSize(T.F_H2)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'))
+          .width('100%');
+        Text(this.anyRunning()
+          ? '后端正在启动或刚切换过配置，这一块会自动重试，不用手动刷新'
+          : '在上面选一个后端启动，节点分组和测速才会出现')
+          .fontSize(T.F_SUB)
           .fontColor($r('app.color.text_secondary'))
           .width('100%')
-          .margin({ top: T.GAP });
+          .margin({ top: 4 });
       }
     }
+  }
+
+  /** 有没有任意一个后端处于运行中：用来区分「没装/没启动」和「启动了但没读到分组」 */
+  private anyRunning(): boolean {
+    for (let i = 0; i < this.backends.length; i++) {
+      if (this.backends[i].running) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private activeLabel(): string {
@@ -549,18 +573,19 @@ export struct ProxyPage {
       .fontSize(T.F_BODY)
       .fontWeight(this.mode === value ? FontWeight.Medium : FontWeight.Normal)
       .fontColor(this.mode === value
-        ? $r('app.color.text_primary')
+        ? $r('app.color.primary')
         : $r('app.color.text_secondary'))
       .textAlign(TextAlign.Center)
       .layoutWeight(1)
-      .height(38)
-      .borderRadius(T.R_INNER)
+      .height(32)
+      .borderRadius(12)
       .backgroundColor(this.mode === value
         ? $r('app.color.segment_thumb')
         : Color.Transparent)
-      .border({
-        width: this.mode === value ? 0.7 : 0,
-        color: $r('app.color.glass_stroke')
+      .shadow({
+        radius: this.mode === value ? 3 : 0,
+        color: '#14000000',
+        offsetY: 1
       })
       .onClick(() => {
         this.setMode(value);

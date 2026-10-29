@@ -30,7 +30,7 @@ export struct Card {
     .backgroundColor($r('app.color.surface'))
     .borderRadius(T.R_CARD)
     .border({ width: 0.7, color: $r('app.color.glass_stroke') })
-    .shadow({ radius: 6, color: '#0D000000', offsetX: 0, offsetY: 1 });
+    .shadow({ radius: 12, color: '#12000000', offsetX: 0, offsetY: 3 });
   }
 }
 

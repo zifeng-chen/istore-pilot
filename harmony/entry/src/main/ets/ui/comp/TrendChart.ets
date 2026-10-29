@@ -57,11 +57,7 @@ export struct TrendChart {
     const plotH: number = y1 - y0;
 
     const n: number = Math.max(this.down.length, this.up.length);
-    if (n < 2 || plotW <= 0) {
-      this.ctx.fillStyle = Pal.textTertiary();
-      this.ctx.font = '11vp sans-serif';
-      this.ctx.textAlign = 'center';
-      this.ctx.fillText('正在采样…', (x0 + x1) / 2, (y0 + y1) / 2);
+    if (plotW <= 0) {
       return;
     }
 
@@ -77,23 +73,59 @@ export struct TrendChart {
     }
     const top: number = TrendChart.niceCeil(peak);
 
-    // 三条网格 + 右侧两个刻度
+    // 网格 + 刻度**任何时候都画**。
+    // 之前样本不足 2 个时直接 return，整张卡只剩一行灰字 —— 在深绿底上等于一块空白。
+    // 网格线用半透明白（分隔线色 #DFE5E2 在绿底上完全看不见，等于没画）。
+    // 4 等分（顶 / 1/4 / 中 / 3/4 / 底）：线多一条，整块区域才不像空的。
+    // 刻度只标顶、中、底三个 —— 5 个标签在窄屏上会挤成一团
     this.ctx.font = '9vp sans-serif';
     this.ctx.textAlign = 'right';
-    for (let g = 0; g <= 2; g++) {
-      const y: number = y0 + plotH * g / 2;
+    this.ctx.setLineDash([2, 4]);
+    for (let g = 0; g <= 4; g++) {
+      const y: number = y0 + plotH * g / 4;
       this.ctx.beginPath();
       this.ctx.moveTo(x0, y);
       this.ctx.lineTo(x1, y);
-      this.ctx.lineWidth = g === 2 ? 0.8 : 0.5;
-      this.ctx.strokeStyle = Pal.divider();
+      this.ctx.lineWidth = g === 4 ? 0.9 : 0.6;
+      this.ctx.strokeStyle = g === 4 ? '#47FFFFFF' : '#1FFFFFFF';
       this.ctx.stroke();
 
-      if (g === 0 || g === 1) {
-        this.ctx.fillStyle = Pal.textTertiary();
-        const v: number = top * (1 - g / 2);
+      if (g === 0 || g === 2 || g === 4) {
+        this.ctx.fillStyle = g === 4 ? '#96FFFFFF' : '#8CFFFFFF';
+        const v: number = top * (1 - g / 4);
         this.ctx.fillText(Fmt.bpsAxis(v), w - 2, y + 3);
       }
+    }
+    this.ctx.setLineDash([]);
+
+    if (n < 2) {
+      // 没数据也画一条贴底的线 + 一层极淡的填充：
+      // 一块空绿底比「零流量」更像坏了，而且这样网格看起来是有主的
+      const baseY: number = y0 + plotH;
+      const grad = this.ctx.createLinearGradient(0, baseY - 6, 0, baseY);
+      grad.addColorStop(0, '#332ED3A6');
+      grad.addColorStop(1, '#002ED3A6');
+      this.ctx.beginPath();
+      this.ctx.moveTo(x0, baseY);
+      this.ctx.lineTo(x1, baseY);
+      this.ctx.lineTo(x1, baseY - 6);
+      this.ctx.lineTo(x0, baseY - 6);
+      this.ctx.closePath();
+      this.ctx.fillStyle = grad;
+      this.ctx.fill();
+
+      this.ctx.beginPath();
+      this.ctx.moveTo(x0, baseY);
+      this.ctx.lineTo(x1, baseY);
+      this.ctx.lineWidth = 1.6;
+      this.ctx.strokeStyle = '#662ED3A6';
+      this.ctx.stroke();
+
+      this.ctx.fillStyle = '#8CFFFFFF';
+      this.ctx.font = '11vp sans-serif';
+      this.ctx.textAlign = 'center';
+      this.ctx.fillText('正在采样…', (x0 + x1) / 2, y0 + plotH / 2 + 4);
+      return;
     }
 
     // 先画面积再画线，线压在面积上才干净

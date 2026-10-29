@@ -63,6 +63,8 @@ export struct OverviewPage {
   @State wanUp: boolean = false;
   @State wanProto: string = '';
   @State onlineCount: number = 0;
+  /** 设备数至少成功取到过一次；false 时才显示「—」，而不是把 0 台当成未知 */
+  @State devicesKnown: boolean = false;
   @State wanIp: string = '—';
   @State wanGw: string = '—';
   @State wanDns: string = '—';
@@ -74,6 +76,8 @@ export struct OverviewPage {
   @State upHist: number[] = [];
   @State loaded: boolean = false;
   @State verdict: string = '';
+  /** 最近一次 overview 取数失败：界面上的数字是缓存，要如实告诉用户 */
+  @State stale: boolean = false;
   @State winW: number = 360;
 
   @StorageProp('tab') @Watch('onTab') tab: number = 0;
@@ -171,13 +175,24 @@ export struct OverviewPage {
     const r: ApiResult = await Api.get(ctx, '/api/v1/overview');
     if (r.ok) {
       this.applyOverview(r.data);
+      this.stale = false;
+    } else {
+      // 断网/路由器挂了时，下面这些数字全是上一次的快照 —— 顶部必须说清楚，
+      // 否则用户看到「运行正常 + 3 天在线」会以为是真的。
+      // 注意 verdict 只在 applyOverview 里算，失败分支必须自己重算一次，
+      // 否则状态行永远停在初始的「正在读取…」
+      this.stale = true;
+      this.verdict = this.buildVerdict();
     }
     await this.refreshTraffic(false);
 
-    // 在线设备数：概览接口里没有，单独问一次（安卓 hero 的第三栏也是这么来的）
+    // 在线设备数：概览接口里没有，单独问一次（安卓 hero 的第三栏也是这么来的）。
+    // 失败时**保留上一次的值** —— 之前只在成功时赋值，网络一抖就永远是初始的 0，
+    // 界面上就是一条永远的「—」。
     const dv: ApiResult = await Api.get(ctx, '/api/v1/devices');
     if (dv.ok) {
       this.onlineCount = dv.data.obj('summary').num('online', 0);
+      this.devicesKnown = true;
     }
     this.loaded = true;
   }
@@ -369,6 +384,9 @@ export struct OverviewPage {
 
   /** 一句话结论：先说好不好，再说为什么 */
   private buildVerdict(): string {
+    if (this.stale) {
+      return '连不上路由器 · 显示的是缓存';
+    }
     if (!this.wanUp) {
       return '外网没有连上';
     }
@@ -480,7 +498,7 @@ export struct OverviewPage {
           .width(7)
           .height(7)
           .borderRadius(4)
-          .backgroundColor($r('app.color.hero_fg'))
+          .backgroundColor(this.stale ? Pal.warn() : $r('app.color.hero_fg'))
           .margin({ right: 7 });
         Text(this.verdict.length > 0 ? this.verdict : '正在读取…')
           .fontSize(12.5)
@@ -525,13 +543,13 @@ export struct OverviewPage {
         .width('100%')
         .height(1)
         .backgroundColor(Pal.heroStroke())
-        .margin({ top: 16, bottom: 14 });
+        .margin({ top: 14, bottom: 12 });
 
       Row() {
         HeroStat({ label: '↓ 当前下载', value: this.rxNow }).layoutWeight(1)
         HeroStat({ label: '↑ 当前上传', value: this.txNow }).layoutWeight(1)
         HeroStat({ label: '在线设备',
-          value: this.onlineCount > 0 ? this.onlineCount.toString() : '—' })
+          value: this.devicesKnown ? this.onlineCount.toString() : '—' })
           .layoutWeight(1)
       }
       .width('100%');
@@ -553,7 +571,7 @@ export struct OverviewPage {
         TrendChart({
           down: this.downHist,
           up: this.upHist,
-          chartHeight: Bp.chartH(this.winW, 96)
+          chartHeight: Bp.chartH(this.winW, 82)
         })
           .margin({ top: 8 });
 
@@ -566,7 +584,7 @@ export struct OverviewPage {
         .margin({ top: 8 });
       }
       .width('100%')
-      .margin({ top: 18 });
+      .margin({ top: 14 });
     }
     .width('100%')
     .padding({ left: 20, right: 20, top: 18, bottom: 18 })

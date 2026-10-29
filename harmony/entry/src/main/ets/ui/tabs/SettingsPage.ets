@@ -114,7 +114,10 @@ export struct SettingsPage {
       this.agentVersion = '';
       this.latency = '';
       this.online = false;
-      this.heroMeta = ping.error.length > 0 ? ping.error : '连不上路由器';
+      // 左边已经写着「连不上」了，这里再重复一遍没有信息量，改成下一步该做什么
+      this.heroMeta = ping.error.indexOf('凭证') >= 0
+        ? ping.error
+        : '确认手机与路由器在同一网络，或点下面「服务器地址」改地址';
     }
 
     const n: ApiResult = await Api.get(ctx, '/api/v1/network');
@@ -367,7 +370,8 @@ export struct SettingsPage {
 
       Row() {
         SettingStat({ label: '响应', value: this.latency.length > 0 ? this.latency + ' ms' : '—' }).layoutWeight(1);
-        SettingStat({ label: '凭证', value: this.tokenOk ? '有效' : '缺失' }).layoutWeight(1);
+        SettingStat({ label: '凭证',
+          value: this.tokenOk ? (this.online ? '有效' : '已保存') : '缺失' }).layoutWeight(1);
         SettingStat({ label: 'Agent', value: this.agentVersion.length > 0 ? ('v' + this.agentVersion) : '—' }).layoutWeight(1);
       }
       .width('100%');

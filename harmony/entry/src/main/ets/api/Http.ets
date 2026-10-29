@@ -67,16 +67,38 @@ export class Http {
       };
     } catch (e) {
       const err = e as BusinessError;
-      let msg: string = err.message;
-      if (msg === undefined || msg.length === 0) {
-        msg = '网络请求失败';
-      }
+      const raw: string = err.message === undefined ? '' : err.message;
       return {
-        ok: false, code: -1, body: '', error: msg
+        ok: false, code: -1, body: '', error: Http.zhError(raw)
       };
     } finally {
       req.destroy();
     }
+  }
+
+  /**
+   * 系统抛的是英文错误（`Failed to connect to the server`、`Timeout was reached`…），
+   * 直接甩到界面上，整页中文里夹一句英文很难看，用户也读不出该做什么。
+   * 这里只做「能对应上就换成人话」，认不出来的保留原文，免得丢掉排查线索。
+   */
+  private static zhError(raw: string): string {
+    const s: string = raw.toLowerCase();
+    if (s.length === 0) {
+      return '网络请求失败';
+    }
+    if (s.includes('timeout') || s.includes('timed out')) {
+      return '请求超时，路由器没响应';
+    }
+    if (s.includes('connect') || s.includes('unreachable') || s.includes('refused')) {
+      return '连不上路由器，检查地址与局域网';
+    }
+    if (s.includes('401') || s.includes('unauthorized')) {
+      return '凭证已失效，请重新登录';
+    }
+    if (s.includes('cleartext') || s.includes('permission')) {
+      return '被系统拦截：检查网络权限配置';
+    }
+    return raw;
   }
 
   /** base 可能带也可能不带尾斜杠，统一收一次 */
