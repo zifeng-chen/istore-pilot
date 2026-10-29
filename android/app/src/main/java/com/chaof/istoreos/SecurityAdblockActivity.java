@@ -22,6 +22,7 @@ public class SecurityAdblockActivity extends BaseActivity {
         setContentView(R.layout.activity_sub);
 
         MaterialToolbar bar = findViewById(R.id.toolbar);
+        bar.setTitle("拦截设置");
         bar.setNavigationOnClickListener(v -> finish());
 
         if (savedInstanceState == null) {

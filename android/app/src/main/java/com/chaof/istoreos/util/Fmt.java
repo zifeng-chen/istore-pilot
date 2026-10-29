@@ -83,6 +83,19 @@ public final class Fmt {
     }
 
     /**
+     * 走秒的运行时长：3 天 04:12:33。
+     * `dur()` 只到分钟，放在界面上像定住了 —— 运行时长是给人「看它还在跑」的，
+     * 秒必须动。
+     */
+    public static String uptime(long seconds) {
+        long s = Math.max(0, seconds);
+        String hms = String.format(Locale.US, "%02d:%02d:%02d",
+                (s % 86400) / 3600, (s % 3600) / 60, s % 60);
+        long d = s / 86400;
+        return d > 0 ? d + " 天 " + hms : hms;
+    }
+
+    /**
      * hero 卡片里的极短时长：6 天 / 23 小时 / 45 分。
      * 那里三列并排，每列只有屏宽的 1/3，「6 天 5 小时」必被截成「6 天 5…」。
      */

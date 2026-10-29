@@ -11,6 +11,9 @@ public final class AppIcons {
     private static final Map<String, Integer> MAP = new HashMap<>();
 
     static {
+        MAP.put("腾讯", R.drawable.ic_app_tencent);
+        MAP.put("X", R.drawable.ic_app_x);
+        MAP.put("支付宝", R.drawable.ic_app_alipay);
         MAP.put("番茄小说", R.drawable.ic_app_fanqie);
         MAP.put("腾讯视频", R.drawable.ic_app_tencent_video);
         MAP.put("爱奇艺", R.drawable.ic_app_iqiyi);

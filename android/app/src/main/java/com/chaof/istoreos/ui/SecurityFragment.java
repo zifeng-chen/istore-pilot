@@ -12,6 +12,7 @@ import android.widget.TextView;
 
 import com.chaof.istoreos.AdblockLogActivity;
 import com.chaof.istoreos.DeviceDetailActivity;
+import com.chaof.istoreos.AppsActivity;
 import com.chaof.istoreos.R;
 import com.chaof.istoreos.SecurityAdblockActivity;
 import com.chaof.istoreos.SecurityDevicesActivity;
@@ -48,6 +49,8 @@ import java.util.List;
 public class SecurityFragment extends BaseFragment {
 
     private TextView tvHeroOnline;
+    private TextView tvHeroAd;
+    private TextView tvHeroRate;
     private TextView tvHeroNote;
     private TextView tvHeroBadge;
 
@@ -65,6 +68,7 @@ public class SecurityFragment extends BaseFragment {
     private boolean syncing = false;
 
     private JSONArray devices = new JSONArray();
+    private AppsCard appsCard;
     private String structure = "";
     private boolean adInstalled = false;
     private boolean adTakeover = false;
@@ -108,20 +112,19 @@ public class SecurityFragment extends BaseFragment {
         top.addView(tvHeroBadge);
         hero.addView(top);
 
-        LinearLayout bigLine = Ui.row(c);
-        bigLine.setGravity(Gravity.BOTTOM);
-        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
+        // 总览三栏：在线设备 / 今日拦截 / 实时流量。
+        // 原来这里只有一个「48 台设备在线」的大数字，占了一整块却只说一件事；
+        // 一级页最该被一眼看到的是这三项，具体的设备清单、拦截明细都在下面
+        LinearLayout statLine = Ui.row(c);
+        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        blp.topMargin = Ui.dp(c, 12);
-        bigLine.setLayoutParams(blp);
+        slp.topMargin = Ui.dp(c, 14);
+        statLine.setLayoutParams(slp);
 
-        tvHeroOnline = Ui.heroNumber(c, "—");
-        bigLine.addView(tvHeroOnline);
-        TextView unit = Ui.heroNote(c, "台设备在线", 0.86f);
-        unit.setTextSize(13f);
-        unit.setPadding(Ui.dp(c, 8), 0, 0, Ui.dp(c, 9));
-        bigLine.addView(unit);
-        hero.addView(bigLine);
+        tvHeroOnline = heroStat(c, statLine, "设备在线", c);
+        tvHeroAd = heroStat(c, statLine, "今日拦截", c);
+        tvHeroRate = heroStat(c, statLine, "实时流量", c);
+        hero.addView(statLine);
 
         tvHeroNote = Ui.heroNote(c, "正在读取…", 0.78f);
         tvHeroNote.setTextSize(12f);
@@ -131,7 +134,7 @@ public class SecurityFragment extends BaseFragment {
 
         // ---------------------------------------------------------- 设备
         Ui.Card dev = Ui.card(c);
-        dev.setPadding(0, Ui.dp(c, 16), 0, Ui.dp(c, 10));
+        Ui.cardPadding(dev, 9);    // 最后一行是「最近活跃」，行内 9
         LinearLayout devHead = Ui.cardTitle(c, dev, Glyph.LINK, "设备", "点数字进清单，点行看详情");
         TextView allDev = Ui.text(c, "全部 ›", 13f, R.color.primary);
         allDev.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
@@ -158,9 +161,19 @@ public class SecurityFragment extends BaseFragment {
         dev.addView(tvRecentEmpty);
         root.addView(dev);
 
+        // ---------------------------------------------------------- 应用流量
+        // 原来这张卡在「设备清单」二级页里，得先点进来才看得到。它回答的是
+        // 「谁在吃带宽」，属于一眼就想知道的东西，所以提到一级页
+        appsCard = new AppsCard(c, v -> startActivity(new Intent(ctx(), AppsActivity.class)));
+        LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        alp.topMargin = Ui.dp(c, 12);
+        appsCard.view().setLayoutParams(alp);
+        root.addView(appsCard.view());
+
         // ---------------------------------------------------------- 拦截
         Ui.Card ad = Ui.card(c);
-        ad.setPadding(0, Ui.dp(c, 16), 0, Ui.dp(c, 8));
+        Ui.cardPadding(ad, 10);    // 最后一行是接管开关，行内 10
         LinearLayout adHead = Ui.cardTitle(c, ad, Glyph.SHIELD, "拦截", "AdGuard Home");
         tvAdState = Ui.pill(c, "—", R.color.text_secondary);
         adHead.addView(tvAdState);
@@ -219,6 +232,22 @@ public class SecurityFragment extends BaseFragment {
         root.addView(ad);
 
         Ui.space(c, root, 8);
+    }
+
+
+    /** hero 里的一格：上面大数字、下面小标题，返回数字控件 */
+    private TextView heroStat(Context c, LinearLayout parent, String label, Context unused) {
+        LinearLayout col = Ui.column(c);
+        TextView num = Ui.heroNumber(c, "—");
+        num.setTextSize(24f);
+        col.addView(num);
+        TextView cap = Ui.heroNote(c, label, 0.82f);
+        cap.setTextSize(11.5f);
+        cap.setPadding(0, Ui.dp(c, 3), 0, 0);
+        col.addView(cap);
+        parent.addView(col, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        return num;
     }
 
     /** 一行「图标 + 标题 + 副标题 + 箭头」的二级页入口，风格跟设置页一致 */
@@ -308,6 +337,10 @@ public class SecurityFragment extends BaseFragment {
 
     @Override
     protected void load(boolean quiet) {
+        if (appsCard != null) {
+            appsCard.refresh();
+        }
+
         Api.get(ctx(), "/api/v1/devices", new Cb() {
             @Override
             public void onData(JSONObject body, boolean fromCache) {
@@ -376,6 +409,18 @@ public class SecurityFragment extends BaseFragment {
         int offline = Math.max(0, total - online);
 
         tvHeroOnline.setText(online > 0 ? String.valueOf(online) : "0");
+
+        double bps = 0;
+        for (int i = 0; i < devices.length(); i++) {
+            JSONObject d = devices.optJSONObject(i);
+            JSONObject n = d == null ? null : d.optJSONObject("net");
+            if (n != null) {
+                bps += n.optDouble("rx_bps", 0) + n.optDouble("tx_bps", 0);
+            }
+        }
+        if (tvHeroRate != null) {
+            tvHeroRate.setText(bps < 1024 ? "0" : Fmt.bps(bps));
+        }
         tvStatOn.setText(String.valueOf(online));
         tvStatOff.setText(String.valueOf(offline));
         tvStatBlocked.setText(String.valueOf(blocked));
@@ -470,15 +515,15 @@ public class SecurityFragment extends BaseFragment {
         row.setPadding(Ui.dp(c, 16), Ui.dp(c, 9), Ui.dp(c, 14), Ui.dp(c, 9));
         row.setTag(mac);
 
+        // 标题依次退：名字 → 主机名 → IP → MAC。**跳过厂商**：
+        // 「私有地址」既不是名字也不告诉你这是谁，拿它当标题只会把真正的 IP 挤到副标题
+        String ip = d.optString("ip");
         String name = d.optString("label");
         if (name.isEmpty()) {
             name = d.optString("hostname");
         }
         if (name.isEmpty()) {
-            name = d.optString("vendor");
-        }
-        if (name.isEmpty()) {
-            name = d.optString("ip");
+            name = ip;
         }
         if (name.isEmpty()) {
             name = mac;
@@ -489,8 +534,16 @@ public class SecurityFragment extends BaseFragment {
         t.setSingleLine(true);
         t.setEllipsize(android.text.TextUtils.TruncateAt.END);
         col.addView(t);
-        String ip = d.optString("ip");
-        TextView sub = Ui.text(c, ip.isEmpty() ? mac : ip, 11.5f, R.color.text_secondary);
+
+        // 标题已经是 IP 了就别再写一遍，改写成厂商（「私有地址」/「小米」都比重复的 IP 有用）
+        String subText;
+        if (name.equals(ip)) {
+            String vendor = d.optString("vendor");
+            subText = vendor.isEmpty() || "未知".equals(vendor) ? mac : vendor;
+        } else {
+            subText = ip.isEmpty() ? mac : ip;
+        }
+        TextView sub = Ui.text(c, subText, 11.5f, R.color.text_secondary);
         sub.setPadding(0, Ui.dp(c, 3), 0, 0);
         col.addView(sub);
         row.addView(col, new LinearLayout.LayoutParams(0,
@@ -541,6 +594,9 @@ public class SecurityFragment extends BaseFragment {
         double pct = stats == null ? 0 : stats.optDouble("percent", 0);
         adPercent = (int) Math.round(pct);
 
+        if (tvHeroAd != null) {
+            tvHeroAd.setText(Fmt.count(blocked));
+        }
         tvAdBlocked.setText(Fmt.count(blocked));
         tvAdSub.setText("今日共查询 " + Fmt.count(queries) + " 次");
         tvAdRate.setText(pct > 0 ? "拦截率 " + (pct < 10

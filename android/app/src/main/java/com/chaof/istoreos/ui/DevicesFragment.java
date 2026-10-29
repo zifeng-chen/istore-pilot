@@ -17,7 +17,6 @@ import com.chaof.istoreos.DeviceDetailActivity;
 import com.chaof.istoreos.R;
 import com.chaof.istoreos.api.Api;
 import com.chaof.istoreos.api.Cb;
-import com.chaof.istoreos.util.AppIcon;
 import com.chaof.istoreos.util.Fmt;
 import com.chaof.istoreos.util.Ui;
 
@@ -47,23 +46,11 @@ public class DevicesFragment extends BaseFragment {
     private TextView tvBlocked;
     private EditText search;
     private LinearLayout listBox;
-    private LinearLayout segBox;
     private LinearLayout deviceArea;
-    private LinearLayout appArea;
-    private LinearLayout appListBox;
-    private TextView tvAppHead;
-    private TextView tvAppBig;
-    private TextView tvAppSub;
-    private TextView tvAppSummary;
-    private TextView tvAppEmpty;
     private View emptyView;
 
     private JSONArray devices = new JSONArray();
-    private JSONArray appRows = new JSONArray();
     private String keyword = "";
-
-    /** 0 = 设备，1 = 应用流量 */
-    private int viewMode = 0;
 
     /**
      * 在线 / 离线筛选。
@@ -76,23 +63,14 @@ public class DevicesFragment extends BaseFragment {
 
     /** 列表结构签名：只有它变了才重建 view，否则只改速率文字，避免每 3 秒闪一下 */
     private String structure = "";
-    private String appStructure = "";
     private final Map<String, TextView> rateViews = new HashMap<>();
     private final Map<String, TextView> statusViews = new HashMap<>();
     private final Map<String, TextView> sumViews = new HashMap<>();
-    private final Map<String, TextView> appAmountViews = new HashMap<>();
-    private final Map<String, TextView> appRateViews = new HashMap<>();
-    private final Map<String, TextView> appMetaViews = new HashMap<>();
 
     @Override
     protected String title() {
-        if (mode == 1) {
-            return "在线设备";
-        }
-        if (mode == 2) {
-            return "离线设备";
-        }
-        return "设备";
+        // 标题放在二级页的标题栏里（返回箭头旁边），内容区不再重复一个大标题
+        return null;
     }
 
     @Override
@@ -103,8 +81,14 @@ public class DevicesFragment extends BaseFragment {
         }
     }
 
+    /**
+     * 固定区：hero + 筛选 + 搜索框。
+     *
+     * 设备有 50 多行，原来这些东西跟着一起滚 —— 翻到第 30 台想换个筛选，
+     * 得先滚回顶上。现在只有下面的列表滚，顶部一直看得到。
+     */
     @Override
-    protected void build(LinearLayout root) {
+    protected void buildPinned(LinearLayout pinned) {
         Context c = ctx();
 
         // 顶部 hero：和概览、广告拦截用同一套渐变卡。
@@ -186,19 +170,7 @@ public class DevicesFragment extends BaseFragment {
         foot.addView(hint);
         head.addView(foot);
 
-        root.addView(head);
-
-        // ---- 分段：设备 / 应用流量
-        segBox = Ui.column(c);
-        LinearLayout.LayoutParams segLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        segLp.bottomMargin = Ui.dp(c, 12);
-        segBox.setLayoutParams(segLp);
-        root.addView(segBox);
-        renderSeg();
-
-        // ---- 设备区
-        deviceArea = Ui.column(c);
+        pinned.addView(head);
 
         // 在线 / 离线筛选：从一级页带着 mode 进来时，这里是「确认入口」；
         // 也可以就地切换，不用退回一级页再点一次
@@ -207,7 +179,7 @@ public class DevicesFragment extends BaseFragment {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         mslp.bottomMargin = Ui.dp(c, 10);
         modeSeg.setLayoutParams(mslp);
-        deviceArea.addView(modeSeg);
+        pinned.addView(modeSeg);
         renderModeSeg();
 
         search = new EditText(c);
@@ -241,7 +213,14 @@ public class DevicesFragment extends BaseFragment {
             public void afterTextChanged(Editable s) {
             }
         });
-        deviceArea.addView(search);
+        pinned.addView(search);
+    }
+
+    @Override
+    protected void build(LinearLayout root) {
+        Context c = ctx();
+        deviceArea = Ui.column(c);
+
 
         listBox = Ui.column(c);
         deviceArea.addView(listBox);
@@ -253,39 +232,6 @@ public class DevicesFragment extends BaseFragment {
         deviceArea.addView(emptyView);
         root.addView(deviceArea);
 
-        // ---- 应用流量区
-        appArea = Ui.column(c);
-        appArea.setVisibility(View.GONE);
-
-        Ui.Card sum = Ui.card(c);
-        tvAppHead = Ui.text(c, "累计用量", 12.5f, R.color.text_secondary);
-        sum.addView(tvAppHead);
-        tvAppBig = Ui.text(c, "—", 30f, R.color.text_primary);
-        tvAppBig.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        tvAppBig.setPadding(0, Ui.dp(c, 2), 0, 0);
-        sum.addView(tvAppBig);
-        tvAppSub = Ui.text(c, "↓ —　↑ —", 13f, R.color.text_secondary);
-        tvAppSub.setPadding(0, Ui.dp(c, 4), 0, 0);
-        sum.addView(tvAppSub);
-        sum.addView(Ui.divider(c));
-        tvAppSummary = Ui.text(c, "正在统计…", 12.5f, R.color.text_secondary);
-        tvAppSummary.setLineSpacing(Ui.dp(c, 3), 1f);
-        sum.addView(tvAppSummary);
-        appArea.addView(sum);
-
-        appListBox = Ui.column(c);
-        LinearLayout.LayoutParams albs = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        albs.topMargin = Ui.dp(c, 10);
-        appListBox.setLayoutParams(albs);
-        appArea.addView(appListBox);
-
-        tvAppEmpty = Ui.text(c, "还没有捕获到应用流量", 14f, R.color.text_secondary);
-        tvAppEmpty.setGravity(Gravity.CENTER);
-        tvAppEmpty.setPadding(0, Ui.dp(c, 24), 0, 0);
-        tvAppEmpty.setVisibility(View.GONE);
-        appArea.addView(tvAppEmpty);
-        root.addView(appArea);
     }
 
     /** 在线 / 离线筛选条。选中态是「烧」在背景里的，所以切换后整条重建 */
@@ -304,24 +250,6 @@ public class DevicesFragment extends BaseFragment {
                     renderModeSeg();
                     render();
                 }));
-    }
-
-    private void renderSeg() {        if (segBox == null) {
-            return;
-        }
-        segBox.removeAllViews();
-        segBox.addView(Ui.segmented(ctx(), new String[]{"设备", "应用流量"}, viewMode, index -> {
-            if (index == viewMode) {
-                return;
-            }
-            viewMode = index;
-            deviceArea.setVisibility(viewMode == 0 ? View.VISIBLE : View.GONE);
-            appArea.setVisibility(viewMode == 1 ? View.VISIBLE : View.GONE);
-            renderSeg();
-            if (viewMode == 1) {
-                loadApps();
-            }
-        }));
     }
 
     private GradientDrawable roundRect(Context c, int colorRes, int radiusDp) {
@@ -373,194 +301,6 @@ public class DevicesFragment extends BaseFragment {
                 }
             }
         });
-
-        if (viewMode == 1) {
-            loadApps();
-        }
-    }
-
-    // ---------------------------------------------------------------- 应用流量
-
-    private void loadApps() {
-        // 只要累计口径：今日/累计两套数字摆在一起，用户总会怀疑哪个才是"真的"
-        Api.get(ctx(), "/api/v1/apps", new Cb() {
-            @Override
-            public void onData(JSONObject body, boolean fromCache) {
-                if (!isAdded() || getContext() == null) {
-                    return;
-                }
-                JSONArray arr = body.optJSONArray("apps");
-                appRows = arr == null ? new JSONArray() : arr;
-                renderApps(body);
-            }
-
-            @Override
-            public void onError(String message) {
-                if (isAdded() && getContext() != null) {
-                    tvAppSummary.setText("读取失败：" + message);
-                }
-            }
-        });
-    }
-
-    private void renderApps(JSONObject body) {
-        if (appListBox == null) {
-            return;
-        }
-        Context c = appListBox.getContext();
-
-        JSONObject session = body.optJSONObject("session");
-        JSONObject clashTotals = body.optJSONObject("clash");
-        JSONObject overall = body.optJSONObject("all");
-        int conns = clashTotals == null ? 0 : clashTotals.optInt("connections", 0);
-
-        long aUp = overall == null ? 0 : overall.optLong("up", 0);
-        long aDown = overall == null ? 0 : overall.optLong("down", 0);
-        long sUp = session == null ? 0 : session.optLong("up", 0);
-        long sDown = session == null ? 0 : session.optLong("down", 0);
-        int days = body.optInt("days", 1);
-
-        tvAppHead.setText(days > 1 ? "累计用量　·　已统计 " + days + " 天" : "累计用量");
-        tvAppBig.setText(Fmt.bytes(aUp + aDown));
-        tvAppSub.setText("↓ " + Fmt.bytes(aDown) + "　↑ " + Fmt.bytes(aUp));
-        tvAppSummary.setText("本次运行 " + Fmt.bytes(sUp + sDown)
-                + "　·　当前 " + conns + " 条连接"
-                + "\n每条记录上的大数字就是该应用的总用量，重启不清零");
-
-        boolean empty = appRows.length() == 0;
-        tvAppEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
-
-        // 结构没变就只刷新用量文字，避免每 3 秒重建整张列表
-        StringBuilder sig = new StringBuilder();
-        for (int i = 0; i < appRows.length(); i++) {
-            JSONObject a = appRows.optJSONObject(i);
-            if (a != null) {
-                sig.append(a.optString("name")).append(';');
-            }
-        }
-        boolean rebuild = !sig.toString().equals(appStructure);
-        appStructure = sig.toString();
-
-        if (rebuild) {
-            appListBox.removeAllViews();
-            appAmountViews.clear();
-            appRateViews.clear();
-            appMetaViews.clear();
-            long maxTotal = 1;
-            for (int i = 0; i < appRows.length(); i++) {
-                JSONObject a = appRows.optJSONObject(i);
-                if (a != null) {
-                    maxTotal = Math.max(maxTotal, a.optLong("all_total", 0));
-                }
-            }
-            for (int i = 0; i < appRows.length(); i++) {
-                JSONObject a = appRows.optJSONObject(i);
-                if (a == null) {
-                    continue;
-                }
-                appListBox.addView(appCard(c, a, maxTotal));
-            }
-        } else {
-            refreshAppLive();
-        }
-    }
-
-    private void refreshAppLive() {
-        for (int i = 0; i < appRows.length(); i++) {
-            JSONObject a = appRows.optJSONObject(i);
-            if (a == null) {
-                continue;
-            }
-            String name = a.optString("name");
-            long total = a.optLong("all_total", 0);
-            long down = a.optLong("all_down", 0);
-            long up = a.optLong("all_up", 0);
-            int conns = a.optInt("conns", 0);
-            double bps = a.optDouble("down_bps", 0) + a.optDouble("up_bps", 0);
-
-            TextView av = appAmountViews.get(name);
-            if (av != null) {
-                av.setText(Fmt.bytes(total));
-            }
-            TextView rv = appRateViews.get(name);
-            if (rv != null) {
-                rv.setText(bps < 1024 ? "" : Fmt.bps(bps));
-            }
-            TextView mv = appMetaViews.get(name);
-            if (mv != null) {
-                mv.setText("↓ " + Fmt.bytes(down) + "　↑ " + Fmt.bytes(up)
-                        + (conns > 0 ? "　·　" + conns + " 连接" : ""));
-            }
-        }
-    }
-
-    private View appCard(Context c, JSONObject a, long maxTotal) {
-        String name = a.optString("name");
-        String category = a.optString("category");
-        int conns = a.optInt("conns", 0);
-        long total = a.optLong("all_total", 0);
-        long down = a.optLong("all_down", 0);
-        long up = a.optLong("all_up", 0);
-        double bps = a.optDouble("down_bps", 0) + a.optDouble("up_bps", 0);
-
-        Ui.Card card = Ui.card(c);
-        LinearLayout line = Ui.row(c);
-
-        // 图标：路由器拿不到真实应用图标，用品牌色 + 首字自绘一个（见 AppIcon）
-        line.addView(AppIcon.make(c, name, category, 44));
-
-        LinearLayout mid = Ui.column(c);
-        mid.setPadding(Ui.dp(c, 12), 0, Ui.dp(c, 6), 0);
-
-        LinearLayout nameRow = Ui.row(c);
-        TextView title = Ui.text(c, name, 15f, R.color.text_primary);
-        title.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        title.setSingleLine(true);
-        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        nameRow.addView(title, new LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
-        // 实时速率只在真的有流量时露头，平时留空，眼睛不会被跳动的数字勾走
-        TextView rate = Ui.text(c, bps < 1024 ? "" : Fmt.bps(bps), 11.5f, R.color.primary);
-        rate.setSingleLine(true);
-        rate.setPadding(Ui.dp(c, 6), 0, 0, 0);
-        nameRow.addView(rate);
-        mid.addView(nameRow);
-
-        TextView meta = Ui.text(c, "↓ " + Fmt.bytes(down) + "　↑ " + Fmt.bytes(up)
-                + (conns > 0 ? "　·　" + conns + " 连接" : ""), 11.5f, R.color.text_secondary);
-        meta.setSingleLine(true);
-        meta.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        meta.setPadding(0, Ui.dp(c, 3), 0, 0);
-        mid.addView(meta);
-
-        line.addView(mid, new LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
-        LinearLayout tail = Ui.column(c);
-        tail.setGravity(Gravity.END);
-        TextView amount = Ui.text(c, Fmt.bytes(total), 18f, R.color.text_primary);
-        amount.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        amount.setSingleLine(true);
-        tail.addView(amount);
-        TextView tag = Ui.text(c, "总计", 11f, R.color.text_secondary);
-        tag.setGravity(Gravity.END);
-        tail.addView(tag);
-        line.addView(tail);
-
-        card.addView(line);
-
-        appAmountViews.put(name, amount);
-        appRateViews.put(name, rate);
-        appMetaViews.put(name, meta);
-
-        // 占比条：相对榜首，一眼看出谁是大头
-        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        blp.topMargin = Ui.dp(c, 12);
-        card.addView(Ui.bar(c, total / (float) maxTotal, R.color.primary), blp);
-
-        return card;
     }
 
     // ---------------------------------------------------------------- 设备列表
@@ -700,10 +440,9 @@ public class DevicesFragment extends BaseFragment {
         LinearLayout line = Ui.row(c);
         line.setGravity(Gravity.CENTER_VERTICAL);
 
-        // 状态点
-        TextView dot = Ui.text(c, "●", 11f, blocked ? R.color.danger : (online ? R.color.primary : R.color.text_secondary));
-        dot.setPadding(0, Ui.dp(c, 1), Ui.dp(c, 8), 0);
-        line.addView(dot);
+        // 接入方式徽标（5G / 2.4G / LAN）替掉原来的状态圆点：
+        // 一列绿点看不出任何信息，而「插线还是无线、哪个频段」才是想知道的
+        line.addView(com.chaof.istoreos.util.Access.badge(c, d.optJSONObject("access"), online));
 
         LinearLayout mid = Ui.column(c);
         String name = d.optString("label");
@@ -722,7 +461,10 @@ public class DevicesFragment extends BaseFragment {
             bits.add(ip);
         }
         StringBuilder who = new StringBuilder();
-        if (!vendor.isEmpty() && !vendor.equals(name) && !"随机 MAC".equals(vendor)) {
+        // 已经手动命名过就别再挂「私有地址」：那是「查不出厂商」的解释，不是厂商
+        boolean named = !d.optString("alias").isEmpty();
+        if (!vendor.isEmpty() && !vendor.equals(name) && !"随机 MAC".equals(vendor)
+                && !("私有地址".equals(vendor) && named)) {
             who.append(vendor);
         }
         if (!kind.isEmpty() && !"其他".equals(kind)) {

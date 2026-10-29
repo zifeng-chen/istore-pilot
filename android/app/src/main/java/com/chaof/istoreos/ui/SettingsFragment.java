@@ -146,7 +146,7 @@ public class SettingsFragment extends BaseFragment {
 
         // ---------------------------------------------------------------- 连接
         Ui.Card conn = Ui.card(c);
-        conn.setPadding(0, Ui.dp(c, 16), 0, Ui.dp(c, 4));
+        Ui.cardPadding(conn, 11);  // 最后一行是设置行，自带 11
         Ui.cardTitle(c, conn, com.chaof.istoreos.widget.Glyph.LINK,
                 "连接", "凭证与服务器");
 
@@ -163,7 +163,7 @@ public class SettingsFragment extends BaseFragment {
         // 原来「网络」页的内容挪到这里：设备列表占了那个页签，
         // 而 WAN 地址属于偶尔看一眼的信息，放设置里更合适
         Ui.Card net = Ui.card(c);
-        net.setPadding(0, Ui.dp(c, 16), 0, Ui.dp(c, 4));
+        Ui.cardPadding(net, 11);
         Ui.cardTitle(c, net, com.chaof.istoreos.widget.Glyph.GLOBE,
                 "网络", "外网与内网网关");
 
@@ -191,7 +191,7 @@ public class SettingsFragment extends BaseFragment {
         // 原来在概览页叫「机器信息」。它是「查资料」型内容：一个月看一次，
         // 放在打开就要看的概览里，每次都占掉一屏的三分之一。
         Ui.Card dev = Ui.card(c);
-        dev.setPadding(0, Ui.dp(c, 16), 0, Ui.dp(c, 4));
+        Ui.cardPadding(dev, 11);
         Ui.cardTitle(c, dev, com.chaof.istoreos.widget.Glyph.CHIP,
                 "设备信息", "这台路由器的硬件与固件");
 
@@ -215,7 +215,7 @@ public class SettingsFragment extends BaseFragment {
 
         // ---------------------------------------------------------------- 外观
         Ui.Card look = Ui.card(c);
-        look.setPadding(0, Ui.dp(c, 16), 0, Ui.dp(c, 4));
+        Ui.cardPadding(look, 11);
         Ui.cardTitle(c, look, com.chaof.istoreos.widget.Glyph.PALETTE,
                 "外观", "深浅色与主题");
         tvTheme = Ui.settingRow(c, look, com.chaof.istoreos.widget.Glyph.PALETTE,
@@ -229,7 +229,7 @@ public class SettingsFragment extends BaseFragment {
 
         // ---------------------------------------------------------------- 系统维护
         Ui.Card system = Ui.card(c);
-        system.setPadding(0, Ui.dp(c, 16), 0, Ui.dp(c, 4));
+        Ui.cardPadding(system, 11);
         Ui.cardTitle(c, system, com.chaof.istoreos.widget.Glyph.BOX,
                 "系统维护", "备份、固件与软件包");
         // 备份排在第一行：它是后面所有危险操作的前提，
@@ -261,7 +261,7 @@ public class SettingsFragment extends BaseFragment {
         // 从概览页搬过来，并换成设置页的图标行样式：
         // 重启/关机是低频且不可撤销的动作，混在概览的指标里容易被误触。
         Ui.Card power = Ui.card(c);
-        power.setPadding(0, Ui.dp(c, 16), 0, Ui.dp(c, 4));
+        Ui.cardPadding(power, 11);
         Ui.cardTitle(c, power, com.chaof.istoreos.widget.Glyph.POWER,
                 "电源控制", "重启与关机都会短暂断网");
         Ui.settingRow(c, power, com.chaof.istoreos.widget.Glyph.REFRESH,
@@ -291,7 +291,7 @@ public class SettingsFragment extends BaseFragment {
 
         // ---------------------------------------------------------------- 安全
         Ui.Card security = Ui.card(c);
-        security.setPadding(0, Ui.dp(c, 16), 0, Ui.dp(c, 4));
+        Ui.cardPadding(security, 11);
         Ui.cardTitle(c, security, com.chaof.istoreos.widget.Glyph.SHIELD,
                 "安全", "两个密码，别记混");
         Ui.settingRow(c, security, com.chaof.istoreos.widget.Glyph.KEY,

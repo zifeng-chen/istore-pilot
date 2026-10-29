@@ -1,5 +1,7 @@
 package com.chaof.istoreos.ui;
 
+import com.chaof.istoreos.widget.MeterBar;
+
 import android.content.Context;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -15,7 +17,6 @@ import com.chaof.istoreos.api.Cb;
 import com.chaof.istoreos.util.Fmt;
 import com.chaof.istoreos.util.Ui;
 import com.chaof.istoreos.widget.PortTile;
-import com.chaof.istoreos.widget.RingView;
 import com.chaof.istoreos.widget.Sheet;
 import com.chaof.istoreos.widget.TrendChart;
 
@@ -44,6 +45,20 @@ public class OverviewFragment extends BaseFragment {
     private TextView tvHeroState;
     private TextView tvHeroHost;
     private TextView tvHeroSys;
+
+    /** 走秒的运行时长：hero 副标题拆成「型号 · 内核」前缀 + 每秒自增的秒数 */
+    private String heroSysPrefix = "";
+    private long upBase = 0;
+    private long upAt = 0;
+    private final android.os.Handler upHandler =
+            new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable upTick = new Runnable() {
+        @Override
+        public void run() {
+            paintHeroSys();
+            upHandler.postDelayed(this, 1000);
+        }
+    };
     private TextView tvHeroBadge;
     private TextView tvHeroDown;
     private TextView tvHeroUp;
@@ -54,16 +69,12 @@ public class OverviewFragment extends BaseFragment {
     private TextView tvPeak;
 
     // 健康
-    private RingView ringCpu;
-    private RingView ringMem;
-    private RingView ringDisk;
-    private TextView tvCpuAbs;
-    private TextView tvMemAbs;
-    private TextView tvDiskAbs;
+    private MeterBar meterCpu;
+    private MeterBar meterMem;
+    private MeterBar meterDisk;
     private TextView tvFacts;
 
     // WAN
-    private View wanDot;
     private TextView tvWanState;
     private TextView tvWanBadge;
     private TextView tvWanIp;
@@ -151,30 +162,45 @@ public class OverviewFragment extends BaseFragment {
         tvHeroUp = heroStat(c, stats, "↑ 当前上传");
         tvHeroDevices = heroStat(c, stats, "在线设备");
         hero.addView(stats);
-        root.addView(hero);
 
-        // ---------------------------------------------------------- 2. 趋势
-        Ui.Card trend = Ui.card(c);
-        LinearLayout right = Ui.header(trend, "流量趋势", "最近 2 分钟");
-        tvPeak = Ui.num(c, "", 12f, R.color.text_secondary);
-        tvPeak.setGravity(Gravity.END);
-        right.addView(tvPeak);
+        // 趋势图直接长在 hero 里。原来它在下面另一张卡上，同一件事
+        // （网快不快）被拆成两块看，往下滚还得来回对照
+        // 不再套一层半透明面板：多一层底色会把图压成「卡片里的小卡片」，
+        // 而且左右各 12dp 的内边距让折线缩在中间。现在图和上面的
+        // 三个数字左对齐、贴着卡片内容区，视觉上就是一体的
+        LinearLayout trendBox = Ui.column(c);
+        trendBox.setBackground(null);
+        trendBox.setPadding(0, 0, 0, 0);
+        LinearLayout.LayoutParams tbLp = new LinearLayout.LayoutParams(match, wrap);
+        tbLp.topMargin = Ui.dp(c, 18);
+        trendBox.setLayoutParams(tbLp);
+
+        LinearLayout tHead = Ui.row(c);
+        TextView tTitle = Ui.heroNote(c, "流量趋势 · 最近 2 分钟", 0.86f);
+        tTitle.setTextSize(11.5f);
+        tHead.addView(tTitle, new LinearLayout.LayoutParams(0, wrap, 1f));
+        tvPeak = Ui.heroNote(c, "", 0.9f);
+        tvPeak.setTextSize(11.5f);
+        tHead.addView(tvPeak);
+        trendBox.addView(tHead);
 
         chart = new TrendChart(c);
-        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(match, Ui.dp(c, 148));
-        clp.topMargin = Ui.dp(c, 14);
-        trend.addView(chart, clp);
+        chart.useOnHero();
+        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(match, Ui.dp(c, 104));
+        clp.topMargin = Ui.dp(c, 8);
+        trendBox.addView(chart, clp);
 
         LinearLayout legend = Ui.row(c);
         LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(match, wrap);
-        llp.topMargin = Ui.dp(c, 10);
+        llp.topMargin = Ui.dp(c, 8);
         legend.setLayoutParams(llp);
-        legend.addView(legendItem(c, "下载", R.color.primary));
-        legend.addView(legendItem(c, "上传", R.color.warn));
+        legend.addView(heroLegend(c, "下载", R.color.primary));
+        legend.addView(heroLegend(c, "上传", R.color.warn));
         legend.addView(new View(c), new LinearLayout.LayoutParams(0, 1, 1f));
-        TextView hint = Ui.text(c, "按住图表看数值", 11f, R.color.text_tertiary);
+        TextView hint = Ui.heroNote(c, "按住图表看数值", 0.62f);
+        hint.setTextSize(10.5f);
         legend.addView(hint);
-        trend.addView(legend);
+        trendBox.addView(legend);
 
         chart.setOnPeek((index, down, up) -> {
             if (tvPeak == null) {
@@ -186,90 +212,75 @@ public class OverviewFragment extends BaseFragment {
                 tvPeak.setText("↓ " + Fmt.bps(down) + "　↑ " + Fmt.bps(up));
             }
         });
-        root.addView(trend);
+
+        hero.addView(trendBox);
+        root.addView(hero);
 
         // ---------------------------------------------------------- 3. 健康
         Ui.Card rings = Ui.card(c);
-        LinearLayout healthHead = Ui.header(rings, "系统负载", "");
+        // 与「设备」「拦截」卡同一套标题行：28dp 图标块 + 16.5sp 标题 + 12sp 副标题。
+        // 卡片自己左右归零，内边距交给标题行和每根进度条，四张卡的行首才对得齐
+        Ui.cardPadding(rings, 0);
+        Ui.CardHead healthHead = Ui.cardTitleLive(c, rings,
+                com.chaof.istoreos.widget.Glyph.CHIP, "系统负载", "CPU · 内存 · 磁盘");
         tvFacts = Ui.text(c, "", 12f, R.color.text_secondary);
         tvFacts.setGravity(Gravity.END);
-        healthHead.addView(tvFacts);
+        healthHead.right.addView(tvFacts);
 
-        LinearLayout row = Ui.row(c);
-        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(match, wrap);
-        rlp.topMargin = Ui.dp(c, 10);
-        row.setLayoutParams(rlp);
-
-        ringCpu = new RingView(c);
-        ringCpu.setLabel("CPU");
-        ringMem = new RingView(c);
-        ringMem.setLabel("内存");
-        ringDisk = new RingView(c);
-        ringDisk.setLabel("磁盘");
-
-        // 环只表达比例，绝对值必须另给一行 —— 「内存 62%」到底剩多少，
-        // 是每个看这个页面的人都会问的第二个问题
-        tvCpuAbs = ringCell(c, row, ringCpu);
-        tvMemAbs = ringCell(c, row, ringMem);
-        tvDiskAbs = ringCell(c, row, ringDisk);
-        rings.addView(row);
+        // 横向进度条替掉三个环：环并排要吃掉半屏，却只表达三个百分比。
+        // 横条能一行一个，还能把「4 核 1.2 GHz」「3.2 / 8 GB」写在名字后面
+        meterCpu = new MeterBar(c, "CPU");
+        meterMem = new MeterBar(c, "内存");
+        meterDisk = new MeterBar(c, "磁盘");
+        LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(match, wrap);
+        mlp.topMargin = Ui.dp(c, 14);
+        mlp.leftMargin = Ui.dp(c, 16);
+        mlp.rightMargin = Ui.dp(c, 16);
+        rings.addView(meterCpu, mlp);
+        LinearLayout.LayoutParams mlp2 = new LinearLayout.LayoutParams(match, wrap);
+        mlp2.topMargin = Ui.dp(c, 14);
+        mlp2.leftMargin = Ui.dp(c, 16);
+        mlp2.rightMargin = Ui.dp(c, 16);
+        rings.addView(meterMem, mlp2);
+        LinearLayout.LayoutParams mlp3 = new LinearLayout.LayoutParams(match, wrap);
+        mlp3.topMargin = Ui.dp(c, 14);
+        mlp3.leftMargin = Ui.dp(c, 16);
+        mlp3.rightMargin = Ui.dp(c, 16);
+        rings.addView(meterDisk, mlp3);
         root.addView(rings);
 
         // ---------------------------------------------------------- 4. 宽带
         Ui.Card wanCard = Ui.card(c);
-        LinearLayout wanHead = Ui.row(c);
-        LinearLayout wanLeft = Ui.column(c);
-        LinearLayout wanTitleRow = Ui.row(c);
-        wanDot = new View(c);
-        GradientDrawable wd = new GradientDrawable();
-        wd.setShape(GradientDrawable.OVAL);
-        wd.setColor(Ui.color(c, R.color.text_tertiary));
-        wanDot.setBackground(wd);
-        LinearLayout.LayoutParams wdlp = new LinearLayout.LayoutParams(
-                Ui.dp(c, 8), Ui.dp(c, 8));
-        wdlp.rightMargin = Ui.dp(c, 7);
-        wanTitleRow.addView(wanDot, wdlp);
-        TextView wanTitle = Ui.text(c, "宽带连接", 16.5f, R.color.text_primary);
-        wanTitle.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        wanTitle.setIncludeFontPadding(false);
-        wanTitleRow.addView(wanTitle);
-        wanLeft.addView(wanTitleRow);
-        tvWanState = Ui.text(c, "读取中…", 12.5f, R.color.text_secondary);
-        tvWanState.setPadding(0, Ui.dp(c, 4), 0, 0);
-        wanLeft.addView(tvWanState);
-        wanHead.addView(wanLeft, new LinearLayout.LayoutParams(0, wrap, 1f));
+        Ui.cardPadding(wanCard, 11);   // 最后一行是设置行，自带 11
+        Ui.CardHead wanHead = Ui.cardTitleLive(c, wanCard,
+                com.chaof.istoreos.widget.Glyph.GLOBE, "宽带连接", "读取中…");
+        // 副标题是活的：连上/断开、失败原因都写这儿，拿 CardHead 的引用直接改
+        tvWanState = wanHead.sub;
 
         tvWanBadge = Ui.pill(c, "—", R.color.text_secondary);
         tvWanBadge.setClickable(true);
         tvWanBadge.setOnClickListener(v -> openWan());
-        wanHead.addView(tvWanBadge);
-        wanCard.addView(wanHead);
+        wanHead.right.addView(tvWanBadge);
 
-        tvWanIp = Ui.kv(wanCard, "WAN 地址", "—");
-        tvWanGw = Ui.kv(wanCard, "网关", "—");
-        tvWanDns = Ui.kv(wanCard, "DNS", "—");
-        tvWanUp = Ui.kv(wanCard, "拨号时长", "—");
+        // kv 行没有自己的左右内边距（靠卡片内边距撑开），卡片归零后要包一层
+        LinearLayout wanInfo = Ui.column(c);
+        wanInfo.setPadding(Ui.dp(c, 16), 0, Ui.dp(c, 16), 0);
+        wanCard.addView(wanInfo);
 
+        tvWanIp = Ui.kv(wanInfo, "WAN 地址", "—");
+        tvWanGw = Ui.kv(wanInfo, "网关", "—");
+        tvWanDns = Ui.kv(wanInfo, "DNS", "—");
+        tvWanUp = Ui.kv(wanInfo, "拨号时长", "—");
+
+        // 最后一行和分割线之间留 12：原来紧贴着，看起来像粘在一起
+        Ui.space(c, wanCard, 12);
         wanCard.addView(Ui.hairline(c));
 
-        // 「网络设置」不能只是一行绿字 —— 它是这张卡唯一可点的东西，
-        // 纯文字没有可点暗示，做成次级胶囊按钮（主色淡底 + 描边）才像按钮
-        TextView cfgWan = Ui.text(c, "网络设置", 14f, R.color.primary);
-        cfgWan.setGravity(Gravity.CENTER);
-        cfgWan.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        GradientDrawable cfgBg = new GradientDrawable();
-        cfgBg.setCornerRadius(Ui.dp(c, 100));
-        cfgBg.setColor(Ui.color(c, R.color.accent_soft));
-        cfgBg.setStroke(Math.max(1, Ui.dp(c, 0.8f)),
-                Ui.alpha(Ui.color(c, R.color.primary), 0.34f));
-        cfgWan.setBackground(new android.graphics.drawable.RippleDrawable(
-                android.content.res.ColorStateList.valueOf(Ui.color(c, R.color.ripple)),
-                cfgBg, cfgBg));
-        cfgWan.setPadding(0, Ui.dp(c, 10), 0, Ui.dp(c, 10));
-        cfgWan.setOnClickListener(v -> openWan());
-        LinearLayout.LayoutParams cfgLp = new LinearLayout.LayoutParams(match, wrap);
-        cfgLp.topMargin = Ui.dp(c, 12);
-        wanCard.addView(cfgWan, cfgLp);
+        // 原来是一个横贯整卡的主色胶囊按钮，跟别处「一行带图标的入口」不是一套。
+        // 换成设置页那种行：图标块 + 标题 + 副标题 + 箭头
+        Ui.settingRow(c, wanCard, com.chaof.istoreos.widget.Glyph.LINK,
+                "网络设置", "WAN / LAN / 无线 / 端口转发", "", true, false,
+                () -> openWan());
         root.addView(wanCard);
 
         // ---------------------------------------------------------- 6. 网口
@@ -277,39 +288,25 @@ public class OverviewFragment extends BaseFragment {
         // 每口一张小卡，带 RJ45 图标、速率徽标、迷你趋势线。
         // WAN 口靠主色描边一眼挑出来，不用逐个读标签。
         Ui.Card ports = Ui.card(c);
-        LinearLayout portHead = Ui.header(ports, "网口", "点开看累计收发");
+        Ui.cardPadding(ports, 0);
+        Ui.CardHead portHead = Ui.cardTitleLive(c, ports,
+                com.chaof.istoreos.widget.Glyph.BOX, "网口", "点开看累计收发");
         tvPortSummary = Ui.pill(c, "—", R.color.text_secondary);
-        portHead.addView(tvPortSummary);
+        portHead.right.addView(tvPortSummary);
 
         portBox = Ui.column(c);
         LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(match, wrap);
         plp.topMargin = Ui.dp(c, 14);
+        plp.leftMargin = Ui.dp(c, 16);
+        plp.rightMargin = Ui.dp(c, 16);
         portBox.setLayoutParams(plp);
         ports.addView(portBox);
         root.addView(ports);
 
     }
 
-    /** 一个环 + 下面一行的绝对值小字，返回那行小字 */
-    private TextView ringCell(Context c, LinearLayout parent, RingView ring) {
-        LinearLayout col = Ui.column(c);
-        col.setGravity(Gravity.CENTER_HORIZONTAL);
-        col.addView(ring, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        TextView abs = Ui.text(c, "", 11f, R.color.text_tertiary);
-        abs.setGravity(Gravity.CENTER);
-        abs.setSingleLine(true);
-        abs.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        abs.setPadding(0, Ui.dp(c, 2), 0, 0);
-        col.addView(abs);
-
-        parent.addView(col, new LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        return abs;
-    }
-
-    /** hero 卡上的一个指标：小标签 + 大数字 */    private TextView heroStat(Context c, LinearLayout parent, String label) {
+    /** hero 卡上的一个指标：小标签 + 大数字 */
+    private TextView heroStat(Context c, LinearLayout parent, String label) {
         LinearLayout col = Ui.column(c);
         TextView l = Ui.heroNote(c, label, 0.86f);
         l.setTextSize(11f);
@@ -331,6 +328,28 @@ public class OverviewFragment extends BaseFragment {
         parent.addView(col, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         return v;
+    }
+
+    /** hero 卡里的小图例：一个色点 + 文字，文字用 on-primary 的透明版 */
+    private LinearLayout heroLegend(Context c, String text, int colorRes) {
+        LinearLayout row = Ui.row(c);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        View dot = new View(c);
+        GradientDrawable d = new GradientDrawable();
+        d.setShape(GradientDrawable.OVAL);
+        d.setColor(Ui.color(c, colorRes));
+        dot.setBackground(d);
+        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(Ui.dp(c, 7), Ui.dp(c, 7));
+        dlp.rightMargin = Ui.dp(c, 5);
+        row.addView(dot, dlp);
+        TextView label = Ui.heroNote(c, text, 0.78f);
+        label.setTextSize(10.5f);
+        row.addView(label);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.rightMargin = Ui.dp(c, 14);
+        row.setLayoutParams(lp);
+        return row;
     }
 
     private LinearLayout legendItem(Context c, String name, int colorRes) {
@@ -435,13 +454,7 @@ public class OverviewFragment extends BaseFragment {
         wanKnown = true;
         String ip = st.optString("ipv4", "");
 
-        GradientDrawable dot = new GradientDrawable();
-        dot.setShape(GradientDrawable.OVAL);
-        dot.setColor(Ui.color(c, up ? R.color.ok : R.color.warn));
-        if (wanDot != null) {
-            wanDot.setBackground(dot);
-        }
-
+        // 状态点没了：标题行统一成图标块，连没连上由副标题文字和颜色表达
         tvWanState.setText(up ? "已拨通" : Fmt.orDash(st.optString("note", "未连接")));
         tvWanState.setTextColor(Ui.color(c, up ? R.color.text_secondary : R.color.warn));
 
@@ -515,14 +528,10 @@ public class OverviewFragment extends BaseFragment {
                 if (!kernel.isEmpty()) {
                     line.append("内核 ").append(kernel);
                 }
-                long up = (long) b.optDouble("uptime", 0);
-                if (up > 0) {
-                    line.append(line.length() > 0 ? "　·　" : "").append("在线 ").append(Fmt.dur(up));
-                }
-                if (line.length() == 0) {
-                    line.append(distro);
-                }
-                tvHeroSys.setText(line.toString());
+                heroSysPrefix = line.length() > 0 ? line.toString() : distro;
+                upBase = Math.max(0, (long) b.optDouble("uptime", 0));
+                upAt = android.os.SystemClock.elapsedRealtime();
+                paintHeroSys();
             }
             if (tvHeroBadge != null) {
                 tvHeroBadge.setText(ver.isEmpty() ? "iStoreOS" : "iStoreOS " + ver);
@@ -536,62 +545,56 @@ public class OverviewFragment extends BaseFragment {
         // ---- 健康 ----
         JSONObject cpu = b.optJSONObject("cpu");
         double cpuPct = cpu == null ? 0 : cpu.optDouble("percent", 0);
-        if (ringCpu != null) {
-            ringCpu.set((float) cpuPct, Math.round(cpuPct) + "%");
-        }
-
-        JSONObject mem = b.optJSONObject("memory");
-        if (mem != null) {
-            double memPct = mem.optDouble("percent", 0);
-            if (ringMem != null) {
-                ringMem.set((float) memPct, Math.round(memPct) + "%");
-            }
-            if (tvMemAbs != null) {
-                // 只显示「已用」的小字：环里已经是百分比，再写总量没信息量
-                tvMemAbs.setText(Fmt.bytes(mem.optLong("used")) + " / "
-                        + Fmt.bytes(mem.optLong("total")));
-            }
-        }
-
-        JSONArray storage = b.optJSONArray("storage");
-        JSONObject disk = biggest(storage);
-        if (disk != null) {
-            double dp = disk.optDouble("percent", 0);
-            if (ringDisk != null) {
-                ringDisk.set((float) dp, Math.round(dp) + "%");
-            }
-            if (tvDiskAbs != null) {
-                tvDiskAbs.setText(Fmt.bytes(disk.optLong("free")) + " 可用");
-            }
-        } else if (ringDisk != null) {
-            ringDisk.set(0, "—");
-        }
-
-        // 环下面的文字：把「环看不出绝对值」的短板补上
-        StringBuilder facts = new StringBuilder();
-        JSONObject load = b.optJSONObject("load");
-        if (load != null) {
-            facts.append("负载 ").append(String.format(java.util.Locale.US, "%.2f",
-                    load.optDouble("load1", 0)));
-        }
         double temp = maxTemp(b.optJSONArray("temperature"));
-        // 温度放 CPU 环下面比塞进右上角那行小字更合适：
-        // 它就是 CPU 的运行状态，跟着 CPU 走
-        if (temp > 0 && tvCpuAbs != null) {
-            tvCpuAbs.setText(Fmt.temp(temp));
-            tvCpuAbs.setTextColor(Ui.color(ctx(), temp >= 80 ? R.color.danger
-                    : temp >= 65 ? R.color.warn : R.color.text_tertiary));
-        }
+
+        JSONObject load = b.optJSONObject("load");
         String threads = load == null ? "" : load.optString("threads", "");
         int slash = threads.indexOf('/');
         if (slash >= 0) {
             threads = threads.substring(slash + 1);
         }
-        if (!threads.isEmpty()) {
-            facts.append(facts.length() > 0 ? "　·　" : "").append(threads).append(" 线程");
+        if (meterCpu != null) {
+            meterCpu.setRatio((float) (cpuPct / 100.0));
+            meterCpu.setValue(Math.round(cpuPct) + "%");
+            StringBuilder detail = new StringBuilder();
+            if (!threads.isEmpty()) {
+                detail.append(threads).append(" 线程");
+            }
+            if (temp > 0) {
+                detail.append(detail.length() > 0 ? "　" : "").append(Fmt.temp(temp));
+            }
+            meterCpu.setDetail(detail.toString());
         }
+
+        JSONObject mem = b.optJSONObject("memory");
+        if (mem != null && meterMem != null) {
+            double memPct = mem.optDouble("percent", 0);
+            meterMem.setRatio((float) (memPct / 100.0));
+            meterMem.setValue(Math.round(memPct) + "%");
+            // 百分比旁边给绝对值：只写「62%」永远有人问「那还剩多少」
+            meterMem.setDetail(Fmt.bytes(mem.optLong("used")) + " / "
+                    + Fmt.bytes(mem.optLong("total")));
+        }
+
+        JSONArray storage = b.optJSONArray("storage");
+        JSONObject disk = biggest(storage);
+        if (meterDisk != null) {
+            if (disk != null) {
+                double dp = disk.optDouble("percent", 0);
+                meterDisk.setRatio((float) (dp / 100.0));
+                meterDisk.setValue(Math.round(dp) + "%");
+                meterDisk.setDetail(Fmt.bytes(disk.optLong("free")) + " 可用");
+            } else {
+                meterDisk.setRatio(0f);
+                meterDisk.setValue("—");
+                meterDisk.setDetail("");
+            }
+        }
+
         if (tvFacts != null) {
-            tvFacts.setText(facts.length() == 0 ? "" : facts.toString());
+            double load1 = load == null ? 0 : load.optDouble("load1", 0);
+            tvFacts.setText(load1 > 0
+                    ? String.format(java.util.Locale.US, "负载 %.2f", load1) : "");
         }
 
         // ---- 速率 ----
@@ -757,6 +760,31 @@ public class OverviewFragment extends BaseFragment {
         super.onResume();
         // 从宽带配置页回来时 WAN 可能已经变了，重置标志让 hero 重新判定
         wanKnown = false;
+        // 运行时长按秒走：3 秒轮询只管校准基准值，中间这两秒本地往前推
+        upHandler.removeCallbacks(upTick);
+        upHandler.postDelayed(upTick, 1000);
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        upHandler.removeCallbacks(upTick);
+    }
+
+    /** hero 副标题里的运行时长，每秒重画一次 */
+    private void paintHeroSys() {
+        if (tvHeroSys == null) {
+            return;
+        }
+        StringBuilder line = new StringBuilder(heroSysPrefix == null ? "" : heroSysPrefix);
+        if (upBase > 0) {
+            long sec = upBase + (android.os.SystemClock.elapsedRealtime() - upAt) / 1000;
+            if (line.length() > 0) {
+                line.append("　·　");
+            }
+            line.append("在线 ").append(Fmt.uptime(sec));
+        }
+        tvHeroSys.setText(line.length() == 0 ? "iStoreOS" : line.toString());
     }
 
     /**

@@ -55,6 +55,19 @@ public class HardwareActivity extends BaseActivity {
     private LinearLayout root;
     private LinearLayout heroBox;
     private LinearLayout sensorBox;
+
+    /** 走秒的运行时长：整页 5 秒才重建一次，秒数得自己往前推 */
+    private TextView tvHeroUp;
+    private TextView tvKvUp;
+    private long upBase = 0;
+    private long upAt = 0;
+    private final Runnable upTick = new Runnable() {
+        @Override
+        public void run() {
+            paintUptime();
+            ticker.postDelayed(this, 1000);
+        }
+    };
     private TextView tvCpuMhz;
 
     @Override
@@ -96,12 +109,30 @@ public class HardwareActivity extends BaseActivity {
         super.onResume();
         ticker.removeCallbacks(tick);
         ticker.postDelayed(tick, TICK_MS);
+        ticker.removeCallbacks(upTick);
+        ticker.postDelayed(upTick, 1000);
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         ticker.removeCallbacks(tick);
+        ticker.removeCallbacks(upTick);
+    }
+
+    /** 已运行按秒跳；日历页 5 秒才重建一次，中间靠这个往前补 */
+    private void paintUptime() {
+        if (upBase <= 0) {
+            return;
+        }
+        long sec = upBase + (android.os.SystemClock.elapsedRealtime() - upAt) / 1000;
+        String text = Fmt.uptime(sec);
+        if (tvHeroUp != null) {
+            tvHeroUp.setText(text);
+        }
+        if (tvKvUp != null) {
+            tvKvUp.setText(text);
+        }
     }
 
     @Override
@@ -173,7 +204,9 @@ public class HardwareActivity extends BaseActivity {
 
         LinearLayout nums = Ui.row(this);
         nums.setPadding(0, Ui.dp(this, 12), 0, 0);
-        heroStat(nums, "已运行", Fmt.dur(sys == null ? 0 : sys.optLong("uptime", 0)));
+        upBase = sys == null ? 0 : Math.max(0, sys.optLong("uptime", 0));
+        upAt = android.os.SystemClock.elapsedRealtime();
+        tvHeroUp = heroStat(nums, "已运行", Fmt.uptime(upBase));
         heroStat(nums, "架构", sys == null ? "—" : sys.optString("arch", "—"));
         heroStat(nums, "内存", mem == null ? "—" : Fmt.bytes(mem.optLong("total", 0)));
         hero.addView(nums);
@@ -378,7 +411,7 @@ public class HardwareActivity extends BaseActivity {
             Ui.kv(card, "架构 / 目标", sys.optString("arch", "") + "　"
                     + sys.optString("target", ""));
             Ui.kv(card, "启动时间", time(sys.optLong("boot", 0)));
-            Ui.kv(card, "已运行", Fmt.dur(sys.optLong("uptime", 0)));
+            tvKvUp = Ui.kv(card, "已运行", Fmt.uptime(upBase));
             Ui.kv(card, "Agent", "v" + sys.optString("agent", "—"));
             Ui.kv(card, "Python", sys.optString("python", "—"));
             root.addView(card);
@@ -543,7 +576,7 @@ public class HardwareActivity extends BaseActivity {
         }
     }
 
-    private void heroStat(LinearLayout parent, String label, String value) {
+    private TextView heroStat(LinearLayout parent, String label, String value) {
         LinearLayout box = Ui.column(this);
         TextView v = Ui.heroNumber(this, value);
         v.setTextSize(17f);
@@ -554,6 +587,7 @@ public class HardwareActivity extends BaseActivity {
         box.addView(l);
         parent.addView(box, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        return v;
     }
 
     /** "Intel(R) Pentium(R) Gold 8505" → "Intel Pentium Gold 8505"，去掉满屏的 ® */

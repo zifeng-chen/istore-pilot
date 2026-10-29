@@ -3,6 +3,8 @@ package com.chaof.istoreos.ui;
 import android.content.Context;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,6 +15,7 @@ import android.widget.Toast;
 
 import com.chaof.istoreos.AdblockLogActivity;
 import com.chaof.istoreos.R;
+import com.chaof.istoreos.WebActivity;
 import com.chaof.istoreos.api.Api;
 import com.chaof.istoreos.api.Cb;
 import com.chaof.istoreos.util.Fmt;
@@ -65,6 +68,18 @@ public class AdblockFragment extends BaseFragment {
     private LinearLayout listBox;
 
     private String mode = "";
+    /** 未安装时「去安装」要落的 LuCI 页面，由 Agent 下发 */
+    private String installPath = "";
+    private String installPkg = "";
+
+    /** DNS 兜底巡检的自愈记录，只在触发过时显示一行说明 */
+    private int guardCount;
+    private String guardReason = "";
+
+    /** 一键安装：Agent 在路由器上跑，这里只显示进度 */
+    private TextView tvInstall;
+    private boolean installBusy;
+    private final Handler ui = new Handler(Looper.getMainLooper());
 
     @Override
     protected String title() {
@@ -758,10 +773,21 @@ public class AdblockFragment extends BaseFragment {
 
     private void render(JSONObject b) {
         Context c = ctx();
-        boolean installed = b.optBoolean("installed", false);
+        // 缺这个字段（老 Agent）按「装了」处理，别把一台正常的机器显示成未安装
+        boolean installed = b.optBoolean("installed", true);
         boolean running = b.optBoolean("running", false);
         mode = b.optString("mode", "");
         String modeLabel = b.optString("mode_label", mode);
+
+        // 没装的时候给一个能直接落地的入口：软路由上装它要去「软件包」，
+        // 让用户自己翻菜单等于把人扔回网页端。路径由 Agent 下发，别写死
+        JSONObject ins = b.optJSONObject("install");
+        installPath = ins == null ? "" : ins.optString("luci_path", "");
+        installPkg = ins == null ? "" : ins.optString("package", "");
+
+        JSONObject guard = b.optJSONObject("guard");
+        guardCount = guard == null ? 0 : guard.optInt("count", 0);
+        guardReason = guard == null ? "" : guard.optString("reason", "");
 
         // 状态点与文案：跑起来是主色，没跑是灰色
         String stateText = !installed ? "未安装" : (running ? "运行中" : "未运行");
@@ -870,9 +896,28 @@ public class AdblockFragment extends BaseFragment {
         actionBox.removeAllViews();
 
         if (!installed) {
-            TextView tip = Ui.text(c, "AdGuard Home 未安装，请先在路由器上安装本体。",
+            TextView tip = Ui.text(c, "AdGuard Home 未安装，拦截、规则、日志这些都用不了。"
+                            + "装好之后这一页会自动变成可用状态，不用重装 App。",
                     13f, R.color.text_secondary);
+            tip.setLineSpacing(Ui.dp(c, 3), 1f);
+            tip.setPadding(0, 0, 0, Ui.dp(c, 10));
             actionBox.addView(tip);
+
+            // 进度行：装的时候每 1.2 秒刷一次，装完就隐藏
+            tvInstall = Ui.text(c, installBusy ? "安装中…" : "", 12f, R.color.text_secondary);
+            tvInstall.setLineSpacing(Ui.dp(c, 2), 1f);
+            tvInstall.setPadding(0, 0, 0, Ui.dp(c, 8));
+            tvInstall.setVisibility(installBusy ? View.VISIBLE : View.GONE);
+            actionBox.addView(tvInstall);
+
+            action(actionBox, "一键安装",
+                    "Agent 自动装到路由器，约 6.6 MB，不改 DNS",
+                    R.color.primary, true, this::askInstall);
+
+            String pkg = installPkg.isEmpty() ? "luci-app-adguardhome" : installPkg;
+            action(actionBox, "去路由器网页安装",
+                    "在路由器网页端的「软件包」里装 " + pkg,
+                    R.color.text_secondary, false, this::openPackageManager);
             return;
         }
 
@@ -897,6 +942,143 @@ public class AdblockFragment extends BaseFragment {
 
         // 「刷新规则」已经挪到上面的「规则更新」卡里（那里能看频率、能改间隔），
         // 这里不再重复放一个同样的入口，否则同一件事有两个按钮
+
+        // 巡检触发过自愈时留一条痕迹：否则用户只会看到「怎么突然变成观察模式了」
+        if (guardCount > 0) {
+            TextView note = Ui.text(c, "DNS 巡检触发过 " + guardCount + " 次自愈"
+                            + (guardReason.isEmpty() ? "" : " · " + guardReason)
+                            + "（53 没人应答时自动把 dnsmasq 放回去）",
+                    11.5f, R.color.text_tertiary);
+            note.setLineSpacing(Ui.dp(c, 2), 1f);
+            note.setPadding(Ui.dp(c, 2), Ui.dp(c, 6), 0, 0);
+            actionBox.addView(note);
+        }
+    }
+
+    /** 打开路由器网页端的软件包页：Agent 已经换好免密票据，落地就能装 */
+    private void openPackageManager() {
+        Context c = ctx();
+        if (c == null) {
+            return;
+        }
+        android.content.Intent it = new android.content.Intent(c, WebActivity.class);
+        it.putExtra(WebActivity.EXTRA_TITLE, "安装 AdGuard Home");
+        if (!installPath.isEmpty()) {
+            it.putExtra(WebActivity.EXTRA_PATH, installPath);
+        }
+        c.startActivity(it);
+    }
+
+    /**
+     * 一键安装的第一步：把「会做什么」讲清楚再让用户点。
+     *
+     * 装包这件事不可逆（卸载要另跑 opkg），而且会联网下载 6 MB，
+     * 所以必须二次确认；确认后由 Agent 在路由器上执行，App 只轮询进度。
+     */
+    private void askInstall() {
+        Sheet.confirm(ctx(), "在路由器上安装 AdGuard Home？",
+                "Agent 会在路由器上依次执行：\n"
+                        + "· 联网下载本体（约 6.6 MB，来自 static.adtidy.org）\n"
+                        + "· 解包到 /usr/bin/AdGuardHome\n"
+                        + "· 以观察模式启动：只监听 127.0.0.1，53 端口仍归 dnsmasq\n\n"
+                        + "全程不改 DNS、不影响家里上网，大约 1–3 分钟，可以切走干别的。",
+                "开始安装", false, this::startInstall);
+    }
+
+    private void startInstall() {
+        final Context c = ctx();
+        if (c == null) {
+            return;
+        }
+        installBusy = true;
+        if (tvInstall != null) {
+            tvInstall.setText("已提交，正在安装…");
+            tvInstall.setTextColor(Ui.color(c, R.color.text_secondary));
+            tvInstall.setVisibility(View.VISIBLE);
+        }
+
+        JSONObject body = new JSONObject();
+        try {
+            body.put("confirm", "install");
+        } catch (Exception ignored) {
+        }
+        Api.post(c, "/api/v1/adblock/install", body, new Cb() {
+            @Override
+            public void onData(JSONObject data, boolean fromCache) {
+                if (!isAdded()) {
+                    return;
+                }
+                if (!data.optBoolean("ok", false)) {
+                    installBusy = false;
+                    Toast.makeText(c, data.optString("error", "安装没被受理"),
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
+                tickInstall();
+            }
+
+            @Override
+            public void onError(String message) {
+                installBusy = false;
+                if (isAdded()) {
+                    Toast.makeText(c, "安装请求失败：" + message, Toast.LENGTH_LONG).show();
+                }
+            }
+        });
+    }
+
+    /** 轮询安装进度。1.2 秒一跳，装完自动刷新整页 */
+    private void tickInstall() {
+        if (!isAdded() || !installBusy) {
+            return;
+        }
+        final Context c = ctx();
+        if (c == null) {
+            return;
+        }
+        Api.get(c, "/api/v1/adblock/install", new Cb() {
+            @Override
+            public void onData(JSONObject s, boolean fromCache) {
+                if (!isAdded()) {
+                    return;
+                }
+                boolean done = s.optBoolean("done", false);
+                boolean running = s.optBoolean("running", false);
+                boolean ok = s.optBoolean("ok", false);
+                String err = s.optString("error", "");
+                String step = s.optString("step", "");
+
+                if (tvInstall != null) {
+                    String text = ok ? "已安装，正在刷新…"
+                            : (!err.isEmpty() ? "失败：" + err : step + " · " + s.optInt("pct", 0) + "%");
+                    tvInstall.setText(text);
+                    tvInstall.setTextColor(Ui.color(c,
+                            (done && !ok) ? R.color.danger : R.color.text_secondary));
+                }
+
+                if (done && !running) {
+                    installBusy = false;
+                    Toast.makeText(c, ok ? "装好了，这一页已经可用" : "安装失败：" + err,
+                            Toast.LENGTH_LONG).show();
+                    // /adblock 有 2 秒缓存，稍等一下再拉，避免又读到 installed=false
+                    ui.postDelayed(() -> {
+                        if (isAdded()) {
+                            load(false);
+                        }
+                    }, 1600);
+                    return;
+                }
+                ui.postDelayed(AdblockFragment.this::tickInstall, 1200);
+            }
+
+            @Override
+            public void onError(String message) {
+                if (!isAdded() || !installBusy) {
+                    return;
+                }
+                ui.postDelayed(AdblockFragment.this::tickInstall, 2500);
+            }
+        });
     }
 
     /**

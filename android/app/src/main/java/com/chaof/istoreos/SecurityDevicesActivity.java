@@ -36,6 +36,9 @@ public class SecurityDevicesActivity extends BaseActivity {
         bar.setNavigationOnClickListener(v -> finish());
 
         int mode = getIntent().getIntExtra("mode", MODE_ALL);
+        // 标题放标题栏里（内容区的大标题去掉了，滚到一半不会露出半截字）
+        bar.setTitle(mode == MODE_ONLINE ? "在线设备"
+                : (mode == MODE_OFFLINE ? "离线设备" : "设备"));
 
         if (savedInstanceState == null) {
             DevicesFragment f = new DevicesFragment();

@@ -1,8 +1,15 @@
 package com.chaof.istoreos.util;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.RectF;
 import android.graphics.Typeface;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.View;
@@ -86,13 +93,118 @@ public final class AppIcon {
         int s = Ui.dp(c, sizeDp);
         int res = AppIcons.res(name);
         if (res != 0) {
-            ImageView iv = new ImageView(c);
+            // 抓来的图全是 144x144 的**方图**（圆角是 App Store 客户端自己加的），
+            // 直接贴就是方的，跟旁边的字母块不是一套形状
+            RoundIconView iv = new RoundIconView(c, ROUND_RATIO);
             iv.setImageResource(res);
             iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
             iv.setLayoutParams(new LinearLayout.LayoutParams(s, s));
+
+            if (iv.isWhiteBg()) {
+                // 「白底 + 内缩 logo」这一类（番茄小说、百度、QQ 音乐…），图案常常
+                // 一直铺到某几条边。按 24% 裁圆角时，角上那圈会啃到图案，把它的
+                // 圆角切成斜边（看着像八角形）。先把图缩进 8%，让圆角只吃背景
+                int pad = Math.round(s * 0.08f);
+                iv.setPadding(pad, pad, pad, pad);
+            }
             return iv;
         }
         return tile(c, name, category, sizeDp);
+    }
+
+    /**
+     * 图标圆角占边长的比例。iOS 的图标是超椭圆，等效圆角约 22%；这里取 24%，
+     * 字母块和图片图标共用同一个值，摆在一起才是一套形状
+     */
+    private static final float ROUND_RATIO = 0.24f;
+
+    /**
+     * 强制圆角的图标 View。
+     *
+     * 不用 `setClipToOutline` + `ViewOutlineProvider`：那套依赖 RenderNode 的轮廓裁剪，
+     * 个别机型/图层（软件层、被父容器强制 layer）下会静默失效，图标又变回方的。
+     * 直接在 canvas 上裁路径没有这些前提 —— 拿到多大画多大，四个角一定是圆的。
+     */
+    private static final class RoundIconView extends ImageView {
+
+        private final float ratio;
+        private final Path path = new Path();
+        private final RectF rect = new RectF();
+        private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
+        /** 四角是不是白的。null = 还没判断过 */
+        private Boolean whiteBg;
+
+        RoundIconView(Context c, float ratio) {
+            super(c);
+            this.ratio = ratio;
+            setWillNotDraw(false);
+            stroke.setStyle(Paint.Style.STROKE);
+            // 7% 黑：在白底上是一道很淡的灰线，刚好勾出圆角；彩色图标上几乎看不见
+            stroke.setColor(0x12000000);
+        }
+
+        /**
+         * 图标是不是「白底 + 内缩 logo」。
+         *
+         * 不能只看四角：番茄小说的橙色番茄一直铺到**底部两角**，四角判断会漏掉它。
+         * 改为看顶部一整行 —— 满铺的图标（苹果蓝、抖音黑、华为红）上边是清一色的
+         * 品牌色，白底图标上边绝大部分是白的。取 12 个采样点，六成以上是白就算。
+         */
+        boolean isWhiteBg() {
+            if (whiteBg != null) {
+                return whiteBg;
+            }
+            whiteBg = false;
+            Drawable d = getDrawable();
+            if (d instanceof BitmapDrawable) {
+                Bitmap b = ((BitmapDrawable) d).getBitmap();
+                if (b != null && b.getWidth() > 12 && b.getHeight() > 12) {
+                    int w = b.getWidth();
+                    int y = Math.max(2, b.getHeight() / 40);
+                    int hits = 0;
+                    int total = 12;
+                    for (int i = 0; i < total; i++) {
+                        int x = 4 + i * (w - 8) / (total - 1);
+                        int col = b.getPixel(x, y);
+                        if (Color.alpha(col) > 200
+                                && Color.red(col) > 238
+                                && Color.green(col) > 238
+                                && Color.blue(col) > 238) {
+                            hits++;
+                        }
+                    }
+                    whiteBg = hits >= total * 0.6f;
+                }
+            }
+            return whiteBg;
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            int w = getWidth();
+            int h = getHeight();
+            if (w <= 0 || h <= 0) {
+                super.onDraw(canvas);
+                return;
+            }
+            float r = Math.min(w, h) * ratio;
+            path.reset();
+            rect.set(0, 0, w, h);
+            path.addRoundRect(rect, r, r, Path.Direction.CW);
+            int save = canvas.save();
+            canvas.clipPath(path);
+            super.onDraw(canvas);
+            canvas.restoreToCount(save);
+
+            // 白底图标和卡片同色，光裁圆角看不出来 —— 补一道内描边把轮廓勾出来。
+            // 彩色图标不画：它们自己就有边界，加线反而脏
+            if (isWhiteBg()) {
+                float sw = Math.max(1f, Math.min(w, h) * 0.008f);
+                stroke.setStrokeWidth(sw);
+                rect.set(sw / 2f, sw / 2f, w - sw / 2f, h - sw / 2f);
+                canvas.drawRoundRect(rect, r, r, stroke);
+            }
+        }
     }
 
     private static TextView tile(Context c, String name, String category, int sizeDp) {
@@ -116,8 +228,7 @@ public final class AppIcon {
         GradientDrawable bgDrawable = new GradientDrawable(
                 GradientDrawable.Orientation.TL_BR,
                 new int[]{mix(bg, 0xFFFFFF, 0.18f), bg});
-        // iOS 那种超椭圆差不多是边长的 28%
-        bgDrawable.setCornerRadius(Ui.dp(c, sizeDp * 0.28f));
+        bgDrawable.setCornerRadius(Ui.dp(c, sizeDp * ROUND_RATIO));
         v.setBackground(bgDrawable);
 
         int s = Ui.dp(c, sizeDp);
@@ -125,9 +236,23 @@ public final class AppIcon {
         return v;
     }
 
+    /**
+     * 没有官方图标的品牌，颜色得手动钉死 —— KEYS/COLORS 是按顺序一一对应的，
+     * 中间插一条就会整列错位，所以不在那张表里改。
+     */
+    private static final String[][] BRAND_EXACT = {
+            {"华为", "0xFFCF0A2C"}, {"荣耀", "0xFF0A59F7"}, {"X", "0xFF000000"},
+            {"支付宝", "0xFF1677FF"}, {"腾讯", "0xFF0052D9"},
+    };
+
     public static int brand(String name, String category) {
         // 大小写不敏感：账本里会出现 apple.com、Apple 服务两种写法，都该落到同一色
         String n = name == null ? "" : name.toLowerCase(java.util.Locale.ROOT);
+        for (String[] pair : BRAND_EXACT) {
+            if (pair[0].equalsIgnoreCase(name == null ? "" : name.trim())) {
+                return (int) Long.parseLong(pair[1].substring(2), 16);
+            }
+        }
         int limit = Math.min(NAME_KEYS, Math.min(KEYS.length, COLORS.length));
         for (int i = 0; i < limit; i++) {
             if (n.contains(KEYS[i].toLowerCase(java.util.Locale.ROOT))) {
@@ -147,9 +272,24 @@ public final class AppIcon {
      * 图标里的字：中文取首字（「小米 / 米家」→「小」），
      * 英文取前两个单词首字母（「Prime Video」→「PV」），纯数字取前两位（「12306」→「12」）。
      */
+    /**
+     * 少数名字的首字没有信息量（「AI 编程助手」只取「A」跟「Apple」撞车，
+     * 「遥测 / 统计」取「遥」没人看得懂），这里直接给缩写。
+     */
+    private static final String[][] GLYPH_OVERRIDE = {
+            {"AI 编程", "AI"}, {"CDN 加速", "CDN"}, {"广告联盟", "AD"},
+            {"应用推送", "推"}, {"遥测", "统计"}, {"IP 直连", "IP"},
+            {"开发仓库", "GH"}, {"腾讯", "腾"}, {"未知设备", "?"},
+    };
+
     public static String glyph(String name) {
         if (name == null || name.isEmpty()) {
             return "?";
+        }
+        for (String[] pair : GLYPH_OVERRIDE) {
+            if (name.contains(pair[0])) {
+                return pair[1];
+            }
         }
         char c0 = name.charAt(0);
         if (c0 >= '0' && c0 <= '9') {

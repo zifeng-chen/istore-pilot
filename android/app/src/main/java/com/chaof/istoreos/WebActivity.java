@@ -48,10 +48,14 @@ import org.json.JSONObject;
 public class WebActivity extends BaseActivity {
 
     public static final String EXTRA_TITLE = "title";
+    /** 落地的 LuCI 路径，比如 /cgi-bin/luci/admin/system/package-manager。
+     *  不传就停在后台首页。 */
+    public static final String EXTRA_PATH = "path";
 
     private WebView web;
     private ProgressBar bar;
     private TextView errorBox;
+    private String wantPath = "";
 
     /** 拿不到票据时的兜底地址：Agent 在 8443，LuCI 在 80，端口必须剥掉 */
     private String fallbackUrl = "";
@@ -66,6 +70,8 @@ public class WebActivity extends BaseActivity {
         if (title == null || title.isEmpty()) {
             title = "路由器网页端";
         }
+        String p = getIntent().getStringExtra(EXTRA_PATH);
+        wantPath = p == null ? "" : p;
 
         fallbackUrl = guessLuciUrl();
 
@@ -207,7 +213,7 @@ public class WebActivity extends BaseActivity {
                     cm.removeAllCookies(cleared -> runOnUiThread(() ->
                             cm.setCookie(url, name + "=" + value + "; path=/", ok -> runOnUiThread(() -> {
                                 if (!isFinishing() && web != null) {
-                                    web.loadUrl(url);
+                                    web.loadUrl(withPath(url));
                                 }
                             }))));
                     return;
@@ -217,7 +223,7 @@ public class WebActivity extends BaseActivity {
                 if (!why.isEmpty()) {
                     Toast.makeText(WebActivity.this, "需要手动登录一次后台", Toast.LENGTH_SHORT).show();
                 }
-                web.loadUrl(url);
+                web.loadUrl(withPath(url));
             }
 
             @Override
@@ -290,6 +296,25 @@ public class WebActivity extends BaseActivity {
         String s = url == null ? "" : url.replaceFirst("^https?://", "");
         int slash = s.indexOf('/');
         return slash > 0 ? s.substring(0, slash) : s;
+    }
+
+    /**
+     * 落地到指定 LuCI 页面。
+     *
+     * 票据给的 url 是后台首页，深链要自己换上路径；query 必须清掉，
+     * 否则首页带过来的参数会跟着跑到别的页面上去。
+     */
+    private String withPath(String url) {
+        if (wantPath == null || wantPath.isEmpty() || url == null || url.isEmpty()) {
+            return url;
+        }
+        try {
+            android.net.Uri u = android.net.Uri.parse(url);
+            String path = wantPath.startsWith("/") ? wantPath : "/" + wantPath;
+            return u.buildUpon().encodedPath(path).clearQuery().fragment(null).build().toString();
+        } catch (Exception e) {
+            return url;
+        }
     }
 
     @Override

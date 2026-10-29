@@ -109,9 +109,33 @@ public abstract class BaseFragment extends Fragment implements Refreshable {
 
         scroller.addView(content);        scroller.setOnScrollChangeListener((NestedScrollView.OnScrollChangeListener)
                 (v, x, y, oldX, oldY) -> syncNavTitle(y));
-        swipe.addView(scroller);
+
+        // 固定区：不放进滚动容器。设备清单这类页面要把 hero、筛选、搜索框
+        // 钉在顶上，只让下面的列表滚 —— 否则翻到第 30 台想换筛选，还得先滚回去
+        LinearLayout pinned = Ui.column(c);
+        pinned.setPadding(pad, Ui.dp(c, 8), pad, 0);
+        buildPinned(pinned);
+
+        LinearLayout shell = new LinearLayout(c);
+        shell.setOrientation(LinearLayout.VERTICAL);
+        if (pinned.getChildCount() > 0) {
+            shell.addView(pinned, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
+        shell.addView(scroller, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        swipe.addView(shell);
         swipe.setOnRefreshListener(() -> refresh(false));
         return swipe;
+    }
+
+    /**
+     * 固定区（不进滚动容器）。默认没有内容。
+     *
+     * 放这里的东西会一直贴在顶部，滚动只影响 {@link #build} 里的内容。
+     */
+    protected void buildPinned(LinearLayout pinned) {
     }
 
     /** 页面大标题，返回 null 表示不要大标题 */

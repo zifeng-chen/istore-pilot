@@ -8,8 +8,8 @@ android {
         applicationId "com.chaof.istoreos"
         minSdk 24
         targetSdk 34
-        versionCode 25
-        versionName "0.1.2"
+        versionCode 26
+        versionName "0.1.3"
         resConfigs "zh", "en"
     }
 
@@ -30,8 +30,13 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled false
-            shrinkResources false
+            // 之前是 false：dex 8.83 MB（占 APK 未压缩体积 80%），
+            // 里面大量是没被用到的 AndroidX / Material / 图表库代码。
+            // 这个 App 没有反射、没有按名字取资源，开 R8 是安全的。
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
+                    'proguard-rules.pro'
             signingConfig signingConfigs.release
         }
         debug {

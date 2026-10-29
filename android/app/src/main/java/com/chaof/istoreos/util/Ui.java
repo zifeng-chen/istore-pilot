@@ -381,6 +381,29 @@ public final class Ui {
     }
 
     /**
+     * 卡片内容区的留白：标题文字顶到卡片顶、最后一个行文字底到卡片底，都用这个值。
+     *
+     * 卡片本身左右必须是 0 —— 内边距由标题行（`cardTitle` 自带 16）和每个内容行提供，
+     * 这样卡片边缘和行首才能对齐。
+     */
+    public static final int CARD_PAD = 16;
+
+    /**
+     * 设置卡片上下留白。
+     *
+     * 顶部直接 16；底部要**减掉最后一行自己带的 bottom padding**，否则视觉上
+     * 「最后一行离卡片底」会比「标题离卡片顶」更宽松 —— 各卡片最后一行不同
+     * （列表行 10、设置行 11、没有内边距的块 0），所以由调用方把那个值传进来。
+     *
+     * @param lastRowBottomDp 最后一行自带的下内边距（dp），没有就传 0
+     */
+    public static void cardPadding(LinearLayout card, int lastRowBottomDp) {
+        Context c = card.getContext();
+        card.setPadding(0, dp(c, CARD_PAD), 0,
+                dp(c, Math.max(0, CARD_PAD - lastRowBottomDp)));
+    }
+
+    /**
      * 分组容器：一个卡片里装若干 {@link #listRow}，行间用 {@link #hairline} 分隔。
      *
      * 为什么要有这个：55 台设备如果每台一张卡，就是 55 层圆角 + 55 层投影，
@@ -845,7 +868,29 @@ public final class Ui {
      * 卡片标题左边的小图标，让每张卡的「身份」也能一眼认出。
      * 自带左右 16dp 内边距（配合 padding 为 0 的卡片使用），返回右侧容器。
      */
+    /** cardTitle 交出来的东西：右侧插槽 + 副标题（状态类卡片要就地更新副标题） */
+    public static final class CardHead {
+        public final LinearLayout right;
+        public final TextView sub;
+
+        CardHead(LinearLayout right, TextView sub) {
+            this.right = right;
+            this.sub = sub;
+        }
+    }
+
     public static LinearLayout cardTitle(Context c, LinearLayout card, int glyph,
+                                         String title, String sub) {
+        return cardTitleLive(c, card, glyph, title, sub).right;
+    }
+
+    /**
+     * 卡片标题行：28dp 图标块 + 16.5sp 标题 + 12sp 副标题，右侧返回一个插槽。
+     *
+     * 与 {@link #cardTitle} 的区别只在于把副标题也交出来 —— 「宽带连接」这类卡
+     * 的副标题是活的（连接状态随时变），拿不到引用就只能每天重建整张卡。
+     */
+    public static CardHead cardTitleLive(Context c, LinearLayout card, int glyph,
                                          String title, String sub) {
         LinearLayout row = row(c);
         row.setPadding(dp(c, 16), 0, dp(c, 16), dp(c, 2));
@@ -859,10 +904,14 @@ public final class Ui {
         t.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         t.setIncludeFontPadding(false);
         left.addView(t);
+
+        TextView subView = null;
         if (sub != null && !sub.isEmpty()) {
-            TextView s = text(c, sub, 12f, R.color.text_secondary);
-            s.setPadding(0, dp(c, 4), 0, 0);
-            left.addView(s);
+            subView = text(c, sub, 12f, R.color.text_secondary);
+            subView.setPadding(0, dp(c, 4), 0, 0);
+            subView.setSingleLine(true);
+            subView.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            left.addView(subView);
         }
         row.addView(left, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -870,7 +919,7 @@ public final class Ui {
         LinearLayout right = row(c);
         row.addView(right);
         card.addView(row);
-        return right;
+        return new CardHead(right, subView);
     }
 
     /**

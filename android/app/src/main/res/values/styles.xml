@@ -31,6 +31,15 @@
         <item name="android:windowLightStatusBar">true</item>
     </style>
 
+
+    <!-- 启动页：深绿底 + 无标题栏，避免打开瞬间先闪一下白底再变深绿 -->
+    <style name="SplashTheme" parent="Theme.IStore.Base">
+        <item name="android:windowBackground">@color/hero_from</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">@color/hero_from</item>
+        <item name="android:navigationBarColor">@color/hero_from</item>
+    </style>
+
     <!-- 对话框也用大圆角，跟卡片一致 -->
     <style name="DialogTheme" parent="ThemeOverlay.Material3.MaterialAlertDialog">
         <item name="shapeAppearanceOverlay">@style/DialogShape</item>

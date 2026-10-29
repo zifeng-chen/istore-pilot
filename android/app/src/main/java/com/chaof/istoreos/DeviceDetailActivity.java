@@ -381,6 +381,14 @@ public class DeviceDetailActivity extends BaseActivity {
             String sub = (category.isEmpty() || "其他".equals(category) ? "" : category + " · ")
                     + "↓ " + Fmt.bytes(a.optLong("down", 0))
                     + "　↑ " + Fmt.bytes(a.optLong("up", 0));
+            // 累计值每秒只涨一点点，边看视频也几乎看不出变化 —— 正在跑的应用
+            // 直接把此刻的速率顶到副标题最前面，动没动一眼就知道
+            double live = a.optDouble("down_bps", 0) + a.optDouble("up_bps", 0);
+            if (live >= 1024) {
+                sub = "↓ " + Fmt.bps(a.optDouble("down_bps", 0))
+                        + "  ↑ " + Fmt.bps(a.optDouble("up_bps", 0))
+                        + " · " + sub;
+            }
             TextView meta = Ui.text(this, sub, 11.5f, R.color.text_secondary);
             meta.setSingleLine(true);
             meta.setPadding(0, Ui.dp(this, 2), 0, 0);
@@ -425,6 +433,11 @@ public class DeviceDetailActivity extends BaseActivity {
         }
         if (!model.isEmpty() && !name.contains(model)) {
             who.add(model);
+        }
+        // 接入方式是推测值（AP 桥接，上游分不出无线/有线），所以把依据也带上
+        String accessText = com.chaof.istoreos.util.Access.describe(d.optJSONObject("access"));
+        if (!accessText.isEmpty()) {
+            who.add(accessText);
         }
         if (!who.isEmpty()) {
             sub = sub + " · " + TextUtils.join(" ", who);

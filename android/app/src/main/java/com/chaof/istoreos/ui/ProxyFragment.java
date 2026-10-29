@@ -47,7 +47,8 @@ import java.util.Set;
  *
  * 折叠状态必须自己记住：以前用「集合为空就展开第一组」做初始化，
  * 结果把唯一展开的那个组收起来后集合归空，下一次渲染又自动展开 ——
- * 表现就是「GLOBAL 怎么点都收不起来」。现在用一个 seeded 标记，只初始化一次。
+ * 表现就是「GLOBAL 怎么点都收不起来」。现在**全部默认折叠**、状态只由点击改，
+ * 不再替用户做初始展开（自动展开「自动选择」会让一进来就是几十行节点）。
  */
 public class ProxyFragment extends BaseFragment {
 
@@ -74,7 +75,6 @@ public class ProxyFragment extends BaseFragment {
     /** GLOBAL 组当前指向谁，切全局模式前用来判断会不会一把拒掉所有流量 */
     private String globalNow = "";
     /** 分组默认只展开一次，之后完全听用户的 */
-    private boolean seeded = false;
     private JSONObject lastGroups;
     /** 刚测出来的延迟，优先级高于接口里带的历史值 */
     private final Map<String, Integer> tested = new HashMap<>();
@@ -94,19 +94,24 @@ public class ProxyFragment extends BaseFragment {
         root.addView(hero);
 
         // ---------------------------------------------------------- 代理后端
-        Ui.Card back = Ui.card(c);
-        back.setPadding(0, Ui.dp(c, 16), 0, Ui.dp(c, 6));
-        Ui.cardTitle(c, back, Glyph.POWER, "代理后端", "两个插件互斥，点一行切过去");
+        // 并进 hero：后端是「这一页在管谁」的身份信息，本来就该跟状态放一起。
+        // 原来它单独占一张白卡，hero 里又重复写一遍后端名，等于说两遍
+        TextView backCap = Ui.heroNote(c, "代理后端 · 点一行切换", 0.62f);
+        backCap.setTextSize(11f);
+        LinearLayout.LayoutParams bclp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        bclp.topMargin = Ui.dp(c, 16);
+        hero.addView(backCap, bclp);
+
         backendBox = Ui.column(c);
         LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        blp.topMargin = Ui.dp(c, 8);
-        back.addView(backendBox, blp);
-        root.addView(back);
+        blp.topMargin = Ui.dp(c, 6);
+        hero.addView(backendBox, blp);
 
         // ---------------------------------------------------------- 运行模式
         Ui.Card mode = Ui.card(c);
-        mode.setPadding(0, Ui.dp(c, 16), 0, Ui.dp(c, 14));
+        Ui.cardPadding(mode, 0);   // 最后一行是说明文字，自身无内边距
         LinearLayout modeHead = Ui.cardTitle(c, mode, Glyph.BOLT, "运行模式", "改完立即生效");
         tvMode = Ui.num(c, "—", 13.5f, R.color.primary);
         tvMode.setGravity(Gravity.END);
@@ -127,7 +132,7 @@ public class ProxyFragment extends BaseFragment {
 
         // ---------------------------------------------------------- 配置与节点
         Ui.Card combo = Ui.card(c);
-        combo.setPadding(0, Ui.dp(c, 16), 0, Ui.dp(c, 8));
+        Ui.cardPadding(combo, 3);  // 最后一行是分组标题，底部留 3
         Ui.cardTitle(c, combo, Glyph.LIST, "配置与节点", "换配置会重启内核，断网十几秒");
 
         // 当前配置：整行可点，右侧「切换」胶囊给出明确的可操作性
@@ -200,6 +205,19 @@ public class ProxyFragment extends BaseFragment {
         });
     }
 
+
+    /** hero 深色底上的小胶囊：白字 + on-primary 淡底 */
+    private TextView heroPill(Context c, String text, boolean on) {
+        TextView v = Ui.text(c, text, 11f, R.color.hero_fg);
+        v.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        v.setPadding(Ui.dp(c, 9), Ui.dp(c, 3), Ui.dp(c, 9), Ui.dp(c, 3));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(Ui.dp(c, 100));
+        bg.setColor(Ui.alpha(Ui.color(c, R.color.hero_fg), on ? 0.22f : 0.10f));
+        v.setBackground(bg);
+        return v;
+    }
+
     private void renderBackends(JSONObject body) {
         Context c = backendBox.getContext();
         backendBox.removeAllViews();
@@ -225,23 +243,28 @@ public class ProxyFragment extends BaseFragment {
                 int count = b.optInt("node_count", 0);
 
                 if (i > 0) {
-                    backendBox.addView(Ui.hairline(c, 58));
+                    // hero 是深绿底，卡片那套 divider 色在上面看不见
+                    View hair = new View(c);
+                    hair.setBackgroundColor(Ui.alpha(Ui.color(c, R.color.hero_fg), 0.16f));
+                    LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, Ui.dp(c, 0.7f)));
+                    hlp.topMargin = Ui.dp(c, 2);
+                    backendBox.addView(hair, hlp);
                 }
 
                 LinearLayout line = Ui.row(c);
-                int px = Ui.dp(c, 16);
-                line.setPadding(px, Ui.dp(c, 10), px, Ui.dp(c, 10));
+                // hero 自己已经有 20dp 内边距，这里不再加左右
+                line.setPadding(0, Ui.dp(c, 10), 0, Ui.dp(c, 10));
 
-                LinearLayout tile = Ui.glyphTile(c, Glyph.POWER, 30,
-                        running ? R.color.primary : R.color.text_secondary);
+                LinearLayout tile = Ui.glyphTile(c, Glyph.POWER, 30, R.color.hero_fg);
                 LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(
                         Ui.dp(c, 30), Ui.dp(c, 30));
                 tlp.rightMargin = Ui.dp(c, 12);
                 line.addView(tile, tlp);
 
                 LinearLayout col = Ui.column(c);
-                TextView name = Ui.text(c, label, 15f,
-                        running ? R.color.text_primary : R.color.text_secondary);
+                TextView name = Ui.text(c, label, 15f, R.color.hero_fg);
+                name.setTextColor(Ui.alpha(Ui.color(c, R.color.hero_fg), running ? 1f : 0.62f));
                 name.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
                 name.setSingleLine(true);
                 col.addView(name);
@@ -249,7 +272,8 @@ public class ProxyFragment extends BaseFragment {
                 String sub = installed
                         ? (engine.isEmpty() ? "" : engine + " · ") + count + " 个节点"
                         : "未安装";
-                TextView subText = Ui.text(c, sub, 11.5f, R.color.text_secondary);
+                TextView subText = Ui.text(c, sub, 11.5f, R.color.hero_fg);
+                subText.setTextColor(Ui.alpha(Ui.color(c, R.color.hero_fg), 0.62f));
                 subText.setPadding(0, Ui.dp(c, 3), 0, 0);
                 subText.setSingleLine(true);
                 col.addView(subText);
@@ -258,15 +282,14 @@ public class ProxyFragment extends BaseFragment {
                         ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
                 if (running) {
-                    line.addView(Ui.pill(c, "运行中", R.color.primary));
+                    line.addView(heroPill(c, "运行中", true));
                     backendLabel = label;
                     activeCount = count;
                     activeEngine = engine;
                 } else {
                     // 用 text_on_track 而不是 text_secondary：
                     // 灰字配 19% 灰底，在深色下「未运行」几乎读不出来
-                    line.addView(Ui.pill(c, installed ? "未运行" : "未安装",
-                            R.color.text_on_track));
+                    line.addView(heroPill(c, installed ? "未运行" : "未安装", false));
                     // 装好了但没跑，点一下就能切过去 —— 比让用户去后台点强
                     if (installed) {
                         final String fid = id;
@@ -636,11 +659,9 @@ public class ProxyFragment extends BaseFragment {
                 (isAutoGroup(b.optString("name", "")) ? 1 : 0)
                         - (isAutoGroup(a.optString("name", "")) ? 1 : 0));
 
-        // 只有第一次进来才替用户展开第一个分组，之后一切听用户的
-        if (!seeded && !ordered.isEmpty()) {
-            expanded.add(ordered.get(0).optString("name", ""));
-            seeded = true;
-        }
+        // 分组一律默认折叠：一屏先看到所有「组名 + 当前节点 + 节点数」，
+        // 想换哪个再展开哪个。以前会自动展开第一个（排序后就是「自动选择」），
+        // 进来先被几十个节点铺满屏，反而不容易找到别的组
 
         for (int i = 0; i < ordered.size(); i++) {
             JSONObject g = ordered.get(i);

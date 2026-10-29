@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 二级页外壳：和 activity_main 的区别是「有返回、没有底部页签」。
-     设备清单、拦截配置这些从一级页点进来的页面，用户的心理模型是「进去一下再出来」 -->
+     设备清单、拦截配置这些从一级页点进来的页面，用户的心理模型是「进去一下再出来」。
+     注意 navigationIconTint：ic_back 是纯白的矢量图，不染色的白箭头在浅色底上
+     几乎看不见（之前就是这样）；tint 用 text_primary，深浅色主题都对。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -12,9 +14,9 @@
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="48dp"
-        android:alpha="0"
         android:background="@color/app_bg"
         app:navigationIcon="@drawable/ic_back"
+        app:navigationIconTint="@color/text_primary"
         app:titleCentered="true"
         app:titleTextColor="@color/text_primary" />
 

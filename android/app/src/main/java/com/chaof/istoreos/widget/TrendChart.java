@@ -136,6 +136,19 @@ public class TrendChart extends LineChart {
         });
     }
 
+    /**
+     * 放进深色的 hero 卡里用：网格线和刻度换成半透明浅色。
+     * 默认配色是按白底设计的，直接放到墨绿渐变上什么都看不见。
+     */
+    public void useOnHero() {
+        Context c = getContext();
+        int fg = Ui.color(c, R.color.hero_fg);
+        YAxis y = getAxisLeft();
+        y.setGridColor(Ui.alpha(fg, 0.16f));
+        y.setTextColor(Ui.alpha(fg, 0.55f));
+        setNoDataTextColor(Ui.alpha(fg, 0.55f));
+    }
+
     private LineDataSet series(Context c, int colorRes, boolean fill) {
         int base = Ui.color(c, colorRes);
         LineDataSet s = new LineDataSet(null, null);
