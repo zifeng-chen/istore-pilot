@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """生成 iStore Pilot 宣传图（高清）。
 
-为什么重写：上一版画布只有 1600x900，中文按 15~26px 渲染，
-发到大屏或放大看必然糊。这一版按 4K 原生尺寸绘制 ——
-所有字号直接以目标像素渲染，不靠放大，文字边缘是实的。
+为什么按 4K 原生绘制：1600x900 的设计稿缩放到大屏上中文会糊，
+这里所有字号直接以目标像素渲染，不靠放大，文字边缘是实的。
 
 素材：
-  docs/screenshots/promo/{overview,network,devices,proxy,settings}.png（真机 1080x2412）
+  docs/screenshots/promo/{overview,devices,apps,proxy,settings}.png（真机 1080x2412）
   ~/Desktop/蓝色路由系统管理图标.png                      （用户给的母版，只缩放不重绘）
 
-用法: python scripts/make_promo.py
+用法: python scripts/make_promo.py           # 只出亮色
+      python scripts/make_promo.py dark      # 需要时再出深色
 输出:
-  dist/promo_4k.png                 3840x2160
-  dist/promo_1080p.png              1920x1080
+  dist/promo_light_4k.png           3840x2160
+  dist/promo_light_1080p.png        1920x1080
 """
 import os
 import sys
@@ -119,6 +119,10 @@ def paste_icon(canvas, x, y, w, shadow=True):
 
 def paste_shot(canvas, name, x, top, width, radius=24, blur=22, alpha=132):
     src = Image.open(os.path.join(SHOT_DIR, name)).convert('RGB')
+    # 裁掉状态栏：三张截图不是同一秒拍的，时钟会差一两分钟，放大看就是「拼的」；
+    # 顺手也去掉电量、网速这些小图标，画面上只剩 App 自己
+    sw, sh = src.size
+    src = src.crop((0, int(108 * sw / 1080), sw, sh))
     sw, sh = src.size
     w, hh = P(width), P(int(width * sh / sw))
     shot = src.resize((w, hh), Image.LANCZOS)
@@ -177,15 +181,15 @@ def build(theme='dark', out_name='promo_4k.png'):
         dr.text((P(tx), P(y + 28)), desc, font=font(14.5, False), fill=t['sub'])
 
     # 不写具体数值：换到别人的环境就对不上了
-    feature(470, 1, '五个页签，一眼看全', '概览 · 网络 · 设备 · 代理 · 设置')
-    feature(556, 2, '全屋设备，在线离线分明', '实时速率、累计流量、一键禁网')
-    feature(642, 3, '宽带和局域网，总算看懂了', '拨号状态、DHCP 地址池、防火墙风险')
+    feature(470, 1, '四个页签，一眼看全', '概览 · 设备 · 代理 · 设置')
+    feature(556, 2, '谁在用网，怎么连的一列看清', '5G / 2.4G / 有线，实时速率与累计流量')
+    feature(642, 3, '流量花在哪个 App', '按应用汇总，点进去看连接与设备')
     feature(728, 4, '代理与拦截，点一下就换', '节点延迟实测，拦截率与日志可查')
 
     # ---------- 底部版本信息 ----------
     dr.line([(P(LX), P(806)), (P(LX + 430), P(806))], fill=(255, 255, 255, 26) if theme == 'dark'
             else (0, 0, 0, 22), width=max(1, int(1 * S)))
-    meta = ['v0.1.0', '5.3 MB', '免 Root', 'Android 8.0+']
+    meta = ['v0.1.3', '5.5 MB', '免 Root', 'Android 8.0+']
     x = LX
     mf = font(14)
     for i, item in enumerate(meta):
@@ -197,14 +201,15 @@ def build(theme='dark', out_name='promo_4k.png'):
     dr.text((P(LX), P(860)), '适配 iStoreOS 24.10 及以上', font=font(13.5, False), fill=t['dim'])
 
     # ---------- 三台手机：左低、中高（主视觉）、右低 ----------
-    # 主视觉换成「网络」页：本轮新增的页签，信息密度最高
+    # 只放四个主界面里的三个（概览 / 设备 / 代理）——
+    # 副页面（设备清单、应用流量、设备详情）不上面，那是点进去才看的东西
     side_w, main_w, gap = 280, 328, 20
     x_main = 628 + side_w + gap
     x_right = x_main + main_w + gap
     k = 1.0 if theme == 'dark' else 1.55      # 浅底上投影要更重，否则浮不起来
     paste_shot(canvas, 'devices.png', 628, 138, side_w, radius=22, blur=20, alpha=int(118 * k))
-    paste_shot(canvas, 'network.png', x_main, 62, main_w, radius=26, blur=26, alpha=int(150 * k))
-    paste_shot(canvas, 'overview.png', x_right, 138, side_w, radius=22, blur=20, alpha=int(118 * k))
+    paste_shot(canvas, 'overview.png', x_main, 62, main_w, radius=26, blur=26, alpha=int(150 * k))
+    paste_shot(canvas, 'proxy.png', x_right, 138, side_w, radius=22, blur=20, alpha=int(118 * k))
 
     os.makedirs(OUT_DIR, exist_ok=True)
     out = os.path.join(OUT_DIR, out_name)
@@ -217,14 +222,120 @@ def build(theme='dark', out_name='promo_4k.png'):
     print(f'{small}  1920x1080')
 
 
+# ---------------------------------------------------------------- 竖版单页
+
+#: 四张竖图，一个主界面一张。副页面（设备清单 / 应用流量 / 设备详情）不上，
+#: 那是点进去才有内容 —— 宣传图上放主界面，看的人一眼就知道这 App 长什么样
+CARDS = [
+    ('overview.png', 'promo-card-1-overview.png', '概览',
+     '一眼看清家里的网', '实时速率 · 系统负载 · 宽带状态'),
+    ('devices.png', 'promo-card-2-devices.png', '设备',
+     '谁在用网，怎么连的', '5G / 2.4G / 有线，一列看清'),
+    ('proxy.png', 'promo-card-3-proxy.png', '代理',
+     '换个节点，不用开电脑', 'OpenClash 与 Passwall 一个界面'),
+    ('settings.png', 'promo-card-4-settings.png', '设置',
+     '连接、备份、改密码', '内外网自动选路，改完即时生效'),
+]
+
+CW, CH = 1080, 1920
+CM = 96                                    # 左右留白
+INK = (15, 31, 25)
+INK_SOFT = (100, 118, 110)
+GREEN_DEEP = (0, 108, 80)
+
+
+def cfont(px: int, bold: bool = True):
+    """竖版按目标像素直接取字号，不经过 1600 基准的换算"""
+    for p in (BOLD if bold else REG):
+        if os.path.exists(p):
+            try:
+                return ImageFont.truetype(p, px)
+            except OSError:
+                continue
+    return ImageFont.load_default()
+
+
+def card_phone(name, width, radius=46, bezel=8, blur=32, alpha=54):
+    """截图 → 带窄边框和圆角的手机，附带柔和投影（含外扩留白）"""
+    src = Image.open(os.path.join(SHOT_DIR, name)).convert('RGB')
+    sw, sh = src.size
+    src = src.crop((0, int(108 * sw / 1080), sw, sh))   # 去状态栏，理由同 paste_shot
+    sw, sh = src.size
+    h = int(width * sh / sw)
+    body = src.resize((width, h), Image.LANCZOS).convert('RGBA')
+
+    mask = Image.new('L', (width, h), 0)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, width - 1, h - 1], radius, fill=255)
+    body.putalpha(mask)
+
+    fw, fh = width + bezel * 2, h + bezel * 2
+    frame = Image.new('RGBA', (fw, fh), (0, 0, 0, 0))
+    ImageDraw.Draw(frame).rounded_rectangle([0, 0, fw - 1, fh - 1],
+                                            radius + bezel, fill=(13, 26, 22, 255))
+    frame.paste(body, (bezel, bezel), body)
+
+    pad = blur * 2
+    canvas = Image.new('RGBA', (fw + pad * 2, fh + pad * 2), (0, 0, 0, 0))
+    shade = Image.new('RGBA', canvas.size, (0, 0, 0, 0))
+    ImageDraw.Draw(shade).rounded_rectangle(
+        [pad, pad + 20, pad + fw, pad + fh + 20], radius + bezel, fill=(10, 40, 30, alpha))
+    shade = shade.filter(ImageFilter.GaussianBlur(blur))
+    canvas = Image.alpha_composite(canvas, shade)
+    canvas.paste(frame, (pad, pad), frame)
+    return canvas
+
+
+def card(shot_name, out_name, tag, headline, sub):
+    # glow 只吃同模式的图（内部是 Image.composite），所以先做光斑再转 RGBA
+    canvas = gradient(CW, CH, (248, 252, 250), (224, 239, 233))
+    canvas = glow(canvas, 130, 250, 900, 0.10, GREEN)
+    canvas = glow(canvas, 980, 1560, 1000, 0.07, GREEN)
+    canvas = canvas.convert('RGBA')
+    d = ImageDraw.Draw(canvas)
+
+    # 品牌行：绿点 + 名字（没有竖排 logo 素材，别硬拼一个假图标）
+    d.ellipse([CM, 104, CM + 26, 130], fill=GREEN)
+    d.text((CM + 42, 92), 'iStore Pilot', font=cfont(28), fill=INK)
+
+    d.text((CM, 190), tag, font=cfont(30, False), fill=GREEN_DEEP)
+    d.text((CM, 232), headline, font=cfont(74), fill=INK)
+    d.text((CM, 358), sub, font=cfont(30, False), fill=INK_SOFT)
+
+    ph = card_phone(shot_name, 570)
+    canvas.alpha_composite(ph, ((CW - ph.width) // 2, 432))
+
+    d.text((CM, 1852), 'iStoreOS 原生客户端', font=cfont(24, False), fill=INK_SOFT)
+    tail = 'Android · iOS · HarmonyOS'
+    d.text((CW - CM - d.textlength(tail, font=cfont(24, False)), 1852),
+           tail, font=cfont(24, False), fill=INK_SOFT)
+
+    out = os.path.join(OUT_DIR, out_name)
+    canvas.convert('RGB').save(out, optimize=True)
+    print(f'{out}  {CW}x{CH}')
+
+
+def build_cards():
+    missing = [c[0] for c in CARDS if not os.path.exists(os.path.join(SHOT_DIR, c[0]))]
+    if missing:
+        print('缺少截图:', missing)
+        sys.exit(1)
+    for args in CARDS:
+        card(*args)
+
+
 if __name__ == '__main__':
     if not os.path.exists(ICON_MASTER):
         print('缺少图标母版:', ICON_MASTER)
         sys.exit(1)
-    missing = [n for n in ('overview.png', 'network.png', 'devices.png')
-               if not os.path.exists(os.path.join(SHOT_DIR, n))]
+    need = {'overview.png', 'devices.png', 'proxy.png'} | {c[0] for c in CARDS}
+    missing = sorted(n for n in need if not os.path.exists(os.path.join(SHOT_DIR, n)))
     if missing:
         print('缺少截图:', missing)
         sys.exit(1)
-    build('dark', 'promo_4k.png')
-    build('light', 'promo_light_4k.png')
+    modes = sys.argv[1:] or ['light', 'cards']
+    if 'light' in modes:
+        build('light', 'promo_light_4k.png')
+    if 'dark' in modes:
+        build('dark', 'promo_4k.png')
+    if 'cards' in modes:
+        build_cards()

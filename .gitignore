@@ -54,3 +54,7 @@ docs/screenshots/*
 # ================= WorkBuddy 本地数据 =================
 # 含项目笔记与运维记录，不入库
 .workbuddy/
+
+# 本地调试抓包/连接表，含真实地址与 MAC，不入库
+.clash.json
+.ct.txt

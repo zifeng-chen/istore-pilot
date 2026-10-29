@@ -28,6 +28,13 @@ JAVA_OUT = os.path.join(ROOT, "android", "app", "src", "main", "java",
 
 # (后端应用名, 搜索词, 区份, 资源名, 结果名必须包含的关键词)
 ICONS = [
+    # 品牌方/系统类：原来是拿「智慧生活」「腾讯视频」凑的，图标不对。
+    # 华为 / 荣耀没有品牌 logo 的官方 App（App Store 上只有商城、运动健康
+    # 这些子品牌），抓回来反而更不像，所以不做图标 —— 交给 AppIcon 用
+    # 品牌色块 + 首字，比挂个「华为运动健康」的橙色心形强
+    ("腾讯", "腾讯会议", "cn", "tencent", "腾讯"),
+    ("X", "X", "us", "x", "X"),
+    ("支付宝", "支付宝", "cn", "alipay", "支付宝"),
     ("番茄小说", "番茄小说", "cn", "fanqie", "番茄"),
     ("腾讯视频", "腾讯视频", "cn", "tencent_video", "腾讯视频"),
     ("爱奇艺", "爱奇艺", "cn", "iqiyi", "爱奇艺"),
@@ -197,7 +204,7 @@ def main() -> int:
               "    public static int res(String name) {",
               "        Integer id = name == null ? null : MAP.get(name);",
               "        return id == null ? 0 : id;", "    }", "}", ""]
-    with open(JAVA_OUT, "w", encoding="utf-8") as fh:
+    with open(JAVA_OUT, "w", encoding="utf-8", newline="\n") as fh:
         fh.write("\n".join(lines))
 
     print(f"\n成功 {len(mapping)} 个，映射写入 {JAVA_OUT}")

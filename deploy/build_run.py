@@ -74,6 +74,7 @@ HEADER = r'''#!/bin/sh
 APP_NAME="iStore Pilot"
 PKG_VERSION="@VER@"
 PKG_REVISION="@REV@"
+PKG_ARCH="@ARCH@"
 PAYLOAD_OFFSET=__OFFSET__
 PAYLOAD_LEN=__LEN__
 
@@ -100,7 +101,7 @@ cleanup() { [ -n "$CFG_BAK" ] && rm -f "$CFG_BAK"; }
 usage() {
 	cat <<EOF
 
-  $APP_NAME $PKG_VERSION-$PKG_REVISION  自解压安装包
+  $APP_NAME $PKG_VERSION-$PKG_REVISION  自解压安装包（$PKG_ARCH）
 
   用法：sh $SELF [选项]
 
@@ -181,6 +182,30 @@ check_env() {
 	fi
 }
 
+m_arch() {
+	uname -m 2>/dev/null | tr 'A-Z' 'a-z'
+}
+
+# 载荷是纯 Python，跨架构本来就能跑；这里只做「对号」提示，
+# 免得把 x86_64 版发给 ARM 路由器的人时以为装错了
+arch_match() {
+	[ "$PKG_ARCH" = "all" ] && return 0
+	case "$PKG_ARCH:$(m_arch)" in
+		x86_64:x86_64|x86_64:amd64|arm64:aarch64|arm64:arm64|armv7:armv7l|armv7:armv7)
+			return 0 ;;
+	esac
+	return 1
+}
+
+arch_note() {
+	if arch_match; then
+		ok "架构匹配：$(m_arch)（本包 $PKG_ARCH 版）"
+	else
+		warn "本包是 $PKG_ARCH 版，当前设备是 $(m_arch)"
+		info "载荷是纯 Python，仍可正常安装；只是包名与设备不符，建议换对应架构的包"
+	fi
+}
+
 lan_ip() {
 	local ip
 	ip=$(uci -q get network.lan.ipaddr 2>/dev/null)
@@ -236,6 +261,7 @@ do_check() {
 	check_env
 	ok "sh / gzip / tar 可用"
 	ok "python3 在 $PY（$("$PY" -V 2>&1)）"
+	arch_note
 
 	local size expect
 	size=$(wc -c < "$SELF" 2>/dev/null | tr -d ' ')
@@ -271,7 +297,8 @@ do_install() {
 	need_root
 	check_env
 
-	printf '\n  %s %s-%s 安装\n\n' "$APP_NAME" "$PKG_VERSION" "$PKG_REVISION"
+	printf '\n  %s %s-%s 安装（%s）\n\n' "$APP_NAME" "$PKG_VERSION" "$PKG_REVISION" "$PKG_ARCH"
+	arch_note
 
 	# 0) 先只往 /tmp 解一遍验货。损坏的包必须在这一步就被拦住，
 	#    绝不能等到「删完旧文件」才失败——那会把服务留在半死状态。
@@ -472,7 +499,38 @@ def manifest_of(stage: str) -> list[str]:
     return sorted(out)
 
 
-def build(with_apk: bool) -> int:
+#: 支持的目标架构。载荷是纯 Python，写成哪个都能装，这里只影响包名与自检提示
+ARCHS = ("x86_64", "arm64", "armv7", "all")
+
+
+def render_header(version: str, revision: int, arch: str, payload_len: int) -> bytes:
+    """把 @VER@/@REV@/@ARCH@/__OFFSET__/__LEN__ 填好，返回头部字节。
+
+    偏移量要写进头部，而头部长度又取决于偏移量的位数 —— 迭代到稳定。
+    用纯数字（不加前导零）：shell 里 0 开头会被当成八进制，含 8/9 还会直接报错。
+    """
+    off = 0
+    for _ in range(8):
+        text = (HEADER
+                .replace("@VER@", version)
+                .replace("@REV@", str(revision))
+                .replace("@ARCH@", arch)
+                .replace("__OFFSET__", str(off))
+                .replace("__LEN__", str(payload_len)))
+        new = len(text.encode("utf-8"))
+        if new == off:
+            break
+        off = new
+    else:
+        raise RuntimeError("头部偏移量迭代未收敛")
+
+    blob = text.encode("utf-8")
+    if len(blob) != off:
+        raise RuntimeError("头部长度与记录的偏移量不一致")
+    return blob
+
+
+def build(archs: tuple[str, ...], with_apk: bool) -> int:
     bipk = load_build_ipk()
     ver = f"{bipk.version()}-{bipk.revision()}"
 
@@ -493,44 +551,26 @@ def build(with_apk: bool) -> int:
         with open(man, "w", encoding="utf-8", newline="\n") as fh:
             fh.write("\n".join(files + ["usr/lib/istore-agent/MANIFEST"]) + "\n")
 
+        # 载荷只打一次，四个架构共用；不同的只有头部里的架构字串
         payload = bipk.tar_gz(stage)
-
-        # 偏移量要写进头部，而头部长度又取决于偏移量的位数 —— 迭代到稳定。
-        # 用纯数字（不加前导零）：shell 里 0 开头的常量会被当成八进制，
-        # 0000001234 这种值算出来是错的，还会因为含 8/9 直接报错。
-        off = 0
-        for _ in range(8):
-            text = (HEADER
-                    .replace("@VER@", bipk.version())
-                    .replace("@REV@", str(bipk.revision()))
-                    .replace("__OFFSET__", str(off))
-                    .replace("__LEN__", str(len(payload))))
-            new = len(text.encode("utf-8"))
-            if new == off:
-                break
-            off = new
-        else:
-            raise RuntimeError("头部偏移量迭代未收敛")
-
-        blob = text.encode("utf-8") + payload
-        if len(text.encode("utf-8")) != off:
-            raise RuntimeError("头部长度与记录的偏移量不一致")
-
         os.makedirs(OUT_DIR, exist_ok=True)
-        out = os.path.join(OUT_DIR, f"istore-pilot_{ver}.run")
-        with open(out, "wb") as fh:
-            fh.write(blob)
-        if os.name == "posix":
-            os.chmod(out, 0o755)
 
-        total = len(files) + 1
-        print(f"\n产物：{out}")
-        print(f"  文件 {total} 个，安装器头部 {off} 字节，载荷 {len(payload) / 1048576:.2f} MB")
-        print(f"  整包 {len(blob) / 1048576:.2f} MB"
+        print(f"\n  {ver}  载荷 {len(payload) / 1048576:.2f} MB"
               f"{'（含 APK）' if with_apk else '（不含 APK）'}")
-        print("\n  安装：把文件传到路由器，执行")
-        print(f"        sh {os.path.basename(out)} --check    # 先看环境")
-        print(f"        sh {os.path.basename(out)}            # 再装")
+        for arch in archs:
+            head = render_header(bipk.version(), bipk.revision(), arch, len(payload))
+            suffix = "" if arch == "all" else "_" + arch
+            out = os.path.join(OUT_DIR, f"istore-pilot_{ver}{suffix}.run")
+            with open(out, "wb") as fh:
+                fh.write(head + payload)
+            if os.name == "posix":
+                os.chmod(out, 0o755)
+            print(f"    {os.path.basename(out):<40} "
+                  f"{os.path.getsize(out) / 1048576:5.2f} MB  头部 {len(head)} B")
+
+        print("\n  装法：把对应架构的包传到路由器，执行")
+        print("        sh <包名> --check    # 先看环境与架构")
+        print("        sh <包名>            # 再装")
         return 0
     finally:
         import shutil
@@ -538,7 +578,19 @@ def build(with_apk: bool) -> int:
 
 
 def main() -> int:
-    return build("--no-apk" not in sys.argv)
+    args = sys.argv[1:]
+    with_apk = "--no-apk" not in args
+
+    pick = [a for a in args if a.startswith("--arch=")]
+    if pick:
+        want = pick[0].split("=", 1)[1]
+        if want not in ARCHS:
+            print(f"未知架构 {want}，可选：{', '.join(ARCHS)}")
+            return 2
+        archs: tuple[str, ...] = (want,)
+    else:
+        archs = ARCHS
+    return build(archs, with_apk)
 
 
 if __name__ == "__main__":

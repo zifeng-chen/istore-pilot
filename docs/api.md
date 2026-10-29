@@ -188,6 +188,46 @@ Agent 就跑在这台机器上、还是 root，直接替它登一次，**口令�
 在线判定四路交叉（邻居表 / 流量 / `used` / 主动 ping），详见
 [architecture.md](architecture.md#在线判定)。
 
+### IPv6 与接入方式
+
+**IPv4 / IPv6 都要算。** 设备的 `ips` 字段给出它的全部地址，连接明细、域名归属、
+`apps` 归类都按这组地址匹配。速率与用量的方向判定用 `br-lan` 前缀
+（`ip -j addr show dev br-lan`）而不是「10./172.16./192.168.」—— IPv6 下设备拿的是
+运营商全局地址，字面上和公网地址一样，只认 IPv4 私网会把走 IPv6 的整段流量丢掉。
+
+每台设备还有 `access`：
+
+```json
+"access": { "type": "wifi|wired|unknown",
+            "band": "2.4G|5G",          // 只有无线有
+            "source": "ap|guess",
+            "conf": "high|medium|low",
+            "reason": "AP 报表 · wlan4",
+            "ap": "192.168.100.165" }
+```
+
+`source=ap + conf=high` 是**事实**：Agent 登录 AP 读它的接入设备表。其余都是推断，
+界面必须标「(推测)」。
+
+**驱动是可插拔的**（`agent/ap.py`）：`ap.driver` 选驱动，目前只有 `zte`
+（中兴 ZXSLC 系列，`agent/zte.py`）。没配、驱动不存在、口令错、设备换了牌子，
+都返回空表 + `disabled`（带 `reason`），上层自动退回按类型推断 —— 功能降级，
+不会坏，也不会把「有线」标错。
+
+AP 侧的限制：
+
+- 一个 AP 只允许一个管理会话。Agent 读完立刻 `logout`，不占着；别人开着后台时
+  先让给他，被占超过 90 秒且 15 分钟内没抢过才抢占一次
+- 硬失败（口令错、不是这个牌子、地址不通）连撞三次就退到 30 分钟一轮，
+  只有「被占 / 会话过期」这种自己会好的才 30 秒重试 —— 别对着别人的路由器狂敲
+- `hosts` 可以配多台（Mesh 主 + 从）。**从节点的无线客户端在主节点表里会以
+  `eth1` 出现**，所以两台都要读：任何一台说无线就是无线
+- 从节点读不到时，主节点报的「有线」不可信，退回按设备类型推断（`conf=medium`）；
+  推断不出来的标 `unknown`，不硬猜
+
+`/devices/detail` 的 `apps[]` 每项带 `up_bps` / `down_bps`（上一采样窗口的速率，
+闲着的应用为 0）。累计字节几秒才涨一点，只给 `total` 会让人以为统计坏了。
+
 ## 代理
 
 OpenClash 与 Passwall 双后端，`backend` 参数可选，不传则按当前运行的那个。
@@ -231,6 +271,21 @@ OpenClash 专用接口，保留兼容。新代码请用 `/proxy/*`。
 | POST | `/adblock/refresh` | 手动刷新规则（AGH 本身每 24 小时自动一次） |
 | POST | `/adblock/rules` | `{enabled, interval, ...}` 改规则表开关与自动更新间隔 |
 | POST | `/adblock/probe` | 探测 AGH 可达性 |
+
+### 没装 AdGuard Home 的情况
+
+`/adblock` 永远带 `installed`（二进制或 `/etc/config/AdGuardHome` 任一存在即为真）
+和 `install`：
+
+```json
+{ "installed": false,
+  "install": { "package": "luci-app-adguardhome",
+               "luci_path": "/cgi-bin/luci/admin/system/package-manager" } }
+```
+
+动作接口在未安装时统一返回 `{"ok": false, "installed": false, "error": "...",
+"hint": "...", "install": {...}}`，不会抛 500。客户端只认 `ok` / `installed` 即可，
+`luci_path` 用内置 WebView 打开就是软件包页（Agent 会顺带换好 LuCI 免密票据）。
 
 ## 配置备份
 

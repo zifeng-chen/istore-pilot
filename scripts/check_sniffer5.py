@@ -6,7 +6,23 @@ import sys
 import time
 from collections import Counter
 
-SECRET = "5PLiToz9"
+CLASH_SECRET = ""
+
+def _secret() -> str:
+    """口令不写进仓库：优先环境变量，其次路由器上的 Agent 配置。"""
+    import os
+    if CLASH_SECRET:
+        return CLASH_SECRET
+    env = os.environ.get("CLASH_SECRET")
+    if env:
+        return env
+    try:
+        with open("/etc/istore-agent/config.json", encoding="utf-8") as fh:
+            return json.load(fh).get("clash", {}).get("secret", "")
+    except OSError:
+        return ""
+
+SECRET = _secret()
 DURATION = int(sys.argv[1]) if len(sys.argv) > 1 else 90
 
 

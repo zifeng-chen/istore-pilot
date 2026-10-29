@@ -7,8 +7,42 @@ local port    = uci:get("istore-agent", "main", "port") or "8443"
 local bind    = uci:get("istore-agent", "main", "bind") or "192.168.100.1"
 local enabled = uci:get_bool("istore-agent", "main", "enabled")
 
--- 进程在不在：按启动命令匹配，不能只看 python3，路由器上可能有别的 python 进程
-local running = (sys.call("pgrep -f 'istore-agent/run.py' >/dev/null 2>&1") == 0)
+-- 进程怎么找：不能再用 `pgrep -f 'istore-agent/run.py'`。
+-- 这个模式会匹配到**执行 pgrep 的那个 shell**（它的命令行里就有这串字），
+-- pid 回绕之后 shell 的 pid 往往比 Agent 还小，`head -1` 就挑到它了 ——
+-- 那个进程刚起来 0 秒，算出来的时长是负数，页面于是永远显示「—」。
+-- 改成直接读 /proc/<pid>/cmdline，要求「argv[1] 是 python、argv[2] 正好是
+-- 那个 run.py 路径」，精确匹配，躲开自己人。
+local function agent_pid()
+	local found
+	local ok, iter = pcall(fs.dir, "/proc")
+	if not ok or not iter then return nil end
+	for name in iter do
+		local pid = tonumber(name:match("^(%d+)$"))
+		if pid then
+			local raw = fs.readfile("/proc/" .. pid .. "/cmdline")
+			if raw and #raw > 0 then
+				local args = {}
+				for a in raw:gmatch("([^%z]+)") do args[#args + 1] = a end
+				-- 参数里可能夹着 -u、-O 之类，所以不是看第 2 个，而是看有没有
+				-- **正好等于那个脚本路径**的参数；`sh -c "...run.py"` 那种整串
+				-- 带空格的不会被匹配上
+				if args[1] and args[1]:match("python") then
+					for _, a in ipairs(args) do
+						if a:match("^/[^%s]+/istore%-agent/run%.py$") then
+							if not found or pid < found then found = pid end
+							break
+						end
+					end
+				end
+			end
+		end
+	end
+	return found
+end
+
+local agent = agent_pid()
+local running = (agent ~= nil)
 
 -- 端口通不通：这一步才是真的验证，进程活着但端口没起来也照样连不上
 local listening = (sys.call("netstat -ln 2>/dev/null | grep -q ':" .. port .. " '") == 0)
@@ -31,11 +65,12 @@ local function trim(s)
 	return (tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
--- starttime 的单位是 USER_HZ，x86_64 上是 100，别的地方可能不同，能问就问
+-- starttime 的单位是 USER_HZ。能问就问 getconf，但这台固件**根本没装 getconf**，
+-- 只能按常见值挨个验算：算出来的时长必须落在 0..系统运行时长 之间，不对就换下一个
 local function clk_tck()
 	local v = tonumber(trim(sys.exec("getconf CLK_TCK 2>/dev/null")))
 	if v and v > 0 then return v end
-	return 100
+	return nil
 end
 
 local function proc_age(pid)
@@ -51,29 +86,39 @@ local function proc_age(pid)
 	-- rest 是从第 3 个字段（state）开始的，所以第 22 个字段 starttime → fields[20]
 	local ticks = tonumber(fields[20])
 	if not ticks then return nil end
-	local up = math.floor(sys.uptime() - ticks / clk_tck())
-	if up <= 0 or up > 315360000 then return nil end
-	return up
+	local boot = sys.uptime()
+	if not boot or boot <= 0 then return nil end
+	local hz = clk_tck()
+	local candidates = hz and { hz } or { 100, 250, 1000 }
+	for _, h in ipairs(candidates) do
+		local up = math.floor(boot - ticks / h)
+		if up > 0 and up <= boot then return up end
+	end
+	return nil
 end
 
+-- 带上秒：这一格是要「一秒一跳」的，只到分钟看着像定住了
 local function fmt_span(sec)
 	if not sec then return nil end
 	local d  = math.floor(sec / 86400)
 	local h  = math.floor((sec % 86400) / 3600)
 	local mi = math.floor((sec % 3600) / 60)
-	if d > 0 then return string.format("%d 天 %d 小时", d, h) end
-	if h > 0 then return string.format("%d 小时 %d 分", h, mi) end
-	if mi > 0 then return string.format("%d 分钟", mi) end
-	return string.format("%d 秒", sec % 60)
+	local ss = sec % 60
+	local hms = string.format("%02d:%02d:%02d", h, mi, ss)
+	if d > 0 then return string.format("%d 天 %s", d, hms) end
+	return hms
 end
 
-local uptime = "—"
-if running then
-	local pid = trim(sys.exec("pgrep -f 'istore-agent/run.py' | head -1"))
-	if pid ~= "" then
-		uptime = fmt_span(proc_age(pid)) or "—"
-	end
+local uptime, uptime_sec = "—", nil
+if agent then
+	uptime_sec = proc_age(agent)
+	uptime = fmt_span(uptime_sec) or "—"
 end
+-- 秒数单独算成一个不含引号的字符串再输出。
+-- **注释里绝对不能出现模板定界符**（小于号 + 百分号/百分号 + 大于号）：
+-- 解析器不认注释，会在那里就把代码块截断，后面的 HTML 全被当成 Lua 吞掉，
+-- 页面表现是整块内容凭空消失，而且不报错 —— 排查了很久。
+local uptime_attr = uptime_sec and tostring(uptime_sec) or ""
 
 -- ---------------------------------------------------------------- 初始密码
 local initial_pw = nil
@@ -167,7 +212,7 @@ body.dark .ia-dlg, [data-darkmode="true"] .ia-dlg { background:#1b1d21; color:#e
 	</div>
 	<div class="ia-box">
 		<div class="k">运行时长</div>
-		<div class="v" style="font-size:15px"><%= uptime %></div>
+		<div class="v" style="font-size:15px" id="ia-up" data-sec="<%= uptime_attr %>"><%= uptime %></div>
 	</div>
 	<div class="ia-box">
 		<div class="k">开机自启</div>
@@ -245,6 +290,23 @@ body.dark .ia-dlg, [data-darkmode="true"] .ia-dlg { background:#1b1d21; color:#e
 			if (ev.target === mask) mask.classList.remove('on');
 		};
 	}
+	// 运行时长按秒走：页面是服务端渲染的，不自己走秒就跟死了没区别
+	var up = document.getElementById('ia-up');
+	if (up && up.dataset.sec) {
+		var sec = parseInt(up.dataset.sec, 10);
+		if (!isNaN(sec)) {
+			var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
+			var tick = function () {
+				sec++;
+				var d = Math.floor(sec / 86400);
+				var hms = pad(Math.floor((sec % 86400) / 3600)) + ':'
+					+ pad(Math.floor((sec % 3600) / 60)) + ':' + pad(sec % 60);
+				up.textContent = d > 0 ? (d + ' 天 ' + hms) : hms;
+			};
+			setInterval(tick, 1000);
+		}
+	}
+
 	var rst = document.getElementById('ia-restart');
 	if (rst) {
 		rst.onclick = function () {
