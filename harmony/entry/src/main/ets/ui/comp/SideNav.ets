@@ -1,5 +1,6 @@
 import { Ico } from './Icons';
 import { Pal, T } from '../Theme';
+import { LineIcon } from '../Comp';
 
 interface RailItem {
   label: string;
@@ -42,14 +43,12 @@ export struct SideNav {
               .height(30)
               .borderRadius(9)
               .backgroundColor($r('app.color.accent_soft2'));
-            Path()
-              .commands('M7 9 L11.5 5.5 M7 9 L11.5 12.5 M7 9 L7 9.1')
-              .width(22)
-              .height(22)
-              .fill(Color.Transparent)
-              .stroke(Pal.primary())
-              .strokeWidth(1.8)
-              .strokeLineCap(LineCapStyle.Round);
+            LineIcon({
+              path: 'M7 9 L11.5 5.5 M7 9 L11.5 12.5 M7 9 L7 9.1',
+              color: Pal.primary(),
+              side: 22,
+              lineWidth: 1.8
+            })
           }
           .width(30)
           .height(30);
@@ -105,16 +104,13 @@ export struct SideNav {
         .borderRadius(2)
         .backgroundColor(Pal.primary());
 
-      Path()
-        .commands(item.path)
-        .width(21)
-        .height(21)
-        .fill(Color.Transparent)
-        .stroke(this.current === i ? Pal.primary() : Pal.iconOff())
-        .strokeWidth(this.current === i ? 1.85 : 1.6)
-        .strokeLineCap(LineCapStyle.Round)
-        .strokeLineJoin(LineJoinStyle.Round)
-        .margin({ left: 12 });
+      LineIcon({
+        path: item.path,
+        color: this.current === i ? Pal.primary() : Pal.iconOff(),
+        side: 21,
+        lineWidth: this.current === i ? 1.85 : 1.6
+      })
+        .margin({ left: 12 })
 
       Column() {
         Text(item.label)

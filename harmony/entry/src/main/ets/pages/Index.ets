@@ -126,14 +126,14 @@ struct Index {
           .alignItems(VerticalAlign.Top);
         } else {
           Stack({ alignContent: Alignment.Bottom }) {
-            this.pages(T.NAV_H + this.safeBottom);
+            // 底部要多让 16：导航条上下各留 4 / 12 的边（和安卓 navhost 一致），
+            // 只让 NAV_H 的话最后一屏内容会被胶囊压住
+            this.pages(T.NAV_H + 16 + this.safeBottom);
 
-            Column() {
-              NavBar({ current: $current })
-            }
-            .width('100%')
-            .padding({ bottom: this.safeBottom })
-            .backgroundColor($r('app.color.surface_glass'));
+            NavBar({ current: $current })
+              .width('100%')
+              .padding({ left: 14, right: 14 })
+              .margin({ top: 4, bottom: this.safeBottom + 12 });
           }
           .width('100%')
           .height('100%');

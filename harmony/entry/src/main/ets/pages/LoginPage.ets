@@ -4,6 +4,7 @@ import { Api, ApiResult } from '../api/Api';
 import { Session } from '../core/Session';
 import { Snap } from '../core/Snap';
 import { Pal, T } from '../ui/Theme';
+import { LineIcon } from '../ui/Comp';
 import { Ico } from '../ui/comp/Icons';
 
 const DEFAULT_BASE: string = 'http://192.168.100.1:8443';
@@ -87,15 +88,12 @@ struct LoginPage {
         // 品牌区
         Column() {
           Stack() {
-            Path()
-              .commands(Ico.SHIELD)
-              .width(46)
-              .height(46)
-              .fill(Color.Transparent)
-              .stroke(Pal.primary())
-              .strokeWidth(2)
-              .strokeLineCap(LineCapStyle.Round)
-              .strokeLineJoin(LineJoinStyle.Round);
+            LineIcon({
+              path: Ico.SHIELD,
+              color: Pal.primary(),
+              side: 46,
+              lineWidth: 2
+            })
           }
           .width(76)
           .height(76)

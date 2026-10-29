@@ -417,7 +417,7 @@ export struct OverviewPage {
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .width('100%')
-          .margin({ top: 6, bottom: 14 });
+          .margin({ bottom: 10 });
 
         if (this.rail()) {
           Row({ space: Bp.gap(this.winW) }) {

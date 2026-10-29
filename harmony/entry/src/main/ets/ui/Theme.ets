@@ -30,7 +30,7 @@ export class T {
   static readonly F_SUB: number = 12.5;
   static readonly F_TINY: number = 11.5;
 
-  static readonly NAV_H: number = 64;    // 底部导航栏高度
+  static readonly NAV_H: number = 62;    // 底部导航栏高度（与安卓 NavBar 一致）
 }
 
 /**

@@ -3,7 +3,7 @@ import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
 import { Bp } from '../Breakpoint';
 import { Pal, T } from '../Theme';
-import { Card, CardHeader, CardTitle, Comp, GroupBox, Hairline, Pill } from '../Comp';
+import { Card, CardHeader, CardTitle, Comp, GroupBox, Hairline, LineIcon, Pill } from '../Comp';
 import { Glyph, Ico } from '../comp/Icons';
 
 interface Backend {
@@ -442,15 +442,13 @@ export struct ProxyPage {
               Text(g.members.length + ' 个')
                 .fontSize(T.F_TINY)
                 .fontColor($r('app.color.text_tertiary'));
-              Path()
-                .commands(Ico.CHEVRON)
-                .width(16)
-                .height(16)
-                .fill(Color.Transparent)
-                .stroke(Pal.textTertiary())
-                .strokeWidth(1.6)
-                .strokeLineCap(LineCapStyle.Round)
-                .rotate({ angle: this.expanded === g.name ? 90 : 0 });
+              LineIcon({
+                path: Ico.CHEVRON,
+                color: Pal.textTertiary(),
+                side: 16,
+                lineWidth: 1.6,
+                spin: this.expanded === g.name ? 90 : 0
+              })
             }
             .width('100%')
             .padding({ left: 16, right: 14, top: 12, bottom: 12 })

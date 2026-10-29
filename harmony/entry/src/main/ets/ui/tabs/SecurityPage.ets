@@ -5,7 +5,7 @@ import { J } from '../../core/Json';
 import { Fmt } from '../../util/Fmt';
 import { Pal, T } from '../Theme';
 import { Bp } from '../Breakpoint';
-import { Card, CardHeader, CardTitle, Comp, GlyphIcon, Hairline, Pill } from '../Comp';
+import { Card, CardHeader, CardTitle, Comp, GlyphIcon, Hairline, LineIcon, Pill } from '../Comp';
 import { Glyph, Ico } from '../comp/Icons';
 import { AppIcon } from '../comp/AppIcon';
 import { DevicesPage } from './DevicesPage';
@@ -285,15 +285,13 @@ export struct SecurityPage {
   backBar(title: string) {
     Row() {
       Row() {
-        Path()
-          .commands(Ico.CHEVRON)
-          .width(18)
-          .height(18)
-          .fill(Color.Transparent)
-          .stroke(Pal.textPrimary())
-          .strokeWidth(1.9)
-          .strokeLineCap(LineCapStyle.Round)
-          .rotate({ angle: 180 });
+        LineIcon({
+          path: Ico.CHEVRON,
+          color: Pal.textPrimary(),
+          side: 18,
+          lineWidth: 1.9,
+          spin: 180
+        })
         Text('返回')
           .fontSize(T.F_BODY)
           .fontColor($r('app.color.primary'))
@@ -453,14 +451,7 @@ export struct SecurityPage {
       .alignItems(HorizontalAlign.Start)
       .layoutWeight(1);
 
-      Path()
-        .commands(Ico.CHEVRON)
-        .width(16)
-        .height(16)
-        .fill(Color.Transparent)
-        .stroke(Pal.textTertiary())
-        .strokeWidth(1.6)
-        .strokeLineCap(LineCapStyle.Round);
+      LineIcon({ path: Ico.CHEVRON, color: Pal.textTertiary(), side: 16, lineWidth: 1.6 })
     }
     .width('100%')
     .padding({ top: 11, bottom: 11 })
@@ -516,9 +507,14 @@ export struct SecurityPage {
         title: '应用流量',
         sub: (this.appDays > 1 ? '近 ' + this.appDays + ' 天 · ' : '') + '共 ' + Fmt.bytes(this.appTotalBytes)
       }) {
-        Text('全部 ' + this.appRows.length + ' 个 ›')
-          .fontSize(T.F_TINY)
-          .fontColor($r('app.color.primary'));
+        // 不用 Text('›')：这个字符依赖系统字体，换机型可能变方框，走路径图标
+        Row({ space: 2 }) {
+          Text('全部 ' + this.appRows.length + ' 个')
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.primary'));
+          LineIcon({ path: Ico.CHEVRON, color: Pal.primary(), side: 12, lineWidth: 1.6 });
+        }
+        .alignItems(VerticalAlign.Center);
       }
 
       Hairline({ indent: 0 });

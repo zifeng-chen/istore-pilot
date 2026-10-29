@@ -102,6 +102,40 @@ export struct Kv {
   }
 }
 
+/**
+ * 22×22 设计坐标的线条图标（页签、返回箭头、列表行尾箭头都走它）。
+ *
+ * **必须包一层 Shape + viewPort**：裸 Path 不设 viewPort 时，坐标会被当成
+ * 一个默认大小（约 100 单位）的画布再缩到组件尺寸 —— 22 格的图标最后只剩
+ * 一个 4~5vp 的小点，底部导航就是这么"消失"的。
+ */
+@Component
+export struct LineIcon {
+  @Prop path: string = '';
+  @Prop color: string = '';
+  /** 组件边长（vp） */
+  @Prop side: number = 22;
+  @Prop lineWidth: number = 1.7;
+  /** 需要旋转的箭头：90 / 180 */
+  @Prop spin: number = 0;
+
+  build() {
+    Shape() {
+      Path()
+        .commands(this.path)
+        .fill(Color.Transparent)
+        .stroke(this.color)
+        .strokeWidth(this.lineWidth)
+        .strokeLineCap(LineCapStyle.Round)
+        .strokeLineJoin(LineJoinStyle.Round);
+    }
+    .viewPort({ x: 0, y: 0, width: 22, height: 22 })
+    .width(this.side)
+    .height(this.side)
+    .rotate({ angle: this.spin });
+  }
+}
+
 /** 小号彩色标签，比如「运行中」「已接管」 */
 @Component
 export struct Pill {

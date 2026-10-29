@@ -8,7 +8,7 @@ import { Fmt } from '../../util/Fmt';
 import { Appearance } from '../Appearance';
 import { Bp } from '../Breakpoint';
 import { Pal, T } from '../Theme';
-import { CardTitle, GlyphIcon, Note, RowCard, SettingRow } from '../Comp';
+import { CardTitle, GlyphIcon, LineIcon, Note, RowCard, SettingRow } from '../Comp';
 import { Glyph, Ico } from '../comp/Icons';
 import { BackupsPage } from './BackupsPage';
 
@@ -195,6 +195,15 @@ export struct SettingsPage {
       Stack({ alignContent: Alignment.Bottom }) {
       Scroll() {
         Column() {
+          // 安卓四个页签都有大标题（BaseFragment 的 title()），这里原来没有，
+          // 进去直接是一张绿卡，和另外三页不是一套
+          Text('设置')
+            .fontSize(T.F_TITLE)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.text_primary'))
+            .width('100%')
+            .margin({ bottom: 10 });
+
           if (this.rail()) {
             // 平板：左「我是谁 / 连到哪」，右「怎么用 / 怎么改」
             Row({ space: Bp.gap(this.winW) }) {
@@ -274,15 +283,13 @@ export struct SettingsPage {
   backBar(title: string) {
     Row() {
       Row() {
-        Path()
-          .commands(Ico.CHEVRON)
-          .width(18)
-          .height(18)
-          .fill(Color.Transparent)
-          .stroke(Pal.textPrimary())
-          .strokeWidth(1.9)
-          .strokeLineCap(LineCapStyle.Round)
-          .rotate({ angle: 180 });
+        LineIcon({
+          path: Ico.CHEVRON,
+          color: Pal.textPrimary(),
+          side: 18,
+          lineWidth: 1.9,
+          spin: 180
+        })
         Text('返回')
           .fontSize(T.F_BODY)
           .fontColor($r('app.color.primary'))

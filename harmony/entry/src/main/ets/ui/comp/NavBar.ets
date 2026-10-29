@@ -1,5 +1,6 @@
 import { Ico } from './Icons';
 import { Pal, T } from '../Theme';
+import { LineIcon } from '../Comp';
 
 interface NavItem {
   label: string;
@@ -37,7 +38,11 @@ export struct NavBar {
     .padding({ left: 4, right: 4 })
     .backgroundColor($r('app.color.surface_glass'))
     .backdropBlur(24)
-    .border({ width: { top: 0.5 }, color: $r('app.color.divider') })
+    // 悬浮胶囊，不是贴边通栏条：安卓那边是圆角 26 + 0.7 描边 + 投影，
+    // 外面还留 14 的边。原来这里是一条通栏 + 顶部细线，两个 App 一眼就不像。
+    .borderRadius(26)
+    .border({ width: 0.7, color: $r('app.color.glass_stroke') })
+    .shadow({ radius: 22, color: '#1A000000', offsetY: 8 })
   }
 
   @Builder
@@ -51,15 +56,12 @@ export struct NavBar {
             .borderRadius(14)
             .backgroundColor($r('app.color.accent_soft2'));
         }
-        Path()
-          .commands(item.path)
-          .width(22)
-          .height(22)
-          .fill(Color.Transparent)
-          .stroke(this.current === i ? Pal.primary() : Pal.iconOff())
-          .strokeWidth(this.current === i ? 1.85 : 1.6)
-          .strokeLineCap(LineCapStyle.Round)
-          .strokeLineJoin(LineJoinStyle.Round);
+        LineIcon({
+          path: item.path,
+          color: this.current === i ? Pal.primary() : Pal.iconOff(),
+          side: 21,
+          lineWidth: this.current === i ? 1.85 : 1.6
+        })
       }
       .width(46)
       .height(28);
@@ -69,8 +71,8 @@ export struct NavBar {
         .fontWeight(this.current === i ? FontWeight.Medium : FontWeight.Normal)
         .fontColor(this.current === i
           ? $r('app.color.primary')
-          : $r('app.color.text_secondary'))
-        .margin({ top: 1 });
+          : $r('app.color.icon_off'))
+        .margin({ top: 3 });
     }
     .layoutWeight(1)
     .justifyContent(FlexAlign.Center)
