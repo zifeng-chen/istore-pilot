@@ -37,6 +37,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST = os.path.join(ROOT, "dist")
 REPO = "zifeng-chen/istore-pilot"
 API = "https://api.github.com"
+#: 资产上传走另一个域名，用 api.github.com 会 404
+UPLOAD = "https://uploads.github.com"
 APK_BUILD = os.path.join(ROOT, "android", "app", "build", "outputs", "apk", "release", "app-release.apk")
 
 
@@ -108,7 +110,7 @@ def upload(release_id: int, path: str, tok: str) -> tuple[int, dict]:
     name = os.path.basename(path)
     size = os.path.getsize(path)
     url = "%s/repos/%s/releases/%d/assets?name=%s" % (
-        API, REPO, release_id, urllib.parse.quote(name))
+        UPLOAD, REPO, release_id, urllib.parse.quote(name))
     req = urllib.request.Request(url, data=open(path, "rb").read(), method="POST", headers={
         "Authorization": "token " + tok,
         "Content-Type": "application/octet-stream",
@@ -296,22 +298,28 @@ def main() -> int:
     # 5) Release
     status, rel = api("GET", "/repos/%s/releases/tags/%s" % (REPO, tag), tok)
     if status == 200:
-        print("! Release %s 已存在，跳过创建（要重发请先在网页删除）" % tag)
-        return 5
+        # 已经建过：只补传缺的资产，不重复创建（重复创建会 422）
+        have = {a["name"] for a in rel.get("assets", [])}
+        todo = [p for p in assets if os.path.basename(p) not in have]
+        if not todo:
+            print("  Release %s 已存在且资产齐全：%s" % (tag, rel.get("html_url")))
+            return 0
+        print("  Release %s 已存在，补传 %d 个缺失资产" % (tag, len(todo)))
+        assets = todo
+    else:
+        body = (open(notes_file, encoding="utf-8").read() if notes_file
+                else notes_for(tag, ver, full))
+        payload = {"tag_name": tag, "name": "%s — iStore Pilot" % tag,
+                   "body": body, "draft": False, "prerelease": False}
+        if dry:
+            print("  [dry] 创建 Release %s，上传 %d 个资产" % (tag, len(assets)))
+            return 0
 
-    body = (open(notes_file, encoding="utf-8").read() if notes_file
-            else notes_for(tag, ver, full))
-    payload = {"tag_name": tag, "name": "%s — iStore Pilot" % tag,
-               "body": body, "draft": False, "prerelease": False}
-    if dry:
-        print("  [dry] 创建 Release %s，上传 %d 个资产" % (tag, len(assets)))
-        return 0
-
-    status, rel = api("POST", "/repos/%s/releases" % REPO, tok, payload)
-    if status not in (200, 201):
-        print("! 创建 Release 失败 %s：%s" % (status, rel.get("message")))
-        return 5
-    print("  Release 已创建：%s" % rel.get("html_url"))
+        status, rel = api("POST", "/repos/%s/releases" % REPO, tok, payload)
+        if status not in (200, 201):
+            print("! 创建 Release 失败 %s：%s" % (status, rel.get("message")))
+            return 5
+        print("  Release 已创建：%s" % rel.get("html_url"))
 
     ok = 0
     for path in assets:
