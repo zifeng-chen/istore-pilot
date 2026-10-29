@@ -24,7 +24,7 @@ HarmonyOS NEXT 原生应用，ArkTS + ArkUI（Stage 模型）。
 entry/src/main/ets/
 ├─ entryability/EntryAbility.ets   入口 Ability：沉浸式、配置变化清色缓存、401 跳登录
 ├─ pages/
-│  ├─ Index.ets                    五个页签的容器 + 安全区测量 + 页签广播
+│  ├─ Index.ets                    四个页签的容器 + 安全区测量 + 页签广播
 │  └─ LoginPage.ets                服务器地址 + 密码，可先「测试连接」再登录
 ├─ api/
 │  ├─ Http.ets                     系统网络库封装（不引第三方 HTTP 客户端）
@@ -59,7 +59,7 @@ entry/src/main/ets/
 ## 构建
 
 1. DevEco Studio → Open → 选本目录
-2. 首次打开会提示 Sync，让它下载 SDK（`compatibleSdkVersion: 5.0.0(12)`）
+2. 首次打开会提示 Sync，让它下载 SDK（`compatibleSdkVersion: 6.0.0(20)`）
 3. File → Project Structure → Signing Configs → 勾选 Automatically generate signature
    （需要登录华为开发者账号，仅签名用，编译本身不需要）
 4. 手机开「开发者选项 → USB 调试」，`hdc list targets` 能看到设备
@@ -74,7 +74,8 @@ hdc install -r entry/build/default/outputs/default/entry-default-signed.hap
 
 ## 当前状态
 
-代码已完整实现，但**尚未编译验证** —— 本机没有 DevEco Studio / HarmonyOS SDK。
+代码已完整实现，并在 DevEco Studio（macOS，SDK 6.0.0(20)）上**编译通过**，
+产出 `entry-default-unsigned.hap`（2.50 MB）。真机安装受签名限制，见下。
 工程刻意留了三处「由 DevEco 自己补」的缺口，这不是遗漏：
 
 | 位置 | 留空原因 |
@@ -89,7 +90,7 @@ hdc install -r entry/build/default/outputs/default/entry-default-signed.hap
 2. **「Cannot find module '@ohos/hvigor-ohos-plugin'」** —— 先点 Sync，不要直接 Build
 3. **Run 时提示未配置签名** —— File → Project Structure → Signing Configs，
    勾「Automatically generate signature」，登录华为账号即可
-4. **`compatibleSdkVersion: 5.0.0(12)` 报低于设备系统** —— 改成 `6.1.1(24)`，
+4. **`compatibleSdkVersion` 报低于设备系统** —— 按设备实际版本上调，
    或按设备实际版本下调到 `4.0.0(10)`
 
 ### 待验证项（写的时候只能靠推理，跑起来才知道）

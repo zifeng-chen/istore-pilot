@@ -51,7 +51,7 @@ IStorePilot/
 │   └── Comp.swift         卡片 / 键值行 / 胶囊 / 进度条 / 分段控件
 └── Views/
     ├── LoginView.swift
-    ├── RootView.swift     五页签 + 自绘底部导航
+    ├── RootView.swift     四页签 + 自绘底部导航
     ├── OverviewView.swift 概览
     ├── DevicesView.swift  设备列表（搜索 / 筛选）
     ├── DeviceDetailView.swift

@@ -17,6 +17,10 @@
 
 ---
 
+> 下文以 **0.1.3-1** 为例。下载时换成 Releases 里对应的版本号即可，
+> 架构后缀按 `uname -m` 选（`x86_64` / `aarch64`→`arm64` / `armv7l`→`armv7`）。
+> 拿不准就直接用不带后缀的通用版。
+
 ## 一、`.run` 安装（推荐）
 
 ### 1. 把文件传到路由器
@@ -25,10 +29,10 @@
 
 ```bash
 # 电脑上，用 scp
-scp istore-pilot_0.1.2-11.run root@192.168.1.1:/tmp/
+scp istore-pilot_0.1.3-1.run root@192.168.1.1:/tmp/
 
 # 或者在路由器上直接下载（需要能访问 GitHub）
-wget -O /tmp/pilot.run https://github.com/zifeng-chen/istore-pilot/releases/latest/download/istore-pilot_0.1.2-11.run
+wget -O /tmp/pilot.run https://github.com/zifeng-chen/istore-pilot/releases/latest/download/istore-pilot_0.1.3-1_x86_64.run
 ```
 
 也可以在 LuCI 里操作：**系统 → 文件传输**，把 `.run` 上传到 `/tmp/`。
@@ -59,7 +63,7 @@ cat /etc/istore-agent/INITIAL_PASSWORD
 ```
 
 Android 客户端也可以直接在路由器上下载：
-`http://<路由器IP>/istore-agent/istoreos-0.1.2.apk`
+`http://<路由器IP>/istore-agent/istoreos-0.1.3.apk`
 
 ### 全部参数
 
@@ -83,7 +87,7 @@ Android 客户端也可以直接在路由器上下载：
 ```sh
 opkg update
 opkg install python3
-opkg install luci-app-istore-agent_0.1.2-11_all.ipk
+opkg install luci-app-istore-agent_0.1.3-1_all.ipk
 ```
 
 或者 LuCI：**系统 → 软件包 → 上传软件包** → 选择 ipk → 安装。
@@ -160,7 +164,7 @@ sh /tmp/pilot.run --purge       # 全删干净
 sh /tmp/pilot.run --force        # 会先 opkg remove，再由本包接管
 
 # .run → ipk
-opkg install --force-reinstall luci-app-istore-agent_0.1.2-11_all.ipk
+opkg install --force-reinstall luci-app-istore-agent_0.1.3-1_all.ipk
 ```
 
 迁移时配置文件都会保留，密码不变。

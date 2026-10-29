@@ -24,9 +24,11 @@
     - 与 opkg 安装互斥：检测到已由 opkg 管理时拒绝执行，除非显式 --force
 
 用法：
-    python deploy/build_run.py               # 含最新 APK（可在路由器上下载安装）
-    python deploy/build_run.py --no-apk      # 不含 APK，包体小 5 MB
-    python deploy/build_run.py --rev 11      # 指定修订号
+    python deploy/build_run.py               # 一次出四份：x86_64 / arm64 / armv7 / all
+    python deploy/build_run.py --arch=arm64  # 只出指定架构
+    python deploy/build_run.py --no-apk      # 不含 APK，包体小 2.6 MB
+
+四份共享同一个 tar.gz 载荷（内容跟架构无关），只有头部里的 PKG_ARCH 不同。
 """
 
 from __future__ import annotations

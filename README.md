@@ -1,5 +1,7 @@
 # iStore Pilot
 
+![iStore Pilot](docs/screenshots/banner.png)
+
 **iStoreOS / OpenWrt 路由器的原生管理客户端，外加一个跑在路由器上的轻量 Agent。**
 
 手机上装 App，局域网或外网直连路由器，看实时状态、管设备、切代理节点、查拦截日志。
@@ -26,28 +28,32 @@
 
 | 文件 | 装在哪 | 说明 |
 |---|---|---|
-| `istore-pilot_x.y.z-N.run` | 路由器 | **推荐**。单文件，`sh` 一下就装完，不用 opkg、不用联网 |
-| `luci-app-istore-agent_x.y.z-N_all.ipk` | 路由器 | 传统方式，走 opkg（软件包页面上传安装） |
-| `istoreos-x.y.z.apk` | Android 手机 | 连路由器用 |
+| `istore-pilot_0.1.3-1.run` | 路由器 | **推荐**。单文件，`sh` 一下就装完，不用 opkg、不用联网 |
+| `luci-app-istore-agent_0.1.3-1_all.ipk` | 路由器 | 传统方式，走 opkg（软件包页面上传安装） |
+| `istoreos-0.1.3.apk` | Android 手机 | 连路由器用 |
+| iOS / 鸿蒙 | — | 暂未提供安装包，按 [六、构建](#六构建与打包) 自行编译 |
+
+`.run` 按架构分了四份（`_x86_64` / `_arm64` / `_armv7` / 无后缀的通用版）。
+载荷是纯 Python，四份内容一致，只是包名不同、`--check` 时会对一下 `uname -m`。
 
 路由器端，两种方式**选一种**：
 
 ```sh
 # 方式 A：.run（推荐）—— 把文件传到路由器后执行
-sh istore-pilot_0.1.2-11.run --check    # 先只检查环境，不改任何文件
-sh istore-pilot_0.1.2-11.run            # 安装或升级，保留现有配置
+sh istore-pilot_0.1.3-1_x86_64.run --check    # 先只检查环境与架构，不改任何文件
+sh istore-pilot_0.1.3-1_x86_64.run            # 安装或升级，保留现有配置
 
 # 方式 B：ipk
 opkg update && opkg install python3
-opkg install luci-app-istore-agent_0.1.2-11_all.ipk
+opkg install luci-app-istore-agent_0.1.3-1_all.ipk
 ```
 
 `.run` 的其它用法：
 
 ```sh
-sh istore-pilot_0.1.2-11.run --uninstall   # 卸载程序，保留密码与配置
-sh istore-pilot_0.1.2-11.run --purge       # 卸载并清除全部配置
-sh istore-pilot_0.1.2-11.run --force       # 已用 opkg 装过时，改由本包接管
+sh istore-pilot_0.1.3-1.run --uninstall   # 卸载程序，保留密码与配置
+sh istore-pilot_0.1.3-1.run --purge       # 卸载并清除全部配置
+sh istore-pilot_0.1.3-1.run --force       # 已用 opkg 装过时，改由本包接管
 ```
 
 装完打开 `http://<路由器IP>:8443`。首次安装的随机密码在路由器上查看：
@@ -57,7 +63,7 @@ cat /etc/istore-agent/INITIAL_PASSWORD
 ```
 
 Android：装 APK，或者直接在装好插件的路由器上下载
-`http://<路由器IP>/istore-agent/istoreos-0.1.2.apk`（插件自带这个文件）。
+`http://<路由器IP>/istore-agent/istoreos-0.1.3.apk`（插件自带这个文件）。
 
 > `.run` **不会改动任何网络、防火墙、DHCP、DNS 配置**，装的过程中现有网络不受影响。
 > 已有 `/etc/config/istore-agent` 时一律保留，不会把 `bind` 覆盖成 `0.0.0.0`。
@@ -113,14 +119,26 @@ iStore Pilot 想做的是**一个合格的手机端仪表盘**：
 
 ## 四、功能
 
-| 页签 | 内容 |
+四个底部页签，加若干二级页：
+
+| 页面 | 内容 |
 |---|---|
-| **概览** | 主机名/系统/内核/在线时长；CPU·内存·磁盘三个环；负载、温度、进程数；WAN 实时上下行（含曲线）；网口状态；重启/关机 |
-| **设备** | 在线/总数/已禁网统计；实时总流量；搜索；在线离线分组；按实时流量排序 |
-| 　└ 详情 | 品牌/类型/型号；实时上下行 + 累计流量；正在访问的域名（带代理链和命中规则）；连接明细；改备注 / 禁网 / 固定 IP / 唤醒 |
-| **代理** | OpenClash 与 Passwall 谁在跑；引擎与节点数；运行模式切换；节点分组折叠 + 一键测速；配置文件切换；订阅管理 |
-| **拦截** | AdGuard Home 状态与模式；拦截率环形；规则数与更新计划；拦截 Top 5 与完整日志；运行体检；接管全网 / 退出接管 |
-| **设置** | 连接信息；WAN/LAN 明细（含 IPv6 全局地址）；改密码；配置备份与恢复；固件与软件包更新；外观 |
+| **概览** | 主机名/系统/内核/在线时长；实时上下行与 2 分钟曲线；CPU·内存·磁盘三根进度条；负载、温度、线程数；WAN 状态与地址；网口状态 |
+| **设备** | 在线/总数/已禁网；今日拦截与实时总流量；搜索；在线离线分组，按实时流量排序；内嵌应用流量与广告拦截两张卡 |
+| 　└ 设备清单 | 全部设备，带 `5G` / `2.4G` / `有线` 徽标（来自 AP 接入表，不是猜的） |
+| 　└ 设备详情 | 品牌/类型/型号；实时上下行 + 累计流量；正在访问的域名（带代理链和命中规则）；连接明细；改备注 / 禁网 / 固定 IP / 唤醒 |
+| 　└ 应用流量 | 按 App 汇总近 5 天用量，77 个官方图标；从域名特征反推，路由器看不到进程名也能认 |
+| 　└ 广告拦截 | 拦截率、查询次数、规则数；**DNS 链路图**（家庭设备 → dnsmasq → AGH → 上游）；拦截 Top 5；规则与更新；接管全网 / 退出接管 |
+| **代理** | OpenClash 与 Passwall 谁在跑；引擎与节点数；规则/全局/直连一键切换；节点分组折叠 + 一键测速；配置文件切换；订阅管理 |
+| **设置** | 连接信息与响应延迟；服务器地址 / 重新登录 / 清缓存；WAN 与 LAN 明细（含 IPv6 全局地址）；外观与刷新率；配置备份与恢复；固件与软件包更新 |
+
+有两处是别的客户端不做的：
+
+- **AP 未安装时的一键安装**：拦截页在 `installed=false` 时给一个按钮，二次确认后
+  由 Agent 在路由器上 opkg + 下载本体 + 初始化向导 + 加规则，客户端只看进度条。
+  全程不碰 53 端口，装完是「观察模式」，接管仍要你另外点一次。
+- **DNS 兜底巡检**：接管后每 12 秒看一眼 53 有没有人应答，没有就把 dnsmasq 放回去。
+  宁可丢拦截，不能丢网。
 
 ## 五、仓库结构
 
@@ -141,55 +159,114 @@ istoreOS/
 
 | 模块 | 文件数 | 行数 |
 |---|---:|---:|
-| `agent/` | 20 个 .py | 9,001 |
-| `android/` | 40 个 .java | 14,123 |
-| `harmony/` | 27 个 .ets | 7,806 |
-| `ios/` | 25 个 .swift | 6,859 |
-| `web/` | 2 个 .js | 815 |
-| `deploy/` + `scripts/` | 30 个 .py | 3,723 |
+| `agent/` | 24 个 .py | 10,531 |
+| `android/` | 47 个 .java | 15,939 |
+| `harmony/` | 31 个 .ets | 9,283 |
+| `ios/` | 26 个 .swift | 7,963 |
+| `web/` | 2 个 .js | 847 |
+| `deploy/` + `scripts/` | 38 个 .py | 5,848 |
 
-## 六、构建
+## 六、构建与打包
+
+三端共用同一个版本号（见 [九、版本管理](#九版本管理)），但构建链完全独立 ——
+任何一端都能单独 clone、单独出包，互不依赖。
 
 ### Android
 
 ```bash
 export JAVA_HOME="<JDK 17>"
 export ANDROID_HOME="<Android SDK>"
-export JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8"   # 中文文案必须锁 UTF-8
+export JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8"   # 中文文案必须锁 UTF-8，否则按 GBK 编译成乱码
 cd android
 gradle assembleRelease
 ```
 
-产物 `app/build/outputs/apk/release/app-release.apk`。minSdk 24 / targetSdk 34。
+产物 `app/build/outputs/apk/release/app-release.apk`，当前 **2.57 MB**。
+minSdk 24 / targetSdk 34。
+
+release 已开 **R8 + 资源收缩**（`minifyEnabled true` + `shrinkResources true`）。
+开之前必须确认三件事，否则会在运行时崩：
+
+| 前提 | 为什么 |
+|---|---|
+| 没有反射（`Class.forName` / `getDeclaredMethod`） | keep 规则写不全就会 `ClassNotFoundException` |
+| 布局里没有自定义 View 的全限定名 | 这类类不会被自动 keep，inflate 时直接崩 |
+| 图标是静态 `R.drawable.*` 引用，不是 `getIdentifier` | 按名字取资源时，收缩会把图标删成占位块 |
 
 签名需要 `android/keystore.properties` 与 `android/istoreos.keystore`，
 **两者都不入库**（`.gitignore` 已排除），格式见 [`docs/clients.md`](docs/clients.md)。
 
 ### HarmonyOS
 
-DevEco Studio 打开 `harmony/` 直接运行，或命令行：
+工程是 **Stage 模型 + ArkTS**，用 DevEco Studio 自带的 hvigor 构建
+（不需要 Gradle，也不需要 Mac）：
 
 ```bash
 cd harmony
-hvigorw --mode module -p product=default -p buildMode=release assembleHap
+
+# 一次性：让 DevEco 补齐 hvigor 插件版本（写在 hvigor-config.json5 里会跟 SDK 对不上）
+hvigorw --sync
+
+# 出包
+hvigorw --mode module -p product=default -p buildMode=release assembleHap --no-daemon
 ```
 
-`entry/src/main/resources/base/profile/network_config.json` 里的
-`cleartextTrafficPermitted: true` **必须保留** —— 接口是明文 HTTP 的 `:8443`，
-去掉就连不上。
+产物 `entry/build/default/outputs/default/entry-default-unsigned.hap`（约 2.5 MB）。
+
+签名是**装不上的唯一门槛**：`build-profile.json5` 里的 `signingConfigs` 是空数组，
+证书要在 AppGallery Connect 上按自己的 `bundleName` 申请 `p12 + cer + p7b`，
+再在 DevEco 的 Signing Configs 里勾一次。本仓库现成的 p7b 绑的是别的包名，
+所以产物只能是 `unsigned`，`hdc install` 会拒绝。
+
+其它三条不能动的配置：
+
+- `resources/base/profile/network_config.json` 的 `cleartextTrafficPermitted: true`
+  —— 接口是明文 HTTP `:8443`，去掉直接连不上
+- 新增页面必须在 `resources/base/profile/main_pages.json` 里登记，光有 `@Entry` 不够
+- 图标用 `Path` 指令画，遇到圆弧（`A`）会被截断成一个点；用
+  `python scripts/harmony_icon_paths.py --check` 扫
 
 ### iOS
 
+纯 SwiftUI，工程文件由脚本生成 —— **`project.pbxproj` 不要手改**：
+
 ```bash
 cd ios
+python gen_project.py        # 增删 .swift 之后必须重跑，否则报 cannot find X in scope
+
 xcodebuild -project IStorePilot.xcodeproj -scheme IStorePilot \
            -configuration Release -destination 'generic/platform=iOS' \
            -archivePath build/IStorePilot.xcarchive archive
+
+# 只有 archive 还不够，出 IPA 要再导一次
+xcodebuild -exportArchive -archivePath build/IStorePilot.xcarchive \
+           -exportPath build/ipa -exportOptionsPlist ExportOptions.plist
 ```
 
-`Info.plist` 已放开 `NSAllowsArbitraryLoads` 与本地网络权限。
-`.xcodeproj` 由 `ios/gen_project.py` 生成 —— **增删 `.swift` 后必须重跑**，
-否则报 `cannot find X in scope`。
+第二条命令需要 `ExportOptions.plist` 里写明 `teamID` 和 `provisioningProfiles`，
+也就是必须先有一个描述文件。**当前这一环是缺的** —— 仓库里有 1 张
+Apple Development 证书、0 个描述文件，所以只能编译/归档，导不出可安装的 IPA。
+自己跑的话，Xcode 里选一次 Team（免费 Apple ID 也行，7 天有效）就能导出。
+
+`Info.plist` 已放开 `NSAllowsArbitraryLoads`（明文 8443）与
+`NSLocalNetworkUsageDescription`（iOS 14+ 访问局域网要授权）。
+
+### 一条命令发版
+
+APK 更新后不要手动重打包，跑这个：
+
+```bash
+python scripts/release.py            # 全流程
+python scripts/release.py --dry-run  # 只看会做什么
+python scripts/release.py --notes 说明.md
+python scripts/release.py --update-notes   # 只改已发布 Release 的正文
+```
+
+它依次做：同步 `app-release.apk` → `dist/` → 重打四份 `.run` → commit/push →
+打 tag → 建 Release 并上传 5 个资产。
+
+> **坑**：`.run` 里的 APK 是按 **文件修改时间**从 `dist/` 挑最新的，不认「你刚编译过」。
+> 只跑 `build_run.py` 而没先把 APK 复制进 `dist/`，发出去的就是旧 App。脚本里已经替你做掉这步。
 
 ## 七、部署 Agent
 
@@ -204,9 +281,9 @@ python deploy/deploy.py            # 开发期：直接推文件 + 重启服务
 
 ```bash
 # A. .run 自解压包（推荐，用户装就这一个文件）
-python deploy/build_run.py               # 产出 dist/istore-pilot_<版本>-<修订>.run
-python deploy/build_run.py --no-apk      # 不含 APK，小 5 MB
-python deploy/build_run.py --rev 12      # 指定修订号
+python deploy/build_run.py                 # 一次出四份：x86_64 / arm64 / armv7 / all
+python deploy/build_run.py --arch=arm64    # 只出指定架构
+python deploy/build_run.py --no-apk        # 不含 APK，小 2.6 MB
 
 # B. ipk（走 opkg，可被「软件包」页面管理）
 python deploy/build_ipk.py                 # 产出 dist/luci-app-istore-agent_<版本>_all.ipk
@@ -285,29 +362,51 @@ Agent 自己的配置文件在 `/etc/istore-agent/config.json`，可用
 
 ```bash
 python scripts/bump_version.py          # 看当前版本与下一位
-python scripts/bump_version.py --next   # 自增并同步四处
+python scripts/bump_version.py --next   # 自增并同步六处
+python scripts/check_version.py         # 校验六处是否一致（提交前跑）
 ```
 
 规则：`0.1.0` 起，**第三位满 10 进位到第二位**（没有 `0.1.10`，是 `0.2.0`）。
 `versionCode` 单调递增、与语义版本解耦 —— Android 不接受版本号回退。
 
-`bump_version.py` 同步的四个位置：`harmony/AppScope/app.json5`、
-`android/app/build.gradle`、`ios/gen_project.py`、`agent/server.py`。
+`bump_version.py` 同步的六个位置：`agent/server.py`、`android/app/build.gradle`、
+`ios/gen_project.py`、`harmony/AppScope/app.json5`、`harmony/oh-package.json5`、
+`harmony/entry/oh-package.json5`。
+
+最后两个容易被忘 —— 它们是 hvigor 写进产物清单的字段，不跟着改会出现
+「`app.json5` 写 0.1.3、HAP 清单里写别的」，排查起来很费时间。改完 ios 的还要
+再跑一次 `python ios/gen_project.py`。
 
 当前版本见 [`CHANGELOG.md`](CHANGELOG.md)。
 
-## 十、截图
+## 十、界面
 
-真机截图，不是效果图。
+全部是真机截图（1080×2412），不是效果图。截图里的设备名、内网地址、订阅名
+已用 [`scripts/mask_shots.py`](scripts/mask_shots.py) 换成中性值，
+处理方式是「原位重绘」而不是打码块。
 
 | | | |
 |---|---|---|
-| ![](docs/screenshots/final/01_home.png) | ![](docs/screenshots/final/02_devices.png) | ![](docs/screenshots/final/03_proxy.png) |
-| 概览 | 设备 | 代理 |
-| ![](docs/screenshots/final/04_adblock.png) | ![](docs/screenshots/final/05_settings_top.png) | ![](docs/screenshots/final/09_home_dark.png) |
-| 拦截 | 设置 | 深色模式 |
+| ![](docs/screenshots/app/overview.png) | ![](docs/screenshots/app/devices.png) | ![](docs/screenshots/app/proxy.png) |
+| 概览：实时速率、2 分钟曲线、负载 | 设备：在线统计、接入方式徽标 | 代理：双后端、规则/全局/直连 |
+| ![](docs/screenshots/app/adblock.png) | ![](docs/screenshots/app/settings.png) | ![](docs/screenshots/app/dark.png) |
+| 广告拦截：DNS 链路与拦截 Top 5 | 设置：连接延迟、WAN/LAN 明细 | 深色模式（跟随系统） |
 
-## 十一、文档
+## 十一、已知限制
+
+写在这里，省得你试了才发现：
+
+| 限制 | 原因 | 有没有救 |
+|---|---|---|
+| iOS / 鸿蒙没有现成安装包 | 缺描述文件（iOS）、HAP 未签名（鸿蒙） | 自己编译，见上一节 |
+| 禁网不会断掉已建立的连接 | `src_mac + REJECT` 只拦新连接 | 无（内核层做不到，除非 conntrack 清理） |
+| 不能限速 | 固件没装 `tc` | 装 `tc` 后可加 |
+| 看不到 Wi-Fi 信号强度 | 软路由没有无线网卡 | 无 |
+| 接入方式依赖 AP | 只有中兴（ZXSLC 系列）驱动；从节点读不到客户端表 | 驱动可插拔，见第八节 |
+| 改 WAN / 切代理后端会断网 | 重拨或重启内核，10–30 秒 | 有 60 秒自动回滚，但断网是真的 |
+| 接管全网 DNS 后 AGH 是单点 | 53 端口只有它在听 | 12 秒巡检自愈，退回观察模式 |
+
+## 十二、文档
 
 | 文档 | 内容 |
 |---|---|
@@ -315,10 +414,10 @@ python scripts/bump_version.py --next   # 自增并同步四处
 | [`docs/install.md`](docs/install.md) | 路由器端安装详解：`.run` 与 ipk 两种方式、卸载、排错 |
 | [`docs/architecture.md`](docs/architecture.md) | 架构与关键设计决策、踩过的硬坑 |
 | [`docs/api.md`](docs/api.md) | Agent 接口参考 |
-| [`docs/clients.md`](docs/clients.md) | 三端打包、安装、签名、真机调试细节 |
+| [`docs/clients.md`](docs/clients.md) | 三端打包、签名、安装与真机调试 |
 | [`PLAN.md`](PLAN.md) | 功能规划与早期设计取舍 |
-| `harmony/README.md`、`ios/README.md` | 各端工程内说明 |
+| `harmony/README.md`、`ios/README.md` | 各端工程内说明（目录结构、平台差异、坑） |
 
-## 十二、许可
+## 十三、许可
 
 未指定许可证。代码公开可见，但未授予使用、修改、分发许可，如需引用请联系作者。

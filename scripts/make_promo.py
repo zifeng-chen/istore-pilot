@@ -40,7 +40,9 @@ THEMES = {
 }
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SHOT_DIR = os.path.join(ROOT, 'docs', 'screenshots', 'promo')
+# 素材用 docs/screenshots/app/ 里那份 —— 它们已经过 mask_shots.py 脱敏，
+# 直接拿原始截图会把这户人家的设备名和内网地址画进宣传图
+SHOT_DIR = os.path.join(ROOT, 'docs', 'screenshots', 'app')
 ICON_MASTER = os.path.expanduser('~/Desktop/蓝色路由系统管理图标.png')
 OUT_DIR = os.path.join(ROOT, 'dist')
 
@@ -189,7 +191,7 @@ def build(theme='dark', out_name='promo_4k.png'):
     # ---------- 底部版本信息 ----------
     dr.line([(P(LX), P(806)), (P(LX + 430), P(806))], fill=(255, 255, 255, 26) if theme == 'dark'
             else (0, 0, 0, 22), width=max(1, int(1 * S)))
-    meta = ['v0.1.3', '5.5 MB', '免 Root', 'Android 8.0+']
+    meta = ['v0.1.3', '2.6 MB', '免 Root', 'Android 7.0+']
     x = LX
     mf = font(14)
     for i, item in enumerate(meta):

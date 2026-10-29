@@ -50,6 +50,9 @@ docs/screenshots/*
 !docs/screenshots/final/
 !docs/screenshots/promo/
 !docs/screenshots/0*.png
+# README 用的图：一页一张（app/，已脱敏）+ 顶部横幅
+!docs/screenshots/app/
+!docs/screenshots/banner.png
 
 # ================= WorkBuddy 本地数据 =================
 # 含项目笔记与运维记录，不入库
