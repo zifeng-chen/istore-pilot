@@ -228,6 +228,30 @@ AP 侧的限制：
 `/devices/detail` 的 `apps[]` 每项带 `up_bps` / `down_bps`（上一采样窗口的速率，
 闲着的应用为 0）。累计字节几秒才涨一点，只给 `total` 会让人以为统计坏了。
 
+## 应用流量
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/apps` | 按 App 汇总的用量排行（只给累计口径） |
+
+路由器在转发路径上拿不到进程名，所以**应用是从访问的域名反推的**
+（`agent/apps.py` 里的特征库 + 规则）。只统计经过 Clash 的连接。
+
+```json
+{ "ts": 1761700000, "ready": true, "days": 5, "period": "all",
+  "apps": [{ "name": "华为", "category": "系统",
+             "up": 1234, "down": 20000000, "total": 20001234,
+             "up_bps": 0.0, "down_bps": 18342.5, "conns": 3,
+             "all_up": 4000000, "all_down": 150000000, "all_total": 154000000,
+             "share": 18.4, "domains": ["huawei.com"] }],
+  "idle": [], "session": { "up": 0, "down": 0 } }
+```
+
+- `up/down/total` 是本次会话，`all_*` 是落盘账本里的累计（跨重启）
+- `share` 是占全部流量的百分比；`IP_ONLY`（纯 IP 连接）永远排最后
+- `period` 参数保留但被忽略 —— 早期有今日/本周口径，界面上两套数字只会让人反复对比
+- 这个接口不走 `cached()`：自带 3 秒采样线程，缓存会把速率冻住
+
 ## 代理
 
 OpenClash 与 Passwall 双后端，`backend` 参数可选，不传则按当前运行的那个。
@@ -271,6 +295,8 @@ OpenClash 专用接口，保留兼容。新代码请用 `/proxy/*`。
 | POST | `/adblock/refresh` | 手动刷新规则（AGH 本身每 24 小时自动一次） |
 | POST | `/adblock/rules` | `{enabled, interval, ...}` 改规则表开关与自动更新间隔 |
 | POST | `/adblock/probe` | 探测 AGH 可达性 |
+| POST | `/adblock/install` | 一键安装，必须带 `{"confirm":"install"}`，立即返回 |
+| GET | `/adblock/install` | 安装进度 `{running,pct,step,ok,done,error,log}` |
 
 ### 没装 AdGuard Home 的情况
 
@@ -286,6 +312,45 @@ OpenClash 专用接口，保留兼容。新代码请用 `/proxy/*`。
 动作接口在未安装时统一返回 `{"ok": false, "installed": false, "error": "...",
 "hint": "...", "install": {...}}`，不会抛 500。客户端只认 `ok` / `installed` 即可，
 `luci_path` 用内置 WebView 打开就是软件包页（Agent 会顺带换好 LuCI 免密票据）。
+
+### 一键安装（Agent 代劳）
+
+`POST /adblock/install {"confirm": "install"}` 让 Agent 在路由器上装：
+
+```
+opkg update → opkg install luci-app-adguardhome（失败不致命）
+→ 按 CPU 架构下载 static.adtidy.org 的本体
+→ 解包到 /usr/bin/AdGuardHome（旧目录改名留底）
+→ 写最小 uci → 启动 → 等 127.0.0.1:3000 就绪
+→ 走 AGH 自带的 /control/install/configure 设管理员密码、绑 127.0.0.1、选观察端口
+→ 加 anti-AD 规则 → uci enabled=1
+```
+
+三条设计约束：
+
+- **必须带 `confirm`**，否则拒绝。已安装时也拒绝（不覆盖）
+- **跑在后台线程**，接口立刻返回；客户端 1.2 秒轮询一次 `GET /adblock/install`。
+  装到一半切页签、甚至杀掉 App，安装都会继续
+- **全程不碰 53 端口**。装完是「观察模式」（只绑 `127.0.0.1`），
+  接管仍要用户另外点一次 `POST /adblock/takeover`
+
+**不要自己拼 `AdGuardHome.yaml`**：`schema_version` 和 bcrypt 口令绕不开，
+拼错就是启动失败。向导接口是 AGH 首次启动时自己走的那条路。
+
+### DNS 兜底巡检
+
+接管期间 AGH 是 53 端口唯一的监听者。Agent 每 12 秒检查一次
+`dnsmasq` 是否还在 53、53 有没有人应答；只有「`dnsmasq` 不在 53 **且** 53 完全无人监听」
+才把 `dnsmasq` 放回去，并把 AGH 的 yaml 改回观察端口。状态在 `/adblock` 的 `guard`：
+
+```json
+{ "guard": { "checks": 1382, "count": 0, "healed_at": 0,
+             "reason": "", "recent": [] } }
+```
+
+`count > 0` 表示真的救过场，客户端会在拦截页显示一行「DNS 巡检触发过 N 次自愈」。
+另外接管状态下 `POST /adblock/service {"action":"stop"}` 会被拒绝并返回
+`need_release: true` —— 停掉 AGH 等于把全家的 DNS 打死。
 
 ## 配置备份
 
