@@ -216,6 +216,20 @@ _LEGACY = {
     "教育网": IP_ONLY,
 }
 
+#: 学到的 IP → 应用。百度网盘这类下载器会自己解析出 IP 后直连，
+#: 同一个 CDN 节点时而带域名、时而是裸 IP —— 带域名的那次记下来，
+#: 后面裸 IP 的流量就能归到同一个应用，不用永远堆在「IP 直连」里。
+#: 值 = [应用名, 分类, 学到的时间戳]
+_ip_app: dict[str, list] = {}
+_net_app: dict[str, list] = {}
+_IP_APP_STORE = os.path.join(DATA_DIR, "ip-app.json")
+_IP_APP_TTL = 86400.0        # 精确 IP 记一天（IP 会重分配，不能永久信）
+_NET_APP_TTL = 6 * 3600.0    # /24、/64 只记 6 小时，同网段可能换业务
+_MAX_IP_APP = 3000
+_IP_APP_SAVE_EVERY = 300.0   # 5 分钟写一次：这张表变得比账本勤，跟着 15 秒的节拍写会磨闪存
+_ip_app_dirty = False
+_ip_app_last = 0.0
+
 # 落盘的账本：total = 累计，days = 按天（YYYY-MM-DD）
 _hist_total: dict[str, list[float]] = {}
 _hist_days: dict[str, dict[str, list[float]]] = {}
@@ -255,9 +269,27 @@ def _merge_keys(mapping: dict[str, list[float]]) -> dict[str, list[float]]:
     return out
 
 
+def _load_ip_app() -> None:
+    """读回学到的 IP 归属表。坏了就当空表，只影响裸 IP 的归类精度。"""
+    global _ip_app, _net_app
+    try:
+        with open(_IP_APP_STORE, "r", encoding="utf-8") as fh:
+            raw = json.load(fh)
+    except (OSError, ValueError):
+        return
+    for key, target in (("ip", _ip_app), ("net", _net_app)):
+        table = raw.get(key)
+        if not isinstance(table, dict):
+            continue
+        for k, v in table.items():
+            if isinstance(v, list) and len(v) == 3 and isinstance(v[0], str):
+                target[k] = [v[0], str(v[1]), float(v[2])]
+
+
 def _load() -> None:
     """启动时读回账本。文件坏了就当作空账本，绝不因为读盘失败拖垮统计。"""
     global _hist_total, _hist_days
+    _load_ip_app()
     try:
         with open(STORE, "r", encoding="utf-8") as fh:
             raw = json.load(fh)
@@ -305,6 +337,21 @@ def _save(force: bool = False) -> None:
         os.replace(tmp, STORE)
     except OSError:
         pass
+
+    # IP → 应用 单独一份，跟大账本分开写，并且用自己的 5 分钟节拍 ——
+    # 它几乎每轮都在变，按 15 秒写一次等于天天刷闪存
+    global _ip_app_dirty, _ip_app_last
+    if _ip_app_dirty and (force or time.monotonic() - _ip_app_last >= _IP_APP_SAVE_EVERY):
+        _ip_app_dirty = False
+        _ip_app_last = time.monotonic()
+        try:
+            tmp2 = _IP_APP_STORE + ".tmp"
+            with open(tmp2, "w", encoding="utf-8") as fh:
+                json.dump({"ip": _ip_app, "net": _net_app}, fh,
+                          ensure_ascii=False, separators=(",", ":"))
+            os.replace(tmp2, _IP_APP_STORE)
+        except OSError:
+            pass
 
 
 def _trim() -> None:
@@ -507,14 +554,70 @@ def _geo_lookup(host: str) -> tuple[str, str] | None:
     return None
 
 
+def _net_key(ip: str) -> str:
+    """同网段聚合键：IPv4 取 /24，IPv6 取 /64。
+
+    CDN 节点经常整段分配（113.0.124.53/.70/.86 都是百度），
+    只按精确 IP 学，命中率会差很多。
+    """
+    if ":" in ip:
+        parts = ip.split(":")
+        return ":".join(parts[:4]) + "::/64"
+    parts = ip.split(".")
+    if len(parts) == 4:
+        return ".".join(parts[:3]) + ".0/24"
+    return ""
+
+
+def _learn_ip(dst: str, name: str, category: str) -> None:
+    """由「带域名的连接」反推 IP 归属，供后续裸 IP 连接使用。"""
+    global _ip_app_dirty
+    if not dst or name in (IP_ONLY, LAN_ONLY):
+        return
+    now = time.time()
+    _ip_app[dst] = [name, category, now]
+    net = _net_key(dst)
+    if net:
+        _net_app[net] = [name, category, now]
+    if len(_ip_app) > _MAX_IP_APP:
+        # 超量就按时间淘汰最旧的，别让这张表无限涨
+        for key in sorted(_ip_app, key=lambda k: _ip_app[k][2])[:len(_ip_app) - _MAX_IP_APP]:
+            _ip_app.pop(key, None)
+    if len(_net_app) > _MAX_IP_APP:
+        for key in sorted(_net_app, key=lambda k: _net_app[k][2])[:len(_net_app) - _MAX_IP_APP]:
+            _net_app.pop(key, None)
+    _ip_app_dirty = True
+
+
+def _ip_lookup(host: str) -> tuple[str, str] | None:
+    """先查精确 IP，再查网段。过期的当作没学到。"""
+    if not host:
+        return None
+    now = time.time()
+    hit = _ip_app.get(host)
+    if hit and now - hit[2] < _IP_APP_TTL:
+        return hit[0], hit[1]
+    net = _net_key(host)
+    if net:
+        hit = _net_app.get(net)
+        if hit and now - hit[2] < _NET_APP_TTL:
+            return hit[0], hit[1]
+    return None
+
+
 def _match(host: str) -> tuple[str, str]:
     """域名 → (应用名, 分类)。认不出来就退化成主域名，归类「其他」。"""
     if _is_lan(host):
         return LAN_ONLY, "局域网"
     if _is_ip(host):
-        # 裸 IP 没有域名可查，但能查出是谁的网段：Telegram 的 91.108.x、
-        # 阿里云的 39.101.x 这类一眼就认出来。反查是异步的，第一轮先按
-        # 「IP 直连」记，后台查完下一轮自然归到新桶里
+        # 先看有没有从「同一个 IP/同网段的域名连接」学到过归属：
+        # 百度网盘的下载节点时而有域名、时而裸 IP，靠这条能把大头收回来
+        learned = _ip_lookup(host)
+        if learned:
+            return learned
+        # 没学到就查 ASN：Telegram 的 91.108.x、阿里云的 39.101.x 一眼就认出来。
+        # 运营商段（联通/电信/移动）不认，直接进「IP 直连」——
+        # 整段都是运营商不代表就是某个应用，硬认反而会乱
         label = asn.peek(host)
         if label and label not in _CARRIER:
             return label, "网络"
@@ -573,6 +676,11 @@ def _sample_once() -> None:
         name, category = _match(host)
         if name == LAN_ONLY:
             continue
+        # 带域名的连接顺手记下「这个 IP 属于谁」。
+        # 同一个 CDN 节点下次可能是裸 IP 连过来（下载器自己解析后直连），
+        # 靠这张表就能归到同一个应用，而不是掉进「IP 直连」
+        if host and not _is_ip(host):
+            _learn_ip(str(c.get("destination_ip") or ""), name, category)
 
         if first:
             d_up = d_down = 0.0
@@ -595,6 +703,53 @@ def _sample_once() -> None:
             bucket = dev_step.setdefault(mac, {}).setdefault(name, [0.0, 0.0])
             bucket[0] += d_up
             bucket[1] += d_down
+
+    # ---- 零头归并 ----
+    # 百度网盘这类下载器会同时连几十个节点：带域名的能归到应用，裸 IP 的只能靠
+    # 「IP/网段学习」补 —— 但新节点总是不断出现，学习永远追不上零头。
+    # 这里做一层保守归并：某台设备这一轮里如果某个应用占绝对多数（≥60%），
+    # 而同轮的裸 IP 流量只是它的零头（≤35%），就把这点零头算到它头上。
+    # 两个阈值都留了余量：真正的「大流量但不知道是谁」（比如 SSH 拉大文件）
+    # 占比会明显超过 35%，不会被吞掉。
+    folded: dict[str, list] = {}
+    for mac, names in list(dev_step.items()):
+        ip_slot = names.get(IP_ONLY)
+        if not ip_slot:
+            continue
+        ip_b = ip_slot[0] + ip_slot[1]
+        total_b = sum(v[0] + v[1] for v in names.values())
+        if ip_b <= 0 or total_b <= 0:
+            continue
+        best_name, best_b = "", 0.0
+        for nm, val in names.items():
+            if nm == IP_ONLY:
+                continue
+            b = val[0] + val[1]
+            if b > best_b:
+                best_name, best_b = nm, b
+        if best_name and best_b / total_b >= 0.6 and ip_b <= best_b * 0.35:
+            slot = names.setdefault(best_name, [0.0, 0.0])
+            slot[0] += ip_slot[0]
+            slot[1] += ip_slot[1]
+            del names[IP_ONLY]
+            folded[mac] = [best_name, ip_slot[0], ip_slot[1]]
+
+    for _mac, (nm, up_b, down_b) in folded.items():
+        g = step.get(IP_ONLY)
+        if not g:
+            break
+        take_up = min(g["up"], up_b)
+        take_down = min(g["down"], down_b)
+        g["up"] -= take_up
+        g["down"] -= take_down
+        dst = step.get(nm)
+        if dst is None:
+            dst = step[nm] = {"up": 0.0, "down": 0.0, "conns": 0,
+                              "category": _NAME_CATEGORY.get(nm, "其他")}
+        dst["up"] += take_up
+        dst["down"] += take_down
+        if g["up"] <= 0.0 and g["down"] <= 0.0:
+            step.pop(IP_ONLY, None)
 
     _prev = cur
     _last_ts = now
