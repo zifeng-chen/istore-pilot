@@ -1045,3 +1045,30 @@ ug.link 301 / 199 ms。两轮守护都是「验收通过，保留新规则」。
 另两处细节：连不上时文案改成「路由器暂时没响应，先进入界面」且不会被「准备就绪」
 覆盖；收尾时先快速走满再让「满格 + 准备就绪」停到最短停留，避免出现"70% 就说准备好了"。
 
+### 工具 · 一条命令发版（scripts/release.py）
+
+以前发版是四步手动的：编译 APK → 复制进 dist → 重打 .run → 网页建 Release 传资产。
+最容易出的错是第二步漏掉——`.run` 里的 APK 由 `newest_apk()` 按 **文件时间**从 `dist/`
+挑最新的，不认「你刚编译过」。漏了就会给用户发旧 App。
+
+现在：
+
+```sh
+python scripts/release.py                 # 全自动
+python scripts/release.py --dry-run       # 只看会做什么
+python scripts/release.py --notes 说明.md # 自定义正文
+python scripts/release.py --update-notes  # 只改已发布 Release 的正文
+```
+
+它依次完成：同步 APK → 重打四份 .run → commit/push → 打 tag `v<版本>` →
+建 Release 并上传 4 份 .run + APK。
+
+**三个踩过的坑**（都写进代码注释了）
+
+1. 资产上传域名是 `uploads.github.com`，用 `api.github.com` 一律 404
+2. 改已发布 Release 的正文只能 PATCH `/releases/<数字id>`，`/releases/tags/<tag>` 也 404
+3. 系统代理对 curl 有效、对 urllib 返回 502 → 脚本先直连，失败再退回代理
+
+**首次发布**：`v0.1.3`，资产 5 个（4 份 .run + APK），
+https://github.com/zifeng-chen/istore-pilot/releases/tag/v0.1.3
+
