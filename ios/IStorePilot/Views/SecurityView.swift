@@ -22,6 +22,10 @@ struct SecurityView: View {
     @State private var sub = 0
     @State private var subFilter = 0
 
+    @State private var appsData: J = Api.cached("/api/v1/apps") ?? [:]
+    @State private var goApps = false
+    @Environment(\.barAxis) private var axis
+
     @State private var askTakeover: Bool? = nil
     @State private var busy = false
 
@@ -56,9 +60,16 @@ struct SecurityView: View {
                     } else {
                         // 宽屏：左边设备、右边拦截。两块本来就是「两个系统」，
                         // 竖着排的时候要滑过一整张卡才能看到拦截今天挡了多少
-                        DuoColumns {
+                        if axis == .rail {
+                            DuoColumns {
+                                deviceCard
+                            } right: {
+                                adCard
+                            }
+                            appsCard
+                        } else {
                             deviceCard
-                        } right: {
+                            appsCard
                             adCard
                         }
                     }
@@ -75,6 +86,9 @@ struct SecurityView: View {
             .background(C.appBg)
             .navigationTitle("设备")
             .navigationBarTitleDisplayMode(.large)
+            .sheet(isPresented: $goApps) {
+                NavigationStack { AppsView() }
+            }
             .task { await load() }
             .onReceive(tick) { _ in Task { await load(quiet: true) } }
             .confirmationDialog(takeover ? "退出 DNS 接管？" : "让所有设备走 AdGuard Home 解析？",
@@ -146,12 +160,7 @@ struct SecurityView: View {
     private var deviceCard: some View {
         Card {
             VStack(alignment: .leading, spacing: 0) {
-                SectionTitle(text: "设备")
-                HStack {
-                    Text("点数字进清单，点行看详情")
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(C.textSecondary)
-                    Spacer()
+                CardHead(icon: "link", title: "设备", sub: "点数字进清单，点行看详情") {
                     Button {
                         open(.all)
                     } label: {
@@ -259,6 +268,69 @@ struct SecurityView: View {
         }
     }
 
+    // MARK: - 应用流量卡
+
+    /// 与安卓一级页的 AppsCard 同构：图标标题 + 副标题（时间范围与总量）+ 前 3 名。
+    /// 原来这张卡只在「设备清单」二级页里，得先点进去才看得到。
+    private var appsCard: some View {
+        let arr = appsData.objs("apps")
+        let all = appsData.obj("all") ?? [:]
+        let days = Int(appsData.dbl("days"))
+        let total = all.dbl("up") + all.dbl("down")
+        let top = arr.filter { $0.dbl("all_total") > 1024 }.prefix(3)
+
+        return Button {
+            goApps = true
+        } label: {
+            Card {
+                VStack(alignment: .leading, spacing: 0) {
+                    CardHead(icon: "bolt", title: "应用流量",
+                             sub: (days > 1 ? "近 \(days) 天 · " : "") + "共 " + F.bytes(total)) {
+                        Text("全部 \(arr.count) 个 ›")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(C.primary)
+                    }
+                    .padding(.bottom, 8)
+
+                    Hairline(inset: 0)
+
+                    if top.isEmpty {
+                        Text("正在统计…")
+                            .font(F.tiny)
+                            .foregroundStyle(C.textSecondary)
+                            .padding(.top, 10)
+                    } else {
+                        ForEach(Array(top.enumerated()), id: \.offset) { i, a in
+                            if i > 0 { Hairline(inset: 0) }
+                            HStack(spacing: 9) {
+                                AppIconView(name: a.str("name"), size: 28)
+                                Text(a.str("name"))
+                                    .font(F.caption)
+                                    .foregroundStyle(C.textPrimary)
+                                    .lineLimit(1)
+                                if a.dbl("down_bps") + a.dbl("up_bps") >= 1024 {
+                                    Text(F.rate(a.dbl("down_bps") + a.dbl("up_bps")))
+                                        .font(F.num(10.5, .medium))
+                                        .foregroundStyle(C.primary)
+                                }
+                                Spacer(minLength: 6)
+                                Text(F.bytes(a.dbl("all_total")))
+                                    .font(F.num(12.5, .medium))
+                                    .foregroundStyle(C.textPrimary)
+                                Text(String(format: "%.0f%%", a.dbl("share")))
+                                    .font(F.num(10.5, .regular))
+                                    .foregroundStyle(C.textTertiary)
+                                    .frame(width: 32, alignment: .trailing)
+                            }
+                            .padding(.vertical, 9)
+                        }
+                    }
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
     // MARK: - 拦截卡
 
     private var adCard: some View {
@@ -269,15 +341,10 @@ struct SecurityView: View {
 
         return Card {
             VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    SectionTitle(text: "拦截")
-                    Spacer()
+                CardHead(icon: "shield.lefthalf.filled", title: "拦截", sub: "AdGuard Home") {
                     Pill(text: adStateText,
                          color: ad.bool("running") ? C.primary : C.textSecondary)
                 }
-                Text("AdGuard Home")
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(C.textSecondary)
 
                 HStack(alignment: .firstTextBaseline, spacing: 7) {
                     Text(F.count(blocked))
@@ -396,10 +463,12 @@ struct SecurityView: View {
         do {
             async let a = Api.get("/api/v1/devices", cache: quiet)
             async let b = Api.get("/api/v1/adblock", cache: quiet)
-            let (dv, ab) = try await (a, b)
+            async let c = Api.get("/api/v1/apps", cache: quiet)
+            let (dv, ab, ap) = try await (a, b, c)
             await MainActor.run {
                 d = dv
                 ad = ab
+                appsData = ap
                 loading = false
                 err = ""
             }

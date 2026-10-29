@@ -5,9 +5,8 @@ import { J } from '../../core/Json';
 import { Fmt } from '../../util/Fmt';
 import { Bp } from '../Breakpoint';
 import { Pal, T } from '../Theme';
-import { Card, CardHeader, GlyphIcon, Hairline, Kv, Pill } from '../Comp';
+import { Card, CardHeader, CardTitle, GlyphIcon, Hairline, Kv, Pill } from '../Comp';
 import { Glyph } from '../comp/Icons';
-import { Ring } from '../comp/Ring';
 import { TrendChart } from '../comp/TrendChart';
 import { PortTile } from '../comp/PortTile';
 
@@ -61,6 +60,13 @@ export struct OverviewPage {
   @State txTotal: string = '—';
   @State wanUp: boolean = false;
   @State wanProto: string = '';
+  @State onlineCount: number = 0;
+  @State wanIp: string = '—';
+  @State wanGw: string = '—';
+  @State wanDns: string = '—';
+  @State wanUpSec: number = 0;
+  @State memDetail: string = '';
+  @State diskDetail: string = '';
   @State ports: PortVM[] = [];
   @State downHist: number[] = [];
   @State upHist: number[] = [];
@@ -73,6 +79,10 @@ export struct OverviewPage {
 
   private timer: number = -1;
   private liveTimer: number = -1;
+  /** 运行时长的走秒器：5 秒轮询只校准基准，中间靠它一秒一跳 */
+  private upTimer: number = -1;
+  private upBase: number = 0;
+  private upAt: number = 0;
 
   aboutToAppear(): void {
     this.winW = this.winWStore;
@@ -108,6 +118,17 @@ export struct OverviewPage {
     this.liveTimer = setInterval(() => {
       this.refreshTraffic(true);
     }, 3000);
+    this.upTimer = setInterval(() => {
+      this.tickUptime();
+    }, 1000);
+  }
+
+  /** 运行时长按秒跳，轮询来的基准值 5 秒才更新一次 */
+  private tickUptime(): void {
+    if (this.upBase <= 0) {
+      return;
+    }
+    this.uptime = Fmt.uptime(this.upBase + Math.floor((Date.now() - this.upAt) / 1000));
   }
 
   private stopPoll(): void {
@@ -118,6 +139,10 @@ export struct OverviewPage {
     if (this.liveTimer >= 0) {
       clearInterval(this.liveTimer);
       this.liveTimer = -1;
+    }
+    if (this.upTimer >= 0) {
+      clearInterval(this.upTimer);
+      this.upTimer = -1;
     }
   }
 
@@ -146,6 +171,12 @@ export struct OverviewPage {
       this.applyOverview(r.data);
     }
     await this.refreshTraffic(false);
+
+    // 在线设备数：概览接口里没有，单独问一次（安卓 hero 的第三栏也是这么来的）
+    const dv: ApiResult = await Api.get(ctx, '/api/v1/devices');
+    if (dv.ok) {
+      this.onlineCount = dv.data.obj('summary').num('online', 0);
+    }
     this.loaded = true;
   }
 
@@ -262,7 +293,9 @@ export struct OverviewPage {
     this.model = cpu.str('model', board.str('model', ''));
     this.kernel = board.str('kernel', '');
     this.osVersion = board.str('version', '');
-    this.uptime = Fmt.dur(j.num('uptime', 0));
+    this.upBase = j.num('uptime', 0);
+    this.upAt = Date.now();
+    this.uptime = Fmt.uptime(this.upBase);
     this.load1 = load.num('load1', 0).toFixed(2);
     this.threads = load.str('threads', '—');
 
@@ -271,20 +304,24 @@ export struct OverviewPage {
 
     this.memPct = mem.num('percent', 0) / 100;
     this.memText = mem.num('percent', 0).toFixed(0) + '%';
+    this.memDetail = Fmt.bytes(mem.num('used', 0)) + ' / ' + Fmt.bytes(mem.num('total', 0));
 
     // 磁盘取容量最大的那个挂载点：overlay 只有 2G，跟装了多少东西没多少关系
     const disks: J[] = j.arr('storage');
     let bestPct: number = 0;
     let bestTotal: number = -1;
+    let bestFree: number = 0;
     for (let i = 0; i < disks.length; i++) {
       const total: number = disks[i].num('total', 0);
       if (total > bestTotal) {
         bestTotal = total;
         bestPct = disks[i].num('percent', 0);
+        bestFree = disks[i].num('free', 0);
       }
     }
     this.diskPct = bestPct / 100;
     this.diskText = bestPct.toFixed(0) + '%';
+    this.diskDetail = Fmt.bytes(bestFree) + ' 可用';
 
     // 温度优先取 CPU 封装温度，acpitz 那路是主板环境温度，参考价值低
     const temps: J[] = j.arr('temperature');
@@ -304,6 +341,11 @@ export struct OverviewPage {
 
     this.wanUp = wan.bool('up', false);
     this.wanProto = wan.str('proto', '').toUpperCase();
+    this.wanIp = wan.str('ipv4', '—');
+    this.wanGw = wan.str('gateway', '—');
+    const dnsList: string[] = wan.strs('dns');
+    this.wanDns = dnsList.length === 0 ? '自动' : dnsList.join('  ');
+    this.wanUpSec = wan.num('uptime', 0);
 
     const list: J[] = net.arr('ports');
     for (let i = 0; i < list.length; i++) {
@@ -362,13 +404,13 @@ export struct OverviewPage {
           Row({ space: Bp.gap(this.winW) }) {
             Column() {
               this.heroCard();
-              this.trafficCard();
             }
             .layoutWeight(1)
             .alignItems(HorizontalAlign.Start);
 
             Column() {
               this.ringCard();
+              this.wanCard();
               this.portCard();
               this.machineCard();
               this.netEntryCard();
@@ -381,8 +423,8 @@ export struct OverviewPage {
         } else {
           Column() {
             this.heroCard();
-            this.trafficCard();
             this.ringCard();
+            this.wanCard();
             this.portCard();
             this.machineCard();
             this.netEntryCard();
@@ -444,10 +486,34 @@ export struct OverviewPage {
       Row() {
         this.heroStat('下行', this.rxNow);
         this.heroStat('上行', this.txNow);
-        this.heroStat('温度', this.temp);
+        this.heroStat('在线设备', this.onlineCount > 0 ? this.onlineCount.toString() : '—');
       }
       .width('100%')
       .margin({ top: 20 });
+
+      // 趋势图并进 hero（与安卓一致）：网快不快是同一件事，
+      // 拆成下面另一张卡看得来回对照
+      Column() {
+        Row() {
+          Text('流量趋势 · 最近 2 分钟')
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.hero_fg_soft'))
+            .layoutWeight(1);
+          Text('累计 ↓ ' + this.rxTotal + '  ↑ ' + this.txTotal)
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.hero_fg_soft'));
+        }
+        .width('100%');
+
+        TrendChart({
+          down: this.downHist,
+          up: this.upHist,
+          chartHeight: Bp.chartH(this.winW, 96)
+        })
+          .margin({ top: 8 });
+      }
+      .width('100%')
+      .margin({ top: 18 });
     }
     .width('100%')
     .padding(20)
@@ -461,100 +527,121 @@ export struct OverviewPage {
   }
 
   @Builder
-  trafficCard() {
-    Card({ gapTop: 0, gapBottom: this.rail() ? 0 : T.GAP }) {
-      Row() {
-        Text('实时流量')
-          .fontSize(T.F_H2)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.text_primary'))
-          .layoutWeight(1);
-        Text('近 2 分钟')
+  ringCard() {
+    Card({ gapTop: 0, gapBottom: this.rail() ? Bp.gap(this.winW) : T.GAP }) {
+      CardTitle({ glyph: Glyph.CHIP, title: '系统负载', sub: 'CPU · 内存 · 磁盘' }) {
+        Text('负载 ' + this.load1)
           .fontSize(T.F_TINY)
           .fontColor($r('app.color.text_secondary'));
       }
-      .width('100%');
-
-      Row({ space: 16 }) {
-        this.legend(Pal.primaryDim(), '下行', this.rxNow);
-        this.legend(Pal.primaryBright(), '上行', this.txNow);
-      }
-      .width('100%')
-      .margin({ top: 10 });
-
-      TrendChart({
-        down: this.downHist,
-        up: this.upHist,
-        chartHeight: Bp.chartH(this.winW, 132)
-      })
-        .margin({ top: 6 });
-
-      Row() {
-        Text('累计 ↓ ' + this.rxTotal)
-          .fontSize(T.F_TINY)
-          .fontColor($r('app.color.text_secondary'))
-          .layoutWeight(1);
-        Text('↑ ' + this.txTotal)
-          .fontSize(T.F_TINY)
-          .fontColor($r('app.color.text_secondary'));
-      }
-      .width('100%')
-      .margin({ top: 8 });
+      this.meterRow('CPU', this.cpuPct, this.cpuText,
+        this.threads + ' 线程' + (this.temp.length > 0 && this.temp !== '—' ? ' · ' + this.temp : ''));
+      this.meterRow('内存', this.memPct, this.memText, this.memDetail);
+      this.meterRow('磁盘', this.diskPct, this.diskText, this.diskDetail);
     }
   }
 
   @Builder
-  ringCard() {
-    Card({ gapTop: 0, gapBottom: this.rail() ? Bp.gap(this.winW) : T.GAP }) {
-      CardHeader({ title: '系统负载', sub: '负载 ' + this.load1 + ' · 线程 ' + this.threads });
+  meterRow(label: string, ratio: number, value: string, detail: string) {
+    Column() {
       Row() {
-        Ring({
-          ratio: this.cpuPct,
-          label: this.cpuText,
-          caption: 'CPU',
-          accent: '',
-          diameter: Bp.ring(this.winW, 84)
-        })
-          .layoutWeight(1);
-        Ring({
-          ratio: this.memPct,
-          label: this.memText,
-          caption: '内存',
-          accent: '',
-          diameter: Bp.ring(this.winW, 84)
-        })
-          .layoutWeight(1);
-        Ring({
-          ratio: this.diskPct,
-          label: this.diskText,
-          caption: '磁盘',
-          accent: '',
-          diameter: Bp.ring(this.winW, 84)
-        })
-          .layoutWeight(1);
+        Text(label)
+          .fontSize(T.F_BODY)
+          .fontColor($r('app.color.text_primary'));
+        if (detail.length > 0) {
+          Text(detail)
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_secondary'))
+            .margin({ left: 8 });
+        }
+        Blank();
+        Text(value)
+          .fontSize(T.F_BODY)
+          .fontColor($r('app.color.text_primary'));
       }
       .width('100%')
-      .margin({ top: 10 });
+      .alignItems(VerticalAlign.Center);
+
+      Stack({ alignContent: Alignment.Start }) {
+        Row()
+          .width('100%')
+          .height(6)
+          .borderRadius(3)
+          .backgroundColor($r('app.color.track'));
+        Row()
+          .width(this.pctWidth(ratio))
+          .height(6)
+          .borderRadius(3)
+          .backgroundColor($r('app.color.primary'));
+      }
+      .width('100%')
+      .margin({ top: 6 });
+    }
+    .width('100%')
+    .margin({ top: 14 });
+  }
+
+  private pctWidth(r: number): string {
+    const v: number = Math.max(0, Math.min(1, r));
+    return (v * 100).toFixed(0) + '%';
+  }
+
+  /** 宽带连接：四项关键信息 + 网络设置入口（安卓概览里也是独立一张） */
+  @Builder
+  wanCard() {
+    Card({ gapTop: 0, gapBottom: this.rail() ? Bp.gap(this.winW) : T.GAP }) {
+      CardTitle({ glyph: Glyph.GLOBE, title: '宽带连接', sub: this.wanUp ? '已拨通' : '未连接' }) {
+        Pill({
+          text: this.wanProto.length > 0 ? this.wanProto : '配置',
+          tone: this.wanUp ? Pal.ok() : Pal.textSecondary()
+        });
+      }
+
+      Column({ space: 9 }) {
+        Kv({ label: 'WAN 地址', value: this.wanIp, valueSize: 0, accent: false });
+        Kv({ label: '网关', value: this.wanGw, valueSize: 0, accent: false });
+        Kv({ label: 'DNS', value: this.wanDns, valueSize: 0, accent: false });
+        Kv({
+          label: '拨号时长',
+          value: this.wanUpSec > 0 ? Fmt.uptime(this.wanUpSec) : '—',
+          valueSize: 0,
+          accent: false
+        });
+      }
+      .width('100%')
+      .margin({ top: 12 });
+
+      Hairline({ indent: 0 });
+
+      Row() {
+        GlyphIcon({ kind: Glyph.LINK, color: Pal.primary(), side: 16, lineWidth: 1.9 });
+        Column() {
+          Text('网络设置')
+            .fontSize(T.F_BODY)
+            .fontColor($r('app.color.text_primary'));
+          Text('WAN / LAN / 无线 / 端口转发')
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_secondary'))
+            .margin({ top: 2 });
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        .margin({ left: 10 });
+        GlyphIcon({ kind: Glyph.CHEVRON, color: Pal.textTertiary(), side: 15, lineWidth: 1.9 });
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
+      .padding({ top: 12, bottom: 4 })
+      .onClick(() => {
+        router.pushUrl({ url: 'pages/NetSettingsPage' });
+      });
     }
   }
 
   @Builder
   portCard() {
     Card({ gapTop: 0, gapBottom: this.rail() ? Bp.gap(this.winW) : T.GAP }) {
-      Row() {
-        Column() {
-          Text('网口')
-            .fontSize(T.F_H2)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.text_primary'));
-          Text('点开看累计收发')
-            .fontSize(T.F_TINY)
-            .fontColor($r('app.color.text_secondary'))
-            .margin({ top: 3 });
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1);
-
+      CardTitle({ glyph: Glyph.BOX, title: '网口', sub: '点开看累计收发' }) {
         Pill({
           text: this.ports.length === 0
             ? '—'
@@ -562,8 +649,6 @@ export struct OverviewPage {
           tone: this.onlinePorts() > 0 ? Pal.primary() : Pal.textSecondary()
         });
       }
-      .width('100%')
-      .alignItems(VerticalAlign.Center);
 
       if (this.ports.length === 0) {
         Text('没有检测到物理网口')

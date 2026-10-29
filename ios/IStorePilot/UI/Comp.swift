@@ -48,7 +48,158 @@ struct Hairline: View {
     }
 }
 
+// MARK: - 流量曲线
+
+/// hero 卡里的流量趋势：两条折线 + 四条横向网格线。
+/// 只描线不填充 —— 深色底上填充会盖住另一条线。
+struct Sparkline: View {
+    let down: [Double]
+    let up: [Double]
+    var height: CGFloat = 88
+
+    var body: some View {
+        GeometryReader { geo in
+            let peak = max(down.max() ?? 0, up.max() ?? 0, 1)
+            ZStack(alignment: .topLeading) {
+                VStack(spacing: 0) {
+                    ForEach(0..<4, id: \.self) { i in
+                        Rectangle()
+                            .fill(Color.white.opacity(0.10))
+                            .frame(height: 0.5)
+                        if i < 3 { Spacer(minLength: 0) }
+                    }
+                }
+                line(up, size: geo.size, peak: peak)
+                    .stroke(Color(hex: 0xFFC46B).opacity(0.85),
+                            style: StrokeStyle(lineWidth: 1.3, lineCap: .round, lineJoin: .round))
+                line(down, size: geo.size, peak: peak)
+                    .stroke(Color(hex: 0x5FE7C4),
+                            style: StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round))
+            }
+        }
+        .frame(height: height)
+    }
+
+    private func line(_ data: [Double], size: CGSize, peak: Double) -> Path {
+        Path { p in
+            guard data.count > 1, size.width > 0 else { return }
+            let stepX = size.width / CGFloat(data.count - 1)
+            for (i, v) in data.enumerated() {
+                let x = CGFloat(i) * stepX
+                let ratio = min(1, max(0, v / peak))
+                let y = size.height - CGFloat(ratio) * (size.height - 6) - 3
+                if i == 0 {
+                    p.move(to: CGPoint(x: x, y: y))
+                } else {
+                    p.addLine(to: CGPoint(x: x, y: y))
+                }
+            }
+        }
+    }
+}
+
+// MARK: - 应用图标
+
+/// 应用图标：优先用 Assets 里的官方图（与安卓 drawable-nodpi 同一批，
+/// 由 scripts/sync_app_icons.py 同步），认不出来的名字退回「首字 + 稳定色块」。
+///
+/// 圆角 24% 与安卓 `AppIcon.RoundIconView` 一致 —— 抓来的图都是方图，
+/// 圆角是 App Store 客户端加上去的，不裁就是方的。
+struct AppIconView: View {
+    let name: String
+    var size: CGFloat = 32
+
+    private var corner: CGFloat { size * 0.24 }
+
+    var body: some View {
+        Group {
+            if let asset = AppIcons.asset(name) {
+                Image(asset)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size)
+                    .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
+            } else {
+                Text(glyph)
+                    .font(.system(size: size * 0.42, weight: .medium))
+                    .foregroundStyle(.white)
+                    .frame(width: size, height: size)
+                    .background(tint)
+                    .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
+            }
+        }
+        .frame(width: size, height: size)
+    }
+
+    /// 没有官方图时的首字：中文取第一个字，英文取前两个单词首字母
+    private var glyph: String {
+        let n = name.trimmingCharacters(in: .whitespaces)
+        guard let first = n.first else { return "?" }
+        if first.isNumber { return String(n.prefix(2)) }
+        if first.unicodeScalars.first!.value > 0x2E80 { return String(first) }
+        let parts = n.split(separator: " ")
+        if parts.count >= 2, let a = parts[0].first, let b = parts[1].first {
+            return "\(Character(a.uppercased()))\(Character(b.uppercased()))"
+        }
+        return String(Character(first.uppercased()))
+    }
+
+    /// 稳定色：用字符编码求和，不用 hashValue（Swift 的 hash 每次启动都不同，
+    /// 同一个应用的颜色会变来变去）
+    private var tint: Color {
+        let palette: [UInt32] = [
+            0xFF5A2D, 0xFF7A00, 0xFB7299, 0x00BE06, 0x1E9FFF, 0xFF6C00,
+            0xFF3B30, 0x161823, 0x07C160, 0x12B7F5, 0xFFAA00, 0x2577E3,
+            0xCF0A2C, 0x0A59F7, 0x10A37F, 0x7C3AED,
+        ]
+        let seed = name.unicodeScalars.reduce(0) { ($0 &+ Int($1.value)) % 9973 }
+        return Color(hex: palette[seed % palette.count])
+    }
+}
+
 // MARK: - 文字
+
+/// 卡片标题行：28pt 圆角图标块 + 标题 + 副标题，右侧留给调用方。
+///
+/// 对应安卓的 `Ui.cardTitle`。原来这里只有 `SectionTitle`（一行字，没有图标块），
+/// 结果安卓的卡片都有彩色图标块、iOS 全是一行裸标题 —— 同一个 App 两个长相。
+struct CardHead<Trailing: View>: View {
+    let icon: String
+    let title: String
+    var sub: String = ""
+    @ViewBuilder var trailing: () -> Trailing
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(C.primary)
+                .frame(width: 28, height: 28)
+                .background(C.accentSoft)
+                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 16.5, weight: .medium))
+                    .foregroundStyle(C.textPrimary)
+                if !sub.isEmpty {
+                    Text(sub)
+                        .font(.system(size: 12))
+                        .foregroundStyle(C.textSecondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 8)
+            trailing()
+        }
+    }
+}
+
+extension CardHead where Trailing == EmptyView {
+    init(icon: String, title: String, sub: String = "") {
+        self.init(icon: icon, title: title, sub: sub, trailing: { EmptyView() })
+    }
+}
 
 struct SectionTitle: View {
     let text: String
@@ -114,6 +265,41 @@ struct Pill: View {
             .padding(.vertical, 2.5)
             .background(color.opacity(0.13))
             .clipShape(Capsule())
+    }
+}
+
+/// 接入方式徽标：5G / 2.4G / WiFi / LAN / —。
+/// 事实画实心、推测画描边（从节点读不到时，主节点把经它接入的无线报成有线）。
+/// 尺寸与配色照搬安卓 `Access.badge`，两端列表放在同一个位置上，看起来才是一套东西
+struct AccessBadge: View {
+    let access: J
+    var online: Bool = true
+
+    var body: some View {
+        Text(F.accessShort(access))
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(tint)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(F.isAccessReal(access) ? tint.opacity(0.14) : .clear)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .strokeBorder(tint.opacity(F.isAccessReal(access) ? 0 : 0.42),
+                                          lineWidth: 1)
+                    }
+            }
+            .fixedSize()
+    }
+
+    private var tint: Color {
+        guard online else { return C.textTertiary }
+        switch F.accessShort(access) {
+        case "5G": return C.primary
+        case "2.4G": return C.warn
+        default: return C.textSecondary
+        }
     }
 }
 

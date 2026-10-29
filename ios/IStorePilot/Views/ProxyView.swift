@@ -18,7 +18,6 @@ struct ProxyView: View {
     @State private var busy = false
     /// 展开了哪些分组。和 Android 一样「只自动展开一次」，之后完全听用户的
     @State private var expanded: Set<String> = []
-    @State private var seeded = false
     @State private var testingGroup = ""
     /// 刚测出来的延迟，优先级高于接口里带的历史值
     @State private var tested: [String: Int] = [:]
@@ -126,7 +125,7 @@ struct ProxyView: View {
     private var backendCard: some View {
         Card {
             VStack(alignment: .leading, spacing: 0) {
-                SectionTitle(text: "代理后端", trailing: "两个插件互斥")
+                CardHead(icon: "server.rack", title: "代理后端", sub: "两个插件互斥，点一行切过去")
 
                 ForEach(Array(backends.enumerated()), id: \.offset) { i, b in
                     if i > 0 { Hairline(inset: 46) }
@@ -183,7 +182,11 @@ struct ProxyView: View {
 
         return Card {
             VStack(alignment: .leading, spacing: 10) {
-                SectionTitle(text: "运行模式", trailing: modeLabel(mode))
+                CardHead(icon: "bolt", title: "运行模式", sub: "改完立即生效") {
+                    Text(modeLabel(mode))
+                        .font(F.caption)
+                        .foregroundStyle(C.textSecondary)
+                }
 
                 HStack(spacing: 3) {
                     ForEach(Array(labels.enumerated()), id: \.offset) { i, t in
@@ -256,7 +259,7 @@ struct ProxyView: View {
 
         return Card {
             VStack(alignment: .leading, spacing: 0) {
-                SectionTitle(text: "配置与订阅", trailing: "换配置会重启内核")
+                CardHead(icon: "doc.text", title: "配置与订阅", sub: "换配置会重启内核")
 
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 3) {
@@ -318,7 +321,7 @@ struct ProxyView: View {
         }
         return Card {
             VStack(alignment: .leading, spacing: 0) {
-                SectionTitle(text: "节点", trailing: "点分组展开，点节点切换")
+                CardHead(icon: "list.bullet", title: "节点", sub: "点分组展开，点节点切换")
 
                 ForEach(Array(sorted.enumerated()), id: \.offset) { i, g in
                     if i > 0 { Hairline(inset: 16) }
@@ -468,11 +471,8 @@ struct ProxyView: View {
             await MainActor.run {
                 d = p
                 groups = (g["groups"] as? [Any])?.compactMap { $0 as? J } ?? []
-                // 只自动展开一次第一个分组，之后完全听用户的
-                if !seeded, let first = groups.first {
-                    expanded.insert(first.str("name"))
-                    seeded = true
-                }
+                // 分组一律默认折叠（与安卓一致）：一屏先看到所有组的当前节点和节点数，
+                // 想换哪个再展开哪个。以前会自动展开第一个，进来就是几十行节点
                 if let m { mode = m.str("mode") }
                 if let c { cfg = c }
                 loading = false

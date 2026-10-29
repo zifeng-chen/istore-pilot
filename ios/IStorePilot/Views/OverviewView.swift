@@ -17,6 +17,16 @@ struct OverviewView: View {
 
     private let tick = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
 
+    /// 运行时长按秒走：3 秒轮询只负责校准基准，中间由这个 1 秒节拍往前推
+    @State private var upBase: Double = 0
+    @State private var upAt: Date = .distantPast
+    @State private var now: Date = Date()
+    private let secTick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+    /// hero 里的流量曲线：每 3 秒一个采样点，留 48 个（约 2 分半）
+    @State private var rxHist: [Double] = []
+    @State private var txHist: [Double] = []
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -34,11 +44,13 @@ struct OverviewView: View {
                         } right: {
                             deviceCard
                         }
+                        wanCard
                         portCard(tileMin: 120)
                     } else {
                         // 窄屏维持原来的单列顺序。156 是手机上排两张的下限：
                         // 402pt 的机器内容宽 334，再大就只能排一张，六个口要滑六屏
                         systemCard
+                        wanCard
                         portCard(tileMin: 156)
                         deviceCard
                     }
@@ -57,6 +69,7 @@ struct OverviewView: View {
             .navigationBarTitleDisplayMode(.large)
             .task { await load() }
             .onReceive(tick) { _ in Task { await load() } }
+            .onReceive(secTick) { now = $0 }
             .navigationDestination(isPresented: $goHardware) { HardwareView() }
             .navigationDestination(isPresented: $goWan) { WanView() }
             .alert(item: $popup) { p in
@@ -87,8 +100,8 @@ struct OverviewView: View {
                         .fill(wan.bool("up") ? Color(hex: 0x5FE7C4) : Color(hex: 0xFF7A6B))
                         .frame(width: 7, height: 7)
                     Spacer()
-                    Text(F.dur(d.dbl("uptime")))
-                        .font(F.tiny)
+                    Text(F.uptime(uptimeNow))
+                        .font(F.num(12, .regular))
                         .foregroundStyle(C.heroFgSoft)
                 }
 
@@ -96,17 +109,42 @@ struct OverviewView: View {
                     .font(F.tiny)
                     .foregroundStyle(C.heroFgSoft)
 
+                // 三栏：下载 / 上传 / 在线设备。第三栏是安卓 hero 里就有的 ——
+                // 「现在有多少台设备在用这条宽带」和速率是同一件事的两面
                 HStack(spacing: 0) {
-                    rateBlock(icon: "arrow.down", label: "下载", v: up)
+                    rateBlock(icon: "arrow.down", label: "当前下载", text: F.rate(up))
                     Rectangle().fill(Color.white.opacity(0.18)).frame(width: 0.8, height: 34)
-                    rateBlock(icon: "arrow.up", label: "上传", v: down)
+                    rateBlock(icon: "arrow.up", label: "当前上传", text: F.rate(down))
+                    Rectangle().fill(Color.white.opacity(0.18)).frame(width: 0.8, height: 34)
+                    rateBlock(icon: "wifi", label: "在线设备", text: "\(onlineCount)")
                 }
                 .padding(.top, 2)
+
+                // 趋势图直接长在 hero 里，与安卓一致：网快不快是同一件事，
+                // 拆成下面另一张卡看得来回对照
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("流量趋势 · 最近 2 分钟")
+                            .font(.system(size: 11))
+                            .foregroundStyle(C.heroFgSoft)
+                        Spacer()
+                        Text(peakText)
+                            .font(.system(size: 11))
+                            .foregroundStyle(C.heroFgSoft)
+                    }
+                    Sparkline(down: rxHist, up: txHist, height: 88)
+                    HStack(spacing: 14) {
+                        legendDot(color: Color(hex: 0x5FE7C4), text: "下载")
+                        legendDot(color: Color(hex: 0xFFC46B), text: "上传")
+                        Spacer()
+                    }
+                }
+                .padding(.top, 14)
             }
         }
     }
 
-    private func rateBlock(icon: String, label: String, v: Double) -> some View {
+    private func rateBlock(icon: String, label: String, text: String) -> some View {
         HStack(spacing: 9) {
             Image(systemName: icon)
                 .font(.system(size: 13, weight: .bold))
@@ -118,13 +156,31 @@ struct OverviewView: View {
                 Text(label)
                     .font(.system(size: 10.5))
                     .foregroundStyle(C.heroFgSoft)
-                Text(F.rate(v))
+                Text(text)
                     .font(F.num(16.5, .semibold))
                     .foregroundStyle(C.heroFg)
             }
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private var onlineCount: Int {
+        dev.obj("summary")?.int("online") ?? 0
+    }
+
+    private var peakText: String {
+        let peak = max(rxHist.max() ?? 0, txHist.max() ?? 0)
+        return peak > 0 ? "峰值 " + F.rate(peak) : ""
+    }
+
+    private func legendDot(color: Color, text: String) -> some View {
+        HStack(spacing: 5) {
+            Circle().fill(color).frame(width: 7, height: 7)
+            Text(text)
+                .font(.system(size: 10.5))
+                .foregroundStyle(C.heroFgSoft)
+        }
     }
 
     // MARK: - 系统
@@ -139,7 +195,12 @@ struct OverviewView: View {
 
         return Card {
             VStack(alignment: .leading, spacing: 14) {
-                SectionTitle(text: "系统状态", trailing: cpu.str("model"))
+                CardHead(icon: "cpu", title: "系统负载",
+                         sub: "CPU · 内存 · 磁盘") {
+                    Text(cpu.str("model"))
+                        .font(F.caption)
+                        .foregroundStyle(C.textSecondary)
+                }
 
                 metricRow(title: "CPU",
                           value: F.pct(cpu.dbl("percent")),
@@ -223,8 +284,14 @@ struct OverviewView: View {
 
         return Card {
             VStack(alignment: .leading, spacing: 12) {
-                SectionTitle(text: "网口",
-                             trailing: ports.isEmpty ? "" : "\(online)/\(ports.count) 在线")
+                CardHead(icon: "cable.connector", title: "网口",
+                         sub: "点开看累计收发") {
+                    if !ports.isEmpty {
+                        Text("\(online)/\(ports.count) 在线")
+                            .font(F.caption)
+                            .foregroundStyle(C.textSecondary)
+                    }
+                }
 
                 if ports.isEmpty {
                     Text("没有检测到物理网口")
@@ -252,12 +319,58 @@ struct OverviewView: View {
                     }
                 }
 
+            }
+        }
+    }
+
+    // MARK: - 宽带连接
+
+    /// 与安卓概览的「宽带连接」卡同构：图标标题 + 四项关键信息 + 网络设置入口。
+    /// 原来这部分信息只藏在「网口」卡底部的一个文字链接里，得点进去才知道拨没拨通。
+    private var wanCard: some View {
+        let wan = d.obj("network")?.obj("wan") ?? [:]
+        let up = wan.bool("up")
+        let proto = wan.str("proto_label", wan.str("proto", ""))
+        let dns = wan.list("dns").compactMap { $0 as? String }
+        let secs = wan.dbl("uptime")
+
+        return Card {
+            VStack(alignment: .leading, spacing: 12) {
+                CardHead(icon: "globe", title: "宽带连接",
+                         sub: up ? "已拨通" : "未连接") {
+                    Text(proto.isEmpty ? "配置" : proto)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(up ? C.ok : C.textSecondary)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 4)
+                        .background(C.accentSoft)
+                        .clipShape(Capsule())
+                }
+
+                VStack(spacing: 9) {
+                    KV("WAN 地址", wan.str("ipv4"))
+                    KV("网关", wan.str("gateway"))
+                    KV("DNS", dns.isEmpty ? "自动" : dns.joined(separator: "  "))
+                    KV("拨号时长", secs > 0 ? F.uptime(secs) : "—")
+                }
+
                 Hairline(inset: 0)
+
                 Button {
                     goWan = true
                 } label: {
-                    HStack {
-                        Text("宽带连接与配置").font(F.body).foregroundStyle(C.primary)
+                    HStack(spacing: 10) {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(C.primary)
+                            .frame(width: 28, height: 28)
+                            .background(C.accentSoft)
+                            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("网络设置").font(F.body).foregroundStyle(C.textPrimary)
+                            Text("WAN / LAN / 无线 / 端口转发")
+                                .font(F.tiny).foregroundStyle(C.textSecondary)
+                        }
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.system(size: 11, weight: .semibold))
@@ -281,8 +394,14 @@ struct OverviewView: View {
 
         return Card {
             VStack(alignment: .leading, spacing: 12) {
-                SectionTitle(text: "局域网设备",
-                             trailing: list.isEmpty ? "" : "\(online.count) / \(list.count) 在线")
+                CardHead(icon: "link", title: "局域网设备",
+                         sub: "点行看详情") {
+                    if !list.isEmpty {
+                        Text("\(online.count) / \(list.count) 在线")
+                            .font(F.caption)
+                            .foregroundStyle(C.textSecondary)
+                    }
+                }
 
                 HStack(spacing: 10) {
                     statBlock("在线", "\(online.count)", C.primary)
@@ -351,6 +470,12 @@ struct OverviewView: View {
         }
     }
 
+    /// 当前运行秒数：基准值 + 本地走过的秒数
+    private var uptimeNow: Double {
+        guard upBase > 0 else { return 0 }
+        return upBase + now.timeIntervalSince(upAt)
+    }
+
     // MARK: - 载入
 
     private func load() async {
@@ -358,6 +483,8 @@ struct OverviewView: View {
         // 在里面改 @State 会变成后台线程写视图状态
         if let o = try? await Api.get("/api/v1/overview") {
             d = o
+            upBase = o.dbl("uptime")
+            upAt = Date()
             recordHistory(o)
         } else if d.isEmpty {
             err = "连不上路由器"
@@ -370,6 +497,14 @@ struct OverviewView: View {
     /// 每个网口留 32 个采样点。只记总速率（收 + 发），
     /// 分开记两条线在 26pt 高的小图里只会糊成一团。
     private func recordHistory(_ o: J) {
+        let w = o.obj("network")?.obj("wan") ?? [:]
+        rxHist.append(w.dbl("rx_bps"))
+        txHist.append(w.dbl("tx_bps"))
+        if rxHist.count > 48 {
+            rxHist.removeFirst(rxHist.count - 48)
+            txHist.removeFirst(txHist.count - 48)
+        }
+
         let ports = o.obj("network")?.objs("ports") ?? []
         var next = hist
         for p in ports {

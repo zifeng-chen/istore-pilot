@@ -177,4 +177,18 @@ export class Pal {
   static skeletonHi(): string {
     return Pal.of($r('app.color.skeleton_highlight'), '#F7FBF9');
   }
+
+  /**
+   * 给实体色加透明度，返回 '#AARRGGBB'（ArkUI 把 alpha 写在最前面）。
+   * 传进来的如果是 8 位色，先砍掉原来的 alpha —— 否则会拼出 10 位，界面直接变透明
+   */
+  static alpha(hex: string, a: number): string {
+    let body: string = hex.startsWith('#') ? hex.substring(1) : hex;
+    if (body.length === 8) {
+      body = body.substring(2);
+    }
+    const aa: number = Math.round(Math.max(0, Math.min(1, a)) * 255);
+    const s: string = aa.toString(16);
+    return '#' + (s.length === 1 ? '0' + s : s) + body;
+  }
 }

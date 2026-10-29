@@ -14,9 +14,17 @@ import WebKit
 /// 照样打开网页端，让用户自己登一次，行为和改版前一样。
 struct WebScreen: View {
     var title: String = "路由器网页端"
+    /// 落地路径，比如 /cgi-bin/luci/admin/system/package-manager；空就停在后台首页
+    var path: String = ""
 
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var ctl = WebController()
+    @StateObject private var ctl: WebController
+
+    init(title: String = "路由器网页端", path: String = "") {
+        self.title = title
+        self.path = path
+        _ctl = StateObject(wrappedValue: WebController(path: path))
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -110,12 +118,14 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate {
 
     let web: WKWebView
     private var loaded = false
+    private let wantPath: String
 
     var view: UIViewRepresentableBox { UIViewRepresentableBox(web: web) }
 
     var canGoBack: Bool { web.canGoBack }
 
-    override init() {
+    init(path: String = "") {
+        wantPath = path
         let cfg = WKWebViewConfiguration()
         cfg.allowsInlineMediaPlayback = true
         web = WKWebView(frame: .zero, configuration: cfg)
@@ -164,11 +174,21 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate {
         guard let res, res.bool("ok"), !name.isEmpty, !value.isEmpty,
               let url = URL(string: urlStr), let urlHost = url.host else {
             // 拿不到票据：不是错误，退回「打开网页端，自己登」
-            await load(fallback, cookie: nil)
+            await load(withPath(fallback), cookie: nil)
             return
         }
-        await load(urlStr, cookie: (name, value, urlHost))
+        await load(withPath(urlStr), cookie: (name, value, urlHost))
         await MainActor.run { host = urlHost }
+    }
+
+    /// 票据给的 url 是后台首页，深链要自己换上路径；query 必须清掉，
+    /// 否则首页带过来的参数会跟着跑到别的页面上
+    private func withPath(_ s: String) -> String {
+        guard !wantPath.isEmpty, var comp = URLComponents(string: s) else { return s }
+        comp.path = wantPath.hasPrefix("/") ? wantPath : "/" + wantPath
+        comp.query = nil
+        comp.fragment = nil
+        return comp.url?.absoluteString ?? s
     }
 
     private func load(_ urlStr: String, cookie: (String, String, String)?) async {

@@ -9,12 +9,14 @@
 /* Begin PBXBuildFile section */
 		78507155C8DF724638E16435 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB034A81837C7D41A104C093 /* App.swift */; };
 		F171994678125D4B9722C444 /* Api.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7D6BAE4A8DD650C0BFDE91E /* Api.swift */; };
+		95E71888A4F5B3ABC26250FB /* AppIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D96DBFAA5E0C0FB3A21395E /* AppIcons.swift */; };
 		37689F8250779585B70D110D /* Fmt.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC0759E6ADF16C177FE3A74E /* Fmt.swift */; };
 		D7A4FDB839D6574A49C6F7B3 /* J.swift in Sources */ = {isa = PBXBuildFile; fileRef = E78C88DAFACFED4B88EA0C91 /* J.swift */; };
 		AB5AA5C94DE6656F2796C738 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6622E821119751D10E5D46F /* Session.swift */; };
 		78A66D0853E4CD5E2745D689 /* Comp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB43E9FF46990D334393AB91 /* Comp.swift */; };
 		35807E6EE590EFD400446333 /* DuoLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7989AB621B0D25F655474A0 /* DuoLayout.swift */; };
 		FE9E0C55D0E594515A31BCF2 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC1FCBF27EBDAF9884EF0F4 /* Theme.swift */; };
+		FB2A0190F3B2D49D9F9EE4DF /* AppsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E7DB447FAE199D4C0AB35CF /* AppsView.swift */; };
 		5BE49A73AA3BF18EB168979B /* BackupsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80FCA721763560787729ABBE /* BackupsView.swift */; };
 		FA41263880C8D68C9F584FD9 /* DeviceDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9161FB931DFC415882CD59B9 /* DeviceDetailView.swift */; };
 		8326BC4E76E5A7A588F1F19D /* DevicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A83ABDDD7AF702729432E5A4 /* DevicesView.swift */; };
@@ -37,12 +39,14 @@
 /* Begin PBXFileReference section */
 		FB034A81837C7D41A104C093 /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
 		F7D6BAE4A8DD650C0BFDE91E /* Api.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Api.swift; sourceTree = "<group>"; };
+		2D96DBFAA5E0C0FB3A21395E /* AppIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIcons.swift; sourceTree = "<group>"; };
 		DC0759E6ADF16C177FE3A74E /* Fmt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fmt.swift; sourceTree = "<group>"; };
 		E78C88DAFACFED4B88EA0C91 /* J.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = J.swift; sourceTree = "<group>"; };
 		C6622E821119751D10E5D46F /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
 		CB43E9FF46990D334393AB91 /* Comp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Comp.swift; sourceTree = "<group>"; };
 		E7989AB621B0D25F655474A0 /* DuoLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuoLayout.swift; sourceTree = "<group>"; };
 		FAC1FCBF27EBDAF9884EF0F4 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		2E7DB447FAE199D4C0AB35CF /* AppsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppsView.swift; sourceTree = "<group>"; };
 		80FCA721763560787729ABBE /* BackupsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupsView.swift; sourceTree = "<group>"; };
 		9161FB931DFC415882CD59B9 /* DeviceDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceDetailView.swift; sourceTree = "<group>"; };
 		A83ABDDD7AF702729432E5A4 /* DevicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevicesView.swift; sourceTree = "<group>"; };
@@ -108,6 +112,7 @@
 			isa = PBXGroup;
 			children = (
 				F7D6BAE4A8DD650C0BFDE91E /* Api.swift */,
+				2D96DBFAA5E0C0FB3A21395E /* AppIcons.swift */,
 				DC0759E6ADF16C177FE3A74E /* Fmt.swift */,
 				E78C88DAFACFED4B88EA0C91 /* J.swift */,
 				C6622E821119751D10E5D46F /* Session.swift */,
@@ -128,6 +133,7 @@
 		38DF21AEF4612506D6BE5CBE /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				2E7DB447FAE199D4C0AB35CF /* AppsView.swift */,
 				80FCA721763560787729ABBE /* BackupsView.swift */,
 				9161FB931DFC415882CD59B9 /* DeviceDetailView.swift */,
 				A83ABDDD7AF702729432E5A4 /* DevicesView.swift */,
@@ -219,12 +225,14 @@
 			files = (
 				78507155C8DF724638E16435 /* App.swift in Sources */,
 				F171994678125D4B9722C444 /* Api.swift in Sources */,
+				95E71888A4F5B3ABC26250FB /* AppIcons.swift in Sources */,
 				37689F8250779585B70D110D /* Fmt.swift in Sources */,
 				D7A4FDB839D6574A49C6F7B3 /* J.swift in Sources */,
 				AB5AA5C94DE6656F2796C738 /* Session.swift in Sources */,
 				78A66D0853E4CD5E2745D689 /* Comp.swift in Sources */,
 				35807E6EE590EFD400446333 /* DuoLayout.swift in Sources */,
 				FE9E0C55D0E594515A31BCF2 /* Theme.swift in Sources */,
+				FB2A0190F3B2D49D9F9EE4DF /* AppsView.swift in Sources */,
 				5BE49A73AA3BF18EB168979B /* BackupsView.swift in Sources */,
 				FA41263880C8D68C9F584FD9 /* DeviceDetailView.swift in Sources */,
 				8326BC4E76E5A7A588F1F19D /* DevicesView.swift in Sources */,
@@ -306,7 +314,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 25;
+				CURRENT_PROJECT_VERSION = 26;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = IStorePilot/Info.plist;
@@ -314,7 +322,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = "0.1.2";
+				MARKETING_VERSION = "0.1.3";
 				PRODUCT_BUNDLE_IDENTIFIER = com.chaof.istoreos;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -329,7 +337,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 25;
+				CURRENT_PROJECT_VERSION = 26;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = IStorePilot/Info.plist;
@@ -337,7 +345,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = "0.1.2";
+				MARKETING_VERSION = "0.1.3";
 				PRODUCT_BUNDLE_IDENTIFIER = com.chaof.istoreos;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

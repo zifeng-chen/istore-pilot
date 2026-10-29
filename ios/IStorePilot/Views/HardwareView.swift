@@ -10,6 +10,12 @@ struct HardwareView: View {
     @State private var loading = true
     @State private var err = ""
 
+    /// 已运行按秒走：这一页只载入一次，不自己走秒的话数字是定住的
+    @State private var upBase: Double = 0
+    @State private var upAt: Date = .distantPast
+    @State private var now: Date = Date()
+    private let secTick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
@@ -42,6 +48,7 @@ struct HardwareView: View {
         .navigationTitle("硬件")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
+        .onReceive(secTick) { now = $0 }
     }
 
     // MARK: - 机器
@@ -80,7 +87,7 @@ struct HardwareView: View {
                     heroStat("CPU",
                              "\(cpu.int("cores")) 核 \(cpu.int("threads")) 线程")
                     heroStat("内存", F.bytes(mem.dbl("total")))
-                    heroStat("运行", F.dur(s.dbl("uptime")))
+                    heroStat("运行", F.uptime(uptimeNow))
                 }
 
                 if !m.str("note").isEmpty {
@@ -377,6 +384,12 @@ struct HardwareView: View {
         }
     }
 
+    /// 当前运行秒数：基准值 + 本地走过的秒数
+    private var uptimeNow: Double {
+        guard upBase > 0 else { return 0 }
+        return upBase + now.timeIntervalSince(upAt)
+    }
+
     // MARK: - 工具
 
     private func firstNonEmpty(_ items: [String], fallback: String) -> String {
@@ -389,6 +402,8 @@ struct HardwareView: View {
             let j = try await Api.get("/api/v1/system/hardware")
             await MainActor.run {
                 h = j
+                upBase = (j.obj("system") ?? [:]).dbl("uptime")
+                upAt = Date()
                 loading = false
                 err = j.bool("ok") ? "" : "硬件信息读取失败"
             }

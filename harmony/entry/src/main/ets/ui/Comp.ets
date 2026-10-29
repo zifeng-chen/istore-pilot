@@ -223,15 +223,30 @@ export struct CardTitle {
   @Prop title: string;
   @Prop sub: string;
   tone: string = '';
+  /** 右侧插槽：在线数、状态胶囊之类 */
+  @BuilderParam trailing: () => void = this.emptyTrailing;
+
+  @Builder
+  emptyTrailing() {
+  }
 
   build() {
     Row() {
-      GlyphIcon({
-        kind: this.glyph,
-        color: this.tone.length > 0 ? this.tone : Pal.primary(),
-        side: 16,
-        lineWidth: 1.9
-      });
+      // 28 的淡色圆角块 + 16 的图标：和安卓 Ui.glyphTile 同规格。
+      // 原来这里只有一枚裸图标，安卓那边是彩色方块 —— 同一个 App 两个长相
+      Stack({ alignContent: Alignment.Center }) {
+        GlyphIcon({
+          kind: this.glyph,
+          color: this.tone.length > 0 ? this.tone : Pal.primary(),
+          side: 16,
+          lineWidth: 1.9
+        });
+      }
+      .width(28)
+      .height(28)
+      .borderRadius(9)
+      .backgroundColor($r('app.color.accent_soft'));
+
       Column() {
         Text(this.title)
           .fontSize(T.F_H2)
@@ -246,11 +261,13 @@ export struct CardTitle {
       }
       .alignItems(HorizontalAlign.Start)
       .layoutWeight(1)
-      .margin({ left: 9 });
+      .margin({ left: 10 });
+
+      this.trailing();
     }
     .width('100%')
     .alignItems(VerticalAlign.Center)
-    .padding({ left: 16, right: 16, bottom: 6 });
+    .padding({ bottom: 2 });
   }
 }
 

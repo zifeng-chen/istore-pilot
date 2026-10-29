@@ -28,10 +28,23 @@ struct WebPage {
   @State url: string = '';
   @State host: string = '';
   @State ready: boolean = false;
+  /** 全屏窗口：标题行要让出状态栏，否则返回键被时钟压住 */
+  @StorageProp('safeTop') safeTop: number = 0;
   @State progress: number = 0;
   @State err: string = '';
 
+  /** 落地路径，比如 /cgi-bin/luci/admin/system/package-manager；空则停在后台首页 */
+  private wantPath: string = '';
+
   aboutToAppear(): void {
+    const raw: Object | undefined = router.getParams();
+    if (raw) {
+      const p: Record<string, Object> = raw as Record<string, Object>;
+      const v: Object = p['path'];
+      if (typeof v === 'string') {
+        this.wantPath = v as string;
+      }
+    }
     this.open();
   }
 
@@ -58,6 +71,22 @@ struct WebPage {
       }
     }
     return 'http://' + host + '/cgi-bin/luci/';
+  }
+
+  /**
+   * 换成指定路径。票据给的 url 是后台首页，深链要自己换；
+   * query 一并丢掉，否则首页带过来的参数会跟到别的页面上。
+   */
+  private withPath(u: string): string {
+    if (this.wantPath.length === 0 || u.length === 0) {
+      return u;
+    }
+    const scheme: number = u.indexOf('://');
+    const from: number = scheme > 0 ? scheme + 3 : 0;
+    const i: number = u.indexOf('/', from);
+    const base: string = i > 0 ? u.substring(0, i) : u;
+    const path: string = this.wantPath.startsWith('/') ? this.wantPath : '/' + this.wantPath;
+    return base + path;
   }
 
   private async open(): Promise<void> {
@@ -88,7 +117,7 @@ struct WebPage {
       }
     }
 
-    this.url = target;
+    this.url = this.withPath(target);
     this.ready = true;
     if (!ok) {
       // 拿不到票据不是错误：照样打开网页端，让用户自己登一次
@@ -161,7 +190,7 @@ struct WebPage {
           });
       }
       .width('100%')
-      .padding({ left: 8, right: 8, top: 8, bottom: 6 })
+      .padding({ left: 8, right: 8, top: 8 + this.safeTop, bottom: 6 })
       .alignItems(VerticalAlign.Center);
 
       // 细进度条：LuCI 是服务端渲染，跳一次 200-600ms，没有提示会以为点了没反应

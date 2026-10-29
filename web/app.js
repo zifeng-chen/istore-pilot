@@ -53,6 +53,33 @@ const fmtDuration = (sec) => {
   if (h > 0) return `${h} 小时 ${m} 分`;
   return `${m} 分钟`;
 };
+/* 走秒的时长：3 天 04:12:33。
+   运行时长这类数字用户是拿来"看它还在跑"的，只到分钟跟死了一样 */
+const fmtUptime = (sec) => {
+  const s = Math.max(0, Math.floor(sec || 0));
+  const pad = (n) => String(n).padStart(2, '0');
+  const hms = `${pad(Math.floor((s % 86400) / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
+  const d = Math.floor(s / 86400);
+  return d > 0 ? `${d} 天 ${hms}` : hms;
+};
+
+/* 秒表：轮询 3 秒才来一次新数字，中间这两秒靠本地时钟往前推 ——
+   界面上看到的是一秒一跳，而不是每 3 秒猛跳一下 */
+const clocks = new Map();
+function setClock(id, sec, fmt) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (!sec) { el.textContent = '—'; clocks.delete(id); return; }
+  clocks.set(id, { base: sec, at: Date.now(), fmt: fmt || fmtUptime });
+  paintClock(id);
+}
+function paintClock(id) {
+  const el = document.getElementById(id);
+  const c = clocks.get(id);
+  if (!el || !c) return;
+  el.textContent = c.fmt(c.base + Math.floor((Date.now() - c.at) / 1000));
+}
+setInterval(() => { for (const id of clocks.keys()) paintClock(id); }, 1000);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -199,7 +226,7 @@ function renderOverview(d) {
   $('#wan-v6').textContent = v6 || '—';
   $('#wan-gw').textContent = wan.gateway || '—';
   $('#wan-dns').textContent = (wan.dns || []).join(' / ') || '—';
-  $('#wan-up').textContent = wan.uptime ? fmtDuration(wan.uptime) : '—';
+  setClock('wan-up', wan.uptime);
 
   const ports = d.network?.ports || [];
   const active = ports.filter((p) => p.up).length;
@@ -227,7 +254,7 @@ function renderOverview(d) {
   $('#sys-fw').textContent = b.version ? `iStoreOS ${b.version}` : '—';
   $('#sys-kernel').textContent = b.kernel || '—';
   $('#sys-cpu').textContent = `${d.cpu.model} · ${d.cpu.cores} 核`;
-  $('#sys-uptime').textContent = fmtDuration(d.uptime);
+  setClock('sys-uptime', d.uptime);
 }
 
 /* ---------------------------------------------------------------- 流量图 */
@@ -700,7 +727,12 @@ async function boot() {
   try {
     const h = await api('/health');
     // 这里原来显示「Agent 12345s」，秒数没人看得懂，改成版本 + 人类可读的运行时长
-    $('#set-agent').textContent = `v${h.version || '?'} · 已运行 ${fmtDuration(h.uptime)}`;
+    if (h.uptime) {
+      setClock('set-agent', h.uptime,
+        (s) => `v${h.version || '?'} · 已运行 ${fmtUptime(s)}`);
+    } else {
+      $('#set-agent').textContent = `v${h.version || '?'}`;
+    }
   } catch {}
   await refreshOverview();
   await pollTraffic();

@@ -94,8 +94,12 @@ struct DevicesView: View {
             }
             .navigationBarTitleDisplayMode(.large)
             .navigationDestination(for: String.self) { mac in
-                DeviceDetailView(mac: mac,
-                                 seed: all.first { $0.str("mac") == mac } ?? [:])
+                if mac == "#apps" {
+                    AppsView()
+                } else {
+                    DeviceDetailView(mac: mac,
+                                     seed: all.first { $0.str("mac") == mac } ?? [:])
+                }
             }
         }
         .task { await load() }
@@ -109,15 +113,10 @@ struct DevicesView: View {
         let online = dv.bool("online")
         let blocked = dv.bool("blocked")
 
-        return HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(online ? C.primary.opacity(0.12) : C.surfaceSunken)
-                    .frame(width: 40, height: 40)
-                Image(systemName: iconFor(dv.str("type")))
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(online ? C.primary : C.textTertiary)
-            }
+        return HStack(spacing: 10) {
+            // 接入方式徽标（5G / 2.4G / LAN）替掉原来的类型圆图标：
+            // 一排圆图标看不出「插线还是无线、连的哪个频段」，而那才是用户想知道的
+            AccessBadge(access: dv.obj("access") ?? [:], online: online)
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
@@ -163,19 +162,6 @@ struct DevicesView: View {
         if d < 3600 { return "\(max(1, Int(d / 60))) 分钟前" }
         if d < 86400 { return "\(Int(d / 3600)) 小时前" }
         return "\(Int(d / 86400)) 天前"
-    }
-
-    private func iconFor(_ type: String) -> String {
-        switch type {
-        case "手机": return "iphone"
-        case "电脑": return "laptopcomputer"
-        case "电视": return "tv"
-        case "音箱": return "hifispeaker"
-        case "摄像头": return "video"
-        case "打印机": return "printer"
-        case "路由": return "wifi.router"
-        default: return "desktopcomputer"
-        }
     }
 
     // MARK: - 搜索

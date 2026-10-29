@@ -24,6 +24,8 @@ import { Glyph } from '../comp/Icons';
 export struct NetworkPage {
   /** 作为二级页打开时显示返回箭头（底部四个页签里没有它了） */
   @Prop showBack: boolean = false;
+  /** 独立成页（网络设置）时窗口是全屏的，标题行要让出状态栏 */
+  @StorageProp('safeTop') safeTop: number = 0;
 
   @State loaded: boolean = false;
   @State err: string = '';
@@ -920,7 +922,7 @@ export struct NetworkPage {
         Row().width('100%').height(24);
       }
       .width('100%')
-      .padding({ left: T.PAD, right: T.PAD, top: 8 });
+      .padding({ left: T.PAD, right: T.PAD, top: 8 + (this.showBack ? this.safeTop : 0) });
     }
     .width('100%')
     .height('100%')

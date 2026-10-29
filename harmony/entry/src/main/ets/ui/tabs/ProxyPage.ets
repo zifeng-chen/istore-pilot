@@ -3,8 +3,8 @@ import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
 import { Bp } from '../Breakpoint';
 import { Pal, T } from '../Theme';
-import { Card, CardHeader, Comp, GroupBox, Hairline, Pill } from '../Comp';
-import { Ico } from '../comp/Icons';
+import { Card, CardHeader, CardTitle, Comp, GroupBox, Hairline, Pill } from '../Comp';
+import { Glyph, Ico } from '../comp/Icons';
 
 interface Backend {
   id: string;
@@ -341,7 +341,8 @@ export struct ProxyPage {
   @Builder
   backendCard() {
     Card() {
-      CardHeader({
+      CardTitle({
+        glyph: Glyph.POWER,
         title: '代理后端',
         sub: this.active === 'none' ? '当前没有代理在运行' : '当前生效：' + this.activeLabel()
       });
@@ -383,7 +384,7 @@ export struct ProxyPage {
   @Builder
   modeCard() {
     Card({ gapTop: T.GAP }) {
-      CardHeader({ title: '运行模式', sub: '规则模式按域名分流，全局模式全部走代理' });
+      CardTitle({ glyph: Glyph.BOLT, title: '运行模式', sub: '规则模式按域名分流，全局模式全部走代理' });
       Row({ space: 6 }) {
         this.modeChip('rule', '规则');
         this.modeChip('global', '全局');

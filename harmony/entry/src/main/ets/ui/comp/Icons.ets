@@ -114,8 +114,7 @@ export class Glyph {
       case Glyph.CHEVRON_LEFT:
         return 'M15.5 5.5 L9.5 11 L15.5 16.5';
       case Glyph.SWAP:
-        return 'M8 4.6 V18.4 M8 4.6 L5 7.6 M8 4.6 L11 7.6 '
-          + 'M16 19.4 V5.6 M16 19.4 L13 16.4 M16 19.4 L19 16.4';
+        return 'M8 4.6 L8 18.4 M8 4.6 L5 7.6 M8 4.6 L11 7.6 M16 19.4 L16 5.6 M16 19.4 L13 16.4 M16 19.4 L19 16.4';
       case Glyph.CHECK:
         return 'M4.5 11.5 L9 16 L17.5 6.5';
       case Glyph.CLOSE:

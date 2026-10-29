@@ -185,7 +185,7 @@ struct SettingsView: View {
     private var connectCard: some View {
         Card {
             VStack(alignment: .leading, spacing: 0) {
-                SectionTitle(text: "连接")
+                CardHead(icon: "link", title: "连接", sub: "凭证与服务器")
                 row(icon: "globe", title: "服务器地址",
                     note: "改地址会重新登录",
                     value: Session.base.replacingOccurrences(of: "http://", with: "")) {
@@ -221,7 +221,7 @@ struct SettingsView: View {
 
         return Card {
             VStack(alignment: .leading, spacing: 0) {
-                SectionTitle(text: "网络")
+                CardHead(icon: "globe", title: "网络", sub: "外网与内网网关")
 
                 plainRow(icon: "dot.radiowaves.left.and.right",
                          title: "外网状态",
@@ -270,7 +270,7 @@ struct SettingsView: View {
 
         return Card {
             VStack(alignment: .leading, spacing: 0) {
-                SectionTitle(text: "设备信息")
+                CardHead(icon: "iphone", title: "设备信息", sub: "型号、固件、运行时长")
                 Text("这台路由器的硬件与固件")
                     .font(.system(size: 11.5))
                     .foregroundStyle(C.textSecondary)
@@ -320,7 +320,7 @@ struct SettingsView: View {
     private var lookCard: some View {
         Card {
             VStack(alignment: .leading, spacing: 0) {
-                SectionTitle(text: "外观")
+                CardHead(icon: "paintpalette", title: "外观", sub: "深浅色")
                 Hairline(inset: 62)
                 row(icon: "circle.lefthalf.filled", title: "主题",
                     note: "跟随系统会随手机的深浅色自动切换",
@@ -342,7 +342,7 @@ struct SettingsView: View {
     private var maintainCard: some View {
         Card {
             VStack(alignment: .leading, spacing: 0) {
-                SectionTitle(text: "系统维护")
+                CardHead(icon: "shippingbox", title: "系统维护", sub: "备份、固件与软件包")
 
                 row(icon: "archivebox", title: "配置备份",
                     note: "动网络之前先存一份，随时能退回来") {
@@ -386,7 +386,11 @@ struct SettingsView: View {
         if !uploads.isEmpty {
             Card {
                 VStack(alignment: .leading, spacing: 8) {
-                    SectionTitle(text: "已上传的包", trailing: "\(uploads.count) 个")
+                    CardHead(icon: "tray.full", title: "已上传的包", sub: "点查看或删除") {
+                    Text("\(uploads.count) 个")
+                        .font(F.caption)
+                        .foregroundStyle(C.textSecondary)
+                }
                     ForEach(Array(uploads.enumerated()), id: \.offset) { _, u in
                         HStack(spacing: 9) {
                             Image(systemName: "doc")
@@ -423,10 +427,7 @@ struct SettingsView: View {
     private var powerCard: some View {
         Card {
             VStack(alignment: .leading, spacing: 0) {
-                SectionTitle(text: "电源控制")
-                Text("重启与关机都会短暂断网")
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(C.textSecondary)
+                CardHead(icon: "power", title: "电源控制", sub: "重启与关机都会短暂断网")
                     .padding(.bottom, 4)
 
                 row(icon: "arrow.triangle.2.circlepath", title: "重启网络服务",
@@ -450,7 +451,7 @@ struct SettingsView: View {
     private var securityCard: some View {
         Card {
             VStack(alignment: .leading, spacing: 0) {
-                SectionTitle(text: "安全")
+                CardHead(icon: "lock.shield", title: "安全", sub: "两个密码，别记混")
                 Hairline(inset: 62)
                 row(icon: "key", title: "修改 App 登录密码",
                     note: "只管这个 App") {

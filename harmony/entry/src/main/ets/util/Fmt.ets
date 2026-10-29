@@ -97,6 +97,17 @@ export class Fmt {
     return Math.floor(seconds) + ' 秒';
   }
 
+  /** 秒 → 「3 天 04:12:33」/「04:12:33」。
+   *  运行时长是拿来「看它还在跑」的，`dur()` 只到分钟，界面上像定住了 */
+  static uptime(seconds: number): string {
+    const s: number = Number.isFinite(seconds) && seconds > 0 ? Math.floor(seconds) : 0;
+    const pad = (n: number): string => (n < 10 ? '0' + n : '' + n);
+    const hms: string = pad(Math.floor((s % 86400) / 3600)) + ':' +
+      pad(Math.floor((s % 3600) / 60)) + ':' + pad(s % 60);
+    const d: number = Math.floor(s / 86400);
+    return d > 0 ? d + ' 天 ' + hms : hms;
+  }
+
   /** 链路速率：2500 → 2.5G */
   static speed(mbps: number): string {
     if (!Number.isFinite(mbps) || mbps <= 0) {

@@ -6,12 +6,44 @@ import { Bp } from '../Breakpoint';
 import { Pal, T } from '../Theme';
 import { GroupBox, Hairline } from '../Comp';
 
+/**
+ * 徽标文字：能缩写就缩写（5G / 2.4G / WiFi / LAN），与安卓 `Access.shortLabel`、
+ * iOS `F.accessShort` 同一套规则。频段不明只说类型，类型不明给破折号 ——
+ * 问号满屏比留白更像故障
+ */
+function accessShort(a: J): string {
+  const type: string = a.str('type', '');
+  const band: string = a.str('band', '');
+  if (type === 'wifi') {
+    if (band.startsWith('5')) {
+      return '5G';
+    }
+    if (band.startsWith('2')) {
+      return '2.4G';
+    }
+    return 'WiFi';
+  }
+  if (type === 'wired') {
+    return 'LAN';
+  }
+  return '—';
+}
+
+/** 「AP 报的 + 高置信」才算事实，其余都是推断（徽标画描边） */
+function accessReal(a: J): boolean {
+  return a.str('source', '') === 'ap' && a.str('conf', '') === 'high';
+}
+
 interface DevRow {
   mac: string;
   ip: string;
   name: string;
   vendor: string;
   type: string;
+  /** 接入方式徽标文字：5G / 2.4G / WiFi / LAN / — */
+  badge: string;
+  /** 徽标是不是事实（实心）。false 画描边，表示是从设备类型推的 */
+  badgeReal: boolean;
   online: boolean;
   blocked: boolean;
   staticIp: boolean;
@@ -138,11 +170,14 @@ export struct DevicesPage {
         name = d.str('mac', '');
       }
 
+      const acc: J = d.obj('access');
       const row: DevRow = {
         mac: d.str('mac', ''),
         ip: d.str('ip', ''),
         name: name,
         vendor: d.str('vendor', ''),
+        badge: accessShort(acc),
+        badgeReal: accessReal(acc),
         type: d.str('type', ''),
         online: d.bool('online', false),
         blocked: isBlocked,
@@ -305,24 +340,38 @@ export struct DevicesPage {
     }
   }
 
+  /** 徽标配色：5G 用主色、2.4G 用警示色，离线整体压灰 —— 与安卓一致 */
+  private badgeColor(d: DevRow): string {
+    if (!d.online) {
+      return Pal.textTertiary();
+    }
+    if (d.badge === '5G') {
+      return Pal.primary();
+    }
+    if (d.badge === '2.4G') {
+      return Pal.warn();
+    }
+    return Pal.textSecondary();
+  }
+
   @Builder
   row(d: DevRow, i: number) {
     Column() {
       if (i > 0) {
         Hairline({ indent: 16 });
       }
-      Row({ space: 12 }) {
-        // 首字圆形图标：拿不到真实图标，用设备名首字做一个稳定标识
-        Stack() {
-          Text(d.name.length > 0 ? d.name.substring(0, 1) : '?')
-            .fontSize(15)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.primary'));
-        }
-        .width(36)
-        .height(36)
-        .borderRadius(12)
-        .backgroundColor($r('app.color.accent_soft'));
+      Row({ space: 10 }) {
+        // 接入方式徽标（5G / 2.4G / LAN）替掉原来的首字方块：
+        // 一排方块看不出「插线还是无线、连的哪个频段」，而那才是用户想知道的
+        Text(d.badge)
+          .fontSize(10)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(this.badgeColor(d))
+          .textAlign(TextAlign.Center)
+          .padding({ left: 6, right: 6, top: 3, bottom: 3 })
+          .borderRadius(7)
+          .backgroundColor(d.badgeReal ? Pal.alpha(this.badgeColor(d), 0.14) : Color.Transparent)
+          .border({ width: d.badgeReal ? 0 : 1, color: Pal.alpha(this.badgeColor(d), 0.42) });
 
         Column() {
           Row({ space: 6 }) {

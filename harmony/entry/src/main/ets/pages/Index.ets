@@ -28,6 +28,9 @@ struct Index {
   @State current: number = 0;
   @State booted: boolean = false;
   @State safeBottom: number = 0;
+  /** 状态栏高度。窗口是全屏的（EntryAbility 里 setWindowLayoutFullScreen），
+      不主动让出来，页面大标题就会被时钟、电量压住 */
+  @StorageLink('safeTop') safeTop: number = 0;
   @State winW: number = 360;
   @State hostname: string = '';
   @StorageProp('forceLogin') @Watch('onForceLogin') forceLogin: number = 0;
@@ -108,7 +111,8 @@ struct Index {
               SideNav({ current: $current, hostname: this.hostname })
             }
             .width(Bp.RAIL_W)
-            .height('100%');
+            .height('100%')
+            .padding({ top: this.safeTop });
 
             // 内容区
             Column() {
@@ -180,8 +184,9 @@ struct Index {
     })
     .width('100%')
     .height('100%')
-    // 手机模式让出底部导航栏高度，否则最后一屏内容会被浮动的导航栏压住；
-    // 平板模式没有底部栏，传 0
-    .padding({ bottom: padBottom });
+    // 顶上让出状态栏，底下让出导航条：这个 App 是全屏窗口
+    // （EntryAbility 里 setWindowLayoutFullScreen），不让出来内容会钻到系统栏底下。
+    // 平板模式没有底部栏，padBottom 传 0
+    .padding({ top: this.safeTop, bottom: padBottom });
   }
 }

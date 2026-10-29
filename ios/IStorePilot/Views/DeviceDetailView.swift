@@ -115,12 +115,21 @@ struct DeviceDetailView: View {
                 KV("主机名", d.str("hostname", "—"), mono: true)
                 Hairline(inset: 0)
                 KV("状态", stateText())
+                if !accessText().isEmpty {
+                    Hairline(inset: 0)
+                    KV("接入方式", accessText())
+                }
                 if dhcp.bool("reserved") {
                     Hairline(inset: 0)
                     KV("静态绑定", dhcp.str("reserved_ip", "—"), mono: true, color: C.primary)
                 }
             }
         }
+    }
+
+    /// 接入方式是**推测**（AP 桥接，上游分不出无线/有线），所以把依据一并写出来
+    private func accessText() -> String {
+        F.accessDetail(d.obj("access") ?? [:])
     }
 
     private func stateText() -> String {
@@ -169,6 +178,7 @@ struct DeviceDetailView: View {
             VStack(alignment: .leading, spacing: 9) {
                 SectionTitle(text: "这台设备的应用")
                 ForEach(Array(apps.prefix(8).enumerated()), id: \.offset) { _, a in
+                    let live = a.dbl("down_bps") + a.dbl("up_bps")
                     HStack(spacing: 9) {
                         Text(a.str("name"))
                             .font(F.caption)
@@ -176,6 +186,13 @@ struct DeviceDetailView: View {
                             .lineLimit(1)
                         Pill(text: a.str("category", "其他"), color: C.textSecondary)
                         Spacer()
+                        // 累计字节几秒才涨一点点，正在跑的时候把实时速率也摆出来，
+                        // 否则边看视频边刷这一页会觉得数字是死的
+                        if live >= 1024 {
+                            Text("↓ " + F.rate(a.dbl("down_bps")))
+                                .font(F.num(11, .medium))
+                                .foregroundStyle(C.primary)
+                        }
                         Text(F.bytes(a.dbl("total")))
                             .font(F.num(11.5, .regular))
                             .foregroundStyle(C.textSecondary)

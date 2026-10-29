@@ -43,6 +43,67 @@ extension F {
         return "\(s) 秒"
     }
 
+    /// 秒 → "3 天 04:12:33" / "04:12:33"。
+    /// 运行时长是拿来「看它还在跑」的，`dur()` 只到分钟，放在界面上像定住了
+    static func uptime(_ sec: Double) -> String {
+        let s = max(0, Int(sec.isFinite ? sec : 0))
+        let hms = String(format: "%02d:%02d:%02d",
+                         (s % 86400) / 3600, (s % 3600) / 60, s % 60)
+        let d = s / 86400
+        return d > 0 ? "\(d) 天 \(hms)" : hms
+    }
+
+    /// 接入方式标签。source == "ap" 是中兴 AP 报表里的**事实**，不写「推测」；
+    /// source == "guess" 是推断的，必须标出来
+    static func accessLabel(_ a: J) -> String {
+        let band = a.str("band")
+        // 只有「AP 报的 + 高置信」才是事实；从节点读不到时退回类型推断，
+        // 那种同样带 source=ap，但必须标「推测」
+        let real = a.str("source") == "ap" && a.str("conf") == "high"
+        switch a.str("type") {
+        case "wifi":
+            let text = band.isEmpty ? "无线" : "无线 \(band)"
+            return real ? text : text + "(推测)"
+        case "wired":
+            return real ? "有线" : "有线(推测)"
+        default:
+            return ""
+        }
+    }
+
+    /// 列表徽标文字：能缩写就缩写（5G / 2.4G / WiFi / LAN），与安卓 `Access.shortLabel` 同一套规则。
+    /// 频段不明就只说类型，类型也不明给破折号 —— 问号满屏比留白更像故障
+    static func accessShort(_ a: J) -> String {
+        let band = a.str("band")
+        switch a.str("type") {
+        case "wifi":
+            if band.hasPrefix("5") { return "5G" }
+            if band.hasPrefix("2") { return "2.4G" }
+            return "WiFi"
+        case "wired":
+            return "LAN"
+        default:
+            return "—"
+        }
+    }
+
+    /// 「AP 报表 + 高置信」才算事实，其余都是推断
+    static func isAccessReal(_ a: J) -> Bool {
+        a.str("source") == "ap" && a.str("conf") == "high"
+    }
+
+    /// 设备详情用的长文案：事实写来源，推测写依据
+    static func accessDetail(_ a: J) -> String {
+        let short = accessLabel(a)
+        if short.isEmpty { return "" }
+        if a.str("source") == "ap" && a.str("conf") == "high" {
+            let ap = a.str("ap")
+            return ap.isEmpty ? short : "\(short)（\(ap)）"
+        }
+        let why = a.str("reason")
+        return why.isEmpty ? short : "\(short)（\(why)）"
+    }
+
     static func pct(_ v: Double) -> String { String(format: "%.0f%%", v) }
 
     static func temp(_ c: Double) -> String { String(format: "%.1f°C", c) }

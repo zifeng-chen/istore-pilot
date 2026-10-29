@@ -10,11 +10,28 @@ struct ShieldView: View {
     @State private var err = ""
     @State private var busy = false
     @State private var goLog = false
+    @State private var goInstall = false
+
+    /// 一键安装：Agent 在路由器上装，这里只管确认和进度
+    @State private var askInstall = false
+    @State private var installing = false
+    @State private var installStep = ""
+    @State private var installPct = 0
+    @State private var installErr = ""
 
     private let tick = Timer.publish(every: 6, on: .main, in: .common).autoconnect()
 
     private var stats: J { d.obj("stats") ?? [:] }
     private var running: Bool { d.bool("running") }
+    /// 软路由上可能根本没装 AdGuard Home。缺字段（老 Agent）按「装了」处理，
+    /// 别把一台正常的机器显示成未安装
+    private var installed: Bool {
+        guard let v = d["installed"] else { return true }
+        if let b = v as? Bool { return b }
+        if let n = v as? NSNumber { return n.boolValue }
+        return true
+    }
+    private var install: J { d.obj("install") ?? [:] }
 
     var body: some View {
         NavigationStack {
@@ -25,6 +42,10 @@ struct ShieldView: View {
                         Card { VStack(alignment: .leading, spacing: 10) {
                             Bone(w: 90, h: 15); Bone(h: 10); Bone(h: 10)
                         } }
+                    } else if !installed {
+                        // 没装的时候统计、排行、规则、接管全都无从谈起，
+                        // 只留一张说明 + 一个能直接落地的安装入口
+                        installCard
                     } else {
                         statCard
                         topCard
@@ -56,14 +77,160 @@ struct ShieldView: View {
             }
             .navigationBarTitleDisplayMode(.large)
             .navigationDestination(isPresented: $goLog) { AdblockLogView() }
+            .sheet(isPresented: $goInstall) {
+                WebScreen(title: "安装 AdGuard Home",
+                          path: install.str("luci_path"))
+            }
             .task { await load() }
             .onReceive(tick) { _ in Task { await load() } }
         }
     }
 
+    // MARK: - 未安装
+
+    private var installCard: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionTitle(text: "装好就能用")
+                Text("Agent 可以直接在路由器上装：联网下载本体、解包、以观察模式启动。"
+                     + "装完这一页自动变成可用状态，不用重装 App。")
+                    .font(F.caption)
+                    .foregroundStyle(C.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if installing || !installErr.isEmpty {
+                    Text(installErr.isEmpty
+                         ? (installStep.isEmpty ? "安装中…" : "\(installStep) · \(installPct)%")
+                         : "失败：\(installErr)")
+                        .font(F.tiny)
+                        .foregroundStyle(installErr.isEmpty ? C.textSecondary : C.danger)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Button {
+                    askInstall = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.down.circle.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text(installing ? "安装中…" : "一键安装")
+                            .font(F.caption)
+                    }
+                    .foregroundStyle(C.onPrimary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 9)
+                    .background(C.primary.opacity(installing ? 0.5 : 1),
+                                in: RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+                .disabled(installing)
+
+                Button {
+                    goInstall = true
+                } label: {
+                    Text("去路由器网页安装")
+                        .font(F.caption)
+                        .foregroundStyle(C.textSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .strokeBorder(C.divider, lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+
+                Text("一键安装不改 DNS：装完只监听本机，接管全网仍是单独一步。")
+                    .font(F.tiny)
+                    .foregroundStyle(C.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .alert("在路由器上安装 AdGuard Home？", isPresented: $askInstall) {
+            Button("取消", role: .cancel) {}
+            Button("开始安装") { Task { await runInstall() } }
+        } message: {
+            Text("会联网下载本体（约 6.6 MB，来自 static.adtidy.org）并装到 /usr/bin/AdGuardHome，"
+                 + "以观察模式启动：只监听 127.0.0.1，53 端口仍归 dnsmasq。"
+                 + "全程不改 DNS、不影响上网，大约 1–3 分钟。")
+        }
+    }
+
+    /// 提交安装 + 轮询进度。装完重新拉一次 /adblock，卡片会自动换成可用状态
+    private func runInstall() async {
+        await MainActor.run {
+            installing = true
+            installErr = ""
+            installStep = "已提交"
+            installPct = 0
+        }
+        do {
+            _ = try await Api.post("/api/v1/adblock/install", ["confirm": "install"])
+        } catch {
+            await MainActor.run {
+                installing = false
+                installErr = error.localizedDescription
+            }
+            return
+        }
+
+        while true {
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            guard let s = try? await Api.get("/api/v1/adblock/install", cache: false) else {
+                continue
+            }
+            let done = s.bool("done")
+            let ok = s.bool("ok")
+            let running = s.bool("running")
+            await MainActor.run {
+                installStep = s.str("step")
+                installPct = s.int("pct")
+                if done && !running {
+                    installing = false
+                    if !ok {
+                        installErr = s.str("error")
+                    }
+                }
+            }
+            if done && !running {
+                if ok {
+                    await load()
+                }
+                break
+            }
+        }
+    }
+
     // MARK: - Hero
 
+    @ViewBuilder
     private var hero: some View {
+        if installed { runningHero } else { missingHero }
+    }
+
+    /// 没装本体：大字改成「未安装」，不再显示 0% —— 显示 0 会让人以为
+    /// 装了只是没生效，反而更迷惑
+    private var missingHero: some View {
+        Hero {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Text("AdGuard Home")
+                        .font(.system(size: 21, weight: .bold))
+                        .foregroundStyle(C.heroFg)
+                    Circle().fill(Color(hex: 0xFFB020)).frame(width: 7, height: 7)
+                    Spacer()
+                    Text("未安装").font(F.tiny).foregroundStyle(C.heroFgSoft)
+                }
+                Text("这台软路由上没有装 AdGuard Home")
+                    .font(F.caption).foregroundStyle(C.heroFg)
+                Text("装上之后拦截、规则、日志、接管全网会自动启用，App 不用更新。")
+                    .font(F.tiny).foregroundStyle(C.heroFgSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var runningHero: some View {
         let pct = stats.dbl("percent")
         return Hero {
             VStack(alignment: .leading, spacing: 10) {
@@ -256,6 +423,16 @@ struct ShieldView: View {
                     .foregroundStyle(C.textSecondary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
+
+                // 巡检救过场就留个痕：否则用户只会看到「怎么突然变成观察模式了」
+                if let g = d.obj("guard"), g.int("count") > 0 {
+                    Text("DNS 巡检触发过 \(g.int("count")) 次自愈"
+                         + (g.str("reason").isEmpty ? "" : " · \(g.str("reason"))"))
+                        .font(F.tiny)
+                        .foregroundStyle(C.textTertiary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                }
             }
         }
     }

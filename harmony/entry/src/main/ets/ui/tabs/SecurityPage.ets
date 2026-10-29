@@ -1,13 +1,25 @@
 import { common } from '@kit.AbilityKit';
+import { router } from '@kit.ArkUI';
 import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
 import { Fmt } from '../../util/Fmt';
 import { Pal, T } from '../Theme';
 import { Bp } from '../Breakpoint';
-import { Card, CardHeader, Comp, GlyphIcon, Hairline, Pill } from '../Comp';
+import { Card, CardHeader, CardTitle, Comp, GlyphIcon, Hairline, Pill } from '../Comp';
 import { Glyph, Ico } from '../comp/Icons';
+import { AppIcon } from '../comp/AppIcon';
 import { DevicesPage } from './DevicesPage';
 import { ShieldPage } from './ShieldPage';
+
+interface AppRow {
+  name: string;
+  category: string;
+  total: number;
+  share: number;
+  bps: number;
+  down: number;
+  up: number;
+}
 
 interface DevRow {
   mac: string;
@@ -47,10 +59,26 @@ export struct SecurityPage {
   @State total: number = 0;
   @State blocked: number = 0;
   @State recent: DevRow[] = [];
+  /** 应用流量排行：一级页只看前几名，全部在 sub=3 */
+  @State appRows: AppRow[] = [];
+  @State appTotalBytes: number = 0;
+  @State appDownBytes: number = 0;
+  @State appUpBytes: number = 0;
+  @State appDays: number = 0;
 
-  @State adInstalled: boolean = false;
+  @State adInstalled: boolean = true;
   @State adRunning: boolean = false;
   @State adTakeover: boolean = false;
+  /** 未安装时「去安装」要落的 LuCI 页面，由 Agent 下发 */
+  @State adInstallPath: string = '';
+  /** 一键安装：Agent 在路由器上跑，这里只显示进度 */
+  @State adInstalling: boolean = false;
+  @State adInstallStep: string = '';
+  @State adInstallPct: number = 0;
+  @State adInstallErr: string = '';
+  /** DNS 兜底巡检的自愈记录，只在触发过时显示一行 */
+  @State adGuardCount: number = 0;
+  @State adGuardReason: string = '';
   @State adBlocked: number = 0;
   @State adQueries: number = 0;
   @State adPct: number = 0;
@@ -131,6 +159,34 @@ export struct SecurityPage {
     if (a.ok) {
       this.applyAd(a.data);
     }
+
+    const ap: ApiResult = await Api.get(ctx, '/api/v1/apps');
+    if (ap.ok) {
+      this.applyApps(ap.data);
+    }
+  }
+
+  private applyApps(b: J): void {
+    const overall: J = b.obj('all');
+    this.appDownBytes = overall.num('down', 0);
+    this.appUpBytes = overall.num('up', 0);
+    this.appTotalBytes = this.appDownBytes + this.appUpBytes;
+    this.appDays = b.num('days', 0);
+    const list: J[] = b.arr('apps');
+    const rows: AppRow[] = [];
+    for (let i = 0; i < list.length; i++) {
+      const x: J = list[i];
+      rows.push({
+        name: x.str('name', ''),
+        category: x.str('category', ''),
+        total: x.num('all_total', 0),
+        share: x.num('share', 0),
+        bps: x.num('down_bps', 0) + x.num('up_bps', 0),
+        down: x.num('all_down', 0),
+        up: x.num('all_up', 0)
+      } as AppRow);
+    }
+    this.appRows = rows;
   }
 
   private applyDevices(b: J): void {
@@ -177,13 +233,19 @@ export struct SecurityPage {
   }
 
   private applyAd(b: J): void {
-    this.adInstalled = b.bool('installed', false);
+    // 缺字段（老 Agent）按「装了」处理，别把正常的机器显示成未安装
+    this.adInstalled = b.bool('installed', true);
     this.adRunning = b.bool('running', false);
     this.adTakeover = b.str('mode', '') === 'takeover';
+    const ins: J = b.obj('install');
+    this.adInstallPath = ins.str('luci_path', '');
     const stats: J = b.obj('stats');
     this.adBlocked = stats.num('blocked', 0);
     this.adQueries = stats.num('queries', 0);
     this.adPct = stats.num('percent', 0);
+    const guard: J = b.obj('guard');
+    this.adGuardCount = guard.num('count', 0);
+    this.adGuardReason = guard.str('reason', '');
   }
 
   private async setTakeover(want: boolean): Promise<void> {
@@ -429,7 +491,7 @@ export struct SecurityPage {
   @Builder
   deviceCard() {
     Card() {
-      CardHeader({ title: '设备', sub: '点数字进清单，点行看详情' });
+      CardTitle({ glyph: Glyph.LINK, title: '设备', sub: '点数字进清单，点行看详情' });
 
       Row() {
         this.statCell('在线', this.online, Pal.primary(), 1);
@@ -462,11 +524,69 @@ export struct SecurityPage {
   }
 
   @Builder
+  appsCard() {
+    // 自定义组件后面不能链式写 .onClick，所以套一层 Column 承接点击
+    Column() {
+      Card({ gapTop: 0, gapBottom: 0 }) {
+      CardTitle({
+        glyph: Glyph.BOLT,
+        title: '应用流量',
+        sub: (this.appDays > 1 ? '近 ' + this.appDays + ' 天 · ' : '') + '共 ' + Fmt.bytes(this.appTotalBytes)
+      }) {
+        Text('全部 ' + this.appRows.length + ' 个 ›')
+          .fontSize(T.F_TINY)
+          .fontColor($r('app.color.primary'));
+      }
+
+      Hairline({ indent: 0 });
+
+      if (this.appRows.length === 0) {
+        Text('正在统计…')
+          .fontSize(T.F_TINY)
+          .fontColor($r('app.color.text_secondary'))
+          .width('100%')
+          .margin({ top: 10 });
+      } else {
+        ForEach(this.appRows.slice(0, 3), (a: AppRow) => {
+          Row() {
+            AppIcon({ name: a.name, side: 28 });
+            Text(a.name)
+              .fontSize(T.F_SUB)
+              .fontColor($r('app.color.text_primary'))
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .layoutWeight(1)
+              .margin({ left: 9 });
+            Text(Fmt.bytes(a.total))
+              .fontSize(T.F_SUB)
+              .fontColor($r('app.color.text_primary'))
+              .margin({ left: 8 });
+            Text(Math.round(a.share) + '%')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_secondary'))
+              .width(36)
+              .textAlign(TextAlign.End);
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Center)
+          .padding({ top: 10, bottom: 10 });
+          }, (a: AppRow) => a.name);
+        }
+      }
+    }
+    .width('100%')
+    .margin({ top: 0, bottom: T.GAP })
+    .onClick(() => {
+      this.sub = 3;
+    });
+  }
+
+  @Builder
   adCard() {
     Card() {
       Row() {
         Column() {
-          CardHeader({ title: '拦截', sub: 'AdGuard Home' });
+          CardTitle({ glyph: Glyph.SHIELD, title: '拦截', sub: 'AdGuard Home' });
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start);
@@ -479,8 +599,65 @@ export struct SecurityPage {
       .width('100%')
       .alignItems(VerticalAlign.Top);
 
-      Row() {
-        Text(Fmt.count(this.adBlocked))
+      if (!this.adInstalled) {
+        // 没装本体：统计、规则、日志、接管全都无从谈起，只留说明 + 安装入口
+        Text('这台软路由上没有装 AdGuard Home。装上之后拦截、规则、日志会自动启用，App 不用更新。')
+          .fontSize(T.F_SUB)
+          .fontColor($r('app.color.text_secondary'))
+          .width('100%')
+          .margin({ top: 12 });
+
+        if (this.adInstalling || this.adInstallErr.length > 0) {
+          Text(this.adInstallErr.length > 0 ? '失败：' + this.adInstallErr
+            : this.adInstallStep + ' · ' + this.adInstallPct.toString() + '%')
+            .fontSize(T.F_TINY)
+            .fontColor(this.adInstallErr.length > 0
+              ? $r('app.color.danger') : $r('app.color.text_secondary'))
+            .width('100%')
+            .margin({ top: 10 });
+        }
+
+        Row() {
+          Text(this.adInstalling ? '安装中…' : '一键安装')
+            .fontSize(T.F_BODY)
+            .fontColor($r('app.color.on_primary'));
+        }
+        .width('100%')
+        .height(42)
+        .justifyContent(FlexAlign.Center)
+        .backgroundColor($r('app.color.primary'))
+        .borderRadius(12)
+        .opacity(this.adInstalling ? 0.55 : 1)
+        .margin({ top: 14 })
+        .onClick(() => {
+          if (!this.adInstalling) {
+            this.askInstall();
+          }
+        });
+
+        Row() {
+          Text('去路由器网页安装')
+            .fontSize(T.F_SUB)
+            .fontColor($r('app.color.text_secondary'));
+        }
+        .width('100%')
+        .height(38)
+        .justifyContent(FlexAlign.Center)
+        .borderRadius(12)
+        .border({ width: 1, color: $r('app.color.divider') })
+        .margin({ top: 8 })
+        .onClick(() => {
+          this.openInstall();
+        });
+
+        Text('一键安装不改 DNS：装完只监听本机，接管全网仍是单独一步。')
+          .fontSize(T.F_TINY)
+          .fontColor($r('app.color.text_tertiary'))
+          .width('100%')
+          .margin({ top: 8 });
+      } else {
+        Row() {
+          Text(Fmt.count(this.adBlocked))
           .fontSize(30)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
@@ -531,6 +708,16 @@ export struct SecurityPage {
       .alignItems(VerticalAlign.Center)
       .margin({ top: 14 });
 
+      if (this.adGuardCount > 0) {
+        Text('DNS 巡检触发过 ' + this.adGuardCount.toString() + ' 次自愈'
+          + (this.adGuardReason.length > 0 ? ' · ' + this.adGuardReason : '')
+          + '（53 没人应答时自动把 dnsmasq 放回去）')
+          .fontSize(T.F_TINY)
+          .fontColor($r('app.color.text_tertiary'))
+          .width('100%')
+          .margin({ top: 8 });
+      }
+
       Column() {
         Hairline({ indent: 0 });
       }
@@ -540,7 +727,102 @@ export struct SecurityPage {
       this.entryRow(Glyph.REFRESH, '规则与更新', '自动更新频率、规则表开关', 2);
       Hairline({ indent: 0 });
       this.entryRow(Glyph.LIST, '拦截日志', '最近被挡掉的域名查询', 2);
+      }
     }
+  }
+
+  /** 打开路由器网页端的软件包页：Agent 已经换好免密票据，落地就能装 */
+  private openInstall(): void {
+    const params: Record<string, Object> = { 'path': this.adInstallPath };
+    router.pushUrl({ url: 'pages/WebPage', params: params });
+  }
+
+  /** 二次确认：装包不可逆，而且会联网下载 6 MB，先讲清楚再动手 */
+  private askInstall(): void {
+    this.getUIContext().showAlertDialog({
+      title: '在路由器上安装 AdGuard Home？',
+      message: 'Agent 会联网下载本体（约 6.6 MB，来自 static.adtidy.org）并装到 /usr/bin/AdGuardHome，'
+        + '以观察模式启动：只监听 127.0.0.1，53 端口仍归 dnsmasq。\n\n'
+        + '全程不改 DNS、不影响家里上网，大约 1–3 分钟。',
+      primaryButton: {
+        value: '开始安装',
+        action: () => {
+          this.startInstall();
+        }
+      },
+      secondaryButton: {
+        value: '取消',
+        action: () => {
+        }
+      }
+    });
+  }
+
+  private startInstall(): void {
+    if (this.adInstalling) {
+      return;
+    }
+    this.adInstalling = true;
+    this.adInstallErr = '';
+    this.adInstallStep = '已提交，正在安装';
+    this.adInstallPct = 0;
+
+    const body: Record<string, Object> = { 'confirm': 'install' };
+    Api.post(this.ctx(), '/api/v1/adblock/install', body).then((r: ApiResult) => {
+      if (!r.ok) {
+        this.adInstalling = false;
+        this.adInstallErr = r.error;
+        return;
+      }
+      if (!r.data.bool('ok', false)) {
+        this.adInstalling = false;
+        this.adInstallErr = r.data.str('error', '安装没被受理');
+        return;
+      }
+      this.tickInstall();
+    }).catch((e: Error) => {
+      this.adInstalling = false;
+      this.adInstallErr = e.message;
+    });
+  }
+
+  /** 轮询安装进度，装完重新拉一次整页 */
+  private tickInstall(): void {
+    if (!this.adInstalling) {
+      return;
+    }
+    Api.get(this.ctx(), '/api/v1/adblock/install').then((r: ApiResult) => {
+      if (!r.ok) {
+        setTimeout(() => {
+          this.tickInstall();
+        }, 2500);
+        return;
+      }
+      const s: J = r.data;
+      this.adInstallStep = s.str('step', '');
+      this.adInstallPct = s.num('pct', 0);
+      const done: boolean = s.bool('done', false);
+      const running: boolean = s.bool('running', false);
+      if (done && !running) {
+        this.adInstalling = false;
+        if (!s.bool('ok', false)) {
+          this.adInstallErr = s.str('error', '安装失败');
+          return;
+        }
+        // /adblock 有 2 秒缓存，等一下再拉
+        setTimeout(() => {
+          this.load(false);
+        }, 1600);
+        return;
+      }
+      setTimeout(() => {
+        this.tickInstall();
+      }, 1200);
+    }).catch((e: Error) => {
+      setTimeout(() => {
+        this.tickInstall();
+      }, 2500);
+    });
   }
 
   private confirmTakeover(want: boolean): void {
@@ -575,6 +857,84 @@ export struct SecurityPage {
         }
         .layoutWeight(1)
         .width('100%');
+      }
+      .width('100%')
+      .height('100%')
+      .backgroundColor($r('app.color.app_bg'));
+    } else if (this.sub === 3) {
+      Column() {
+        this.backBar('应用流量');
+
+        // 汇总卡钉在顶部：翻到第 20 个应用时还想拿它跟眼前这行的数字对照。
+        // 只有下面的列表滚
+        Column() {
+          Text(this.appDays > 1 ? '累计用量 · 已统计 ' + this.appDays + ' 天' : '累计用量')
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_secondary'));
+          Text(Fmt.bytes(this.appTotalBytes))
+            .fontSize(30)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.text_primary'))
+            .margin({ top: 2 });
+          Text('↓ ' + Fmt.bytes(this.appDownBytes) + '　↑ ' + Fmt.bytes(this.appUpBytes))
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_secondary'))
+            .margin({ top: 4 });
+        }
+        .alignItems(HorizontalAlign.Start)
+        .width('100%')
+        .padding({ left: 16, right: 16, top: 14, bottom: 14 })
+        .margin({ left: T.PAD, right: T.PAD, bottom: 10 })
+        .borderRadius(T.R_CARD)
+        .backgroundColor($r('app.color.surface'));
+
+        Scroll() {
+          Column({ space: 10 }) {
+            ForEach(this.appRows, (a: AppRow) => {
+              Row() {
+                AppIcon({ name: a.name, side: 36 });
+                Column() {
+                  Text(a.name)
+                    .fontSize(T.F_BODY)
+                    .fontColor($r('app.color.text_primary'))
+                    .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis });
+                  Text((a.category.length > 0 && a.category !== '其他' ? a.category + ' · ' : '')
+                    + '↓ ' + Fmt.bytes(a.down) + '  ↑ ' + Fmt.bytes(a.up))
+                    .fontSize(T.F_TINY)
+                    .fontColor($r('app.color.text_secondary'))
+                    .maxLines(1)
+                    .margin({ top: 3 });
+                }
+                .alignItems(HorizontalAlign.Start)
+                .layoutWeight(1);
+
+                Column() {
+                  Text(Fmt.bytes(a.total))
+                    .fontSize(T.F_BODY)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor($r('app.color.text_primary'));
+                  Text('占 ' + Math.round(a.share) + '%')
+                    .fontSize(T.F_TINY)
+                    .fontColor($r('app.color.text_secondary'))
+                    .margin({ top: 3 });
+                }
+                .alignItems(HorizontalAlign.End);
+              }
+              .width('100%')
+              .padding({ top: 8, bottom: 8 })
+              .alignItems(VerticalAlign.Center);
+            }, (a: AppRow) => a.name);
+
+            Row().width('100%').height(20);
+          }
+          .width('100%')
+          .padding({ left: T.PAD, right: T.PAD, top: 4 });
+        }
+        .layoutWeight(1)
+        .width('100%')
+        .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.Spring);
       }
       .width('100%')
       .height('100%')
@@ -626,6 +986,7 @@ export struct SecurityPage {
               .alignItems(HorizontalAlign.Start);
 
               Column({ space: T.GAP }) {
+                this.appsCard();
                 this.adCard();
               }
               .layoutWeight(1)
@@ -637,6 +998,7 @@ export struct SecurityPage {
             Column({ space: T.GAP }) {
               this.heroCard();
               this.deviceCard();
+              this.appsCard();
               this.adCard();
             }
             .width('100%');
