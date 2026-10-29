@@ -97,9 +97,11 @@ export struct TrendChart {
     }
 
     // 先画面积再画线，线压在面积上才干净
-    this.area(this.down, x0, y0, plotW, plotH, n, top, Pal.primary(), 0.22);
-    this.area(this.up, x0, y0, plotW, plotH, n, top, Pal.warn(), 0.14);
-    this.line(this.down, x0, y0, plotW, plotH, n, top, Pal.primaryDim(), 1.9);
+    // 这张图长在深绿 hero 上：primaryDim(#007F5E) 和底色几乎同色，
+    // 之前下行线等于没画出来；下行改用亮薄荷，和橙色上传线也分得开
+    this.area(this.down, x0, y0, plotW, plotH, n, top, Pal.primaryBright(), 0.20);
+    this.area(this.up, x0, y0, plotW, plotH, n, top, Pal.warn(), 0.12);
+    this.line(this.down, x0, y0, plotW, plotH, n, top, Pal.primaryBright(), 2.0);
     this.line(this.up, x0, y0, plotW, plotH, n, top, Pal.warn(), 1.6);
   }
 

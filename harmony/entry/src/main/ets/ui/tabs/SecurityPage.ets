@@ -5,7 +5,7 @@ import { J } from '../../core/Json';
 import { Fmt } from '../../util/Fmt';
 import { Pal, T } from '../Theme';
 import { Bp } from '../Breakpoint';
-import { Card, CardHeader, CardTitle, Comp, GlyphIcon, Hairline, LineIcon, Pill } from '../Comp';
+import { Card, CardHeader, CardTitle, Comp, GlyphIcon, Hairline, HeroStat, LineIcon, Pill } from '../Comp';
 import { Glyph, Ico } from '../comp/Icons';
 import { AppIcon } from '../comp/AppIcon';
 import { DevicesPage } from './DevicesPage';
@@ -58,6 +58,8 @@ export struct SecurityPage {
   @State online: number = 0;
   @State total: number = 0;
   @State blocked: number = 0;
+  /** 全网实时速率（上下行相加），hero 第三格用 */
+  @State liveBps: number = 0;
   @State recent: DevRow[] = [];
   /** 应用流量排行：一级页只看前几名，全部在 sub=3 */
   @State appRows: AppRow[] = [];
@@ -194,6 +196,7 @@ export struct SecurityPage {
     this.online = sum.num('online', 0);
     this.total = sum.num('total', 0);
     this.blocked = sum.num('blocked', 0);
+    this.liveBps = sum.num('rx_bps', 0) + sum.num('tx_bps', 0);
 
     const list: J[] = b.arr('devices');
     const rows: DevRow[] = [];
@@ -346,20 +349,15 @@ export struct SecurityPage {
       .width('100%')
       .alignItems(VerticalAlign.Center);
 
+      // 三格和安卓对齐：设备在线 / 今日拦截 / 实时流量。
+      // 原来只有一行「46 台设备在线」，hero 空得慌，也没用上已经取到的拦截数和速率
       Row() {
-        Text(this.online.toString())
-          .fontSize(this.rail() ? 36 : 34)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.hero_fg'));
-        Text('台设备在线')
-          .fontSize(13)
-          .fontColor($r('app.color.hero_fg'))
-          .opacity(0.9)
-          .margin({ left: 8, bottom: 4 });
+        HeroStat({ label: '设备在线', value: this.online.toString() }).layoutWeight(1)
+        HeroStat({ label: '今日拦截', value: Fmt.count(this.adBlocked) }).layoutWeight(1)
+        HeroStat({ label: '实时流量', value: Fmt.bps(this.liveBps) }).layoutWeight(1)
       }
       .width('100%')
-      .alignItems(VerticalAlign.Bottom)
-      .margin({ top: 10 });
+      .margin({ top: 14 });
 
       Text(this.blocked > 0
         ? '共 ' + this.total + ' 台  ·  ' + this.blocked + ' 台已禁网'

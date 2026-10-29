@@ -103,36 +103,164 @@ export struct Kv {
 }
 
 /**
- * 22×22 设计坐标的线条图标（页签、返回箭头、列表行尾箭头都走它）。
+ * SVG 路径（只支持绝对 M / L / C / Z）回放到 Canvas 2D。
  *
- * **必须包一层 Shape + viewPort**：裸 Path 不设 viewPort 时，坐标会被当成
- * 一个默认大小（约 100 单位）的画布再缩到组件尺寸 —— 22 格的图标最后只剩
- * 一个 4~5vp 的小点，底部导航就是这么"消失"的。
+ * 为什么不用 `Path` 组件：本项目实测 `Path().commands('M3 16.2 C...')` 只画出了
+ * 第一个 M 点 —— 描边宽度成了圆头线帽，看起来就是一个 2vp 的小点。加父 `Shape`、
+ * 设 `viewPort`、给 Path 设宽高都试过，都不行；而 Canvas（趋势图、环形）一直正常。
+ * 所以图标统一走 Canvas。
+ */
+export class IconPath {
+  static replay(ctx: CanvasRenderingContext2D, d: string,
+    scale: number, ox: number, oy: number): void {
+    const segs: string[] = IconPath.split(d);
+    for (let i = 0; i < segs.length; i++) {
+      const seg: string = segs[i];
+      const cmd: string = seg.charAt(0);
+      const nums: number[] = IconPath.numbers(seg.substring(1));
+      if (cmd === 'M' || cmd === 'L') {
+        for (let j = 0; j + 1 < nums.length; j += 2) {
+          if (cmd === 'M') {
+            ctx.moveTo(ox + nums[j] * scale, oy + nums[j + 1] * scale);
+          } else {
+            ctx.lineTo(ox + nums[j] * scale, oy + nums[j + 1] * scale);
+          }
+        }
+      } else if (cmd === 'C') {
+        for (let j = 0; j + 5 < nums.length; j += 6) {
+          ctx.bezierCurveTo(
+            ox + nums[j] * scale, oy + nums[j + 1] * scale,
+            ox + nums[j + 2] * scale, oy + nums[j + 3] * scale,
+            ox + nums[j + 4] * scale, oy + nums[j + 5] * scale);
+        }
+      } else if (cmd === 'Z') {
+        ctx.closePath();
+      }
+    }
+  }
+
+  /** 按指令字母切段，逗号当分隔符 */
+  private static split(d: string): string[] {
+    const out: string[] = [];
+    let cur: string = '';
+    for (let i = 0; i < d.length; i++) {
+      const ch: string = d.charAt(i);
+      if (ch === 'M' || ch === 'L' || ch === 'C' || ch === 'Z') {
+        if (cur.length > 0) {
+          out.push(cur);
+        }
+        cur = ch;
+      } else if (ch === ',') {
+        cur += ' ';
+      } else {
+        cur += ch;
+      }
+    }
+    if (cur.length > 0) {
+      out.push(cur);
+    }
+    return out;
+  }
+
+  private static numbers(s: string): number[] {
+    const out: number[] = [];
+    let cur: string = '';
+    for (let i = 0; i < s.length; i++) {
+      const ch: string = s.charAt(i);
+      const isNum: boolean = (ch >= '0' && ch <= '9') || ch === '.' || ch === '-';
+      if (isNum) {
+        cur += ch;
+      } else if (cur.length > 0) {
+        out.push(Number.parseFloat(cur));
+        cur = '';
+      }
+    }
+    if (cur.length > 0) {
+      out.push(Number.parseFloat(cur));
+    }
+    return out;
+  }
+}
+
+/**
+ * 线条图标（页签、返回箭头、行尾箭头、登录页盾牌都走它）。
+ *
+ * `design` 是路径的坐标系边长：页签那套按 22 格手算，Glyph 那套是 24 格 + 1 的留白。
  */
 @Component
 export struct LineIcon {
-  @Prop path: string = '';
-  @Prop color: string = '';
-  /** 组件边长（vp） */
+  @Prop @Watch('redraw') path: string = '';
+  @Prop @Watch('redraw') color: string = '';
   @Prop side: number = 22;
   @Prop lineWidth: number = 1.7;
-  /** 需要旋转的箭头：90 / 180 */
   @Prop spin: number = 0;
+  @Prop design: number = 22;
+
+  private cfg: RenderingContextSettings = new RenderingContextSettings(true);
+  private cv: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.cfg);
+  private ready: boolean = false;
+
+  redraw(): void {
+    if (this.ready) {
+      this.draw();
+    }
+  }
+
+  private draw(): void {
+    const s: number = this.side;
+    this.cv.clearRect(0, 0, s, s);
+    this.cv.strokeStyle = this.color;
+    this.cv.lineWidth = this.lineWidth;
+    this.cv.lineCap = 'round';
+    this.cv.lineJoin = 'round';
+    this.cv.beginPath();
+    IconPath.replay(this.cv, this.path, s / this.design, 0, 0);
+    this.cv.stroke();
+  }
 
   build() {
-    Shape() {
-      Path()
-        .commands(this.path)
-        .fill(Color.Transparent)
-        .stroke(this.color)
-        .strokeWidth(this.lineWidth)
-        .strokeLineCap(LineCapStyle.Round)
-        .strokeLineJoin(LineJoinStyle.Round);
+    Canvas(this.cv)
+      .width(this.side)
+      .height(this.side)
+      .rotate({ angle: this.spin })
+      .onReady(() => {
+        this.ready = true;
+        this.draw();
+      });
+  }
+}
+
+/**
+ * 深绿 hero 卡里的一格：小标签在上、数值在下（和安卓 heroStat 同规格 11 / 20）。
+ *
+ * 为什么是 @Component 而不是 @Builder：
+ * ArkUI 的 @Builder 默认按值传参，**状态变量变化不会刷新 builder 内的 UI**；
+ * 传两个以上参数时连"按引用传递"也不生效。这里原来就是 @Builder，结果
+ * 数据到了界面不动 —— 三格永远是初始值「—」。换成 @Prop 后父组件状态一变，
+ * 子组件就会跟着重绘。
+ */
+@Component
+export struct HeroStat {
+  @Prop label: string = '';
+  @Prop value: string = '';
+  build() {
+    Column() {
+      Text(this.label)
+        .fontSize(11)
+        .fontColor($r('app.color.hero_fg_soft'))
+        .maxLines(1);
+      Text(this.value)
+        .fontSize(T.F_H1)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.hero_fg'))
+        .fontFeature("\"tnum\" on")
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .margin({ top: 5 });
     }
-    .viewPort({ x: 0, y: 0, width: 22, height: 22 })
-    .width(this.side)
-    .height(this.side)
-    .rotate({ angle: this.spin });
+    .alignItems(HorizontalAlign.Start)
+    .width('100%')
+    .layoutWeight(1);
   }
 }
 
@@ -187,34 +315,55 @@ export struct CardHeader {
  */
 @Component
 export struct GlyphIcon {
-  @Prop kind: string;
-  @Prop color: string;
+  @Prop @Watch('redraw') kind: string;
+  @Prop @Watch('redraw') color: string;
   /** 组件边长（vp）。不能叫 size —— 那是 CustomComponent 自带的属性方法 */
   side: number = 20;
   lineWidth: number = 2;
 
-  build() {
-    Shape() {
-      Path()
-        .commands(Glyph.stroke(this.kind))
-        .fill(Color.Transparent)
-        .stroke(this.color)
-        .strokeWidth(this.lineWidth)
-        .strokeLineCap(LineCapStyle.Round)
-        .strokeLineJoin(LineJoinStyle.Round);
+  private cfg: RenderingContextSettings = new RenderingContextSettings(true);
+  private cv: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.cfg);
+  private ready: boolean = false;
 
-      // 色盘的孔、信息图标的点必须实心，混在描边 Path 里整条路径都会被填满
-      if (Glyph.fill(this.kind).length > 0) {
-        Path()
-          .commands(Glyph.fill(this.kind))
-          .fill(this.color)
-          .stroke(Color.Transparent)
-          .strokeWidth(0);
-      }
+  redraw(): void {
+    if (this.ready) {
+      this.draw();
     }
-    .viewPort({ x: -1, y: -1, width: 26, height: 26 })
-    .width(this.side)
-    .height(this.side);
+  }
+
+  private draw(): void {
+    const s: number = this.side;
+    // 设计稿是 24 格，留 1 的边 → 26 的视口，坐标要整体平移 1 格
+    const k: number = s / 26;
+    const o: number = k;
+    this.cv.clearRect(0, 0, s, s);
+    this.cv.lineCap = 'round';
+    this.cv.lineJoin = 'round';
+
+    this.cv.beginPath();
+    this.cv.strokeStyle = this.color;
+    this.cv.lineWidth = this.lineWidth * k;
+    IconPath.replay(this.cv, Glyph.stroke(this.kind), k, o, o);
+    this.cv.stroke();
+
+    // 色盘的孔、信息图标的点必须实心，混在描边里整条路径都会被填满
+    const f: string = Glyph.fill(this.kind);
+    if (f.length > 0) {
+      this.cv.beginPath();
+      this.cv.fillStyle = this.color;
+      IconPath.replay(this.cv, f, k, o, o);
+      this.cv.fill();
+    }
+  }
+
+  build() {
+    Canvas(this.cv)
+      .width(this.side)
+      .height(this.side)
+      .onReady(() => {
+        this.ready = true;
+        this.draw();
+      });
   }
 }
 

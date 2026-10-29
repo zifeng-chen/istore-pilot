@@ -15,6 +15,27 @@
 
 ## 未发布
 
+### 修复 · 鸿蒙端图标改走 Canvas（Path 组件实测画不出形状）
+
+上一版把裸 `Path` 包进 `Shape` + `viewPort`，仍然只有一个小点。放大截图量了一下：
+点的大小正好等于 `strokeWidth` 的圆头线帽 —— 说明 `Path` 只画出了第一个 `M` 点，
+后面的 `C` / `L` 全丢了。给 Path 设宽高、换 viewPort、换父容器都试过，无效。
+
+同一份工程里颜色、曲线、环形都是 **Canvas** 画的，一直正常。所以图标改成
+「解析 SVG 路径 → 回放成 Canvas 2D 调用」：
+
+- 新增 `IconPath`（`ui/Comp.ets`）：只支持绝对 M / L / C / Z（现有 31 条路径全用这几个）
+- `LineIcon` / `GlyphIcon` 都改成 `Canvas` + `onReady` 里绘制，`@Watch` 颜色变化重绘
+- `GlyphIcon` 保留描边 + 实心两层（色盘的孔、信息图标的点）
+
+### 修复 · 其它和安卓对不上的地方
+
+- **hero 文字被居中**：Column 默认 `alignItems` 是 Center，概览的主机名/内核行、
+  设置页的地址行都没写 `width('100%')`，于是飘在中间。补 `textAlign(Start)`
+- **下行曲线看不见**：`primaryDim(#007F5E)` 和深绿 hero 几乎同色，改成 `primaryBright`
+- **设备页 hero 少两格**：安卓是「设备在线 / 今日拦截 / 实时流量」三格，
+  鸿蒙只有一行大数字。补上，并把 `HeroStat` 提到 `Comp.ets` 共用
+
 ### 修复 · 鸿蒙端图标全缩成小点
 
 底部导航的四个图标只剩几个 4~5vp 的小方块，返回箭头、行尾箭头、登录页盾牌也一样。

@@ -347,12 +347,16 @@ export struct SettingsPage {
         .fontColor($r('app.color.hero_fg'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .textAlign(TextAlign.Start)
+        .width('100%')
         .margin({ top: 12 });
 
       Text(this.heroMeta)
         .fontSize(12.5)
         .fontColor($r('app.color.hero_fg_soft'))
         .maxLines(2)
+        .textAlign(TextAlign.Start)
+        .width('100%')
         .margin({ top: 5 });
 
       Row()

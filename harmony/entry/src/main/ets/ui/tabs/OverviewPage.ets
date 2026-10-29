@@ -5,7 +5,7 @@ import { J } from '../../core/Json';
 import { Fmt } from '../../util/Fmt';
 import { Bp } from '../Breakpoint';
 import { Pal, T } from '../Theme';
-import { Card, CardHeader, CardTitle, GlyphIcon, Hairline, Kv, Pill } from '../Comp';
+import { Card, CardHeader, CardTitle, GlyphIcon, Hairline, HeroStat, Kv, Pill } from '../Comp';
 import { Glyph } from '../comp/Icons';
 import { TrendChart } from '../comp/TrendChart';
 import { PortTile } from '../comp/PortTile';
@@ -499,12 +499,16 @@ export struct OverviewPage {
       .alignItems(VerticalAlign.Center);
 
       // 大字是主机名 —— 安卓那边也是「机器叫什么」，结论在上一行
+      // Column 默认 alignItems 是 Center，不写 width/textAlign 就会整行居中 ——
+      // 截图里主机名和内核那行就是飘在中间的
       Text(this.hostname)
         .fontSize(27)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.hero_fg'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .textAlign(TextAlign.Start)
+        .width('100%')
         .margin({ top: 12 });
 
       Text('内核 ' + Fmt.orDash(this.kernel) + ' · 在线 ' + this.uptime)
@@ -512,6 +516,8 @@ export struct OverviewPage {
         .fontColor($r('app.color.hero_fg_soft'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .textAlign(TextAlign.Start)
+        .width('100%')
         .margin({ top: 5 });
 
       // 0.7 的分隔线：渐变底上不能用 divider 色，得用 on-primary 的透明版
@@ -553,7 +559,7 @@ export struct OverviewPage {
 
         // 图例：颜色必须和曲线一致，否则等于没有
         Row({ space: 12 }) {
-          this.heroLegend('下载', Pal.primaryDim());
+          this.heroLegend('下载', Pal.primaryBright());
           this.heroLegend('上传', Pal.warn());
         }
         .width('100%')
@@ -760,40 +766,6 @@ export struct OverviewPage {
     }
   }
 
-}
-
-/**
- * 概览 hero 的一格：大数字在上、标签在下。
- *
- * 为什么是 @Component 而不是 @Builder：
- * ArkUI 的 @Builder 默认按值传参，**状态变量变化不会刷新 builder 内的 UI**；
- * 传两个以上参数时连"按引用传递"也不生效。这里原来就是 @Builder，结果
- * 数据到了界面不动 —— 三格永远是初始值「—」。换成 @Prop 后父组件状态一变，
- * 子组件就会跟着重绘。
- */
-@Component
-struct HeroStat {
-  @Prop label: string = '';
-  @Prop value: string = '';
-  build() {
-    Column() {
-      Text(this.label)
-        .fontSize(11)
-        .fontColor($r('app.color.hero_fg_soft'))
-        .maxLines(1);
-      Text(this.value)
-        .fontSize(T.F_H1)
-        .fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.hero_fg'))
-        .fontFeature("\"tnum\" on")
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .margin({ top: 5 });
-    }
-    .alignItems(HorizontalAlign.Start)
-    .width('100%')
-    .layoutWeight(1);
-  }
 }
 
 /** 系统负载的一行：标签 + 说明 + 百分比 + 进度条。同上是 @Component，不是 @Builder。 */
