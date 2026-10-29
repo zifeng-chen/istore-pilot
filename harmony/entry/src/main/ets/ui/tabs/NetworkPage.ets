@@ -590,20 +590,16 @@ export struct NetworkPage {
     }
   }
 
-  @Builder
-  kvRow(label: string, value: string) {
-    Kv({ label: label, value: value, valueSize: T.F_BODY, accent: false });
-  }
 
   @Builder
   wanCardBody() {
     Column() {
-      this.kvRow('接入方式', this.proto.length > 0 ? this.proto : '—');
+      Kv({ label: '接入方式', value: this.proto.length > 0 ? this.proto : '—', valueSize: T.F_BODY, accent: false });
       if (this.account.length > 0) {
-        this.kvRow('账号', this.account);
+        Kv({ label: '账号', value: this.account, valueSize: T.F_BODY, accent: false });
       }
-      this.kvRow('地址获取', this.wanIp.length > 0 ? '自动下发' : '未获取');
-      this.kvRow('DNS', this.dns.length > 0 ? this.dns : '—');
+      Kv({ label: '地址获取', value: this.wanIp.length > 0 ? '自动下发' : '未获取', valueSize: T.F_BODY, accent: false });
+      Kv({ label: 'DNS', value: this.dns.length > 0 ? this.dns : '—', valueSize: T.F_BODY, accent: false });
     }
     .width('100%');
   }
@@ -611,20 +607,20 @@ export struct NetworkPage {
   @Builder
   lanCardBody() {
     Column() {
-      this.kvRow('管理地址', this.lanCidr.length > 0 ? this.lanCidr : '—');
+      Kv({ label: '管理地址', value: this.lanCidr.length > 0 ? this.lanCidr : '—', valueSize: T.F_BODY, accent: false });
       if (this.lanHosts > 0) {
-        this.kvRow('可用地址', this.lanHosts + ' 个');
+        Kv({ label: '可用地址', value: this.lanHosts + ' 个', valueSize: T.F_BODY, accent: false });
       }
-      this.kvRow('DHCP 服务', this.lanDhcp ? '已开启' : '已关闭，设备需手动配置');
+      Kv({ label: 'DHCP 服务', value: this.lanDhcp ? '已开启' : '已关闭，设备需手动配置', valueSize: T.F_BODY, accent: false });
       if (this.lanDhcp && this.lanPool.length > 0) {
-        this.kvRow('地址池', this.lanPool);
+        Kv({ label: '地址池', value: this.lanPool, valueSize: T.F_BODY, accent: false });
       }
       if (this.lanDhcp) {
-        this.kvRow('已分配租约', this.lanLeases + ' 个'
-          + (this.lanLease.length > 0 ? '  ·  租期 ' + this.lanLease : ''));
+        Kv({ label: '已分配租约', value: this.lanLeases + ' 个'
+          + (this.lanLease.length > 0 ? '  ·  租期 ' + this.lanLease : ''), valueSize: T.F_BODY, accent: false });
       }
       if (this.lanV6.length > 0) {
-        this.kvRow('IPv6 前缀', this.lanV6);
+        Kv({ label: 'IPv6 前缀', value: this.lanV6, valueSize: T.F_BODY, accent: false });
       }
     }
     .width('100%');
@@ -641,17 +637,17 @@ export struct NetworkPage {
           .padding({ top: 6, bottom: 6 });
       } else {
         if (this.fwDefault.length > 0) {
-          this.kvRow('默认入站', this.fwDefault);
+          Kv({ label: '默认入站', value: this.fwDefault, valueSize: T.F_BODY, accent: false });
         }
         if (this.fwLanIn.length > 0) {
-          this.kvRow('LAN 入站', this.fwLanIn);
+          Kv({ label: 'LAN 入站', value: this.fwLanIn, valueSize: T.F_BODY, accent: false });
         }
         if (this.fwWanIn.length > 0) {
-          this.kvRow('WAN 入站', this.fwWanIn);
+          Kv({ label: 'WAN 入站', value: this.fwWanIn, valueSize: T.F_BODY, accent: false });
         }
-        this.kvRow('转发规则', this.fwRules + ' 条');
+        Kv({ label: '转发规则', value: this.fwRules + ' 条', valueSize: T.F_BODY, accent: false });
         if (this.fwRedirects > 0) {
-          this.kvRow('端口转发', this.fwRedirects + ' 条');
+          Kv({ label: '端口转发', value: this.fwRedirects + ' 条', valueSize: T.F_BODY, accent: false });
         }
       }
 

@@ -57,6 +57,8 @@ export struct OverviewPage {
   @State rxNow: string = '—';
   @State txNow: string = '—';
   @State rxTotal: string = '—';
+  /** 峰值：图表右上角那个数，和安卓一样按窗口内最大速率算 */
+  @State peakText: string = '—';
   @State txTotal: string = '—';
   @State wanUp: boolean = false;
   @State wanProto: string = '';
@@ -226,6 +228,16 @@ export struct OverviewPage {
       u.shift();
     }
     this.upHist = u;
+
+    // 峰值跟着窗口走：取两条线的最大值，和趋势图自己的量程口径一致
+    let peak: number = 0;
+    for (let i = 0; i < d.length; i++) {
+      peak = Math.max(peak, d[i]);
+    }
+    for (let i = 0; i < u.length; i++) {
+      peak = Math.max(peak, u[i]);
+    }
+    this.peakText = Fmt.bps(peak);
   }
 
   /** 按名字更新单个网口：不存在就补一条，趋势线保留最近 32 个点 */
@@ -400,6 +412,13 @@ export struct OverviewPage {
   build() {
     Scroll() {
       Column() {
+        Text('概览')
+          .fontSize(T.F_TITLE)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'))
+          .width('100%')
+          .margin({ top: 6, bottom: 14 });
+
         if (this.rail()) {
           Row({ space: Bp.gap(this.winW) }) {
             Column() {
@@ -455,41 +474,61 @@ export struct OverviewPage {
   @Builder
   heroCard() {
     Column() {
+      // 顶部一行：状态点 + 一句话结论 + 系统版本胶囊（与安卓 Ui.gradient 那段一一对应）
       Row() {
-        Text('概览')
-          .fontSize(T.F_TITLE)
+        Row()
+          .width(7)
+          .height(7)
+          .borderRadius(4)
+          .backgroundColor($r('app.color.hero_fg'))
+          .margin({ right: 7 });
+        Text(this.verdict.length > 0 ? this.verdict : '正在读取…')
+          .fontSize(12.5)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.hero_fg'))
-          .layoutWeight(1);
-        Text(this.wanUp ? '在线' : '离线')
-          .fontSize(T.F_TINY)
+          .maxLines(1);
+        Blank();
+        Text('iStoreOS ' + Fmt.orDash(this.osVersion))
+          .fontSize(11)
           .fontColor($r('app.color.hero_fg'))
-          .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
           .borderRadius(T.R_PILL)
           .backgroundColor(Pal.heroStroke());
       }
       .width('100%')
-      .alignItems(VerticalAlign.Top);
+      .alignItems(VerticalAlign.Center);
 
-      Text(this.verdict.length > 0 ? this.verdict : '正在读取…')
-        .fontSize(T.F_H1)
+      // 大字是主机名 —— 安卓那边也是「机器叫什么」，结论在上一行
+      Text(this.hostname)
+        .fontSize(27)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.hero_fg'))
-        .margin({ top: 14 });
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .margin({ top: 12 });
 
-      Text(this.hostname + ' · 内核 ' + Fmt.orDash(this.kernel) + ' · 已运行 ' + this.uptime)
+      Text('内核 ' + Fmt.orDash(this.kernel) + ' · 在线 ' + this.uptime)
         .fontSize(T.F_SUB)
         .fontColor($r('app.color.hero_fg_soft'))
-        .margin({ top: 6 })
-        .maxLines(2);
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .margin({ top: 5 });
+
+      // 0.7 的分隔线：渐变底上不能用 divider 色，得用 on-primary 的透明版
+      Row()
+        .width('100%')
+        .height(1)
+        .backgroundColor(Pal.heroStroke())
+        .margin({ top: 16, bottom: 14 });
 
       Row() {
-        this.heroStat('下行', this.rxNow);
-        this.heroStat('上行', this.txNow);
-        this.heroStat('在线设备', this.onlineCount > 0 ? this.onlineCount.toString() : '—');
+        HeroStat({ label: '↓ 当前下载', value: this.rxNow }).layoutWeight(1)
+        HeroStat({ label: '↑ 当前上传', value: this.txNow }).layoutWeight(1)
+        HeroStat({ label: '在线设备',
+          value: this.onlineCount > 0 ? this.onlineCount.toString() : '—' })
+          .layoutWeight(1)
       }
-      .width('100%')
-      .margin({ top: 20 });
+      .width('100%');
 
       // 趋势图并进 hero（与安卓一致）：网快不快是同一件事，
       // 拆成下面另一张卡看得来回对照
@@ -499,7 +538,7 @@ export struct OverviewPage {
             .fontSize(T.F_TINY)
             .fontColor($r('app.color.hero_fg_soft'))
             .layoutWeight(1);
-          Text('累计 ↓ ' + this.rxTotal + '  ↑ ' + this.txTotal)
+          Text('峰值 ' + this.peakText)
             .fontSize(T.F_TINY)
             .fontColor($r('app.color.hero_fg_soft'));
         }
@@ -511,12 +550,20 @@ export struct OverviewPage {
           chartHeight: Bp.chartH(this.winW, 96)
         })
           .margin({ top: 8 });
+
+        // 图例：颜色必须和曲线一致，否则等于没有
+        Row({ space: 12 }) {
+          this.heroLegend('下载', Pal.primaryDim());
+          this.heroLegend('上传', Pal.warn());
+        }
+        .width('100%')
+        .margin({ top: 8 });
       }
       .width('100%')
       .margin({ top: 18 });
     }
     .width('100%')
-    .padding(20)
+    .padding({ left: 20, right: 20, top: 18, bottom: 18 })
     .borderRadius(T.R_CARD)
     .linearGradient({
       angle: 135,
@@ -524,6 +571,22 @@ export struct OverviewPage {
     })
     .border({ width: 0.7, color: $r('app.color.hero_stroke') })
     .margin({ bottom: this.rail() ? Bp.gap(this.winW) : T.GAP });
+  }
+
+  /** hero 里的小图例：一个色点 + 文字 */
+  @Builder
+  heroLegend(label: string, color: string) {
+    Row({ space: 6 }) {
+      Row()
+        .width(8)
+        .height(8)
+        .borderRadius(4)
+        .backgroundColor(color);
+      Text(label)
+        .fontSize(T.F_TINY)
+        .fontColor($r('app.color.hero_fg_soft'));
+    }
+    .alignItems(VerticalAlign.Center);
   }
 
   @Builder
@@ -534,56 +597,16 @@ export struct OverviewPage {
           .fontSize(T.F_TINY)
           .fontColor($r('app.color.text_secondary'));
       }
-      this.meterRow('CPU', this.cpuPct, this.cpuText,
-        this.threads + ' 线程' + (this.temp.length > 0 && this.temp !== '—' ? ' · ' + this.temp : ''));
-      this.meterRow('内存', this.memPct, this.memText, this.memDetail);
-      this.meterRow('磁盘', this.diskPct, this.diskText, this.diskDetail);
+      MeterRow({
+        label: 'CPU',
+        ratio: this.cpuPct,
+        value: this.cpuText,
+        detail: this.threads + ' 线程'
+          + (this.temp.length > 0 && this.temp !== '—' ? ' · ' + this.temp : '')
+      })
+      MeterRow({ label: '内存', ratio: this.memPct, value: this.memText, detail: this.memDetail })
+      MeterRow({ label: '磁盘', ratio: this.diskPct, value: this.diskText, detail: this.diskDetail })
     }
-  }
-
-  @Builder
-  meterRow(label: string, ratio: number, value: string, detail: string) {
-    Column() {
-      Row() {
-        Text(label)
-          .fontSize(T.F_BODY)
-          .fontColor($r('app.color.text_primary'));
-        if (detail.length > 0) {
-          Text(detail)
-            .fontSize(T.F_TINY)
-            .fontColor($r('app.color.text_secondary'))
-            .margin({ left: 8 });
-        }
-        Blank();
-        Text(value)
-          .fontSize(T.F_BODY)
-          .fontColor($r('app.color.text_primary'));
-      }
-      .width('100%')
-      .alignItems(VerticalAlign.Center);
-
-      Stack({ alignContent: Alignment.Start }) {
-        Row()
-          .width('100%')
-          .height(6)
-          .borderRadius(3)
-          .backgroundColor($r('app.color.track'));
-        Row()
-          .width(this.pctWidth(ratio))
-          .height(6)
-          .borderRadius(3)
-          .backgroundColor($r('app.color.primary'));
-      }
-      .width('100%')
-      .margin({ top: 6 });
-    }
-    .width('100%')
-    .margin({ top: 14 });
-  }
-
-  private pctWidth(r: number): string {
-    const v: number = Math.max(0, Math.min(1, r));
-    return (v * 100).toFixed(0) + '%';
   }
 
   /** 宽带连接：四项关键信息 + 网络设置入口（安卓概览里也是独立一张） */
@@ -737,38 +760,91 @@ export struct OverviewPage {
     }
   }
 
-  @Builder
-  heroStat(label: string, value: string) {
+}
+
+/**
+ * 概览 hero 的一格：大数字在上、标签在下。
+ *
+ * 为什么是 @Component 而不是 @Builder：
+ * ArkUI 的 @Builder 默认按值传参，**状态变量变化不会刷新 builder 内的 UI**；
+ * 传两个以上参数时连"按引用传递"也不生效。这里原来就是 @Builder，结果
+ * 数据到了界面不动 —— 三格永远是初始值「—」。换成 @Prop 后父组件状态一变，
+ * 子组件就会跟着重绘。
+ */
+@Component
+struct HeroStat {
+  @Prop label: string = '';
+  @Prop value: string = '';
+  build() {
     Column() {
-      Text(value)
-        .fontSize(T.F_HERO)
+      Text(this.label)
+        .fontSize(11)
+        .fontColor($r('app.color.hero_fg_soft'))
+        .maxLines(1);
+      Text(this.value)
+        .fontSize(T.F_H1)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.hero_fg'))
         .fontFeature("\"tnum\" on")
         .maxLines(1)
-        .textAlign(TextAlign.Start);
-      Text(label)
-        .fontSize(T.F_TINY)
-        .fontColor($r('app.color.hero_fg_soft'))
-        .margin({ top: 2 });
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .margin({ top: 5 });
     }
     .alignItems(HorizontalAlign.Start)
+    .width('100%')
     .layoutWeight(1);
   }
+}
 
-  @Builder
-  legend(color: string, label: string, value: string) {
-    Row({ space: 6 }) {
-      Row()
-        .width(8)
-        .height(8)
-        .borderRadius(4)
-        .backgroundColor(color);
-      Text(label + ' ' + value)
-        .fontSize(T.F_SUB)
-        .fontColor($r('app.color.text_secondary'))
-        .fontFeature("\"tnum\" on");
+/** 系统负载的一行：标签 + 说明 + 百分比 + 进度条。同上是 @Component，不是 @Builder。 */
+@Component
+struct MeterRow {
+  @Prop label: string = '';
+  @Prop ratio: number = 0;
+  @Prop value: string = '';
+  @Prop detail: string = '';
+
+  private pctWidth(): string {
+    const v: number = Math.max(0, Math.min(1, this.ratio));
+    return (v * 100).toFixed(0) + '%';
+  }
+
+  build() {
+    Column() {
+      Row() {
+        Text(this.label)
+          .fontSize(T.F_BODY)
+          .fontColor($r('app.color.text_primary'));
+        if (this.detail.length > 0) {
+          Text(this.detail)
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_secondary'))
+            .margin({ left: 8 });
+        }
+        Blank();
+        Text(this.value)
+          .fontSize(T.F_BODY)
+          .fontColor($r('app.color.text_primary'));
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center);
+
+      Stack({ alignContent: Alignment.Start }) {
+        Row()
+          .width('100%')
+          .height(6)
+          .borderRadius(3)
+          .backgroundColor($r('app.color.track'));
+        Row()
+          .width(this.pctWidth())
+          .height(6)
+          .borderRadius(3)
+          .backgroundColor($r('app.color.primary'));
+      }
+      .width('100%')
+      .margin({ top: 6 });
     }
-    .alignItems(VerticalAlign.Center);
+    .width('100%')
+    .margin({ top: 14 });
   }
 }

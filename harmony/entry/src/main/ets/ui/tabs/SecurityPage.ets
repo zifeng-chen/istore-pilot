@@ -382,24 +382,6 @@ export struct SecurityPage {
     });
   }
 
-  @Builder
-  statCell(label: string, value: number, tone: string, filter: number) {
-    Column() {
-      Text(value.toString())
-        .fontSize(25)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(tone)
-        .fontFeature("\"tnum\" on");
-      Text(label)
-        .fontSize(T.F_TINY)
-        .fontColor($r('app.color.text_secondary'))
-        .margin({ top: 3 });
-    }
-    .layoutWeight(1)
-    .onClick(() => {
-      this.openSub(1, filter);
-    });
-  }
 
   @Builder
   recentRow(d: DevRow, first: boolean) {
@@ -494,9 +476,9 @@ export struct SecurityPage {
       CardTitle({ glyph: Glyph.LINK, title: '设备', sub: '点数字进清单，点行看详情' });
 
       Row() {
-        this.statCell('在线', this.online, Pal.primary(), 1);
-        this.statCell('离线', this.offline(), Pal.textPrimary(), 2);
-        this.statCell('已禁网', this.blocked, Pal.danger(), 0);
+        StatCell({ label: '在线', value: this.online, tone: Pal.primary(), filter: 1, onTap: () => { this.openSub(1, 1); } }).layoutWeight(1);
+        StatCell({ label: '离线', value: this.offline(), tone: Pal.textPrimary(), filter: 2, onTap: () => { this.openSub(1, 2); } }).layoutWeight(1);
+        StatCell({ label: '已禁网', value: this.blocked, tone: Pal.danger(), filter: 0, onTap: () => { this.openSub(1, 0); } }).layoutWeight(1);
       }
       .width('100%')
       .margin({ top: 12, bottom: 8 });
@@ -518,7 +500,8 @@ export struct SecurityPage {
       } else {
         ForEach(this.recent, (d: DevRow, i: number) => {
           this.recentRow(d, i === 0);
-        }, (d: DevRow) => d.mac);
+        }, (d: DevRow) => d.mac + '|' + d.bps + '|' + d.name + '|' + d.ip
+          + '|' + (d.blocked ? '1' : '0'));
       }
     }
   }
@@ -570,7 +553,7 @@ export struct SecurityPage {
           .width('100%')
           .alignItems(VerticalAlign.Center)
           .padding({ top: 10, bottom: 10 });
-          }, (a: AppRow) => a.name);
+          }, (a: AppRow) => a.name + '|' + a.bps + '|' + a.total + '|' + a.share);
         }
       }
     }
@@ -924,7 +907,7 @@ export struct SecurityPage {
               .width('100%')
               .padding({ top: 8, bottom: 8 })
               .alignItems(VerticalAlign.Center);
-            }, (a: AppRow) => a.name);
+            }, (a: AppRow) => a.name + '|' + a.bps + '|' + a.total + '|' + a.share);
 
             Row().width('100%').height(20);
           }
@@ -1016,5 +999,34 @@ export struct SecurityPage {
       .backgroundColor($r('app.color.app_bg'))
       .align(Alignment.Top);
     }
+  }
+}
+
+/** 设备页顶部的三个统计格。@Builder 按值传参不会刷新，改成 @Prop 组件 */
+@Component
+struct StatCell {
+  @Prop label: string = '';
+  @Prop value: number = 0;
+  @Prop tone: string = '';
+  @Prop filter: number = 0;
+  onTap: () => void = () => {};
+
+  build() {
+    Column() {
+      Text(this.value.toString())
+        .fontSize(25)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(this.tone)
+        .fontFeature("\"tnum\" on");
+      Text(this.label)
+        .fontSize(T.F_TINY)
+        .fontColor($r('app.color.text_secondary'))
+        .margin({ top: 3 });
+    }
+    .width('100%')
+    .layoutWeight(1)
+    .onClick(() => {
+      this.onTap();
+    });
   }
 }

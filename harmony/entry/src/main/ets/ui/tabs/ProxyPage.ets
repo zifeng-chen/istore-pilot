@@ -377,7 +377,7 @@ export struct ProxyPage {
           .alignItems(VerticalAlign.Center);
         }
         .width('100%');
-      }, (b: Backend) => b.id);
+      }, (b: Backend) => b.id + '|' + (b.running ? '1' : '0') + '|' + b.nodes);
     }
   }
 
@@ -519,12 +519,12 @@ export struct ProxyPage {
                   });
                 }
                 .width('100%');
-              }, (m: NodeItem) => g.name + '/' + m.name);
+              }, (m: NodeItem) => g.name + '/' + m.name + '|' + m.delay);
             }
           }
           .width('100%');
         }
-      }, (g: NodeGroup) => g.name);
+      }, (g: NodeGroup) => g.name + '|' + g.now + '|' + g.members.length);
     } else if (this.loaded) {
       Card({ gapTop: this.rail() ? 0 : T.GAP }) {
         Text('没有正在运行的代理后端')

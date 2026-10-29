@@ -355,9 +355,9 @@ export struct SettingsPage {
         .margin({ top: 14, bottom: 12 });
 
       Row() {
-        this.heroStat('响应', this.latency.length > 0 ? this.latency + ' ms' : '—');
-        this.heroStat('凭证', this.tokenOk ? '有效' : '缺失');
-        this.heroStat('Agent', this.agentVersion.length > 0 ? ('v' + this.agentVersion) : '—');
+        SettingStat({ label: '响应', value: this.latency.length > 0 ? this.latency + ' ms' : '—' }).layoutWeight(1);
+        SettingStat({ label: '凭证', value: this.tokenOk ? '有效' : '缺失' }).layoutWeight(1);
+        SettingStat({ label: 'Agent', value: this.agentVersion.length > 0 ? ('v' + this.agentVersion) : '—' }).layoutWeight(1);
       }
       .width('100%');
     }
@@ -372,24 +372,6 @@ export struct SettingsPage {
     .margin({ bottom: this.rail() ? Bp.gap(this.winW) : T.GAP });
   }
 
-  @Builder
-  heroStat(label: string, value: string) {
-    Column() {
-      Text(label)
-        .fontSize(11.5)
-        .fontColor($r('app.color.hero_fg_soft'));
-      Text(value)
-        .fontSize(16)
-        .fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.hero_fg'))
-        .fontFeature("\"tnum\" on")
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .margin({ top: 4 });
-    }
-    .alignItems(HorizontalAlign.Start)
-    .layoutWeight(1);
-  }
 
   @Builder
   connCard() {
@@ -1134,5 +1116,34 @@ export struct SettingsPage {
     this.sheetTitle = this.infoTitle;
     this.infoBody = (running ? '后台任务还在跑…\n\n' : '') +
       (log.length > 0 ? log : '还没有升级记录。');
+  }
+}
+
+/**
+ * 连接卡的三格。用 @Component 而不是 @Builder —— ArkUI 里 @Builder 按值传参
+ * 时状态变化不会刷新，页面上会一直停在初始的「—」。
+ */
+@Component
+struct SettingStat {
+  @Prop label: string = '';
+  @Prop value: string = '';
+
+  build() {
+    Column() {
+      Text(this.label)
+        .fontSize(11.5)
+        .fontColor($r('app.color.hero_fg_soft'));
+      Text(this.value)
+        .fontSize(16)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.hero_fg'))
+        .fontFeature("\"tnum\" on")
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .margin({ top: 4 });
+    }
+    .alignItems(HorizontalAlign.Start)
+    .width('100%')
+    .layoutWeight(1);
   }
 }

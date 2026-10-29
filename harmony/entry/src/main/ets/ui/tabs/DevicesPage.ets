@@ -318,7 +318,7 @@ export struct DevicesPage {
       GroupBox() {
         ForEach(this.online, (d: DevRow, i: number) => {
           this.row(d, i);
-        }, (d: DevRow) => 'on' + d.mac);
+        }, (d: DevRow) => this.rowKey('on', d));
       }
     }
   }
@@ -335,7 +335,7 @@ export struct DevicesPage {
       GroupBox() {
         ForEach(this.offline, (d: DevRow, i: number) => {
           this.row(d, i);
-        }, (d: DevRow) => 'off' + d.mac);
+        }, (d: DevRow) => this.rowKey('off', d));
       }
     }
   }
@@ -352,6 +352,16 @@ export struct DevicesPage {
       return Pal.warn();
     }
     return Pal.textSecondary();
+  }
+
+  /**
+   * ForEach 的 key。**不能只写 MAC** —— 键不变时 ArkUI 会复用节点、不重跑行内容，
+   * 结果是行里的实时速率、累计流量永远停在第一次渲染的值（5 秒一轮的刷新等于没刷）。
+   * 把会变的显示字段一起编进 key，速率一变就重建这一行；列表只有几十行，代价可接受。
+   */
+  private rowKey(prefix: string, d: DevRow): string {
+    return prefix + d.mac + '|' + d.rate + '|' + d.total + '|' + d.name + '|' + d.ip
+      + '|' + d.badge + '|' + (d.badgeReal ? '1' : '0') + '|' + (d.blocked ? '1' : '0');
   }
 
   @Builder

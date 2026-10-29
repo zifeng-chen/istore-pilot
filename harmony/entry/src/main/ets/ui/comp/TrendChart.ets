@@ -98,9 +98,9 @@ export struct TrendChart {
 
     // 先画面积再画线，线压在面积上才干净
     this.area(this.down, x0, y0, plotW, plotH, n, top, Pal.primary(), 0.22);
-    this.area(this.up, x0, y0, plotW, plotH, n, top, Pal.primaryBright(), 0.16);
+    this.area(this.up, x0, y0, plotW, plotH, n, top, Pal.warn(), 0.14);
     this.line(this.down, x0, y0, plotW, plotH, n, top, Pal.primaryDim(), 1.9);
-    this.line(this.up, x0, y0, plotW, plotH, n, top, Pal.primaryBright(), 1.6);
+    this.line(this.up, x0, y0, plotW, plotH, n, top, Pal.warn(), 1.6);
   }
 
   private line(series: number[], x0: number, y0: number, plotW: number, plotH: number,

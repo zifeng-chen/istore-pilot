@@ -415,9 +415,9 @@ export struct ShieldPage {
         .margin({ top: 2 });
 
       Row() {
-        this.heroStat(Fmt.count(this.blocked), '已拦截');
-        this.heroStat(Fmt.count(this.queries), '总查询');
-        this.heroStat(Fmt.count(this.rules), '规则数');
+        ShieldStat({ value: Fmt.count(this.blocked), label: '已拦截' }).layoutWeight(1);
+        ShieldStat({ value: Fmt.count(this.queries), label: '总查询' }).layoutWeight(1);
+        ShieldStat({ value: Fmt.count(this.rules), label: '规则数' }).layoutWeight(1);
       }
       .width('100%')
       .margin({ top: 18 });
@@ -490,7 +490,7 @@ export struct ShieldPage {
           }
           .width('100%')
           .alignItems(HorizontalAlign.Start);
-        }, (h: DnsHop) => h.title);
+        }, (h: DnsHop) => h.title + '|' + h.detail + '|' + h.tone);
       }
       .width('100%')
       .padding({ left: 16, right: 16, top: 10, bottom: 14 })
@@ -577,7 +577,7 @@ export struct ShieldPage {
             .margin({ bottom: 8 });
           }
           .width('100%');
-        }, (r: RankItem) => r.domain);
+        }, (r: RankItem) => r.domain + '|' + r.count);
       }
       .width('100%')
       .padding({ left: 16, right: 16, bottom: 6 });
@@ -729,7 +729,7 @@ export struct ShieldPage {
             .alignItems(VerticalAlign.Center);
           }
           .width('100%');
-        }, (item: RuleItem) => item.id.toString());
+        }, (item: RuleItem) => item.id + '|' + (item.enabled ? '1' : '0') + '|' + item.rules + '|' + item.last);
       }
       .width('100%')
       .padding({ left: 16, right: 16, top: 2, bottom: 6 });
@@ -748,21 +748,29 @@ export struct ShieldPage {
     return Math.round(v);
   }
 
-  @Builder
-  heroStat(value: string, label: string) {
+}
+
+/** 拦截卡的三格。@Builder 按值传参不会刷新，必须用 @Prop 组件 */
+@Component
+struct ShieldStat {
+  @Prop value: string = '';
+  @Prop label: string = '';
+
+  build() {
     Column() {
-      Text(value)
+      Text(this.value)
         .fontSize(19)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.hero_fg'))
         .fontFeature("\"tnum\" on")
         .maxLines(1);
-      Text(label)
+      Text(this.label)
         .fontSize(T.F_TINY)
         .fontColor($r('app.color.hero_fg_soft'))
         .margin({ top: 2 });
     }
     .alignItems(HorizontalAlign.Start)
+    .width('100%')
     .layoutWeight(1);
   }
 }
