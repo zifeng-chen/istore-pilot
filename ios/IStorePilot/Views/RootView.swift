@@ -31,6 +31,17 @@ struct RootView: View {
         axis == .rail && insets.top < 8 ? 10 : 0
     }
 
+    /// 版式断点用的「真实可用宽度」。
+    ///
+    /// `size.width` 是整块画布（含安全区），不能直接算列数：
+    /// Duo 展开竖屏给系统留了右侧 118pt 的状态栏列，画布 699 里只有 581 是能排版的，
+    /// 用 699 去算会多出一列。竖条形态下还要再扣掉导航栏自己占的 84。
+    private var contentAvail: CGFloat {
+        let insetW = insets.leading + insets.trailing
+        let railW = axis == .rail ? NavRail.width : 0
+        return max(0, size.width - insetW - railW)
+    }
+
     var body: some View {
         Group {
             if axis == .rail {
@@ -61,6 +72,7 @@ struct RootView: View {
         .padding(.top, topGuard)
         .background(C.appBg.ignoresSafeArea())
         .environment(\.barAxis, axis)
+        .environment(\.winWidth, contentAvail)
         .modifier(MetricsReader(size: $size, insets: $insets))
         .animation(.easeInOut(duration: 0.22), value: axis)
     }

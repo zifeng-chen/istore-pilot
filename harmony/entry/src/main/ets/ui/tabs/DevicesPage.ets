@@ -34,6 +34,22 @@ function accessReal(a: J): boolean {
   return a.str('source', '') === 'ap' && a.str('conf', '') === 'high';
 }
 
+/**
+ * 副标题：IP · 厂商。
+ * 没命名的设备名字本身就是 IP（安卓/桌面端也这么兜底），
+ * 副标题再写一遍就是同一串数字出现两次，所以相等时跳过。
+ */
+function metaText(d: DevRow): string {
+  const bits: string[] = [];
+  if (d.ip.length > 0 && d.ip !== d.name) {
+    bits.push(d.ip);
+  }
+  if (d.vendor.length > 0) {
+    bits.push(d.vendor);
+  }
+  return bits.length > 0 ? bits.join(' · ') : d.mac;
+}
+
 interface DevRow {
   mac: string;
   ip: string;
@@ -262,24 +278,15 @@ export struct DevicesPage {
             .padding(16);
         }
 
-        if (this.rail()) {
-          // 平板：在线 / 离线并排。分组语义本来就是两支，
-          // 横着放能一眼对比「现在谁在、谁不在」，不用上下滚
-          Row({ space: Bp.gap(this.winW) }) {
-            Column() {
-              this.onlineGroup(0);
-            }
-            .layoutWeight(1)
-            .alignItems(HorizontalAlign.Start);
-
-            Column() {
-              this.offlineGroup(0);
-            }
-            .layoutWeight(1)
-            .alignItems(HorizontalAlign.Start);
+        if (this.cols() > 1) {
+          // 宽画布：一张卡一台设备，按列铺开。
+          // 原来是「在线 / 离线」左右分栏 —— 一天里大半时间离线那一栏是空的，
+          // 等于把右半屏让给了没有内容的列表；改成网格后同样宽度能看到三倍的设备。
+          Column() {
+            this.gridOnline(0);
+            this.gridOffline(18);
           }
-          .width('100%')
-          .alignItems(VerticalAlign.Top);
+          .width('100%');
         } else {
           Column() {
             this.onlineGroup(0);
@@ -402,7 +409,7 @@ export struct DevicesPage {
           }
           .width('100%');
 
-          Text(d.ip + (d.vendor.length > 0 ? ' · ' + d.vendor : ''))
+          Text(metaText(d))
             .fontSize(T.F_TINY)
             .fontColor($r('app.color.text_secondary'))
             .maxLines(1)
@@ -430,5 +437,187 @@ export struct DevicesPage {
       .alignItems(VerticalAlign.Center);
     }
     .width('100%');
+  }
+
+  // MARK: - 宽屏网格
+
+  /** 一张卡至少 260vp 宽：再窄名字和速率就会互相挤 */
+  private cols(): number {
+    return Bp.cols(this.winW, 260);
+  }
+
+  /**
+   * 按列数把列表切成一行一行。
+   *
+   * 不用 `Flex(wrap)` 是因为最后一行只有两张卡时会各自撑到半屏宽，
+   * 和上一行对不齐；切成定长行之后，缺的位置用 Blank 补齐，网格永远齐。
+   */
+  private chunks(list: DevRow[]): DevRow[][] {
+    const n: number = this.cols();
+    const out: DevRow[][] = [];
+    for (let i = 0; i < list.length; i += n) {
+      out.push(list.slice(i, i + n));
+    }
+    return out;
+  }
+
+  /** 补齐最后一行缺的格子。返回值本身不重要，只要个数对 */
+  private fillers(len: number): number[] {
+    const out: number[] = [];
+    for (let i = len; i < this.cols(); i++) {
+      out.push(i);
+    }
+    return out;
+  }
+
+  /** 行 key 要把整行会变的字段编进去，否则速率刷新时这一行不重建 */
+  private chunkKey(chunk: DevRow[]): string {
+    let k: string = 'g';
+    for (let i = 0; i < chunk.length; i++) {
+      k += '|' + this.rowKey('g', chunk[i]);
+    }
+    return k;
+  }
+
+  @Builder
+  gridOnline(topGap: number) {
+    if (this.filter !== 2 && this.online.length > 0) {
+      Row() {
+        Text('在线')
+          .fontSize(T.F_SUB)
+          .fontColor($r('app.color.text_secondary'));
+        Blank();
+        Text(this.online.length + ' 台')
+          .fontSize(T.F_TINY)
+          .fontColor($r('app.color.text_tertiary'))
+          .fontFeature("\"tnum\" on");
+      }
+      .width('100%')
+      .padding({ left: 4, right: 4 })
+      .margin({ top: topGap, bottom: 7 });
+
+      Column({ space: 10 }) {
+        ForEach(this.chunks(this.online), (chunk: DevRow[]) => {
+          Row({ space: 10 }) {
+            ForEach(chunk, (d: DevRow) => {
+              this.card(d);
+            }, (d: DevRow) => this.rowKey('g', d));
+            ForEach(this.fillers(chunk.length), (n: number) => {
+              Blank();
+            }, (n: number) => 'f' + n);
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Top);
+        }, (chunk: DevRow[]) => this.chunkKey(chunk));
+      }
+      .width('100%');
+    }
+  }
+
+  @Builder
+  gridOffline(topGap: number) {
+    if (this.filter !== 1 && this.offline.length > 0) {
+      Row() {
+        Text('离线')
+          .fontSize(T.F_SUB)
+          .fontColor($r('app.color.text_secondary'));
+        Blank();
+        Text(this.offline.length + ' 台')
+          .fontSize(T.F_TINY)
+          .fontColor($r('app.color.text_tertiary'))
+          .fontFeature("\"tnum\" on");
+      }
+      .width('100%')
+      .padding({ left: 4, right: 4 })
+      .margin({ top: topGap, bottom: 7 });
+
+      Column({ space: 10 }) {
+        ForEach(this.chunks(this.offline), (chunk: DevRow[]) => {
+          Row({ space: 10 }) {
+            ForEach(chunk, (d: DevRow) => {
+              this.card(d);
+            }, (d: DevRow) => this.rowKey('g', d));
+            ForEach(this.fillers(chunk.length), (n: number) => {
+              Blank();
+            }, (n: number) => 'f' + n);
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Top);
+        }, (chunk: DevRow[]) => this.chunkKey(chunk));
+      }
+      .width('100%');
+    }
+  }
+
+  /**
+   * 宽屏的一张设备卡。信息顺序和窄屏的行一致：状态 · 名字 · 接入 / IP · 厂商 / 速率 · 累计。
+   * 状态不写字：在线用主色圆点，离线整卡压成浅底 + 速率破折号，
+   * 因为网格里大半是离线设备，逐张写「离线」只会变成噪音。
+   */
+  @Builder
+  card(d: DevRow) {
+    Column() {
+      Row({ space: 6 }) {
+        Row()
+          .width(5)
+          .height(5)
+          .borderRadius(3)
+          .backgroundColor(d.online ? $r('app.color.primary') : $r('app.color.text_tertiary'));
+        Text(d.name)
+          .fontSize(T.F_H2)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(d.online ? $r('app.color.text_primary') : $r('app.color.text_secondary'))
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .layoutWeight(1);
+        if (d.blocked) {
+          Text('禁网')
+            .fontSize(10)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.danger'))
+            .padding({ left: 5, right: 5, top: 2, bottom: 2 })
+            .borderRadius(6)
+            .backgroundColor(Pal.accentSoft());
+        } else {
+          Text(d.badge)
+            .fontSize(10)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(this.badgeColor(d))
+            .padding({ left: 5, right: 5, top: 2, bottom: 2 })
+            .borderRadius(6)
+            .backgroundColor(d.badgeReal ? Pal.alpha(this.badgeColor(d), 0.14) : Color.Transparent)
+            .border({ width: d.badgeReal ? 0 : 1, color: Pal.alpha(this.badgeColor(d), 0.42) });
+        }
+      }
+      .width('100%');
+
+      Text(metaText(d))
+        .fontSize(T.F_TINY)
+        .fontColor($r('app.color.text_secondary'))
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .margin({ top: 3 });
+
+      Row() {
+        Text(d.online ? d.rate : '—')
+          .fontSize(T.F_SUB)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(d.online ? $r('app.color.primary') : $r('app.color.text_tertiary'))
+          .fontFeature("\"tnum\" on");
+        Blank();
+        Text('共 ' + d.total)
+          .fontSize(T.F_TINY)
+          .fontColor($r('app.color.text_tertiary'))
+          .fontFeature("\"tnum\" on");
+      }
+      .width('100%')
+      .margin({ top: 9 });
+    }
+    .layoutWeight(1)
+    .alignItems(HorizontalAlign.Start)
+    .padding({ left: 11, right: 11, top: 10, bottom: 10 })
+    .borderRadius(14)
+    .backgroundColor(d.online ? $r('app.color.surface') : $r('app.color.surface_sunken'))
+    .border({ width: 0.5, color: $r('app.color.divider') });
   }
 }

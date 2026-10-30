@@ -45,6 +45,41 @@ extension EnvironmentValues {
     }
 }
 
+/// 整块画布的宽度。
+///
+/// `barAxis` 只回答「横着还是竖着」，做不了版式断点：Duo **展开竖屏**宽 764，
+/// 高度比宽度还大，axis 依然是 `.bottom`，但它已经放得下两列卡片了。
+/// 所以列数这类判断必须看绝对宽度，不能看方向。
+private struct WinWidthKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
+}
+
+extension EnvironmentValues {
+    var winWidth: CGFloat {
+        get { self[WinWidthKey.self] }
+        set { self[WinWidthKey.self] = newValue }
+    }
+}
+
+/// 设备清单在宽画布上的列数。
+///
+/// 不用「宽度过某个阈值就几列」的写法：Duo 展开竖屏的真实可用宽度只有 549pt
+/// （内屏 699 减去右侧状态栏那一列 118），固定阈值一写就会把它判成单列，
+/// 而 549 其实放得下两张 270pt 的卡。
+///
+/// 所以按「一张卡至少多宽」反推，和鸿蒙 `Bp.cols()` 是同一套算法：
+/// 250 是「名字 + 速率 + 累计用量」在 13pt 字号下不互相挤的下限。
+enum GridCols {
+    static let minCard: CGFloat = 250
+    static let gap: CGFloat = 10
+
+    static func forWidth(_ w: CGFloat) -> Int {
+        guard w > 0 else { return 1 }
+        let n = Int((w + gap) / (minCard + gap))
+        return max(1, min(3, n))
+    }
+}
+
 extension View {
     /// 页面内容末尾的一点呼吸感。
     ///
