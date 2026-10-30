@@ -57,6 +57,7 @@ struct BackupsView: View {
         .background(C.appBg)
         .navigationTitle("配置备份")
         .navigationBarTitleDisplayMode(.inline)
+        .navBarChrome()
         .task { await load() }
         .alert(item: $popup) { p in
             Alert(title: Text(p.title), message: Text(p.body),

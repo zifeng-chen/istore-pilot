@@ -1,9 +1,6 @@
 import SwiftUI
 
 struct ShieldView: View {
-    /// 从「设备与拦截」一级页进来时给返回动作
-    var onBack: (() -> Void)? = nil
-
     @State private var d: J = Api.cached("/api/v1/adblock") ?? [:]
     @State private var top: [J] = []
     @State private var loading = true
@@ -34,8 +31,7 @@ struct ShieldView: View {
     private var install: J { d.obj("install") ?? [:] }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
+        ScrollView {
                 VStack(spacing: 14) {
                     hero
                     if loading {
@@ -61,29 +57,17 @@ struct ShieldView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
             }
-            .scrollIndicators(.hidden)
-            .background(C.appBg)
-            .navigationTitle("拦截")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if let onBack {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button(action: onBack) {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 15, weight: .semibold))
-                        }
-                    }
-                }
-            }
-            .navigationBarTitleDisplayMode(.large)
-            .navigationDestination(isPresented: $goLog) { AdblockLogView() }
-            .sheet(isPresented: $goInstall) {
-                WebScreen(title: "安装 AdGuard Home",
-                          path: install.str("luci_path"))
-            }
-            .task { await load() }
-            .onReceive(tick) { _ in Task { await load() } }
+        .scrollIndicators(.hidden)
+        .background(C.appBg)
+        .navigationTitle("拦截")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(isPresented: $goLog) { AdblockLogView() }
+        .sheet(isPresented: $goInstall) {
+            WebScreen(title: "安装 AdGuard Home",
+                      path: install.str("luci_path"))
         }
+        .task { await load() }
+        .onReceive(tick) { _ in Task { await load() } }
     }
 
     // MARK: - 未安装

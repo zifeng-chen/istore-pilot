@@ -64,6 +64,7 @@ struct SettingsView: View {
             .background(C.appBg)
             .navigationTitle("设置")
             .navigationBarTitleDisplayMode(.large)
+            .navBarChrome()
             .task { await load() }
             .navigationDestination(isPresented: $goHardware) { HardwareView() }
             .navigationDestination(isPresented: $goWan) { WanView() }
@@ -271,30 +272,26 @@ struct SettingsView: View {
         return Card {
             VStack(alignment: .leading, spacing: 0) {
                 CardHead(icon: "iphone", title: "设备信息", sub: "型号、固件、运行时长")
-                Text("这台路由器的硬件与固件")
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(C.textSecondary)
-                    .padding(.bottom, 4)
 
                 plainRow(icon: "house", title: "主机名",
                          note: "局域网里认的就是这个名字", value: board.str("hostname"))
-                Hairline(inset: 42)
+                Hairline(inset: 62)
                 plainRow(icon: "desktopcomputer", title: "型号",
                          note: "主板与平台", value: board.str("model"))
-                Hairline(inset: 42)
+                Hairline(inset: 62)
                 plainRow(icon: "cpu", title: "处理器",
                          note: "\(cpu.int("cores")) 核",
                          value: cpu.str("model").replacingOccurrences(of: "(R)", with: "")
                             .replacingOccurrences(of: "(TM)", with: ""))
-                Hairline(inset: 42)
+                Hairline(inset: 62)
                 plainRow(icon: "memorychip", title: "内存",
                          note: mod.str("type").isEmpty ? "已安装容量" : "\(mod.str("type")) \(mod.int("speed"))",
                          value: F.bytes(mem.dbl("total")))
-                Hairline(inset: 42)
+                Hairline(inset: 62)
                 plainRow(icon: "internaldrive", title: "系统盘",
                          note: store.str("mount").isEmpty ? "" : store.str("mount"),
                          value: F.bytes(store.dbl("total")))
-                Hairline(inset: 42)
+                Hairline(inset: 62)
                 plainRow(icon: "info.circle", title: "系统版本",
                          note: board.str("kernel").isEmpty ? "" : "内核 \(board.str("kernel"))",
                          value: board.str("version"))
@@ -321,6 +318,7 @@ struct SettingsView: View {
         Card {
             VStack(alignment: .leading, spacing: 0) {
                 CardHead(icon: "paintpalette", title: "外观", sub: "深浅色")
+                    .padding(.bottom, 8)
                 Hairline(inset: 62)
                 row(icon: "circle.lefthalf.filled", title: "主题",
                     note: "跟随系统会随手机的深浅色自动切换",
@@ -434,12 +432,12 @@ struct SettingsView: View {
                     note: "只重拨 WAN，通常 10 秒内恢复") {
                     confirmPower = "restart_network"
                 }
-                Hairline(inset: 42)
+                Hairline(inset: 62)
                 row(icon: "arrow.clockwise", title: "重启路由器",
                     note: "所有设备断网约 1 分钟", danger: true) {
                     confirmPower = "reboot"
                 }
-                Hairline(inset: 42)
+                Hairline(inset: 62)
                 row(icon: "power", title: "关闭路由器",
                     note: "关机后只能到设备跟前手动开机", danger: true) {
                     confirmPower = "poweroff"
@@ -452,6 +450,7 @@ struct SettingsView: View {
         Card {
             VStack(alignment: .leading, spacing: 0) {
                 CardHead(icon: "lock.shield", title: "安全", sub: "两个密码，别记混")
+                    .padding(.bottom, 8)
                 Hairline(inset: 62)
                 row(icon: "key", title: "修改 App 登录密码",
                     note: "只管这个 App") {

@@ -71,6 +71,7 @@ struct WanView: View {
         .background(C.appBg)
         .navigationTitle("网络")
         .navigationBarTitleDisplayMode(.inline)
+        .navBarChrome()
         .task { await load() }
         .sheet(isPresented: $showWeb) {
             WebScreen()

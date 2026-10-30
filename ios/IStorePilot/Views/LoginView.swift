@@ -48,7 +48,7 @@ struct LoginView: View {
                         tip(okTip, color: C.ok, icon: "checkmark.circle.fill")
                     }
 
-                    Button(action: submit) {
+                    Button { submit() } label: {
                         HStack(spacing: 8) {
                             if busy { ProgressView().tint(C.onPrimary) }
                             Text(busy ? "连接中…" : "连接")
@@ -88,7 +88,14 @@ struct LoginView: View {
             }
             .scrollDismissesKeyboard(.interactively)
         }
-        .onAppear { focus = nil }
+        .onAppear {
+            focus = nil
+            #if DEBUG
+            // 截图用：带着口令启动就直接登录，走的是和用户一样的登录链路
+            let p = DebugRoute.pass
+            if !p.isEmpty && !busy { submit(p) }
+            #endif
+        }
     }
 
     // MARK: - 组件
@@ -189,12 +196,12 @@ struct LoginView: View {
         }
     }
 
-    private func submit() {
+    private func submit(_ forced: String? = nil) {
         focus = nil
         busy = true
         err = ""; okTip = ""
         let target = addr
-        let password = pwd
+        let password = forced ?? pwd
 
         Task {
             do {

@@ -1,12 +1,21 @@
 import SwiftUI
 
-/// 应用流量排行（二级页）。对应安卓的 AppsActivity。
+/// 应用流量排行（二级页）。对应安卓的 `AppsActivity`。
 ///
-/// 设备页只放一张前几名的卡片，完整的放这里。数据按累计用量排序，
-/// 「IP 直连」由服务端固定在末尾 —— 它不是应用，是认不出域名的那些连接。
+/// 版式与安卓逐项对齐：**一个应用一张小卡**，图标 44、名字 15、
+/// 第二行「占 x% · 分类 · N 连接」，右侧总量 17 + 一行上下行。
+///
+/// 原来这里是「一整个 ListGroup + 36 图标 + 占比放最后」：
+/// 行比安卓矮一截、信息也少一截（没有连接数、上下行被挤在中间行），
+/// 于是同一份数据在两端读起来完全不是一件事。
 struct AppsView: View {
+    /// 从设备页用 sheet 打开时为 true —— 那时要自己给一个关闭按钮，
+    /// 否则用户只能下拉关（导航栏上光秃秃的，看着像没做返回）
+    var asSheet: Bool = false
+
     @State private var d: J = Api.cached("/api/v1/apps") ?? [:]
     @State private var q = ""
+    @Environment(\.dismiss) private var dismiss
 
     private let tick = Timer.publish(every: 4, on: .main, in: .common).autoconnect()
 
@@ -32,15 +41,12 @@ struct AppsView: View {
             .padding(.bottom, 10)
 
             ScrollView {
-                VStack(spacing: 12) {
+                LazyVStack(spacing: 10) {
                     if apps.isEmpty {
                         EmptyHint(icon: "chart.bar", text: "还没有捕获到应用流量")
                     } else {
-                        ListGroup {
-                            ForEach(Array(apps.enumerated()), id: \.offset) { idx, a in
-                                row(a)
-                                if idx < apps.count - 1 { Hairline(inset: 16) }
-                            }
+                        ForEach(Array(apps.enumerated()), id: \.offset) { _, a in
+                            row(a)
                         }
                     }
 
@@ -53,6 +59,15 @@ struct AppsView: View {
         .background(C.appBg)
         .navigationTitle("应用流量")
         .navigationBarTitleDisplayMode(.inline)
+        .navBarChrome()
+        .toolbar {
+            if asSheet {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") { dismiss() }
+                        .font(.system(size: 15, weight: .semibold))
+                }
+            }
+        }
         .task { await load() }
         .onReceive(tick) { _ in Task { await load() } }
     }
@@ -67,24 +82,24 @@ struct AppsView: View {
         let up = all.dbl("up")
         let down = all.dbl("down")
 
-        return Card {
-            VStack(alignment: .leading, spacing: 6) {
+        return Card(padding: 16) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(days > 1 ? "累计用量 · 已统计 \(days) 天" : "累计用量")
-                    .font(F.tiny)
+                    .font(.system(size: 11.5))
                     .foregroundStyle(C.textSecondary)
                 Text(F.bytes(up + down))
-                    .font(F.num(30, .semibold))
+                    .font(F.num(28, .semibold))
                     .foregroundStyle(C.textPrimary)
                 Text("↓ \(F.bytes(down))　↑ \(F.bytes(up))")
-                    .font(F.num(12.5, .regular))
+                    .font(F.num(12, .regular))
                     .foregroundStyle(C.textSecondary)
-                Hairline(inset: 0)
+                Hairline(inset: 0).padding(.vertical, 6)
                 Text("本次运行 \(F.bytes(session.dbl("up") + session.dbl("down")))"
                      + "　·　当前 \(Int(clash.dbl("connections"))) 条连接")
-                    .font(F.tiny)
+                    .font(.system(size: 11))
                     .foregroundStyle(C.textSecondary)
                 Text("「IP 直连」是认不出域名的连接，排在最后")
-                    .font(F.tiny)
+                    .font(.system(size: 10.5))
                     .foregroundStyle(C.textTertiary)
             }
         }
@@ -99,10 +114,20 @@ struct AppsView: View {
                 .font(.system(size: 14))
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
+            if !q.isEmpty {
+                Button { q = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(C.textTertiary)
+                }
+            }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(C.surface, in: RoundedRectangle(cornerRadius: 14))
+        .padding(.vertical, 9)
+        .background(C.surface, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .strokeBorder(C.glassStroke, lineWidth: 0.7)
+        )
     }
 
     // MARK: - 行
@@ -112,47 +137,60 @@ struct AppsView: View {
         let category = a.str("category")
         let total = a.dbl("all_total")
         let share = a.dbl("share")
+        let conns = a.int("conns")
         let bps = a.dbl("down_bps") + a.dbl("up_bps")
 
-        return HStack(spacing: 10) {
-            AppIconView(name: name, size: 36)
+        // 第二行：占比 · 分类 · 连接数。占比排在最前是因为它比「多少 GB」
+        // 更能说明「谁在吃带宽」；上下行挪到右边金额下面，窄屏上才不会被省略号吃掉
+        var meta: [String] = []
+        if share > 0 { meta.append(String(format: "占 %.1f%%", share)) }
+        if !category.isEmpty, category != "其他" { meta.append(category) }
+        if conns > 0 { meta.append("\(conns) 连接") }
 
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text(name)
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(C.textPrimary)
-                        .lineLimit(1)
-                    if bps >= 1024 {
-                        Text(F.rate(bps))
-                            .font(F.num(10.5, .medium))
-                            .foregroundStyle(C.primary)
+        return Card(padding: 13) {
+            HStack(spacing: 0) {
+                AppIconView(name: name, size: 44)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(name)
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(C.textPrimary)
+                            .lineLimit(1)
+                        if bps >= 1024 {
+                            Text(F.rate(bps))
+                                .font(F.num(11.5, .medium))
+                                .foregroundStyle(C.primary)
+                                .lineLimit(1)
+                        }
                     }
-                }
-                HStack(spacing: 6) {
-                    if !category.isEmpty, category != "其他" {
-                        Text(category)
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(C.textSecondary)
-                    }
-                    Text("↓ \(F.bytes(a.dbl("all_down")))　↑ \(F.bytes(a.dbl("all_up")))")
-                        .font(F.num(10.5, .regular))
+                    Text(meta.isEmpty ? "—" : meta.joined(separator: "　·　"))
+                        .font(.system(size: 11.5))
                         .foregroundStyle(C.textSecondary)
                         .lineLimit(1)
                 }
-            }
-            Spacer(minLength: 6)
-            VStack(alignment: .trailing, spacing: 3) {
-                Text(F.bytes(total))
-                    .font(F.num(13, .medium))
-                    .foregroundStyle(C.textPrimary)
-                Text(String(format: "占 %.0f%%", share))
-                    .font(F.num(10.5, .regular))
-                    .foregroundStyle(C.textTertiary)
+                .padding(.leading, 12)
+                .padding(.trailing, 6)
+
+                Spacer(minLength: 0)
+
+                VStack(alignment: .trailing, spacing: 3) {
+                    Text(F.bytes(total))
+                        .font(F.num(17, .medium))
+                        .foregroundStyle(C.textPrimary)
+                        .lineLimit(1)
+                    Text("↓ \(F.bytes(a.dbl("all_down")))　↑ \(F.bytes(a.dbl("all_up")))")
+                        .font(F.num(10, .regular))
+                        .foregroundStyle(C.textSecondary)
+                        .lineLimit(1)
+                }
+                .padding(.leading, 10)
+                // 右侧两个数字是固定信息，不能被中间那行挤掉一半；
+                // 真放不下时让「占 x% · 分类」先截断
+                .fixedSize(horizontal: true, vertical: false)
+                .layoutPriority(1)
             }
         }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 16)
     }
 
     private func load() async {

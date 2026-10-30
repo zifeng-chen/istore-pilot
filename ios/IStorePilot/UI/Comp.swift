@@ -49,6 +49,29 @@ struct Hairline: View {
     }
 }
 
+// MARK: - 导航栏
+
+extension View {
+    /// 导航栏统一底色。
+    ///
+    /// iOS 16 之后导航栏默认是**透明**的：大标题和返回按钮直接漂在页面底色上，
+    /// 内容一滚就从标题底下穿过去。视觉上等于「这个页面没有导航栏」，
+    /// 二级页尤其明显（返回箭头孤零零挂在左上角，没有任何栏的轮廓）。
+    /// 这里给它一个实底，让「栏」重新变成一个可见的容器。
+    func navBarChrome() -> some View { modifier(NavChrome()) }
+}
+
+private struct NavChrome: ViewModifier {
+    @Environment(\.colorScheme) private var scheme
+
+    func body(content: Content) -> some View {
+        content
+            .toolbarBackground(C.appBg, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(scheme, for: .navigationBar)
+    }
+}
+
 // MARK: - 流量曲线
 
 /// hero 卡里的流量趋势（Swift Charts）。

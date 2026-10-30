@@ -43,6 +43,7 @@ struct DeviceDetailView: View {
         .background(C.appBg)
         .navigationTitle(d.str("label", "设备"))
         .navigationBarTitleDisplayMode(.inline)
+        .navBarChrome()
         .task { await load() }
         .onReceive(tick) { _ in Task { await load() } }
         .alert("重命名设备", isPresented: $renaming) {
@@ -76,7 +77,7 @@ struct DeviceDetailView: View {
                 }
 
                 Text(d.str("label", d.str("ip")))
-                    .font(.system(size: 22, weight: .bold))
+                    .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(C.heroFg)
 
                 HStack(spacing: 0) {
@@ -173,33 +174,68 @@ struct DeviceDetailView: View {
 
     // MARK: - 应用
 
+    /// 这台设备的应用占用。版式照安卓 `DeviceDetailActivity` 的应用行：
+    /// 图标 36 + 名字 14.5 + 一行细节，右侧金额 13.5 与占比，下面一条占比条。
+    /// 原来只有「名字 + 分类胶囊 + 两个数字」，没有图标也没有占比条，
+    /// 一列排下来看不出谁是主力，也分不清量级。
     private var appsCard: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 9) {
-                SectionTitle(text: "这台设备的应用")
-                ForEach(Array(apps.prefix(8).enumerated()), id: \.offset) { _, a in
-                    let live = a.dbl("down_bps") + a.dbl("up_bps")
-                    HStack(spacing: 9) {
-                        Text(a.str("name"))
-                            .font(F.caption)
-                            .foregroundStyle(C.textPrimary)
-                            .lineLimit(1)
-                        Pill(text: a.str("category", "其他"), color: C.textSecondary)
-                        Spacer()
-                        // 累计字节几秒才涨一点点，正在跑的时候把实时速率也摆出来，
-                        // 否则边看视频边刷这一页会觉得数字是死的
-                        if live >= 1024 {
-                            Text("↓ " + F.rate(a.dbl("down_bps")))
-                                .font(F.num(11, .medium))
-                                .foregroundStyle(C.primary)
-                        }
-                        Text(F.bytes(a.dbl("total")))
-                            .font(F.num(11.5, .regular))
-                            .foregroundStyle(C.textSecondary)
-                    }
+        let max = apps.map { $0.dbl("total") }.max() ?? 0
+
+        return Card(padding: 16) {
+            VStack(alignment: .leading, spacing: 0) {
+                SectionTitle(text: "这台设备的应用", trailing: "\(apps.count) 个")
+                    .padding(.bottom, 6)
+
+                ForEach(Array(apps.prefix(8).enumerated()), id: \.offset) { i, a in
+                    if i > 0 { Hairline(inset: 0).padding(.vertical, 2) }
+                    appRow(a, max: max)
                 }
             }
         }
+    }
+
+    private func appRow(_ a: J, max: Double) -> some View {
+        let name = a.str("name")
+        let category = a.str("category")
+        let total = a.dbl("total")
+        let live = a.dbl("down_bps") + a.dbl("up_bps")
+
+        // 累计值几秒才涨一点点，正在跑的时候把实时速率顶到最前面，
+        // 否则边看视频边刷这一页会觉得数字是死的
+        var meta: [String] = []
+        if live >= 1024 {
+            meta.append("↓ " + F.rate(a.dbl("down_bps")) + "  ↑ " + F.rate(a.dbl("up_bps")))
+        }
+        if !category.isEmpty, category != "其他" { meta.append(category) }
+        meta.append("↓ " + F.bytes(a.dbl("down")) + "　↑ " + F.bytes(a.dbl("up")))
+
+        return VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 0) {
+                AppIconView(name: name, size: 32)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(name)
+                        .font(.system(size: 14.5))
+                        .foregroundStyle(C.textPrimary)
+                        .lineLimit(1)
+                    Text(meta.joined(separator: "　·　"))
+                        .font(F.num(11, .regular))
+                        .foregroundStyle(C.textSecondary)
+                        .lineLimit(1)
+                }
+                .padding(.leading, 10)
+                Spacer(minLength: 6)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(F.bytes(total))
+                        .font(F.num(13.5, .medium))
+                        .foregroundStyle(C.textPrimary)
+                    Text(String(format: "%.0f%%", max > 0 ? total * 100 / max : 0))
+                        .font(F.num(11, .regular))
+                        .foregroundStyle(C.textSecondary)
+                }
+            }
+            Bar(ratio: max > 0 ? total / max : 0, color: C.primary, height: 3)
+        }
+        .padding(.vertical, 7)
     }
 
     // MARK: - 操作

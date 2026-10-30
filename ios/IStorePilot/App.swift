@@ -15,6 +15,28 @@ struct IStorePilotApp: App {
     }
 }
 
+#if DEBUG
+/// 仅调试：用启动参数直接落到某个页面，方便逐页截图核对版式。
+///   xcrun simctl launch <dev> com.izfeng.www.istoreos -tab 1 -sub apps
+/// Release 构建里整块不编译，不会影响线上行为。
+enum DebugRoute {
+    private static func value(_ key: String) -> String? {
+        let a = ProcessInfo.processInfo.arguments
+        guard let i = a.firstIndex(of: "-" + key), i + 1 < a.count else { return nil }
+        return a[i + 1]
+    }
+
+    static func int(_ key: String, _ fallback: Int) -> Int {
+        Int(value(key) ?? "") ?? fallback
+    }
+
+    static var tab: Int { int("tab", 0) }
+    static var sub: String { value("sub") ?? "" }
+    /// 截图时自动用这个口令登录，走的是和用户完全一样的登录链路
+    static var pass: String { value("pass") ?? "" }
+}
+#endif
+
 /// 全局登录态。令牌失效时 Api 会回调 onAuthFail，这里统一踢回登录页。
 final class AppState: ObservableObject {
     @Published var loggedIn: Bool = Session.isLoggedIn
@@ -48,12 +70,14 @@ struct RootContainer: View {
     @EnvironmentObject private var app: AppState
 
     var body: some View {
-        if app.loggedIn {
-            RootView()
-                .transition(.opacity)
-        } else {
-            LoginView()
-                .transition(.opacity)
+        Group {
+            if app.loggedIn {
+                RootView()
+                    .transition(.opacity)
+            } else {
+                LoginView()
+                    .transition(.opacity)
+            }
         }
     }
 }

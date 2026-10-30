@@ -1,11 +1,15 @@
 import SwiftUI
 
-/// 代理：同时管 OpenClash 与 Passwall（和 Android 端同一套结构）。
+/// 代理：同时管 OpenClash 与 Passwall。
 ///
-///   1. Hero：谁在跑 / 跑哪份配置 / 多少节点
-///   2. 代理后端：两个插件互斥，点一行切过去
-///   3. 运行模式：分段直接切，下面一句讲清后果
-///   4. 配置与节点：当前配置、订阅入口、节点按分组展开（单选点 + 延迟胶囊 + 整组测速）
+/// 结构照安卓 `ui/ProxyFragment` 复刻，一共 **hero + 两张卡**：
+///   1. Hero：谁在跑 / 跑哪份配置 / 多少节点，**代理后端也在这里**（点一行切换）
+///   2. 运行模式：分段直接切，下面一句讲清后果
+///   3. 配置与节点：当前配置、订阅入口、节点按分组展开（单选点 + 延迟胶囊 + 整组测速）
+///
+/// 之前是四张卡：hero + 独立的「代理后端」卡 + 运行模式 + 「配置与订阅」+ 独立的「节点」卡。
+/// 后端名在 hero 里写一遍、又在下面那张卡里写一遍，等于同一件事说两遍；
+/// 配置和节点本来是一条链（换配置 → 重启内核 → 节点重读），拆成两张卡反而要来回看。
 struct ProxyView: View {
     @State private var d: J = Api.cached("/api/v1/proxy") ?? [:]
     @State private var groups: [J] = Api.cached("/api/v1/proxy/groups").map { $0.objs("groups") } ?? []
@@ -36,20 +40,20 @@ struct ProxyView: View {
             ScrollView {
                 VStack(spacing: 14) {
                     hero
+                    // 窄屏顺序 = 安卓：先模式、后配置与节点。
+                    // 宽屏把节点摊到左边，配置/模式挤右栏，省一次长滚动
                     DuoColumns(rightFirstInNarrow: true) {
                         if loading {
-                            Card { VStack(alignment: .leading, spacing: 10) {
-                                Bone(w: 90, h: 15); Bone(h: 10); Bone(h: 10)
-                            } }
-                        } else if groups.isEmpty {
-                            Card { EmptyHint(icon: "network.slash", text: "代理没有在运行，或者没有读到节点") }
+                            Card {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    Bone(w: 90, h: 15); Bone(h: 10); Bone(h: 10)
+                                }
+                            }
                         } else {
-                            nodeCard
+                            comboCard
                         }
                     } right: {
-                        backendCard
                         modeCard
-                        cfgCard
                     }
                     if !err.isEmpty {
                         Text(err).font(F.tiny).foregroundStyle(C.danger)
@@ -63,6 +67,7 @@ struct ProxyView: View {
             .background(C.appBg)
             .navigationTitle("代理")
             .navigationBarTitleDisplayMode(.large)
+            .navBarChrome()
             .navigationDestination(isPresented: $goSubs) { SubscriptionView() }
             .task { await load() }
             .onReceive(tick) { _ in Task { await load() } }
@@ -91,7 +96,7 @@ struct ProxyView: View {
         if bits.isEmpty { bits.append("两个代理后端都停着，所有流量走直连") }
 
         return Hero {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 8) {
                     Circle().fill(running ? Color(hex: 0x5FE7C4) : Color(hex: 0xFF7A6B))
                         .frame(width: 7, height: 7)
@@ -107,32 +112,47 @@ struct ProxyView: View {
                         .clipShape(Capsule())
                 }
                 Text(title)
-                    .font(F.num(27, .semibold))
+                    .font(F.num(26, .semibold))
                     .foregroundStyle(C.heroFg)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                    .padding(.top, 2)
+                    .padding(.top, 10)
                 Text(bits.joined(separator: "　·　"))
                     .font(.system(size: 12))
                     .foregroundStyle(C.heroFgSoft)
                     .lineLimit(1)
+                    .padding(.top, 4)
+
+                // 后端并进 hero：它是「这一页在管谁」的身份信息，本来就该跟状态放一起
+                Text("代理后端 · 点一行切换")
+                    .font(.system(size: 11))
+                    .foregroundStyle(C.heroFgSoft)
+                    .padding(.top, 16)
+
+                VStack(spacing: 0) {
+                    ForEach(Array(backends.enumerated()), id: \.offset) { i, b in
+                        if i > 0 {
+                            // hero 是深绿底，卡片那套 divider 色在上面看不见
+                            Rectangle().fill(C.heroFg.opacity(0.16))
+                                .frame(height: 0.7)
+                                .padding(.top, 2)
+                        }
+                        backendRow(b)
+                    }
+                }
+                .padding(.top, 4)
             }
         }
     }
 
-    // MARK: - 代理后端
-
-    private var backendCard: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 0) {
-                CardHead(icon: "server.rack", title: "代理后端", sub: "两个插件互斥，点一行切过去")
-
-                ForEach(Array(backends.enumerated()), id: \.offset) { i, b in
-                    if i > 0 { Hairline(inset: 46) }
-                    backendRow(b)
-                }
-            }
-        }
+    /// hero 深色底上的小胶囊：白字 + 半透明底
+    private func heroPill(_ text: String, on: Bool) -> some View {
+        Text(text)
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(C.heroFg.opacity(on ? 1 : 0.78))
+            .padding(.horizontal, 9).padding(.vertical, 3)
+            .background(C.heroFg.opacity(on ? 0.22 : 0.10))
+            .clipShape(Capsule())
     }
 
     private func backendRow(_ b: J) -> some View {
@@ -150,26 +170,28 @@ struct ProxyView: View {
             HStack(spacing: 12) {
                 Image(systemName: "power")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(on ? C.primary : C.textSecondary)
+                    .foregroundStyle(C.heroFg.opacity(on ? 1 : 0.62))
                     .frame(width: 30, height: 30)
-                    .background(on ? C.accentSoft : C.surfaceSunken)
+                    .background(C.heroFg.opacity(on ? 0.22 : 0.10))
                     .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                 VStack(alignment: .leading, spacing: 3) {
                     Text(name)
                         .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(on ? C.textPrimary : C.textSecondary)
+                        .foregroundStyle(C.heroFg.opacity(on ? 1 : 0.62))
                     if !sub.isEmpty {
-                        Text(sub).font(.system(size: 11.5)).foregroundStyle(C.textSecondary)
+                        Text(sub)
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(C.heroFg.opacity(0.62))
                     }
                 }
-                Spacer()
-                Pill(text: on ? "运行中" : (installed ? "未运行" : "未安装"),
-                     color: on ? C.primary : C.textSecondary)
+                Spacer(minLength: 6)
+                heroPill(on ? "运行中" : (installed ? "未运行" : "未安装"), on: on)
             }
             .padding(.vertical, 10)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(!installed || on || busy)
     }
 
     // MARK: - 运行模式
@@ -184,11 +206,12 @@ struct ProxyView: View {
             VStack(alignment: .leading, spacing: 10) {
                 CardHead(icon: "bolt", title: "运行模式", sub: "改完立即生效") {
                     Text(modeLabel(mode))
-                        .font(F.caption)
-                        .foregroundStyle(C.textSecondary)
+                        .font(F.num(13.5, .medium))
+                        .foregroundStyle(C.primary)
                 }
 
-                HStack(spacing: 3) {
+                // 尺寸照安卓 Ui.segmented：外槽 34 高、圆角 10、内块圆角 8、字号 13.5
+                HStack(spacing: 0) {
                     ForEach(Array(labels.enumerated()), id: \.offset) { i, t in
                         let on = i == selected
                         Button {
@@ -196,14 +219,14 @@ struct ProxyView: View {
                             Task { await setMode(values[i]) }
                         } label: {
                             Text(t)
-                                .font(.system(size: 13, weight: .medium))
+                                .font(.system(size: 13.5, weight: .medium))
                                 .foregroundStyle(on ? C.textPrimary : C.textSecondary)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 7)
+                                .frame(height: 28)
                                 .background {
                                     if on {
                                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                            .fill(C.surface)
+                                            .fill(C.segmentThumb)
                                             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
                                                 .strokeBorder(C.glassStroke, lineWidth: 0.7))
                                     }
@@ -251,84 +274,116 @@ struct ProxyView: View {
         }
     }
 
-    // MARK: - 配置
+    // MARK: - 配置与节点
 
-    private var cfgCard: some View {
+    private var comboCard: some View {
         let cur = cfg.str("current")
         let curName = (cur as NSString).lastPathComponent.replacingOccurrences(of: ".yaml", with: "")
+        let sorted = groups.sorted { a, b in
+            let aa = isAuto(a.str("name")), bb = isAuto(b.str("name"))
+            if aa != bb { return aa }
+            return false
+        }
 
-        return Card {
+        return Card(padding: 0) {
             VStack(alignment: .leading, spacing: 0) {
-                CardHead(icon: "doc.text", title: "配置与订阅", sub: "换配置会重启内核")
+                CardHead(icon: "list.bullet", title: "配置与节点",
+                         sub: "换配置会重启内核，断网十几秒")
+                    .padding(.horizontal, 18)
+                    .padding(.top, 18)
+                    .padding(.bottom, 10)
 
+                // 当前配置：整行可点，右侧「切换」胶囊给出明确的可操作性
                 HStack(spacing: 10) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("当前配置")
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(C.textSecondary)
+                    Image(systemName: "key")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(C.primary)
+                        .frame(width: 30, height: 30)
+                        .background(C.accentSoft)
+                        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("当前配置").font(F.body).foregroundStyle(C.textPrimary)
                         Text(curName.isEmpty ? "未选择" : curName)
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(C.textPrimary)
+                            .font(F.num(12, .regular))
+                            .foregroundStyle(C.textSecondary)
                             .lineLimit(1)
                             .truncationMode(.middle)
                     }
-                    Spacer()
+                    Spacer(minLength: 6)
                     Button {
                         showCfg = true
                     } label: {
                         Text("切换")
                             .font(.system(size: 12.5, weight: .medium))
                             .foregroundStyle(C.primary)
-                            .padding(.horizontal, 12).padding(.vertical, 6)
+                            .padding(.horizontal, 11).padding(.vertical, 5)
                             .background(C.accentSoft)
                             .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
                     .disabled(busy)
                 }
-                .padding(.top, 8)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 9)
 
-                Hairline(inset: 0).padding(.top, 10)
+                Hairline(inset: 18)
 
                 Button {
                     goSubs = true
                 } label: {
                     HStack(spacing: 10) {
+                        Image(systemName: "arrow.up.doc")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(C.primary)
+                            .frame(width: 30, height: 30)
+                            .background(C.accentSoft)
+                            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                         Text("订阅管理").font(F.body).foregroundStyle(C.textPrimary)
-                        Spacer()
-                        Text("更新 / 添加 / 删除")
-                            .font(.system(size: 11.5))
-                            .foregroundStyle(C.textSecondary)
+                        Spacer(minLength: 6)
                         Image(systemName: "chevron.right")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(C.textTertiary)
                     }
-                    .padding(.vertical, 11)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 9)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+
+                Hairline(inset: 18)
+
+                // 节点：不是一个独立卡片，而是这张卡的最后一段
+                Text("节点")
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(C.textSecondary)
+                    .padding(.horizontal, 18)
+                    .padding(.top, 12)
+                    .padding(.bottom, 2)
+
+                if loading {
+                    Text("读取中…").font(F.tiny).foregroundStyle(C.textSecondary)
+                        .padding(.horizontal, 18).padding(.vertical, 10)
+                } else if sorted.isEmpty {
+                    Text(anyRunning() ? "节点分组还没读取到，这块会自动重试"
+                                      : "代理没在运行，所以没有节点")
+                        .font(F.tiny)
+                        .foregroundStyle(C.textSecondary)
+                        .padding(.horizontal, 18).padding(.vertical, 10)
+                } else {
+                    ForEach(Array(sorted.enumerated()), id: \.offset) { i, g in
+                        if i > 0 { Hairline(inset: 18) }
+                        groupBlock(g)
+                    }
+                }
+                Color.clear.frame(height: 6)
             }
         }
     }
 
-    // MARK: - 节点
-
-    private var nodeCard: some View {
-        let sorted = groups.sorted { a, b in
-            let aa = isAuto(a.str("name")), bb = isAuto(b.str("name"))
-            if aa != bb { return aa }
-            return false
-        }
-        return Card {
-            VStack(alignment: .leading, spacing: 0) {
-                CardHead(icon: "list.bullet", title: "节点", sub: "点分组展开，点节点切换")
-
-                ForEach(Array(sorted.enumerated()), id: \.offset) { i, g in
-                    if i > 0 { Hairline(inset: 16) }
-                    groupBlock(g)
-                }
-            }
-        }
+    /// 有没有任意一个后端处于运行中：用来区分「没装/没启动」和「启动了但没读到分组」
+    private func anyRunning() -> Bool {
+        for i in 0..<backends.count where backends[i].bool("running") { return true }
+        return false
     }
 
     private func groupBlock(_ g: J) -> some View {
@@ -339,44 +394,45 @@ struct ProxyView: View {
 
         return VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Image(systemName: open ? "chevron.down" : "chevron.right")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(C.textSecondary)
-                        Text(name)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(C.textPrimary)
-                            .lineLimit(1)
-                        Spacer()
-                        Button {
-                            testGroup(name)
-                        } label: {
-                            Text(testingGroup == name ? "测速中" : "测速")
-                                .font(.system(size: 11.5, weight: .medium))
-                                .foregroundStyle(testingGroup == name ? C.textSecondary : C.primary)
-                                .padding(.horizontal, 9).padding(.vertical, 4)
-                                .background(testingGroup == name ? C.surfaceSunken : C.accentSoft)
-                                .clipShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
+                HStack(spacing: 6) {
+                    Image(systemName: open ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(C.textSecondary)
+                    Text(name)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(C.textPrimary)
+                        .lineLimit(1)
+                    Spacer()
+                    Button {
+                        testGroup(name)
+                    } label: {
+                        Text(testingGroup == name ? "测速中" : "测速")
+                            .font(.system(size: 11.5, weight: .medium))
+                            .foregroundStyle(testingGroup == name ? C.textSecondary : C.primary)
+                            .padding(.horizontal, 9).padding(.vertical, 4)
+                            .background(testingGroup == name ? C.surfaceSunken : C.accentSoft)
+                            .clipShape(Capsule())
                     }
-                    HStack(spacing: 6) {
-                        Text(now.isEmpty ? "未选择" : "当前 \(now)")
-                            .font(.system(size: 11.5))
-                            .foregroundStyle(now.isEmpty ? C.textTertiary : C.primary)
-                            .lineLimit(1)
-                        Spacer()
-                        Text("\(members.count) 个")
-                            .font(F.num(11.5, .regular))
-                            .foregroundStyle(C.textTertiary)
-                    }
-                    .padding(.leading, 16)
+                    .buttonStyle(.plain)
                 }
-                .padding(.vertical, 10)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    if open { expanded.remove(name) } else { expanded.insert(name) }
+                HStack(spacing: 6) {
+                    Text(now.isEmpty ? "未选择" : "当前 \(now)")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(now.isEmpty ? C.textTertiary : C.primary)
+                        .lineLimit(1)
+                    Spacer()
+                    Text("\(members.count) 个")
+                        .font(F.num(11.5, .regular))
+                        .foregroundStyle(C.textTertiary)
                 }
+                .padding(.leading, 16)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                if open { expanded.remove(name) } else { expanded.insert(name) }
+            }
 
             if open {
                 ForEach(Array(members.enumerated()), id: \.offset) { _, m in
@@ -427,7 +483,7 @@ struct ProxyView: View {
                     Text("—").font(.system(size: 11)).foregroundStyle(C.textTertiary)
                 }
             }
-            .padding(.leading, 34).padding(.trailing, 2).padding(.vertical, 7)
+            .padding(.leading, 34).padding(.trailing, 18).padding(.vertical, 7)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain))
@@ -604,6 +660,7 @@ struct ConfigPicker: View {
             .background(C.appBg)
             .navigationTitle("选择配置")
             .navigationBarTitleDisplayMode(.inline)
+            .navBarChrome()
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("取消") { dismiss() }

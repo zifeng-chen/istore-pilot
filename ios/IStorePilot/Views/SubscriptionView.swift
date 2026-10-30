@@ -51,6 +51,7 @@ struct SubscriptionView: View {
         .background(C.appBg)
         .navigationTitle("订阅管理")
         .navigationBarTitleDisplayMode(.inline)
+        .navBarChrome()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {

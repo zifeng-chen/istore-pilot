@@ -1,7 +1,13 @@
 import SwiftUI
 
 struct RootView: View {
-    @State private var tab = 0
+    @State private var tab: Int = {
+        #if DEBUG
+        return DebugRoute.tab
+        #else
+        return 0
+        #endif
+    }()
     @State private var size: CGSize = .zero
     @State private var insets: EdgeInsets = EdgeInsets()
 
@@ -38,6 +44,11 @@ struct RootView: View {
                     // 图标本身留在安全区里 —— ignoresSafeAreaEdges 只作用于背景
                     BottomBar(items: items, tab: $tab)
                         .background(.regularMaterial, ignoresSafeAreaEdges: .bottom)
+                        // 键盘弹起时底部横条跟着屏幕上移会「浮」到键盘顶上，
+                        // 看着像多出来一条。只让**横条**忽略键盘安全区、
+                        // 留在屏幕底部（被键盘盖住正是系统 TabBar 的行为）；
+                        // 页面内容照常让位，否则输入框会被键盘挡住
+                        .ignoresSafeArea(.keyboard, edges: .bottom)
                 }
             }
         }
@@ -45,7 +56,6 @@ struct RootView: View {
         .background(C.appBg.ignoresSafeArea())
         .environment(\.barAxis, axis)
         .modifier(MetricsReader(size: $size, insets: $insets))
-        .ignoresSafeArea(.keyboard)
         .animation(.easeInOut(duration: 0.22), value: axis)
     }
 

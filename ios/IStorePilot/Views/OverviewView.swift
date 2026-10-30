@@ -67,6 +67,7 @@ struct OverviewView: View {
             .background(C.appBg)
             .navigationTitle("概览")
             .navigationBarTitleDisplayMode(.large)
+            .navBarChrome()
             .task { await load() }
             .onReceive(tick) { _ in Task { await load() } }
             .onReceive(secTick) { now = $0 }
@@ -144,25 +145,32 @@ struct OverviewView: View {
         }
     }
 
+    /// 一格指标：圆图标 + 标签在一行，数值单独占下一行。
+    ///
+    /// 原来是「图标 | 标签/数值」两列并排，370pt 的机器上每栏只剩 60pt 给数字，
+    /// 「147.2 KB/s」必然折行或被截成「147.2 K…」。数值独占一行后就够放了。
     private func rateBlock(icon: String, label: String, text: String) -> some View {
-        HStack(spacing: 9) {
-            Image(systemName: icon)
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(C.heroFg.opacity(0.9))
-                .frame(width: 26, height: 26)
-                .background(Color.white.opacity(0.16))
-                .clipShape(Circle())
-            VStack(alignment: .leading, spacing: 1) {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(C.heroFg.opacity(0.9))
+                    .frame(width: 20, height: 20)
+                    .background(Color.white.opacity(0.16))
+                    .clipShape(Circle())
                 Text(label)
                     .font(.system(size: 10.5))
                     .foregroundStyle(C.heroFgSoft)
-                Text(text)
-                    .font(F.num(16.5, .semibold))
-                    .foregroundStyle(C.heroFg)
+                    .lineLimit(1)
             }
-            Spacer(minLength: 0)
+            Text(text)
+                .font(F.num(16, .semibold))
+                .foregroundStyle(C.heroFg)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.leading, 2)
     }
 
     private var onlineCount: Int {
@@ -185,42 +193,51 @@ struct OverviewView: View {
 
     // MARK: - 系统
 
+    /// 与安卓概览的「系统负载」卡逐项对齐：标题右侧写负载，
+    /// 下面 CPU / 内存 / 磁盘 三根横条，每根自带细节。
+    ///
+    /// 之前这里只有 CPU 和内存，磁盘那条整个缺失 —— 而安卓有。
+    /// 另外 CPU 型号原来塞在标题右侧，`Intel(R) Pentium(R) Gold 8505` 一定被截断
+    /// （截图里就是 `Intel(R) Pentium(R) Gold…`），信息等于没显示。
+    /// 型号改放 CPU 那一行的细节里，右侧让给真正在变的负载值。
     private var systemCard: some View {
         let cpu = d.obj("cpu") ?? [:]
         let mem = d.obj("memory") ?? [:]
         let load = d.obj("load") ?? [:]
         let temps = d.objs("temperature")
         let hot = temps.map { $0.dbl("celsius") }.max() ?? 0
-        let (th, tt) = load.pair("threads")
+        let (_, tt) = load.pair("threads")
+        let disk = biggestDisk()
+        let cpuPct = cpu.dbl("percent")
 
         return Card {
             VStack(alignment: .leading, spacing: 14) {
                 CardHead(icon: "cpu", title: "系统负载",
                          sub: "CPU · 内存 · 磁盘") {
-                    Text(cpu.str("model"))
-                        .font(F.caption)
-                        .foregroundStyle(C.textSecondary)
+                    if load.dbl("load1") > 0 {
+                        Text(String(format: "负载 %.2f", load.dbl("load1")))
+                            .font(F.num(12, .medium))
+                            .foregroundStyle(C.textSecondary)
+                    }
                 }
 
                 metricRow(title: "CPU",
-                          value: F.pct(cpu.dbl("percent")),
-                          ratio: cpu.dbl("percent") / 100,
-                          color: cpu.dbl("percent") > 85 ? C.danger : C.primary,
-                          note: "\(cpu.int("cores")) 线程")
+                          value: F.pct(cpuPct),
+                          ratio: cpuPct / 100,
+                          color: meterColor(cpuPct),
+                          note: "\(tt) 线程" + (hot > 0 ? "　\(F.temp(hot))" : ""))
 
                 metricRow(title: "内存",
                           value: F.pct(mem.dbl("percent")),
                           ratio: mem.dbl("percent") / 100,
-                          color: mem.dbl("percent") > 85 ? C.danger : C.primary,
+                          color: meterColor(mem.dbl("percent")),
                           note: "\(F.bytes(mem.dbl("used"))) / \(F.bytes(mem.dbl("total")))")
 
-                HStack(spacing: 10) {
-                    chip("负载", String(format: "%.2f", load.dbl("load1")))
-                    chip("进程", "\(th)/\(tt)")
-                    chip("温度", hot > 0 ? F.temp(hot) : "—",
-                         color: hot > 75 ? C.warn : C.textPrimary)
-                    chip("内核", d.obj("board")?.str("kernel", "—") ?? "—")
-                }
+                metricRow(title: "磁盘",
+                          value: disk.percent > 0 ? F.pct(disk.percent) : "—",
+                          ratio: disk.percent / 100,
+                          color: meterColor(disk.percent),
+                          note: disk.total > 0 ? F.bytes(disk.free) + " 可用" : "")
 
                 Hairline(inset: 0)
                 Button {
@@ -240,29 +257,37 @@ struct OverviewView: View {
         }
     }
 
+    /// 用量条的配色阶梯：<70% 主色、70–90% 橙、>90% 红。
+    /// 与安卓 `MeterBar.setRatio` 完全一致，也和温度那套判断同源
+    private func meterColor(_ pct: Double) -> Color {
+        pct >= 90 ? C.danger : (pct >= 70 ? C.warn : C.primary)
+    }
+
+    /// 最大的一块盘（安卓 `biggest()` 同逻辑）：overlay 只有 2 GB，
+    /// 按容量最大那块看才有意义
+    private func biggestDisk() -> (total: Double, free: Double, percent: Double) {
+        let list = d.objs("storage")
+        let best = list.max { $0.dbl("total") < $1.dbl("total") } ?? [:]
+        return (best.dbl("total"), best.dbl("free"), best.dbl("percent"))
+    }
+
+    /// 名字 · 细节 ─────────────── 百分比
+    /// ────────── 进度条 ──────────
     private func metricRow(title: String, value: String, ratio: Double,
                            color: Color, note: String) -> some View {
         VStack(spacing: 6) {
-            HStack {
-                Text(title).font(F.body).foregroundStyle(C.textSecondary)
-                Spacer()
-                Text(note).font(F.tiny).foregroundStyle(C.textSecondary)
-                Text(value).font(F.num(15, .semibold)).foregroundStyle(color)
-                    .frame(width: 52, alignment: .trailing)
+            HStack(spacing: 8) {
+                Text(title).font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(C.textPrimary)
+                Text(note)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(C.textSecondary)
+                    .lineLimit(1)
+                Spacer(minLength: 6)
+                Text(value).font(F.num(13, .medium)).foregroundStyle(color)
             }
-            Bar(ratio: ratio, color: color)
+            Bar(ratio: ratio, color: color, height: 7)
         }
-    }
-
-    private func chip(_ k: String, _ v: String, color: Color = C.textPrimary) -> some View {
-        VStack(spacing: 3) {
-            Text(k).font(.system(size: 10.5)).foregroundStyle(C.textSecondary)
-            Text(v).font(F.num(13.5, .medium)).foregroundStyle(color).lineLimit(1)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .background(C.surfaceSunken)
-        .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
     }
 
     // MARK: - 网口

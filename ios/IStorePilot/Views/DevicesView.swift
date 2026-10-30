@@ -1,9 +1,6 @@
 import SwiftUI
 
 struct DevicesView: View {
-    /// 从「设备与拦截」一级页进来时会给一个返回动作；
-    /// 作为独立页签使用时是 nil，导航栏保持原样
-    var onBack: (() -> Void)? = nil
     /// 一级页点「在线 / 离线」进来时预设的筛选（0 全部 / 1 在线 / 2 离线）
     var initialFilter: Int = 0
 
@@ -12,7 +9,6 @@ struct DevicesView: View {
     @State private var loading = (Api.cached("/api/v1/devices") == nil)
     @State private var q = ""
     @State private var filter = 0          // 0 全部 / 1 在线 / 2 离线 / 3 已禁网
-    @State private var path: [String] = []
 
     private let tick = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
 
@@ -37,8 +33,7 @@ struct DevicesView: View {
     }
 
     var body: some View {
-        NavigationStack(path: $path) {
-            ScrollView {
+        ScrollView {
                 VStack(spacing: 12) {
                     searchBar
                         .padding(.horizontal, 16)
@@ -56,9 +51,7 @@ struct DevicesView: View {
                         // 就是 55 层圆角和 55 层投影，又卡又碎
                         ListGroup {
                             ForEach(Array(shown.enumerated()), id: \.offset) { idx, dv in
-                                Button {
-                                    path.append(dv.str("mac"))
-                                } label: {
+                                NavigationLink(value: dv.str("mac")) {
                                     row(dv)
                                 }
                                 .buttonStyle(.plain)
@@ -74,33 +67,19 @@ struct DevicesView: View {
             }
             .scrollIndicators(.hidden)
             .background(C.appBg)
-            .navigationTitle("设备")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if let onBack {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button(action: onBack) {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 15, weight: .semibold))
-                        }
-                    }
-                }
+        .background(C.appBg)
+        // 这一页永远是二级页：导航栈由「设备」页提供，返回箭头和手势返回都交给系统。
+        // 以前是原地换视图 + 自己画一个 chevron，iOS 26 把它渲染成浮在右上角的玻璃圆钮
+        .navigationTitle("设备清单")
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            if !didInit {
+                filter = initialFilter
+                didInit = true
             }
-            .onAppear {
-                if !didInit {
-                    filter = initialFilter
-                    didInit = true
-                }
-            }
-            .navigationBarTitleDisplayMode(.large)
-            .navigationDestination(for: String.self) { mac in
-                if mac == "#apps" {
-                    AppsView()
-                } else {
-                    DeviceDetailView(mac: mac,
-                                     seed: all.first { $0.str("mac") == mac } ?? [:])
-                }
-            }
+        }
+        .navigationDestination(for: String.self) { mac in
+            DeviceDetailView(mac: mac, seed: all.first { $0.str("mac") == mac } ?? [:])
         }
         .task { await load() }
         .onReceive(tick) { _ in Task { await load() } }
@@ -108,52 +87,75 @@ struct DevicesView: View {
 
     // MARK: - 行
 
+    /// 一行设备。信息密度照安卓 `DevicesFragment` 的行来排：
+    ///   主行：名字 +（已命名 / 禁网 / 固定）
+    ///   副行：IP · 厂商 · 类型 · 型号 —— 认设备靠的往往不是名字，是型号
+    ///   右侧三行：实时速率、在线状态、累计用量
+    /// 原来只有「IP · 厂商」和实时速率，「这台用了多少」得点进去才看得到，
+    /// 而且行高全靠 15pt 字撑，看着又大又空。
     private func row(_ dv: J) -> some View {
         let net = dv.obj("net") ?? [:]
         let online = dv.bool("online")
         let blocked = dv.bool("blocked")
+        let total = net.dbl("rx_total") + net.dbl("tx_total")
 
         return HStack(spacing: 10) {
             // 接入方式徽标（5G / 2.4G / LAN）替掉原来的类型圆图标：
             // 一排圆图标看不出「插线还是无线、连的哪个频段」，而那才是用户想知道的
             AccessBadge(access: dv.obj("access") ?? [:], online: online)
 
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 5) {
                     Text(dv.str("label", dv.str("ip")))
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.system(size: 14.5, weight: .medium))
                         .foregroundStyle(C.textPrimary)
                         .lineLimit(1)
-                    if dv.str("alias").isEmpty == false {
-                        Pill(text: "已命名", color: C.primary)
-                    }
-                    if blocked { Pill(text: "禁网", color: C.danger) }
+                    if !dv.str("alias").isEmpty { Pill(text: "已命名", color: C.primary) }
                     if dv.bool("static") { Pill(text: "固定", color: C.textSecondary) }
                 }
-                Text("\(dv.str("ip"))· \(dv.str("vendor", "未知厂商"))")
-                    .font(F.tiny)
+                Text(metaLine(dv))
+                    .font(.system(size: 11.5))
                     .foregroundStyle(C.textSecondary)
                     .lineLimit(1)
             }
 
-            Spacer(minLength: 4)
+            Spacer(minLength: 6)
 
-            VStack(alignment: .trailing, spacing: 3) {
+            VStack(alignment: .trailing, spacing: 2) {
                 Text(F.rate(net.dbl("avg_bps")))
                     .font(F.num(12.5, .medium))
                     .foregroundStyle(online ? C.textPrimary : C.textTertiary)
-                Text(online ? "在线" : shortAgo(dv.dbl("last_seen")))
+                Text(blocked ? "已禁网" : (online ? "在线" : shortAgo(dv.dbl("last_seen"))))
                     .font(.system(size: 10.5))
-                    .foregroundStyle(online ? C.ok : C.textSecondary)
+                    .foregroundStyle(blocked ? C.danger : (online ? C.ok : C.textSecondary))
+                Text(total > 0 ? "共 " + F.bytes(total) : "暂无用量")
+                    .font(F.num(10.5, .regular))
+                    .foregroundStyle(C.textTertiary)
             }
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(C.textTertiary)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 11)
+        .padding(.horizontal, 15)
+        .padding(.vertical, 9)
         .contentShape(Rectangle())
+    }
+
+    /// 副标题：IP · 厂商 · 类型 · 型号。
+    /// 逐项判空而不是无脑 join —— 中间留一个「· ·」比缺信息更难看
+    private func metaLine(_ dv: J) -> String {
+        let kind = dv.str("type")
+        let model = dv.str("model")
+        let name = dv.str("label", dv.str("ip"))
+        var bits: [String] = []
+        let ip = dv.str("ip")
+        if !ip.isEmpty { bits.append(ip) }
+        let vendor = dv.str("vendor")
+        if !vendor.isEmpty, vendor != name, vendor != "私有地址" { bits.append(vendor) }
+        if !kind.isEmpty, kind != "其他" { bits.append(kind) }
+        if !model.isEmpty, !name.lowercased().hasPrefix(model.lowercased()) { bits.append(model) }
+        return bits.isEmpty ? dv.str("mac") : bits.joined(separator: " · ")
     }
 
     private func shortAgo(_ ts: Double) -> String {

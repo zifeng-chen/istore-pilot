@@ -47,6 +47,7 @@ struct HardwareView: View {
         .background(C.appBg)
         .navigationTitle("硬件")
         .navigationBarTitleDisplayMode(.inline)
+        .navBarChrome()
         .task { await load() }
         .onReceive(secTick) { now = $0 }
     }

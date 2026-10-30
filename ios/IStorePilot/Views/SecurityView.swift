@@ -18,9 +18,23 @@ struct SecurityView: View {
     @State private var loading = (Api.cached("/api/v1/devices") == nil)
     @State private var err = ""
 
-    /// 0 = 一级页，1 = 设备清单，2 = 拦截配置
-    @State private var sub = 0
-    @State private var subFilter = 0
+    /// 二级页路由。空数组 = 停在一级页
+    enum Route: Hashable {
+        case devices(Int)
+        case shield
+    }
+
+    @State private var path: [Route] = {
+        #if DEBUG
+        switch DebugRoute.sub {
+        case "devices": return [.devices(0)]
+        case "shield": return [.shield]
+        default: return []
+        }
+        #else
+        return []
+        #endif
+    }()
 
     @State private var appsData: J = Api.cached("/api/v1/apps") ?? [:]
     @State private var goApps = false
@@ -35,22 +49,28 @@ struct SecurityView: View {
     private var devs: [J] { d.objs("devices") }
     private var takeover: Bool { ad.str("mode") == "takeover" }
 
+    /// 二级页走**真正的导航推进**，不再是「原地换一个视图 + 自己画返回箭头」。
+    ///
+    /// 原地换页时没有导航栈，返回按钮只能自己塞一个 ToolbarItem；
+    /// iOS 26 会把它渲染成一颗浮在右上角的玻璃圆钮，跟标题各在各处，
+    /// 看起来就不像导航栏。推进之后返回箭头、标题、手势返回全由系统给。
     var body: some View {
-        Group {
-            if sub == 1 {
-                DevicesView(onBack: { sub = 0 }, initialFilter: subFilter)
-            } else if sub == 2 {
-                ShieldView(onBack: { sub = 0 })
-            } else {
-                level1
-            }
+        NavigationStack(path: $path) {
+            level1
+                .navigationDestination(for: Route.self) { r in
+                    switch r {
+                    case .devices(let f):
+                        DevicesView(initialFilter: f)
+                    case .shield:
+                        ShieldView()
+                    }
+                }
         }
     }
 
     // MARK: - 一级页
 
     private var level1: some View {
-        NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
                     heroCard
@@ -86,10 +106,21 @@ struct SecurityView: View {
             .background(C.appBg)
             .navigationTitle("设备")
             .navigationBarTitleDisplayMode(.large)
+            .navBarChrome()
             .sheet(isPresented: $goApps) {
-                NavigationStack { AppsView() }
+                NavigationStack { AppsView(asSheet: true) }
             }
             .task { await load() }
+            #if DEBUG
+            // 截图用：-sub apps 时自动把应用流量页弹出来
+            .onAppear {
+                guard DebugRoute.sub == "apps" else { return }
+                Task {
+                    try? await Task.sleep(nanoseconds: 700_000_000)
+                    goApps = true
+                }
+            }
+            #endif
             .onReceive(tick) { _ in Task { await load(quiet: true) } }
             .confirmationDialog(takeover ? "退出 DNS 接管？" : "让所有设备走 AdGuard Home 解析？",
                                 isPresented: Binding(
@@ -107,7 +138,6 @@ struct SecurityView: View {
                      ? "退出后所有设备改回运营商 DNS：广告拦截立即失效，已建立的连接不受影响。"
                      : "会把全网的域名查询切到 AdGuard Home。已连设备在租约续期后生效，中途有一两秒解析抖动；如果 AGH 已停用，全网会短时无法解析域名。")
             }
-        }
     }
 
     private var heroCard: some View {
@@ -132,6 +162,8 @@ struct SecurityView: View {
                         .clipShape(Capsule())
                 }
 
+                // 大数字右侧留给「全网实时总流量」：和「几台在线」是同一件事的两面，
+                // 也把这一行原本空着的右半边填上（安卓 hero 就是这么排的）
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("\(online)")
                         .font(F.num(34, .bold))
@@ -139,14 +171,37 @@ struct SecurityView: View {
                     Text("台设备在线")
                         .font(.system(size: 13))
                         .foregroundStyle(C.heroFgSoft)
+                    Spacer(minLength: 8)
+                    Text(totalRate > 0 ? "总流量 " + F.rate(totalRate) : "总流量 —")
+                        .font(F.num(12.5, .medium))
+                        .foregroundStyle(C.heroFgSoft)
+                        .lineLimit(1)
                 }
                 .padding(.top, 10)
 
-                Text(blocked > 0 ? "共 \(total) 台　·　\(blocked) 台已禁网" : "共 \(total) 台")
-                    .font(.system(size: 12))
-                    .foregroundStyle(C.heroFgSoft)
-                    .padding(.top, 4)
+                Rectangle().fill(C.heroFg.opacity(0.18))
+                    .frame(height: 0.7)
+                    .padding(.top, 14)
+
+                HStack(spacing: 8) {
+                    Text(blocked > 0 ? "共 \(total) 台 · \(blocked) 台已禁网" : "共 \(total) 台")
+                        .font(.system(size: 12))
+                        .foregroundStyle(C.heroFgSoft)
+                    Spacer(minLength: 8)
+                    Text("点一行看详情")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(C.heroFgSoft.opacity(0.8))
+                }
+                .padding(.top, 12)
             }
+        }
+    }
+
+    /// 全网实时总流量：把每台设备的上下行加起来
+    private var totalRate: Double {
+        devs.reduce(0) { sum, dv in
+            let net = dv.obj("net") ?? [:]
+            return sum + net.dbl("rx_bps") + net.dbl("tx_bps")
         }
     }
 
@@ -174,7 +229,9 @@ struct SecurityView: View {
                 HStack(spacing: 0) {
                     statCell("在线", sum.int("online"), C.primary) { open(.online) }
                     statCell("离线", offline, C.textPrimary) { open(.offline) }
-                    statCell("已禁网", sum.int("blocked"), C.danger) { open(.all) }
+                    // 0 台禁网时标红只会让人以为出事了；有数才用危险色
+                    statCell("已禁网", sum.int("blocked"),
+                             sum.int("blocked") > 0 ? C.danger : C.textTertiary) { open(.all) }
                 }
                 .padding(.vertical, 10)
 
@@ -240,8 +297,7 @@ struct SecurityView: View {
         let name = [dv.str("label"), dv.str("hostname"), dv.str("vendor"), dv.str("ip"), dv.str("mac")]
             .first { !$0.isEmpty } ?? "—"
         return Button {
-            subFilter = 0
-            sub = 1
+            path.append(.devices(0))
         } label: {
             HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
@@ -304,27 +360,32 @@ struct SecurityView: View {
                     } else {
                         ForEach(Array(top.enumerated()), id: \.offset) { i, a in
                             if i > 0 { Hairline(inset: 0) }
-                            HStack(spacing: 9) {
-                                AppIconView(name: a.str("name"), size: 28)
+                            HStack(spacing: 0) {
+                                AppIconView(name: a.str("name"), size: 32)
                                 Text(a.str("name"))
-                                    .font(F.caption)
+                                    .font(.system(size: 14.5))
                                     .foregroundStyle(C.textPrimary)
                                     .lineLimit(1)
+                                    .padding(.leading, 11)
                                 if a.dbl("down_bps") + a.dbl("up_bps") >= 1024 {
                                     Text(F.rate(a.dbl("down_bps") + a.dbl("up_bps")))
-                                        .font(F.num(10.5, .medium))
+                                        .font(F.num(11, .medium))
                                         .foregroundStyle(C.primary)
+                                        .padding(.leading, 6)
                                 }
                                 Spacer(minLength: 6)
                                 Text(F.bytes(a.dbl("all_total")))
-                                    .font(F.num(12.5, .medium))
+                                    .font(F.num(13.5, .medium))
                                     .foregroundStyle(C.textPrimary)
-                                Text(String(format: "%.0f%%", a.dbl("share")))
-                                    .font(F.num(10.5, .regular))
-                                    .foregroundStyle(C.textTertiary)
-                                    .frame(width: 32, alignment: .trailing)
+                                if a.dbl("share") > 0 {
+                                    Text(String(format: "%.0f%%", a.dbl("share")))
+                                        .font(F.num(11, .regular))
+                                        .foregroundStyle(C.textSecondary)
+                                        .frame(width: 34, alignment: .trailing)
+                                        .padding(.leading, 6)
+                                }
                             }
-                            .padding(.vertical, 9)
+                            .padding(.vertical, 10)
                         }
                     }
                 }
@@ -390,10 +451,10 @@ struct SecurityView: View {
                 Hairline(inset: 0).padding(.top, 12)
 
                 entryRow("arrow.triangle.2.circlepath", "规则与更新",
-                         "自动更新频率、规则表开关") { sub = 2 }
+                         "自动更新频率、规则表开关") { path.append(.shield) }
                 Hairline(inset: 46)
                 entryRow("list.bullet.rectangle", "拦截日志",
-                         "最近被挡掉的域名查询") { sub = 2 }
+                         "最近被挡掉的域名查询") { path.append(.shield) }
             }
         }
     }
@@ -434,12 +495,13 @@ struct SecurityView: View {
     private enum Sub { case all, online, offline }
 
     private func open(_ mode: Sub) {
+        let filter: Int
         switch mode {
-        case .all: subFilter = 0
-        case .online: subFilter = 1
-        case .offline: subFilter = 2
+        case .all: filter = 0
+        case .online: filter = 1
+        case .offline: filter = 2
         }
-        sub = 1
+        path.append(.devices(filter))
     }
 
     private var skeleton: some View {
