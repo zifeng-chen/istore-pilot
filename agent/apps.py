@@ -230,6 +230,22 @@ _IP_APP_SAVE_EVERY = 300.0   # 5 分钟写一次：这张表变得比账本勤�
 _ip_app_dirty = False
 _ip_app_last = 0.0
 
+#: 核实过的裸 IP 归属种子。米家设备（摄像头、网关、插座、音箱）的 SDK
+#: 连接时不发 SNI，Clash 拿到的 host 是空的，于是永远落进「IP 直连」；
+#: 而它们又分散在十几台设备上，累计量不小。
+#: 这几个段是用 TLS 证书核过的（`openssl x509 -subject` 返回 `O = Mijia Cloud`），
+#: 不是猜的 /24：阿里云那种共享网段只固定到具体 IP。
+#: 学习表命中时优先级更高 —— 真有域名连接落进同一段，以实际域名为准。
+_SEED_IP: dict[str, tuple[str, str]] = {
+    "39.101.90.196": ("小米 / 米家", "智能家居"),
+    "39.101.90.207": ("小米 / 米家", "智能家居"),
+}
+_SEED_NET: dict[str, tuple[str, str]] = {
+    "121.228.168.0/24": ("小米 / 米家", "智能家居"),
+    "124.251.34.0/24": ("小米 / 米家", "智能家居"),
+    "61.155.202.0/24": ("小米 / 米家", "智能家居"),
+}
+
 # 落盘的账本：total = 累计，days = 按天（YYYY-MM-DD）
 _hist_total: dict[str, list[float]] = {}
 _hist_days: dict[str, dict[str, list[float]]] = {}
@@ -590,15 +606,26 @@ def _learn_ip(dst: str, name: str, category: str) -> None:
 
 
 def _ip_lookup(host: str) -> tuple[str, str] | None:
-    """先查精确 IP，再查网段。过期的当作没学到。"""
+    """按可信度从高到低查：学到的精确 IP → 种子精确 IP → 种子网段 → 学到的网段。
+
+    「学到的网段」排最后是有原因的：它只是「同 /24 大概率同类」的猜测，
+    而种子那几段是逐台设备用 TLS 证书核过的。放在前面的话，一条偶然落进
+    该段的域名连接就能把整段米家设备改写 6 小时。
+    """
     if not host:
         return None
     now = time.time()
     hit = _ip_app.get(host)
     if hit and now - hit[2] < _IP_APP_TTL:
         return hit[0], hit[1]
+    seed = _SEED_IP.get(host)
+    if seed:
+        return seed
     net = _net_key(host)
     if net:
+        seed = _SEED_NET.get(net)
+        if seed:
+            return seed
         hit = _net_app.get(net)
         if hit and now - hit[2] < _NET_APP_TTL:
             return hit[0], hit[1]
@@ -928,6 +955,13 @@ def snapshot(period: str = "all") -> dict:
                              -(x["down_bps"] + x["up_bps"])))
     idle = [a for a in apps if a["conns"] == 0]
 
+    # 「IP 直连」垫底 + 只返回前 MAX_APPS 条 = 它会被静默截掉。
+    # 账本里能攒到两三百个条目（认不出的域名都退化成主域名进来），
+    # 一旦超过 60 条，用户就再也看不到这个分类了 —— 恰恰是最该解释的那一行。
+    # 所以先截其它应用，再把「IP 直连」固定放回去。
+    leftovers = [a for a in apps if a["name"] == IP_ONLY][:1]
+    ranked = [a for a in apps if a["name"] != IP_ONLY][:MAX_APPS - len(leftovers)] + leftovers
+
     return {
         "ts": int(time.time()),
         "ready": started,
@@ -935,7 +969,7 @@ def snapshot(period: str = "all") -> dict:
         "days": days,
         "period": "all",
         # 不按「有没有在跑」拆表：用过、此刻闲着的应用同样要出现在用量榜上
-        "apps": apps[:MAX_APPS],
+        "apps": ranked,
         "idle": idle[:MAX_APPS],
         "session": {"up": int(totals["up"]), "down": int(totals["down"])},
         "all": all_sum,
