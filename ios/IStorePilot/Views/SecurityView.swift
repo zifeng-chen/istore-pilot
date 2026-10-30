@@ -121,7 +121,7 @@ struct SecurityView: View {
             .navigationTitle("设备")
             .navigationBarTitleDisplayMode(.large)
             .navBarChrome()
-            .sheet(isPresented: $goApps) {
+            .adaptiveSheet(isPresented: $goApps) {
                 NavigationStack { AppsView(asSheet: true) }
             }
             .task { await load() }

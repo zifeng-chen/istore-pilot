@@ -22,8 +22,17 @@ struct DevicesView: View {
         min(winW, axis == .rail ? 980 : 820) - 32
     }
 
-    /// 1 列 = 手机竖屏，保持原来的分组列表；2 / 3 列才换卡片。
+    /// 1 列 = 手机竖屏，保持原来的分组列表；2 列以上才换卡片。
     private var cols: Int { GridCols.forWidth(contentW) }
+
+    /// 方形卡片的边长：按列宽均分，格子本身就是正方形。
+    /// 太小时托底 112，免得设备名只剩三个字；太大时封 168，
+    /// 否则 5 列的大屏上卡片会被拉成竖长条。
+    private var cardSide: CGFloat {
+        guard cols > 1 else { return 0 }
+        let raw = (contentW - CGFloat(cols - 1) * GridCols.gap) / CGFloat(cols)
+        return max(112, min(168, raw))
+    }
 
     /// 分段控件的宽度：宽屏固定 300，两列时按比例收一点，
     /// 否则 549pt 的画布上搜索框只剩 239pt，占位文字会被截掉
@@ -53,70 +62,19 @@ struct DevicesView: View {
     private var offlineShown: [J] { shown.filter { !$0.bool("online") } }
 
     var body: some View {
-        ScrollView {
+        VStack(spacing: 0) {
+            // 搜索与筛选钉在顶部：滚到第 30 台时想换个筛选，
+            // 原来要一路滑回顶上（安卓那边本来就是固定的）
+            header
+            ScrollView {
                 VStack(spacing: 12) {
-                    // 宽屏把搜索框和分段并排：省掉一整行高度，
-                    // 而且铺满整块画布的搜索框本身也长得不像话
-                    if cols > 1 {
-                        HStack(spacing: 10) {
-                            searchBar
-                            Seg(items: ["全部", "在线", "离线", "禁网"], index: $filter)
-                                .frame(width: segW)
-                        }
-                        .padding(.horizontal, 16)
-                    } else {
-                        searchBar
-                            .padding(.horizontal, 16)
-
-                        Seg(items: ["全部", "在线", "离线", "禁网"], index: $filter)
-                            .padding(.horizontal, 16)
-                    }
-
-                    if loading {
-                        if cols > 1 {
-                            cardSkeleton
-                        } else {
-                            listSkeleton.padding(.horizontal, 16)
-                        }
-                    } else if shown.isEmpty {
-                        EmptyHint(icon: "wifi.slash", text: "没有符合条件的设备")
-                            .padding(.horizontal, 16)
-                    } else if cols > 1 {
-                        // 宽画布：一张列表会把一行拉到 900pt，名字和数字之间空出半个屏。
-                        // 改成一卡一台、按列铺开，同样的滚动距离能看到三倍的设备。
-                        VStack(spacing: 0) {
-                            if !onlineShown.isEmpty {
-                                sectionHead("在线", onlineShown.count)
-                                grid(onlineShown)
-                            }
-                            if !offlineShown.isEmpty {
-                                sectionHead("离线", offlineShown.count)
-                                    .padding(.top, onlineShown.isEmpty ? 0 : 18)
-                                grid(offlineShown)
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                    } else {
-                        // 一组一个容器：55 台设备如果每台一张卡，
-                        // 就是 55 层圆角和 55 层投影，又卡又碎
-                        ListGroup {
-                            ForEach(Array(shown.enumerated()), id: \.offset) { idx, dv in
-                                NavigationLink(value: SecurityView.Route.device(dv.str("mac"))) {
-                                    row(dv)
-                                }
-                                .buttonStyle(.plain)
-                                if idx < shown.count - 1 { Hairline(inset: 62) }
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                    }
-
+                    content
                     Color.clear.barBottomGap()
                 }
-                .padding(.top, 6)
+                .padding(.top, 10)
             }
             .scrollIndicators(.hidden)
-            .background(C.appBg)
+        }
         .background(C.appBg)
         // 这一页永远是二级页：导航栈由「设备」页提供，返回箭头和手势返回都交给系统。
         // 以前是原地换视图 + 自己画一个 chevron，iOS 26 把它渲染成浮在右上角的玻璃圆钮
@@ -130,6 +88,72 @@ struct DevicesView: View {
         }
         .task { await load() }
         .onReceive(tick) { _ in Task { await load() } }
+    }
+
+    // MARK: - 顶部固定栏
+
+    private var header: some View {
+        Group {
+            if cols > 1 {
+                // 宽屏并排：省掉一整行高度，搜索框也不会被拉成一整条
+                HStack(spacing: 10) {
+                    searchBar
+                    Seg(items: ["全部", "在线", "离线", "禁网"], index: $filter)
+                        .frame(width: segW)
+                }
+            } else {
+                VStack(spacing: 10) {
+                    searchBar
+                    Seg(items: ["全部", "在线", "离线", "禁网"], index: $filter)
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
+        .background(C.appBg)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if loading {
+            if cols > 1 {
+                cardSkeleton
+            } else {
+                listSkeleton.padding(.horizontal, 16)
+            }
+        } else if shown.isEmpty {
+            EmptyHint(icon: "wifi.slash", text: "没有符合条件的设备")
+                .padding(.horizontal, 16)
+        } else if cols > 1 {
+            // 宽画布：一卡一台、按列铺开。55 台设备两列要滚二十多屏，
+            // 小卡一屏能放 4×5 台，找设备靠扫而不是靠滚
+            VStack(spacing: 0) {
+                if !onlineShown.isEmpty {
+                    sectionHead("在线", onlineShown.count)
+                    grid(onlineShown)
+                }
+                if !offlineShown.isEmpty {
+                    sectionHead("离线", offlineShown.count)
+                        .padding(.top, onlineShown.isEmpty ? 0 : 16)
+                    grid(offlineShown)
+                }
+            }
+            .padding(.horizontal, 16)
+        } else {
+            // 一组一个容器：55 台设备如果每台一张卡，
+            // 就是 55 层圆角和 55 层投影，又卡又碎
+            ListGroup {
+                ForEach(Array(shown.enumerated()), id: \.offset) { idx, dv in
+                    NavigationLink(value: SecurityView.Route.device(dv.str("mac"))) {
+                        row(dv)
+                    }
+                    .buttonStyle(.plain)
+                    if idx < shown.count - 1 { Hairline(inset: 62) }
+                }
+            }
+            .padding(.horizontal, 16)
+        }
     }
 
     // MARK: - 行
@@ -209,8 +233,9 @@ struct DevicesView: View {
     }
 
     private func grid(_ list: [J]) -> some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: cols),
-                  spacing: 10) {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: GridCols.gap),
+                                 count: cols),
+                  spacing: GridCols.gap) {
             ForEach(Array(list.enumerated()), id: \.offset) { _, dv in
                 NavigationLink(value: SecurityView.Route.device(dv.str("mac"))) {
                     card(dv)
@@ -235,58 +260,61 @@ struct DevicesView: View {
         let blocked = dv.bool("blocked")
         let total = net.dbl("rx_total") + net.dbl("tx_total")
         let rate = net.dbl("avg_bps")
-        let name = dv.str("label", dv.str("ip"))
+        // 没命名的设备用 IP 末两段当标题：方形卡只有 130pt 宽，
+        // 整个 192.168.100.243 会被截成「192.168.100...」，四位数字反而认得出来
+        let label = dv.str("label")
+        let name = label.isEmpty ? shortIP(dv.str("ip")) : label
+        let side = cardSide
 
         return VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 6) {
+            HStack(spacing: 5) {
                 Circle()
                     .fill(online ? C.primary : C.textTertiary)
                     .frame(width: 5, height: 5)
-
                 Text(name)
-                    .font(.system(size: 13.5, weight: .medium))
+                    .font(.system(size: 12.5, weight: .medium))
                     .foregroundStyle(online ? C.textPrimary : C.textSecondary)
                     .lineLimit(1)
-
-                Spacer(minLength: 4)
-
-                // 禁网和接入徽标抢同一个位置：禁网是会出事的操作，优先显示它；
-                // 接入方式点进去在详情页仍有
-                if blocked {
-                    Text("禁网")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(C.danger)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2.5)
-                        .background(C.danger.opacity(0.12))
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                        .fixedSize()
-                } else {
-                    AccessBadge(access: dv.obj("access") ?? [:], online: online)
-                }
+                Spacer(minLength: 2)
+                // 角标就是「点得进去」的那一个提示：方形卡上没有地方放整行 chevron，
+                // 右上角一枚小箭头足够，而且四个角里只有它不挡名字
+                cornerBadge(online: online, blocked: blocked)
             }
 
             Text(cardMeta(dv, name: name))
-                .font(.system(size: 11))
-                .foregroundStyle(C.textSecondary)
+                .font(.system(size: 10))
+                .foregroundStyle(online ? C.textSecondary : C.textTertiary)
                 .lineLimit(1)
-                .padding(.top, 3)
+                .padding(.top, 2)
 
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(online ? F.rate(rate) : "—")
-                    .font(F.num(12.5, .medium))
-                    .foregroundStyle(online ? C.primary : C.textTertiary)
-                Spacer(minLength: 4)
-                Text(total > 0 ? "共 " + F.bytes(total) : "暂无用量")
-                    .font(F.num(11, .regular))
-                    .foregroundStyle(C.textTertiary)
+            Spacer(minLength: 4)
+
+            // 徽标和「多久没活跃」并排放在速率上方：
+            // 方形卡中间留一大块空白最难看，把这两条挪下来正好填住
+            HStack(spacing: 6) {
+                AccessBadge(access: dv.obj("access") ?? [:], online: online)
+                Spacer(minLength: 2)
+                Text(blocked ? "已禁网" : agoText(dv.dbl("last_seen"), online: online))
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(blocked ? C.danger
+                                     : (online ? C.ok : C.textTertiary))
                     .lineLimit(1)
             }
-            .padding(.top, 9)
+            .padding(.bottom, 5)
+
+            Text(online ? F.rate(rate) : "—")
+                .font(F.num(13, .medium))
+                .foregroundStyle(online ? C.primary : C.textTertiary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Text(total > 0 ? "共 " + F.bytes(total) : "暂无用量")
+                .font(F.num(10, .regular))
+                .foregroundStyle(C.textTertiary)
+                .lineLimit(1)
+                .padding(.top, 1)
         }
-        .padding(.horizontal, 11)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .frame(width: side, height: side, alignment: .topLeading)
         .background(online ? C.surface : C.surfaceSunken)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
@@ -294,6 +322,27 @@ struct DevicesView: View {
                 .strokeBorder(online ? C.glassStroke : C.divider.opacity(0.6), lineWidth: 0.7)
         )
         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    /// 右上角的小箭头。禁网时换成红色的「禁」字角标 —— 方形卡上再放不下胶囊标签了。
+    private func cornerBadge(online: Bool, blocked: Bool) -> some View {
+        Group {
+            if blocked {
+                Text("禁")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(C.danger)
+                    .frame(width: 16, height: 16)
+                    .background(C.danger.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            } else {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(online ? C.primary : C.textTertiary)
+                    .frame(width: 16, height: 16)
+                    .background(online ? C.accentSoft : C.surfaceHi)
+                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            }
+        }
     }
 
     /// 卡片的副标题只放两段：IP 和「型号，没有型号就用厂商」。
@@ -305,7 +354,7 @@ struct DevicesView: View {
         let model = dv.str("model")
         let vendor = dv.str("vendor")
         var bits: [String] = []
-        if !ip.isEmpty, ip != name { bits.append(ip) }
+        if !ip.isEmpty, ip != name, shortIP(ip) != name { bits.append(ip) }
         if !model.isEmpty {
             bits.append(model)
         } else if !vendor.isEmpty, vendor != "私有地址", vendor != name {
@@ -314,17 +363,33 @@ struct DevicesView: View {
         return bits.isEmpty ? dv.str("mac") : bits.joined(separator: " · ")
     }
 
+    /// 在线设备显示「在线」，离线的显示多久之前还在
+    private func agoText(_ ts: Double, online: Bool) -> String {
+        if online { return "在线" }
+        return shortAgo(ts)
+    }
+
+    /// IPv4 取末两段（100.243）；IPv6 或异常形态原样返回
+    private func shortIP(_ ip: String) -> String {
+        let parts = ip.split(separator: ".")
+        if parts.count == 4 { return "\(parts[2]).\(parts[3])" }
+        return ip
+    }
+
     private var cardSkeleton: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: cols),
-                  spacing: 10) {
-            ForEach(0..<6, id: \.self) { _ in
-                VStack(alignment: .leading, spacing: 8) {
-                    Bone(w: 92, h: 12)
-                    Bone(w: 124, h: 9)
-                    Bone(w: 66, h: 11)
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: GridCols.gap),
+                                 count: cols),
+                  spacing: GridCols.gap) {
+            ForEach(0..<max(6, cols * 2), id: \.self) { _ in
+                VStack(alignment: .leading, spacing: 7) {
+                    Bone(w: 70, h: 11)
+                    Bone(w: 88, h: 8)
+                    Spacer(minLength: 0)
+                    Bone(w: 54, h: 10)
+                    Bone(w: 40, h: 8)
                 }
-                .padding(11)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+                .frame(width: cardSide, height: cardSide, alignment: .topLeading)
                 .background(C.surface)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }

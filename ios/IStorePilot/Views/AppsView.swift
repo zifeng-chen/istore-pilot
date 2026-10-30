@@ -50,7 +50,8 @@ struct AppsView: View {
                         }
                     }
 
-                    Color.clear.barBottomGap()
+                    // 弹窗形态下底部没有页签栏接着，多留一点，最后一张卡才不会贴着边
+                    Color.clear.barBottomGap(asSheet ? 30 : 18)
                 }
                 .padding(.horizontal, 16)
             }

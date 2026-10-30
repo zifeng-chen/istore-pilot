@@ -46,10 +46,8 @@ struct SettingsView: View {
                     // 右边「能对它做什么」（维护/上传/电源/安全/关于）。
                     // 十张卡竖着排的时候，改个密码要滑七八屏
                     DuoColumns {
-                        connectCard
                         networkCard
                         deviceCard
-                        lookCard
                     } right: {
                         maintainCard
                         uploadCard
@@ -119,7 +117,7 @@ struct SettingsView: View {
         let b = d.obj("board") ?? [:]
 
         return Hero {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 8) {
                     Circle()
                         .fill(ping.str("version").isEmpty ? C.heroFgSoft : Color(hex: 0x5FE7C4))
@@ -127,25 +125,50 @@ struct SettingsView: View {
                     Text(ping.str("version").isEmpty ? "连不上" : "已连接")
                         .font(.system(size: 12.5, weight: .medium))
                         .foregroundStyle(C.heroFg)
-                    Spacer()
-                    Text(ping.str("version").isEmpty ? "离线"
-                         : "v" + ping.str("version"))
+                    Spacer(minLength: 6)
+                    Text(ping.str("version").isEmpty ? "离线" : "v" + ping.str("version"))
                         .font(F.tiny)
                         .foregroundStyle(C.heroFgSoft)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Color.white.opacity(0.16))
                         .clipShape(Capsule())
+                    // 主题收进 hero 的右上角：它只影响这一个 App 的长相，
+                    // 原来单独占一张「外观」卡，和连接、网络那些真配置混在一起
+                    themeMenu
                 }
 
                 // 大标题放**主机名**，不再放服务器地址：
-                // 地址在下面「连接」卡里有一行（而且只有那里能改），
-                // 主机名原来又在「设备信息」卡里重复一次。三处说同一件事。
+                // 地址在下面那行（而且只有那里能核对），主机名只在这里出现一次。
                 // 离线时拿不到主机名，退回显示试过的地址 —— 那时地址才是关键信息
                 Text(b.str("hostname").isEmpty ? bareBase : b.str("hostname"))
                     .font(.system(size: 23, weight: .bold))
                     .foregroundStyle(C.heroFg)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
+                    .padding(.top, 8)
+
+                // 连接卡并进 hero：地址、重新登录、清缓存都是「这台连接」的属性，
+                // 原来单独一张卡，占掉半个屏却只有三行
+                HStack(spacing: 8) {
+                    Image(systemName: "server.rack")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(C.heroFgSoft)
+                    Text(bareBase)
+                        .font(F.num(11.5, .regular))
+                        .foregroundStyle(C.heroFgSoft)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                    Spacer(minLength: 6)
+                    heroAction("重新登录") {
+                        Api.onAuthFail?()
+                        app.signOut()
+                    }
+                    heroAction("清缓存") {
+                        SnapCache.shared.clear()
+                        popup = Popup(title: "已清除", body: "下次进入各页面会重新从路由器读取。")
+                    }
+                }
+                .padding(.top, 10)
 
                 Rectangle().fill(Color.white.opacity(0.18)).frame(height: 0.7)
                     .padding(.top, 12)
@@ -157,6 +180,55 @@ struct SettingsView: View {
                     heroCol("温度", hotTemp)
                 }
             }
+        }
+    }
+
+    /// hero 深色底上的小动作：描边胶囊，不填色 —— 填色会跟「已连接」抢注意力。
+    private func heroAction(_ title: String, _ tap: @escaping () -> Void) -> some View {
+        Button(action: tap) {
+            Text(title)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(C.heroFg.opacity(0.92))
+                .padding(.horizontal, 9)
+                .padding(.vertical, 3.5)
+                .background(
+                    Capsule().strokeBorder(C.heroFg.opacity(0.28), lineWidth: 0.9)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var themeIcon: String {
+        switch app.theme {
+        case 1: return "sun.max.fill"
+        case 2: return "moon.fill"
+        default: return "circle.lefthalf.filled"
+        }
+    }
+
+    /// 角上的主题按钮：点开是三个选项，按钮本身只显示当前是哪一个。
+    private var themeMenu: some View {
+        Menu {
+            ForEach(Array(Appearance.modes.enumerated()), id: \.offset) { i, m in
+                Button {
+                    app.setTheme(m)
+                } label: {
+                    Text((app.theme == m ? "✓ " : "") + Appearance.names[i])
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: themeIcon)
+                    .font(.system(size: 11, weight: .medium))
+                Text(Appearance.name(app.theme))
+                    .font(.system(size: 11, weight: .medium))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(C.heroFg)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 3)
+            .background(Color.white.opacity(0.16))
+            .clipShape(Capsule())
         }
     }
 
@@ -190,36 +262,6 @@ struct SettingsView: View {
                 .lineLimit(1).minimumScaleFactor(0.75)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    // MARK: - 连接
-
-    private var connectCard: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 0) {
-                CardHead(icon: "link", title: "连接", sub: "凭证与服务器")
-                row(icon: "globe", title: "服务器地址",
-                    note: "改地址会重新登录",
-                    value: Session.base.replacingOccurrences(of: "http://", with: "")) {
-                    // 改地址在登录页做，这里只提示
-                    popup = Popup(title: "换一台路由器",
-                                  body: "在「登录」页把地址改成新的 IP 或域名即可，"
-                                      + "这里保留当前连接信息供你核对。")
-                }
-                Hairline(inset: 62)
-                row(icon: "arrow.clockwise", title: "重新登录",
-                    note: "凭证过期或换了密码时用") {
-                    Api.onAuthFail?()
-                    app.signOut()
-                }
-                Hairline(inset: 62)
-                row(icon: "trash", title: "清除本地缓存",
-                    note: "只清手机上的快照，不动路由器") {
-                    SnapCache.shared.clear()
-                    popup = Popup(title: "已清除", body: "下次进入各页面会重新从路由器读取。")
-                }
-            }
-        }
     }
 
     // MARK: - 网络
@@ -321,25 +363,6 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
             }
         }
-    }
-
-    private var lookCard: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 0) {
-                CardHead(icon: "paintpalette", title: "外观", sub: "深浅色")
-                row(icon: "circle.lefthalf.filled", title: "主题",
-                    note: "跟随系统会随手机的深浅色自动切换",
-                    value: Appearance.name(app.theme)) {
-                    cycleTheme()
-                }
-            }
-        }
-    }
-
-    private func cycleTheme() {
-        let cur = Appearance.modes.firstIndex(of: app.theme) ?? 0
-        let next = Appearance.modes[(cur + 1) % Appearance.modes.count]
-        app.setTheme(next)
     }
 
     // MARK: - 系统维护

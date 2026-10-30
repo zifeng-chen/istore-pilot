@@ -103,6 +103,11 @@ _RULES: list[tuple[tuple[str, ...], str, str]] = [
     (("ug.link", "ugreen"), "绿联 NAS", "局域网"),
     (("synology", "quickconnect"), "群晖 NAS", "局域网"),
     # ---------------------------------------------------------- 社交
+    # 企业微信的域名里带 weixin，必须排在微信前面，否则永远被归到微信
+    (("wework", "work.weixin"), "企业微信", "办公"),
+    (("dingtalk", "dingtalkapps", "dingtalk.net"), "钉钉", "办公"),
+    (("feishu", "larksuite", "larkoffice", "feishucdn"), "飞书", "办公"),
+    (("wemeet", "meeting.tencent"), "腾讯会议", "办公"),
     (("weixin", "wechat", "wx.qq.com", "mmbiz", "qpic", "qlogo", "wetype"), "微信", "社交"),
     (("telegram", "t.me", "telesco.pe"), "Telegram", "社交"),
     (("whatsapp", "wa.me"), "WhatsApp", "社交"),
@@ -147,7 +152,9 @@ _RULES: list[tuple[tuple[str, ...], str, str]] = [
     (("baidumap", "map.baidu"), "百度地图", "出行"),
     (("12306",), "12306", "出行"),
     (("didiglobal", "didichuxing"), "滴滴", "出行"),
-    (("allawntech", "oray", "teamviewer", "向日葵"), "远程控制", "工具"),
+    (("todesk",), "ToDesk", "工具"),
+    (("oray", "sunlogin"), "向日葵", "工具"),
+    (("teamviewer", "allawntech"), "远程控制", "工具"),
     # ---------------------------------------------------------- 手机厂商 / 智能家居
     (("vivo.com", "iqoo"), "vivo 手机服务", "智能家居"),
     (("oppomobile", "coloros", "heytap"), "OPPO / 欢太", "智能家居"),
@@ -173,6 +180,9 @@ _RULES: list[tuple[tuple[str, ...], str, str]] = [
     (("cloudflare", "akamai", "fastly", "cloudfront", "smtcdns", "wscloudcdn",
       "cdntip", "qiniudns", "qcloudcdn"), "CDN 加速", "网络"),
     (("ntp.org", "time.nist", "pool.ntp"), "时间同步", "系统"),
+    (("pan.baidu", "baidupcs", "baiduyun"), "百度网盘", "工具"),
+    (("aliyundrive", "alipan"), "阿里云盘", "工具"),
+    (("xunlei", "xluser"), "迅雷", "工具"),
     (("bdstatic", "baidu.com", "bdurl"), "百度", "搜索"),
     (("quark", "uc.cn", "ucweb"), "夸克 / UC", "搜索"),
     (("tencent.com", "myqcloud", "tencent-cloud", "gtimg"), "腾讯", "系统"),

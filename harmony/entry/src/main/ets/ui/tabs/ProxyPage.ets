@@ -44,7 +44,9 @@ export struct ProxyPage {
   @State nodeCount: number = 0;
   @State backend: string = '';
   @State mode: string = '';
-  @State expanded: string = '';
+  /** 弹窗里正在看的分组下标，-1 表示没打开 */
+  @State openIdx: number = -1;
+  @State showGroup: boolean = false;
   @State busy: string = '';
   /** 正在测速的分组名，空串表示空闲 */
   @State testingGroup: string = '';
@@ -249,7 +251,7 @@ export struct ProxyPage {
     this.busy = '';
     if (r.ok && r.data.bool('ok', true)) {
       this.toast = '已切换到 ' + name;
-      this.expanded = '';
+      this.showGroup = false;
       await this.loadGroups();
     } else {
       this.toast = r.ok ? r.data.str('error', '切换失败') : r.error;
@@ -335,7 +337,15 @@ export struct ProxyPage {
     .scrollBar(BarState.Off)
     .edgeEffect(EdgeEffect.Spring)
     .backgroundColor($r('app.color.app_bg'))
-    .align(Alignment.Top);
+    .align(Alignment.Top)
+    .bindSheet($$this.showGroup, this.nodeSheet(), {
+      height: 560,
+      dragBar: true,
+      backgroundColor: $r('app.color.app_bg'),
+      onDisappear: () => {
+        this.showGroup = false;
+      }
+    });
   }
 
   @Builder
@@ -403,131 +413,31 @@ export struct ProxyPage {
   @Builder
   groupList() {
     if (this.groups.length > 0) {
-      Text('节点分组')
-        .fontSize(T.F_SUB)
-        .fontColor($r('app.color.text_secondary'))
-        .width('100%')
-        .margin({ top: this.rail() ? 0 : 18, bottom: 6, left: 4 });
+      Row() {
+        Text('节点分组')
+          .fontSize(T.F_SUB)
+          .fontColor($r('app.color.text_secondary'));
+        Blank();
+        Text('点一张卡换节点')
+          .fontSize(T.F_TINY)
+          .fontColor($r('app.color.text_tertiary'));
+      }
+      .width('100%')
+      .padding({ left: 4, right: 4 })
+      .margin({ top: this.rail() ? 0 : 18, bottom: 8 });
 
-      ForEach(this.groups, (g: NodeGroup) => {
-        GroupBox({ gapBottom: 10 }) {
-          Column() {
-            Row({ space: 10 }) {
-              Column() {
-                Text(g.name)
-                  .fontSize(T.F_H2)
-                  .fontColor($r('app.color.text_primary'));
-                Text(g.now.length > 0 ? '当前：' + g.now : g.type)
-                  .fontSize(T.F_TINY)
-                  .fontColor($r('app.color.text_secondary'))
-                  .maxLines(1)
-                  .textOverflow({ overflow: TextOverflow.Ellipsis })
-                  .margin({ top: 2 });
-              }
-              .alignItems(HorizontalAlign.Start)
-              .layoutWeight(1)
-              .onClick(() => {
-                this.expanded = this.expanded === g.name ? '' : g.name;
-              });
-
-              Text(this.testingGroup === g.name ? '测速中' : '测速')
-                .fontSize(T.F_TINY)
-                .fontColor(this.testingGroup === g.name
-                  ? $r('app.color.text_secondary')
-                  : $r('app.color.primary'))
-                .padding({ left: 9, right: 9, top: 4, bottom: 4 })
-                .borderRadius(99)
-                .backgroundColor(this.testingGroup === g.name
-                  ? $r('app.color.surface_sunken')
-                  : $r('app.color.accent_soft'))
-                .margin({ right: 8 })
-                .onClick(() => {
-                  this.testGroup(g.name);
-                });
-              Text(g.members.length + ' 个')
-                .fontSize(T.F_TINY)
-                .fontColor($r('app.color.text_tertiary'));
-              LineIcon({
-                path: Ico.CHEVRON,
-                color: Pal.textTertiary(),
-                side: 16,
-                lineWidth: 1.6,
-                spin: this.expanded === g.name ? 90 : 0
-              })
-            }
-            .width('100%')
-            .padding({ left: 16, right: 14, top: 12, bottom: 12 })
-            .alignItems(VerticalAlign.Center);
-
-            if (this.expanded === g.name) {
-              ForEach(g.members, (m: NodeItem, mi: number) => {
-                Column() {
-                  Hairline({ indent: 16 });
-                  Row({ space: 10 }) {
-                    Stack() {
-                      Circle()
-                        .width(15)
-                        .height(15)
-                        .fill(Color.Transparent)
-                        .stroke(m.name === g.now
-                          ? $r('app.color.primary')
-                          : $r('app.color.text_tertiary'))
-                        .strokeWidth(1.4);
-                      if (m.name === g.now) {
-                        Circle()
-                          .width(7)
-                          .height(7)
-                          .fill($r('app.color.primary'));
-                      }
-                    }
-                    .width(15)
-                    .height(15);
-
-                    Text(m.name)
-                      .fontSize(T.F_BODY)
-                      .fontColor(m.name === g.now
-                        ? $r('app.color.primary')
-                        : $r('app.color.text_primary'))
-                      .maxLines(1)
-                      .textOverflow({ overflow: TextOverflow.Ellipsis })
-                      .layoutWeight(1);
-
-                    if (this.busy === g.name + '/' + m.name) {
-                      Text('切换中…')
-                        .fontSize(T.F_TINY)
-                        .fontColor($r('app.color.text_secondary'));
-                    } else if (m.delay > 0) {
-                      Text(m.delay + 'ms')
-                        .fontSize(T.F_TINY)
-                        .fontColor(this.delayHex(m.delay))
-                        .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-                        .borderRadius(99)
-                        .backgroundColor(Comp.alpha(this.delayHex(m.delay), 0.16))
-                        .fontFeature("\"tnum\" on");
-                    } else if (m.name === g.now) {
-                      Text('使用中')
-                        .fontSize(T.F_TINY)
-                        .fontColor($r('app.color.primary'));
-                    } else {
-                      Text('—')
-                        .fontSize(T.F_TINY)
-                        .fontColor($r('app.color.text_tertiary'));
-                    }
-                  }
-                  .width('100%')
-                  .padding({ left: 16, right: 16, top: 10, bottom: 10 })
-                  .alignItems(VerticalAlign.Center)
-                  .onClick(() => {
-                    this.pickNode(g.name, m.name);
-                  });
-                }
-                .width('100%');
-              }, (m: NodeItem) => g.name + '/' + m.name + '|' + m.delay);
-            }
+      ForEach(this.groupRows(), (row: NodeGroup[]) => {
+        Row({ space: 10 }) {
+          ForEach(row, (g: NodeGroup) => {
+            this.groupCard(g, this.indexOfGroup(g.name));
+          }, (g: NodeGroup) => this.groupKey(g));
+          if (row.length < this.groupCols()) {
+            Blank();
           }
-          .width('100%');
         }
-      }, (g: NodeGroup) => g.name + '|' + g.now + '|' + g.members.length);
+        .width('100%')
+        .alignItems(VerticalAlign.Top);
+      }, (row: NodeGroup[]) => this.groupRowKey(row));
     } else if (this.loaded) {
       // 这里原来一律写「没有正在运行的代理后端」，可上面的卡片明明显示「运行中 ·
       // 63 节点」—— 自相矛盾。分成两种：后端在跑但分组没读到，和后端确实没跑。
@@ -546,6 +456,239 @@ export struct ProxyPage {
           .margin({ top: 4 });
       }
     }
+  }
+
+  private groupCols(): number {
+    return this.rail() ? 2 : 1;
+  }
+
+  private groupRows(): NodeGroup[][] {
+    const n: number = this.groupCols();
+    const out: NodeGroup[][] = [];
+    for (let i = 0; i < this.groups.length; i += n) {
+      out.push(this.groups.slice(i, i + n));
+    }
+    return out;
+  }
+
+  private groupRowKey(row: NodeGroup[]): string {
+    let k: string = 'g';
+    for (let i = 0; i < row.length; i++) {
+      k += '|' + this.groupKey(row[i]);
+    }
+    return k;
+  }
+
+  private groupKey(g: NodeGroup): string {
+    return g.name + '|' + g.now + '|' + g.members.length;
+  }
+
+  private indexOfGroup(name: string): number {
+    for (let i = 0; i < this.groups.length; i++) {
+      if (this.groups[i].name === name) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  private groupType(t: string): string {
+    const k: string = t.toLowerCase();
+    if (k === 'selector') {
+      return '手动';
+    }
+    if (k === 'urltest') {
+      return '自动测速';
+    }
+    if (k === 'fallback') {
+      return '故障转移';
+    }
+    if (k === 'loadbalance') {
+      return '负载均衡';
+    }
+    return t.length > 0 ? t : '分组';
+  }
+
+  /** 一张分组卡：类型、组名、当前节点、节点数。点开是弹窗里的完整节点表 */
+  @Builder
+  groupCard(g: NodeGroup, idx: number) {
+    Column() {
+      Row({ space: 6 }) {
+        Text(this.groupType(g.type))
+          .fontSize(10)
+          .fontColor($r('app.color.text_secondary'))
+          .padding({ left: 6, right: 6, top: 2.5, bottom: 2.5 })
+          .borderRadius(99)
+          .backgroundColor($r('app.color.surface_hi'));
+        Blank();
+        Text('›')
+          .fontSize(12)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.text_tertiary'))
+          .textAlign(TextAlign.Center)
+          .width(16)
+          .height(16)
+          .borderRadius(5)
+          .backgroundColor($r('app.color.surface_hi'));
+      }
+      .width('100%');
+
+      Text(g.name)
+        .fontSize(T.F_H2)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.text_primary'))
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .margin({ top: 7 });
+
+      Blank();
+
+      Text(g.now.length > 0 ? g.now : '未选择')
+        .fontSize(T.F_SUB)
+        .fontColor(g.now.length > 0
+          ? $r('app.color.primary')
+          : $r('app.color.text_tertiary'))
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis });
+
+      Row() {
+        Text(g.members.length + ' 个节点')
+          .fontSize(10)
+          .fontColor($r('app.color.text_tertiary'))
+          .fontFeature("\"tnum\" on");
+      }
+      .width('100%')
+      .margin({ top: 4 });
+    }
+    .layoutWeight(1)
+    .height(104)
+    .alignItems(HorizontalAlign.Start)
+    .padding(12)
+    .borderRadius(14)
+    .backgroundColor($r('app.color.surface_sunken'))
+    .border({ width: 0.5, color: $r('app.color.divider') })
+    .onClick(() => {
+      if (idx >= 0) {
+        this.openIdx = idx;
+        this.showGroup = true;
+      }
+    });
+  }
+
+  /** 弹窗：一个分组的完整节点表，带测速 */
+  @Builder
+  nodeSheet() {
+    Column() {
+      Row({ space: 8 }) {
+        Text(this.openIdx >= 0 && this.openIdx < this.groups.length
+          ? this.groups[this.openIdx].name
+          : '节点')
+          .fontSize(T.F_H1)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'))
+          .layoutWeight(1)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis });
+        Text(this.testingGroup.length > 0 ? '测速中…' : '测速')
+          .fontSize(T.F_SUB)
+          .fontColor(this.testingGroup.length > 0
+            ? $r('app.color.text_secondary')
+            : $r('app.color.primary'))
+          .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+          .borderRadius(99)
+          .backgroundColor($r('app.color.accent_soft'))
+          .onClick(() => {
+            if (this.openIdx >= 0 && this.openIdx < this.groups.length) {
+              this.testGroup(this.groups[this.openIdx].name);
+            }
+          });
+        Text('关闭')
+          .fontSize(T.F_SUB)
+          .fontColor($r('app.color.text_secondary'))
+          .padding({ left: 8, right: 2, top: 4, bottom: 4 })
+          .onClick(() => {
+            this.showGroup = false;
+          });
+      }
+      .width('100%')
+      .padding({ left: 18, right: 18, top: 16, bottom: 10 });
+
+      if (this.openIdx >= 0 && this.openIdx < this.groups.length) {
+        Scroll() {
+          Column() {
+            GroupBox() {
+              ForEach(this.groups[this.openIdx].members, (m: NodeItem) => {
+                Row({ space: 10 }) {
+                  Stack() {
+                    Circle()
+                      .width(15)
+                      .height(15)
+                      .fill(Color.Transparent)
+                      .stroke(m.name === this.groups[this.openIdx].now
+                        ? $r('app.color.primary')
+                        : $r('app.color.text_tertiary'))
+                      .strokeWidth(1.4);
+                    if (m.name === this.groups[this.openIdx].now) {
+                      Circle()
+                        .width(7)
+                        .height(7)
+                        .fill($r('app.color.primary'));
+                    }
+                  }
+                  .width(15)
+                  .height(15);
+
+                  Text(m.name)
+                    .fontSize(T.F_BODY)
+                    .fontColor(m.name === this.groups[this.openIdx].now
+                      ? $r('app.color.primary')
+                      : $r('app.color.text_primary'))
+                    .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                    .layoutWeight(1);
+
+                  if (this.busy === this.groups[this.openIdx].name + '/' + m.name) {
+                    Text('切换中…')
+                      .fontSize(T.F_TINY)
+                      .fontColor($r('app.color.text_secondary'));
+                  } else if (m.delay > 0) {
+                    Text(m.delay + 'ms')
+                      .fontSize(T.F_TINY)
+                      .fontColor(this.delayHex(m.delay))
+                      .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                      .borderRadius(99)
+                      .backgroundColor(Comp.alpha(this.delayHex(m.delay), 0.16))
+                      .fontFeature("\"tnum\" on");
+                  } else if (m.name === this.groups[this.openIdx].now) {
+                    Text('使用中')
+                      .fontSize(T.F_TINY)
+                      .fontColor($r('app.color.primary'));
+                  } else {
+                    Text('—')
+                      .fontSize(T.F_TINY)
+                      .fontColor($r('app.color.text_tertiary'));
+                  }
+                }
+                .width('100%')
+                .padding({ left: 16, right: 16, top: 10, bottom: 10 })
+                .alignItems(VerticalAlign.Center)
+                .onClick(() => {
+                  this.pickNode(this.groups[this.openIdx].name, m.name);
+                });
+              }, (m: NodeItem) => this.groups[this.openIdx].name + '/' + m.name + '|' + m.delay);
+            }
+            Row().height(24);
+          }
+          .width('100%');
+        }
+        .width('100%')
+        .layoutWeight(1)
+        .scrollBar(BarState.Off);
+      }
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor($r('app.color.app_bg'));
   }
 
   /** 有没有任意一个后端处于运行中：用来区分「没装/没启动」和「启动了但没读到分组」 */

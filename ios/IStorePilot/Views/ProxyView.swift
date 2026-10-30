@@ -20,13 +20,15 @@ struct ProxyView: View {
     @State private var showCfg = false
     @State private var goSubs = false
     @State private var busy = false
-    /// 展开了哪些分组。和 Android 一样「只自动展开一次」，之后完全听用户的
-    @State private var expanded: Set<String> = []
+    /// 正在弹窗查看的分组。分组改成卡片之后不再就地展开：
+    /// 一屏只有四张卡，点开哪个弹哪个，节点列表在自己的弹窗里滚
+    @State private var openGroup: J? = nil
     @State private var testingGroup = ""
     /// 刚测出来的延迟，优先级高于接口里带的历史值
     @State private var tested: [String: Int] = [:]
 
     @Environment(\.tabIndex) private var tabIndex
+    @Environment(\.barAxis) private var axis
     @EnvironmentObject private var chrome: TabChrome
 
     private let tick = Timer.publish(every: 6, on: .main, in: .common).autoconnect()
@@ -76,11 +78,27 @@ struct ProxyView: View {
             .onChange(of: goSubs) { chrome.set(tabIndex, $0) }
             .task { await load() }
             .onReceive(tick) { _ in Task { await load() } }
-            .sheet(isPresented: $showCfg) {
+            #if DEBUG
+            // 截图用：-sub group 直接弹开第一个分组，省得手动点
+            .onAppear {
+                guard DebugRoute.sub == "group" else { return }
+                Task {
+                    try? await Task.sleep(nanoseconds: 900_000_000)
+                    openGroup = groups.first { !isAuto($0.str("name")) } ?? groups.first
+                }
+            }
+            #endif
+            .adaptiveSheet(isPresented: $showCfg) {
                 ConfigPicker(current: cfg.str("current"),
                              items: cfg.objs("configs")) { path in
                     await switchConfig(path)
                 }
+            }
+            .adaptiveSheet(isPresented: Binding(
+                get: { openGroup != nil },
+                set: { if !$0 { openGroup = nil } }
+            )) {
+                groupSheet
             }
         }
     }
@@ -381,13 +399,21 @@ struct ProxyView: View {
 
                 Hairline(inset: 18)
 
-                // 节点：不是一个独立卡片，而是这张卡的最后一段
-                Text("节点")
-                    .font(.system(size: 11.5, weight: .medium))
-                    .foregroundStyle(C.textSecondary)
-                    .padding(.horizontal, 18)
-                    .padding(.top, 12)
-                    .padding(.bottom, 2)
+                // 节点分组：四个组各一张卡。原来是一行组名 + 就地展开几十个节点，
+                // 展到第二个组就把配置那半屏顶走了；改成卡片点开弹窗，
+                // 一屏永远只占四张卡的高度
+                HStack(alignment: .firstTextBaseline) {
+                    Text("节点分组")
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(C.textSecondary)
+                    Spacer(minLength: 6)
+                    Text("点一张卡换节点")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(C.textTertiary)
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 14)
+                .padding(.bottom, 8)
 
                 if loading {
                     Text("读取中…").font(F.tiny).foregroundStyle(C.textSecondary)
@@ -399,10 +425,15 @@ struct ProxyView: View {
                         .foregroundStyle(C.textSecondary)
                         .padding(.horizontal, 18).padding(.vertical, 10)
                 } else {
-                    ForEach(Array(sorted.enumerated()), id: \.offset) { i, g in
-                        if i > 0 { Hairline(inset: 18) }
-                        groupBlock(g)
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10),
+                                             count: groupCols),
+                              spacing: 10) {
+                        ForEach(Array(sorted.enumerated()), id: \.offset) { _, g in
+                            groupCard(g)
+                        }
                     }
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 4)
                 }
                 Color.clear.frame(height: 6)
             }
@@ -415,60 +446,89 @@ struct ProxyView: View {
         return false
     }
 
-    private func groupBlock(_ g: J) -> some View {
-        let name = g.str("name")
-        let open = expanded.contains(name)
-        let now = infoNode(g.str("now")) ? "" : g.str("now")
-        let members = g.objs("members")
+    /// 宽屏两列、窄屏一列：四张卡在手机上竖着排刚好一屏，平板上排两行也不浪费。
+    private var groupCols: Int { axis == .rail ? 2 : 1 }
 
-        return VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 3) {
+    private func groupType(_ g: J) -> String {
+        switch g.str("type").lowercased() {
+        case "selector": return "手动"
+        case "urltest": return "自动测速"
+        case "fallback": return "故障转移"
+        case "loadbalance": return "负载均衡"
+        case "relay": return "链式"
+        default: return g.str("type").isEmpty ? "分组" : g.str("type")
+        }
+    }
+
+    /// 一张分组卡：类型、组名、当前节点、节点数与它的延迟。
+    /// 信息刚好够判断「要不要点进去换」，换节点的动作交给弹窗。
+    private func groupCard(_ g: J) -> some View {
+        let name = g.str("name")
+        let now = infoNode(g.str("now")) ? "" : g.str("now")
+        let members = g.objs("members").filter { !infoNode($0.str("name")) }
+        let delay = tested[now] ?? (members.first { $0.str("name") == now }?.int("delay") ?? 0)
+
+        return Button {
+            openGroup = g
+        } label: {
+            VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 6) {
-                    Image(systemName: open ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 10, weight: .semibold))
+                    Text(groupType(g))
+                        .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(C.textSecondary)
-                    Text(name)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(C.textPrimary)
-                        .lineLimit(1)
-                    Spacer()
-                    Button {
-                        testGroup(name)
-                    } label: {
-                        Text(testingGroup == name ? "测速中" : "测速")
-                            .font(.system(size: 11.5, weight: .medium))
-                            .foregroundStyle(testingGroup == name ? C.textSecondary : C.primary)
-                            .padding(.horizontal, 9).padding(.vertical, 4)
-                            .background(testingGroup == name ? C.surfaceSunken : C.accentSoft)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2.5)
+                        .background(C.surfaceHi)
+                        .clipShape(Capsule())
+                    Spacer(minLength: 2)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(C.textTertiary)
+                        .frame(width: 16, height: 16)
+                        .background(C.surfaceHi)
+                        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                }
+
+                Text(name)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(C.textPrimary)
+                    .lineLimit(1)
+                    .padding(.top, 7)
+
+                Spacer(minLength: 8)
+
+                Text(now.isEmpty ? "未选择" : now)
+                    .font(.system(size: 12))
+                    .foregroundStyle(now.isEmpty ? C.textTertiary : C.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+
+                HStack(spacing: 6) {
+                    Text("\(members.count) 个节点")
+                        .font(F.num(10, .regular))
+                        .foregroundStyle(C.textTertiary)
+                    Spacer(minLength: 2)
+                    if delay > 0 {
+                        Text("\(delay)ms")
+                            .font(F.num(10, .medium))
+                            .foregroundStyle(delayColor(delay))
+                            .padding(.horizontal, 6).padding(.vertical, 1.5)
+                            .background(delayColor(delay).opacity(0.14))
                             .clipShape(Capsule())
                     }
-                    .buttonStyle(.plain)
                 }
-                HStack(spacing: 6) {
-                    Text(now.isEmpty ? "未选择" : "当前 \(now)")
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(now.isEmpty ? C.textTertiary : C.primary)
-                        .lineLimit(1)
-                    Spacer()
-                    Text("\(members.count) 个")
-                        .font(F.num(11.5, .regular))
-                        .foregroundStyle(C.textTertiary)
-                }
-                .padding(.leading, 16)
+                .padding(.top, 4)
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 10)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                if open { expanded.remove(name) } else { expanded.insert(name) }
-            }
-
-            if open {
-                ForEach(Array(members.enumerated()), id: \.offset) { _, m in
-                    memberRow(m, group: name, current: now)
-                }
-            }
+            .padding(12)
+            .frame(maxWidth: .infinity, minHeight: 104, alignment: .topLeading)
+            .background(C.surfaceSunken)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(C.glassStroke, lineWidth: 0.7)
+            )
         }
+        .buttonStyle(.plain)
     }
 
     private func memberRow(_ m: J, group: String, current: String) -> AnyView {
@@ -483,7 +543,10 @@ struct ProxyView: View {
 
         return AnyView(Button {
             guard !busy else { return }
-            Task { await selectNode(group: group, node: name) }
+            Task {
+                await selectNode(group: group, node: name)
+                openGroup = nil
+            }
         } label: {
             HStack(spacing: 10) {
                 ZStack {
@@ -512,10 +575,63 @@ struct ProxyView: View {
                     Text("—").font(.system(size: 11)).foregroundStyle(C.textTertiary)
                 }
             }
-            .padding(.leading, 34).padding(.trailing, 18).padding(.vertical, 7)
+            .padding(.horizontal, 15).padding(.vertical, 10)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain))
+    }
+
+    // MARK: - 分组弹窗
+
+    /// 点开的分组：整屏一列节点，带测速。宽度跟着窗口走，
+    /// 不再受系统 sheet 那套尺寸推导影响（见 `adaptiveSheet`）。
+    private var groupSheet: some View {
+        let g = openGroup ?? [:]
+        let name = g.str("name")
+        let now = infoNode(g.str("now")) ? "" : g.str("now")
+        let members = g.objs("members")
+
+        return NavigationStack {
+            ScrollView {
+                VStack(spacing: 12) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(now.isEmpty ? "当前未选择" : "当前 " + now)
+                            .font(.system(size: 12))
+                            .foregroundStyle(now.isEmpty ? C.textTertiary : C.primary)
+                            .lineLimit(1)
+                        Spacer(minLength: 6)
+                        Text("\(members.count) 个节点")
+                            .font(F.num(11.5, .regular))
+                            .foregroundStyle(C.textTertiary)
+                    }
+                    .padding(.horizontal, 4)
+
+                    ListGroup {
+                        ForEach(Array(members.enumerated()), id: \.offset) { i, m in
+                            memberRow(m, group: name, current: now)
+                            if i < members.count - 1 { Hairline(inset: 15) }
+                        }
+                    }
+
+                    Color.clear.frame(height: 18)
+                }
+                .padding(16)
+            }
+            .scrollIndicators(.hidden)
+            .background(C.appBg)
+            .navigationTitle(name.isEmpty ? "节点" : name)
+            .navigationBarTitleDisplayMode(.inline)
+            .navBarChrome()
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("关闭") { openGroup = nil }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(testingGroup.isEmpty ? "测速" : "测速中…") { testGroup(name) }
+                        .disabled(!testingGroup.isEmpty || name.isEmpty)
+                }
+            }
+        }
     }
 
     private func isAuto(_ s: String) -> Bool {

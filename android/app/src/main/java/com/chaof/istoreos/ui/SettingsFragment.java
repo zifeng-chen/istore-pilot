@@ -54,6 +54,8 @@ public class SettingsFragment extends BaseFragment {
     private TextView tvDevDisk;
     private TextView tvDevSys;
     private TextView tvTheme;
+    /** hero 右上角的主题按钮：点开和「外观」卡里的选择器是同一个 */
+    private TextView tvHeroTheme;
 
     /**
      * 选安装包。必须用字段初始化注册 —— 放到 build() 里会抛
@@ -109,6 +111,13 @@ public class SettingsFragment extends BaseFragment {
         bb.setColor(Ui.alpha(Ui.color(c, R.color.hero_fg), 0.16f));
         tvHeroBadge.setBackground(bb);
         topRow.addView(tvHeroBadge);
+
+        // 主题放 hero 右上角：它只影响这个 App 的长相，
+        // 原来单独占「外观」卡的第一行，和网络、维护那些真配置混在一起
+        tvHeroTheme = heroChip(c, Theme.name(c), this::pickTheme);
+        LinearLayout.LayoutParams thlp = new LinearLayout.LayoutParams(wrap, wrap);
+        thlp.leftMargin = Ui.dp(c, 6);
+        topRow.addView(tvHeroTheme, thlp);
         hero.addView(topRow);
 
         // 大标题放主机名（拿不到才退回地址）：地址在下面「连接」卡里有一行，
@@ -131,6 +140,31 @@ public class SettingsFragment extends BaseFragment {
         tvHeroMeta.setEllipsize(android.text.TextUtils.TruncateAt.END);
         hero.addView(tvHeroMeta);
 
+        // 连接卡并进 hero：地址、重新登录、清缓存都是「这台连接」的属性，
+        // 原来单独一张卡占掉半屏，却只有三行
+        LinearLayout connRow = Ui.row(c);
+        connRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams crlp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, wrap);
+        crlp.topMargin = Ui.dp(c, 10);
+        hero.addView(connRow, crlp);
+
+        tvBase = Ui.heroNote(c,
+                Session.base(c).replaceFirst("^https?://", ""), 0.86f);
+        tvBase.setTextSize(11.5f);
+        tvBase.setSingleLine(true);
+        tvBase.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        connRow.addView(tvBase, new LinearLayout.LayoutParams(0, wrap, 1f));
+
+        TextView heroRelogin = heroChip(c, "重新登录", this::relogin);
+        LinearLayout.LayoutParams hl1 = new LinearLayout.LayoutParams(wrap, wrap);
+        hl1.leftMargin = Ui.dp(c, 6);
+        connRow.addView(heroRelogin, hl1);
+        TextView heroClear = heroChip(c, "清缓存", this::clearCache);
+        LinearLayout.LayoutParams hl2 = new LinearLayout.LayoutParams(wrap, wrap);
+        hl2.leftMargin = Ui.dp(c, 6);
+        connRow.addView(heroClear, hl2);
+
         View heroLine = new View(c);
         heroLine.setBackgroundColor(Ui.alpha(Ui.color(c, R.color.hero_fg), 0.18f));
         LinearLayout.LayoutParams hllp = new LinearLayout.LayoutParams(
@@ -146,22 +180,6 @@ public class SettingsFragment extends BaseFragment {
         tvAgent = heroStat(c, stats, "Agent");
         hero.addView(stats);
         root.addView(hero);
-
-        // ---------------------------------------------------------------- 连接
-        Ui.Card conn = Ui.card(c);
-        Ui.cardPadding(conn, 11);  // 最后一行是设置行，自带 11
-        Ui.cardTitle(c, conn, com.chaof.istoreos.widget.Glyph.LINK,
-                "连接", "凭证与服务器");
-
-        tvBase = Ui.settingRow(c, conn, com.chaof.istoreos.widget.Glyph.GLOBE,
-                "服务器地址", "改地址会重新登录",
-                Session.base(c).replaceFirst("^https?://", ""), true, false, this::editBase);
-        Ui.settingRow(c, conn, com.chaof.istoreos.widget.Glyph.REFRESH,
-                "重新登录", "凭证过期或换了密码时用", "", false, false, this::relogin);
-        Ui.settingRow(c, conn, com.chaof.istoreos.widget.Glyph.LIST,
-                "清除本地缓存", "只清手机上的快照，不动路由器", "", false, false,
-                this::clearCache);
-        root.addView(conn);
 
         // 原来「网络」页的内容挪到这里：设备列表占了那个页签，
         // 而 WAN 地址属于偶尔看一眼的信息，放设置里更合适
@@ -219,9 +237,12 @@ public class SettingsFragment extends BaseFragment {
         Ui.Card look = Ui.card(c);
         Ui.cardPadding(look, 11);
         Ui.cardTitle(c, look, com.chaof.istoreos.widget.Glyph.PALETTE,
-                "外观", "深浅色与主题");
-        tvTheme = Ui.settingRow(c, look, com.chaof.istoreos.widget.Glyph.PALETTE,
-                "主题", "跟随系统会随手机自动切换", Theme.name(c), true, false, this::pickTheme);
+                "显示", "刷新率与主题");
+        // 主题挪到 hero 右上角了，这里只留一句指路，免得用户翻遍整页找
+        tvTheme = Ui.text(c, "深浅色主题在上方卡片的右上角切换。",
+                11.5f, R.color.text_secondary);
+        tvTheme.setPadding(Ui.dp(c, 16), Ui.dp(c, 2), Ui.dp(c, 16), Ui.dp(c, 2));
+        look.addView(tvTheme);
         // 高刷是这一版新加的：窗口不主动申请，120Hz 屏也只有 60 帧，
         // 把结果显示出来，用户能自己确认是不是真的跑在高刷上
         Ui.settingRow(c, look, com.chaof.istoreos.widget.Glyph.BOLT,
@@ -348,6 +369,23 @@ public class SettingsFragment extends BaseFragment {
     }
 
     /** hero 里的一个小统计块：上面小字，下面数值 */
+    /** hero 深色底上的小动作：描边胶囊，不填色 —— 填色会跟「已连接」抢注意力 */
+    private TextView heroChip(Context c, String text, Runnable onClick) {
+        TextView t = Ui.heroNote(c, text, 0.92f);
+        t.setTextSize(11f);
+        t.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        t.setPadding(Ui.dp(c, 9), Ui.dp(c, 3.5f), Ui.dp(c, 9), Ui.dp(c, 3.5f));
+        t.setSingleLine(true);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(Ui.dp(c, 100));
+        bg.setColor(0);
+        bg.setStroke(Math.max(1, Ui.dp(c, 0.9f)),
+                Ui.alpha(Ui.color(c, R.color.hero_fg), 0.28f));
+        t.setBackground(bg);
+        t.setOnClickListener(v -> onClick.run());
+        return t;
+    }
+
     private TextView heroStat(Context c, LinearLayout parent, String label) {
         LinearLayout box = Ui.column(c);
         TextView l = Ui.heroNote(c, label, 0.86f);
@@ -372,8 +410,8 @@ public class SettingsFragment extends BaseFragment {
             Theme.applyMode(c, mode);
             // 重建是异步的，先把这一行文案改掉，
             // 否则在「系统本来就是这个颜色」的情况下不重建，会一直显示旧值
-            if (tvTheme != null) {
-                tvTheme.setText(Theme.name(mode));
+            if (tvHeroTheme != null) {
+                tvHeroTheme.setText(Theme.name(mode));
             }
         });
     }

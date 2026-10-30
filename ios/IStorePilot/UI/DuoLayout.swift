@@ -64,19 +64,22 @@ extension EnvironmentValues {
 /// 设备清单在宽画布上的列数。
 ///
 /// 不用「宽度过某个阈值就几列」的写法：Duo 展开竖屏的真实可用宽度只有 549pt
-/// （内屏 699 减去右侧状态栏那一列 118），固定阈值一写就会把它判成单列，
-/// 而 549 其实放得下两张 270pt 的卡。
+/// （内屏 699 减去右侧状态栏那一列 118），固定阈值一写就会把它判成单列。
 ///
-/// 所以按「一张卡至少多宽」反推，和鸿蒙 `Bp.cols()` 是同一套算法：
-/// 250 是「名字 + 速率 + 累计用量」在 13pt 字号下不互相挤的下限。
+/// 宽度够的时候直接上小卡：一屏 4–5 台比两列大卡信息密度高得多，
+/// 55 台设备不用滚十几屏。124 是「一行名字 + 一行 IP + 速率」在 12.5pt 下
+/// 不折行的下限；460 以下（手机竖屏）还是回到原来的分组列表 ——
+/// 单列小卡又小又空，反而难认。
 enum GridCols {
-    static let minCard: CGFloat = 250
-    static let gap: CGFloat = 10
+    static let minCard: CGFloat = 124
+    static let gap: CGFloat = 8
+    /// 低于这个宽度不换卡片，保持分组列表
+    static let gridFloor: CGFloat = 460
 
     static func forWidth(_ w: CGFloat) -> Int {
-        guard w > 0 else { return 1 }
+        guard w > 0, w >= gridFloor else { return 1 }
         let n = Int((w + gap) / (minCard + gap))
-        return max(1, min(3, n))
+        return max(2, min(5, n))
     }
 }
 
@@ -157,6 +160,36 @@ struct DuoColumns<Left: View, Right: View>: View {
                     leftContent
                     rightContent
                 }
+            }
+        }
+    }
+}
+
+/// 宽画布上系统的 `.sheet` 会被排到窗口之外。
+///
+/// Duo 展开时窗口只有 951×669，form sheet 却按更大的尺寸布了一遍：
+/// 顶部留 7pt 之后，卡片的下沿直接落到屏幕外面 —— 列表滚到底也看不到最后几行，
+/// 底部圆角更是从来没出现过。全屏覆盖不吃这套尺寸推导，正好当模态用。
+extension View {
+    func adaptiveSheet<C: View>(isPresented: Binding<Bool>,
+                                @ViewBuilder content: @escaping () -> C) -> some View {
+        modifier(AdaptiveSheet(isPresented: isPresented, sheetContent: content))
+    }
+}
+
+private struct AdaptiveSheet<C: View>: ViewModifier {
+    @Binding var isPresented: Bool
+    @Environment(\.barAxis) private var axis
+    let sheetContent: () -> C
+
+    func body(content: Content) -> some View {
+        if axis == .rail {
+            // 试过 `.presentationDetents([.large])`：没用，form sheet 依然按更大的
+            // 尺寸布了一遍，底部照样落在屏幕外。全屏覆盖不吃这套推导，尺寸跟着窗口走。
+            content.fullScreenCover(isPresented: $isPresented) { sheetContent() }
+        } else {
+            content.sheet(isPresented: $isPresented) {
+                sheetContent().presentationDetents([.large])
             }
         }
     }

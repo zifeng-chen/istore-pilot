@@ -34,20 +34,13 @@ function accessReal(a: J): boolean {
   return a.str('source', '') === 'ap' && a.str('conf', '') === 'high';
 }
 
-/**
- * 副标题：IP · 厂商。
- * 没命名的设备名字本身就是 IP（安卓/桌面端也这么兜底），
- * 副标题再写一遍就是同一串数字出现两次，所以相等时跳过。
- */
-function metaText(d: DevRow): string {
-  const bits: string[] = [];
-  if (d.ip.length > 0 && d.ip !== d.name) {
-    bits.push(d.ip);
+/** IPv4 取末两段（100.243）；IPv6 或异常形态原样返回 */
+function shortIp(ip: string): string {
+  const parts: string[] = ip.split('.');
+  if (parts.length === 4) {
+    return parts[2] + '.' + parts[3];
   }
-  if (d.vendor.length > 0) {
-    bits.push(d.vendor);
-  }
-  return bits.length > 0 ? bits.join(' · ') : d.mac;
+  return ip;
 }
 
 interface DevRow {
@@ -60,6 +53,10 @@ interface DevRow {
   badge: string;
   /** 徽标是不是事实（实心）。false 画描边，表示是从设备类型推的 */
   badgeReal: boolean;
+  /** 卡片标题：没命名的设备用 IP 末两段，130vp 宽放不下整串 */
+  shortName: string;
+  /** 副标题：IP/厂商，名字已经由 IP 派生时不再重复 IP */
+  meta: string;
   online: boolean;
   blocked: boolean;
   staticIp: boolean;
@@ -187,10 +184,26 @@ export struct DevicesPage {
       }
 
       const acc: J = d.obj('access');
+      const ip4: string = d.str('ip', '');
+      const vendor4: string = d.str('vendor', '');
+      const label4: string = d.str('label', '');
+      // 卡片标题：有名字用名字，没有就用 IP 末两段（整串在 130vp 里会被截断）
+      const cardName: string = label4.length > 0
+        ? label4
+        : (ip4.length > 0 ? shortIp(ip4) : name);
+      const bits: string[] = [];
+      if (ip4.length > 0 && ip4 !== cardName && shortIp(ip4) !== cardName) {
+        bits.push(ip4);
+      }
+      if (vendor4.length > 0) {
+        bits.push(vendor4);
+      }
       const row: DevRow = {
         mac: d.str('mac', ''),
-        ip: d.str('ip', ''),
+        ip: ip4,
         name: name,
+        shortName: cardName,
+        meta: bits.length > 0 ? bits.join(' · ') : d.str('mac', ''),
         vendor: d.str('vendor', ''),
         badge: accessShort(acc),
         badgeReal: accessReal(acc),
@@ -409,7 +422,7 @@ export struct DevicesPage {
           }
           .width('100%');
 
-          Text(metaText(d))
+          Text(d.meta)
             .fontSize(T.F_TINY)
             .fontColor($r('app.color.text_secondary'))
             .maxLines(1)
@@ -441,9 +454,31 @@ export struct DevicesPage {
 
   // MARK: - 宽屏网格
 
-  /** 一张卡至少 260vp 宽：再窄名字和速率就会互相挤 */
+  /** 内容区真实可用宽度：扣掉侧栏、页面留白 */
+  private usableWidth(): number {
+    const pad: number = this.rail() ? 20 : T.PAD;
+    return Bp.contentWidth(this.winW) - pad * 2;
+  }
+
+  /**
+   * 手机竖屏仍是分组列表（单列小卡又小又空），宽画布一屏 4–5 台。
+   * 124vp 是「名字 + IP + 速率」在 12.5 字号下不折行的下限，
+   * 和 iOS 的 `GridCols` 同一套算法。
+   */
   private cols(): number {
-    return Bp.cols(this.winW, 260);
+    const w: number = this.usableWidth();
+    if (w < 460) {
+      return 1;
+    }
+    const n: number = Math.floor((w + 8) / (124 + 8));
+    return Math.max(2, Math.min(5, n));
+  }
+
+  /** 方形卡的边长，托底 112、封顶 168 */
+  private cardSide(): number {
+    const n: number = this.cols();
+    const raw: number = (this.usableWidth() - 8 * (n - 1)) / n;
+    return Math.max(112, Math.min(168, raw));
   }
 
   /**
@@ -496,9 +531,9 @@ export struct DevicesPage {
       .padding({ left: 4, right: 4 })
       .margin({ top: topGap, bottom: 7 });
 
-      Column({ space: 10 }) {
+      Column({ space: 8 }) {
         ForEach(this.chunks(this.online), (chunk: DevRow[]) => {
-          Row({ space: 10 }) {
+          Row({ space: 8 }) {
             ForEach(chunk, (d: DevRow) => {
               this.card(d);
             }, (d: DevRow) => this.rowKey('g', d));
@@ -531,9 +566,9 @@ export struct DevicesPage {
       .padding({ left: 4, right: 4 })
       .margin({ top: topGap, bottom: 7 });
 
-      Column({ space: 10 }) {
+      Column({ space: 8 }) {
         ForEach(this.chunks(this.offline), (chunk: DevRow[]) => {
-          Row({ space: 10 }) {
+          Row({ space: 8 }) {
             ForEach(chunk, (d: DevRow) => {
               this.card(d);
             }, (d: DevRow) => this.rowKey('g', d));
@@ -557,65 +592,82 @@ export struct DevicesPage {
   @Builder
   card(d: DevRow) {
     Column() {
-      Row({ space: 6 }) {
+      Row({ space: 5 }) {
         Row()
           .width(5)
           .height(5)
           .borderRadius(3)
           .backgroundColor(d.online ? $r('app.color.primary') : $r('app.color.text_tertiary'));
-        Text(d.name)
-          .fontSize(T.F_H2)
+        Text(d.shortName)
+          .fontSize(12.5)
           .fontWeight(FontWeight.Medium)
           .fontColor(d.online ? $r('app.color.text_primary') : $r('app.color.text_secondary'))
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .layoutWeight(1);
+        // 角标 = 「点得进去」：方形卡放不下整行 chevron，右上角一枚小箭头就够
         if (d.blocked) {
-          Text('禁网')
-            .fontSize(10)
-            .fontWeight(FontWeight.Medium)
+          Text('禁')
+            .fontSize(9)
+            .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.danger'))
-            .padding({ left: 5, right: 5, top: 2, bottom: 2 })
-            .borderRadius(6)
+            .textAlign(TextAlign.Center)
+            .width(16)
+            .height(16)
+            .borderRadius(5)
             .backgroundColor(Pal.accentSoft());
         } else {
-          Text(d.badge)
-            .fontSize(10)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(this.badgeColor(d))
-            .padding({ left: 5, right: 5, top: 2, bottom: 2 })
-            .borderRadius(6)
-            .backgroundColor(d.badgeReal ? Pal.alpha(this.badgeColor(d), 0.14) : Color.Transparent)
-            .border({ width: d.badgeReal ? 0 : 1, color: Pal.alpha(this.badgeColor(d), 0.42) });
+          Text('›')
+            .fontSize(12)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(d.online ? $r('app.color.primary') : $r('app.color.text_tertiary'))
+            .textAlign(TextAlign.Center)
+            .width(16)
+            .height(16)
+            .borderRadius(5)
+            .backgroundColor(d.online
+              ? $r('app.color.accent_soft')
+              : $r('app.color.surface_hi'));
         }
       }
       .width('100%');
 
-      Text(metaText(d))
-        .fontSize(T.F_TINY)
-        .fontColor($r('app.color.text_secondary'))
+      Text(d.meta)
+        .fontSize(10)
+        .fontColor(d.online ? $r('app.color.text_secondary') : $r('app.color.text_tertiary'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .margin({ top: 3 });
+        .margin({ top: 2 });
 
-      Row() {
-        Text(d.online ? d.rate : '—')
-          .fontSize(T.F_SUB)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(d.online ? $r('app.color.primary') : $r('app.color.text_tertiary'))
-          .fontFeature("\"tnum\" on");
-        Blank();
-        Text('共 ' + d.total)
-          .fontSize(T.F_TINY)
-          .fontColor($r('app.color.text_tertiary'))
-          .fontFeature("\"tnum\" on");
-      }
-      .width('100%')
-      .margin({ top: 9 });
+      Text(d.badge)
+        .fontSize(9.5)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(this.badgeColor(d))
+        .padding({ left: 5, right: 5, top: 1.5, bottom: 1.5 })
+        .borderRadius(6)
+        .backgroundColor(d.badgeReal ? Pal.alpha(this.badgeColor(d), 0.14) : Color.Transparent)
+        .border({ width: d.badgeReal ? 0 : 1, color: Pal.alpha(this.badgeColor(d), 0.42) })
+        .margin({ top: 5 });
+
+      Blank();
+
+      Text(d.online ? d.rate : '—')
+        .fontSize(13)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(d.online ? $r('app.color.primary') : $r('app.color.text_tertiary'))
+        .fontFeature("\"tnum\" on")
+        .maxLines(1);
+      Text('共 ' + d.total)
+        .fontSize(10)
+        .fontColor($r('app.color.text_tertiary'))
+        .fontFeature("\"tnum\" on")
+        .maxLines(1)
+        .margin({ top: 1 });
     }
     .layoutWeight(1)
+    .height(this.cardSide())
     .alignItems(HorizontalAlign.Start)
-    .padding({ left: 11, right: 11, top: 10, bottom: 10 })
+    .padding({ left: 10, right: 10, top: 10, bottom: 10 })
     .borderRadius(14)
     .backgroundColor(d.online ? $r('app.color.surface') : $r('app.color.surface_sunken'))
     .border({ width: 0.5, color: $r('app.color.divider') });

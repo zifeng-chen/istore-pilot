@@ -79,7 +79,16 @@ public final class AppIcons {
         MAP.put("网易", R.drawable.ic_app_netease);
         MAP.put("腾讯服务", R.drawable.ic_app_tencent);
         MAP.put("开发仓库", R.drawable.ic_app_docker);
-        MAP.put("远程控制", R.drawable.ic_app_oray);
+        MAP.put("向日葵", R.drawable.ic_app_oray);
+        MAP.put("ToDesk", R.drawable.ic_app_todesk);
+        MAP.put("远程控制", R.drawable.ic_app_teamviewer);
+        MAP.put("钉钉", R.drawable.ic_app_dingtalk);
+        MAP.put("企业微信", R.drawable.ic_app_wework);
+        MAP.put("飞书", R.drawable.ic_app_feishu);
+        MAP.put("腾讯会议", R.drawable.ic_app_wemeet);
+        MAP.put("百度网盘", R.drawable.ic_app_baidupan);
+        MAP.put("阿里云盘", R.drawable.ic_app_aliyundrive);
+        MAP.put("迅雷", R.drawable.ic_app_xunlei);
         MAP.put("主机 / 平台", R.drawable.ic_app_xbox);
         MAP.put("阿里云", R.drawable.ic_app_aliyun);
         MAP.put("腾讯云", R.drawable.ic_app_tencent_cloud);
