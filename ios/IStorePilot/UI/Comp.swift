@@ -218,9 +218,24 @@ struct CardHead<Trailing: View>: View {
     let icon: String
     let title: String
     var sub: String = ""
+    /// 标题行与下面内容之间画不画一条分割线。
+    ///
+    /// 默认画：卡片里「标题 + 图标块」和它下面的图表/列表原来只有 10~14pt 间距、
+    /// 字号也接近，扫下去分不清哪是头、哪是内容，手指也容易点在边界上。
+    /// 一条 12pt 外的细线把两者切开，和分组列表的观感一致。
+    var divider: Bool = true
     @ViewBuilder var trailing: () -> Trailing
 
     var body: some View {
+        VStack(spacing: 0) {
+            row
+            if divider {
+                Hairline(inset: 0).padding(.top, 12)
+            }
+        }
+    }
+
+    private var row: some View {
         HStack(alignment: .center, spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 14, weight: .semibold))

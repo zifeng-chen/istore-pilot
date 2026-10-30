@@ -38,6 +38,8 @@ public class SettingsFragment extends BaseFragment {
     private TextView tvHeroState;
     private TextView tvHeroBadge;
     private TextView tvHeroMeta;
+    /** hero 大标题：在线时是主机名，拿不到才退回服务器地址 */
+    private TextView tvHeroHost;
 
     private TextView tvWanState;
     private TextView tvWanV4;
@@ -46,7 +48,6 @@ public class SettingsFragment extends BaseFragment {
     private TextView tvLanV4;
 
     // 设备信息（原概览页的「机器信息」）
-    private TextView tvDevHost;
     private TextView tvDevModel;
     private TextView tvDevCpu;
     private TextView tvDevMem;
@@ -110,17 +111,19 @@ public class SettingsFragment extends BaseFragment {
         topRow.addView(tvHeroBadge);
         hero.addView(topRow);
 
-        TextView host = Ui.text(c,
+        // 大标题放主机名（拿不到才退回地址）：地址在下面「连接」卡里有一行，
+        // 主机名原来又在「设备信息」卡里重复一次 —— 同一件事说三遍
+        tvHeroHost = Ui.text(c,
                 Session.base(c).replaceFirst("^https?://", ""), 24f, R.color.hero_fg);
-        host.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        host.setIncludeFontPadding(false);
-        host.setLetterSpacing(-0.02f);
-        host.setSingleLine(true);
-        host.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        tvHeroHost.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        tvHeroHost.setIncludeFontPadding(false);
+        tvHeroHost.setLetterSpacing(-0.02f);
+        tvHeroHost.setSingleLine(true);
+        tvHeroHost.setEllipsize(android.text.TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, wrap);
         hlp.topMargin = Ui.dp(c, 12);
-        hero.addView(host, hlp);
+        hero.addView(tvHeroHost, hlp);
 
         tvHeroMeta = Ui.heroNote(c, "正在检测连接…", 0.86f);
         tvHeroMeta.setPadding(0, Ui.dp(c, 5), 0, 0);
@@ -195,8 +198,7 @@ public class SettingsFragment extends BaseFragment {
         Ui.cardTitle(c, dev, com.chaof.istoreos.widget.Glyph.CHIP,
                 "设备信息", "这台路由器的硬件与固件");
 
-        tvDevHost = Ui.settingRow(c, dev, com.chaof.istoreos.widget.Glyph.LINK,
-                "主机名", "局域网里认的就是这个名字", "—", true, false, null);
+        // 「主机名」这一行删掉了：它已经是 hero 的大标题，卡片里再说一遍是重复
         tvDevModel = Ui.settingRow(c, dev, com.chaof.istoreos.widget.Glyph.BOX,
                 "型号", "主板与平台", "—", false, false, null);
         tvDevCpu = Ui.settingRow(c, dev, com.chaof.istoreos.widget.Glyph.CHIP,
@@ -484,9 +486,12 @@ public class SettingsFragment extends BaseFragment {
         JSONObject mem = b.optJSONObject("memory");
         JSONObject sys = b.optJSONObject("system");
 
-        if (sys != null && tvDevHost != null) {
+        // 主机名已经摆在 hero 大标题上了，「设备信息」卡不再重复这一行
+        if (sys != null && tvHeroHost != null) {
             String host = sys.optString("hostname", "");
-            tvDevHost.setText(host.isEmpty() ? "—" : host);
+            if (!host.isEmpty()) {
+                tvHeroHost.setText(host);
+            }
         }
         if (tvDevModel != null) {
             String model = sys == null ? "" : sys.optString("model", "");

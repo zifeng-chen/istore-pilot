@@ -164,7 +164,7 @@ struct AppsView: View {
                                 .lineLimit(1)
                         }
                     }
-                    Text(meta.isEmpty ? "—" : meta.joined(separator: "　·　"))
+                    Text(meta.isEmpty ? "—" : meta.joined(separator: " · "))
                         .font(.system(size: 11.5))
                         .foregroundStyle(C.textSecondary)
                         .lineLimit(1)
@@ -176,7 +176,7 @@ struct AppsView: View {
 
                 VStack(alignment: .trailing, spacing: 3) {
                     Text(F.bytes(total))
-                        .font(F.num(17, .medium))
+                        .font(F.num(16, .medium))
                         .foregroundStyle(C.textPrimary)
                         .lineLimit(1)
                     Text("↓ \(F.bytes(a.dbl("all_down")))　↑ \(F.bytes(a.dbl("all_up")))")

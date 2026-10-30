@@ -127,6 +127,33 @@ struct DuoColumns<Left: View, Right: View>: View {
     }
 }
 
+/// 页签序号：让页面知道自己属于第几个页签，才能往 `TabChrome` 里报状态
+private struct TabIndexKey: EnvironmentKey {
+    static let defaultValue: Int = -1
+}
+
+extension EnvironmentValues {
+    var tabIndex: Int {
+        get { self[TabIndexKey.self] }
+        set { self[TabIndexKey.self] = newValue }
+    }
+}
+
+/// 底部横条画在 NavigationStack **外面**，栈里推了新页面它不知道，
+/// 于是二级页、三级页底下还压着四个页签（安卓那边推进后是整页覆盖、没有横条）。
+///
+/// 让每个页签在推进/返回时把状态报上来，RootView 据此决定画不画横条。
+/// 按页签分开存（而不是一个 Bool）：四个页签同时存在于 ZStack 里，
+/// 用单个布尔会被隐藏页签的 0 覆盖掉。
+final class TabChrome: ObservableObject {
+    @Published private(set) var pushed: [Bool] = [false, false, false, false]
+
+    func set(_ index: Int, _ value: Bool) {
+        guard index >= 0, index < pushed.count, pushed[index] != value else { return }
+        pushed[index] = value
+    }
+}
+
 /// 量窗口尺寸和安全区。
 ///
 /// 不用 `GeometryReader` 包在外层：那会把窗口安全区吃成 0，

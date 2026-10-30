@@ -22,6 +22,11 @@ struct SecurityView: View {
     enum Route: Hashable {
         case devices(Int)
         case shield
+        /// 三级页：某台设备的详情。放在同一个枚举里 —— `NavigationStack(path:)`
+        /// 的 path 是 `[Route]`，只能往里 push `Route`；
+        /// 之前清单里用 `NavigationLink(value: mac)`（String）配
+        /// `.navigationDestination(for: String.self)`，类型对不上，点了没反应
+        case device(String)
     }
 
     @State private var path: [Route] = {
@@ -39,6 +44,8 @@ struct SecurityView: View {
     @State private var appsData: J = Api.cached("/api/v1/apps") ?? [:]
     @State private var goApps = false
     @Environment(\.barAxis) private var axis
+    @Environment(\.tabIndex) private var tabIndex
+    @EnvironmentObject private var chrome: TabChrome
 
     @State private var askTakeover: Bool? = nil
     @State private var busy = false
@@ -57,12 +64,19 @@ struct SecurityView: View {
     var body: some View {
         NavigationStack(path: $path) {
             level1
+                // onAppear 里也要报一次：onChange 只在变化时触发，
+                // 冷启动直接落在二级页（调试参数）时初值就非空
+                .onAppear { chrome.set(tabIndex, !path.isEmpty) }
+                .onChange(of: path.count) { chrome.set(tabIndex, $0 > 0) }
                 .navigationDestination(for: Route.self) { r in
                     switch r {
                     case .devices(let f):
                         DevicesView(initialFilter: f)
                     case .shield:
                         ShieldView()
+                    case .device(let mac):
+                        DeviceDetailView(mac: mac,
+                                         seed: devs.first { $0.str("mac") == mac } ?? [:])
                     }
                 }
         }
@@ -224,7 +238,6 @@ struct SecurityView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                .padding(.bottom, 4)
 
                 HStack(spacing: 0) {
                     statCell("在线", sum.int("online"), C.primary) { open(.online) }
@@ -348,9 +361,6 @@ struct SecurityView: View {
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(C.primary)
                     }
-                    .padding(.bottom, 8)
-
-                    Hairline(inset: 0)
 
                     if top.isEmpty {
                         Text("正在统计…")

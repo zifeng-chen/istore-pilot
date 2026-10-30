@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct RootView: View {
+    @StateObject private var chrome = TabChrome()
+
     @State private var tab: Int = {
         #if DEBUG
         return DebugRoute.tab
@@ -40,16 +42,20 @@ struct RootView: View {
             } else {
                 VStack(spacing: 0) {
                     tabs
-                    // 材料要铺到屏幕最底下（Home 指示条那一条），
-                    // 图标本身留在安全区里 —— ignoresSafeAreaEdges 只作用于背景
-                    BottomBar(items: items, tab: $tab)
-                        .background(.regularMaterial, ignoresSafeAreaEdges: .bottom)
-                        // 键盘弹起时底部横条跟着屏幕上移会「浮」到键盘顶上，
-                        // 看着像多出来一条。只让**横条**忽略键盘安全区、
-                        // 留在屏幕底部（被键盘盖住正是系统 TabBar 的行为）；
-                        // 页面内容照常让位，否则输入框会被键盘挡住
-                        .ignoresSafeArea(.keyboard, edges: .bottom)
+                    // 二级页推进后整页覆盖，底下不该还压着四个页签（安卓就是这样）。
+                    // 淡出而不是直接删，避免内容高度突变
+                    if !chrome.pushed[tab] {
+                        BottomBar(items: items, tab: $tab)
+                            .background(.regularMaterial, ignoresSafeAreaEdges: .bottom)
+                            // 键盘弹起时底部横条跟着屏幕上移会「浮」到键盘顶上，
+                            // 看着像多出来一条。只让**横条**忽略键盘安全区、
+                            // 留在屏幕底部（被键盘盖住正是系统 TabBar 的行为）；
+                            // 页面内容照常让位，否则输入框会被键盘挡住
+                            .ignoresSafeArea(.keyboard, edges: .bottom)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
                 }
+                .animation(.easeInOut(duration: 0.2), value: chrome.pushed[tab])
             }
         }
         .padding(.top, topGuard)
@@ -63,11 +69,16 @@ struct RootView: View {
     /// 切回来不用重新拉数据、滚动位置也不会跳回顶部
     private var tabs: some View {
         ZStack {
-            OverviewView().opacity(tab == 0 ? 1 : 0).allowsHitTesting(tab == 0)
-            SecurityView().opacity(tab == 1 ? 1 : 0).allowsHitTesting(tab == 1)
-            ProxyView().opacity(tab == 2 ? 1 : 0).allowsHitTesting(tab == 2)
-            SettingsView().opacity(tab == 3 ? 1 : 0).allowsHitTesting(tab == 3)
+            OverviewView().environment(\.tabIndex, 0)
+                .opacity(tab == 0 ? 1 : 0).allowsHitTesting(tab == 0)
+            SecurityView().environment(\.tabIndex, 1)
+                .opacity(tab == 1 ? 1 : 0).allowsHitTesting(tab == 1)
+            ProxyView().environment(\.tabIndex, 2)
+                .opacity(tab == 2 ? 1 : 0).allowsHitTesting(tab == 2)
+            SettingsView().environment(\.tabIndex, 3)
+                .opacity(tab == 3 ? 1 : 0).allowsHitTesting(tab == 3)
         }
+        .environmentObject(chrome)
         .contentColumn(axis == .rail ? 980 : 820)
     }
 }

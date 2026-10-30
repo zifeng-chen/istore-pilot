@@ -120,6 +120,13 @@ export struct SettingsPage {
         : '确认手机与路由器在同一网络，或点下面「服务器地址」改地址';
     }
 
+    // 主机名：hero 的大标题用它。服务器地址只在下面「连接」卡里出现一次，
+    // 原来是 hero 和「连接」卡各写一遍地址 —— 同一件事说两遍
+    const ov: ApiResult = await Api.get(ctx, '/api/v1/overview');
+    if (ov.ok) {
+      this.hostname = ov.data.obj('board').str('hostname', '');
+    }
+
     const n: ApiResult = await Api.get(ctx, '/api/v1/network');
     if (!n.ok) {
       return;
@@ -344,7 +351,7 @@ export struct SettingsPage {
       .width('100%')
       .alignItems(VerticalAlign.Center);
 
-      Text(this.hostText())
+      Text(this.hostname.length > 0 ? this.hostname : this.hostText())
         .fontSize(24)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.hero_fg'))

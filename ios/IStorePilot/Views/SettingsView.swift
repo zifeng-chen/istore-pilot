@@ -13,6 +13,8 @@ import UniformTypeIdentifiers
 ///    退出没有任何意义（令牌过期会自动回登录页），所以整块移除
 struct SettingsView: View {
     @EnvironmentObject private var app: AppState
+    @Environment(\.tabIndex) private var tabIndex
+    @EnvironmentObject private var chrome: TabChrome
 
     @State private var d: J = Api.cached("/api/v1/overview") ?? [:]
     @State private var net: J = Api.cached("/api/v1/network") ?? [:]
@@ -69,6 +71,10 @@ struct SettingsView: View {
             .navigationDestination(isPresented: $goHardware) { HardwareView() }
             .navigationDestination(isPresented: $goWan) { WanView() }
             .navigationDestination(isPresented: $goBackups) { BackupsView() }
+            .onAppear { chrome.set(tabIndex, goHardware || goWan || goBackups) }
+            .onChange(of: goHardware) { v in chrome.set(tabIndex, v || goWan || goBackups) }
+            .onChange(of: goWan) { v in chrome.set(tabIndex, v || goHardware || goBackups) }
+            .onChange(of: goBackups) { v in chrome.set(tabIndex, v || goHardware || goWan) }
             .alert(item: $popup) { p in
                 Alert(title: Text(p.title), message: Text(p.body),
                       dismissButton: .default(Text("好")))
@@ -131,20 +137,19 @@ struct SettingsView: View {
                         .clipShape(Capsule())
                 }
 
-                Text(Session.base.replacingOccurrences(of: "http://", with: "")
-                        .replacingOccurrences(of: "https://", with: ""))
+                // 大标题放**主机名**，不再放服务器地址：
+                // 地址在下面「连接」卡里有一行（而且只有那里能改），
+                // 主机名原来又在「设备信息」卡里重复一次。三处说同一件事。
+                // 离线时拿不到主机名，退回显示试过的地址 —— 那时地址才是关键信息
+                Text(b.str("hostname").isEmpty ? bareBase : b.str("hostname"))
                     .font(.system(size: 23, weight: .bold))
                     .foregroundStyle(C.heroFg)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
 
-                Text(b.str("hostname", "iStoreOS") + "　·　" + b.str("description", "—"))
-                    .font(F.tiny)
-                    .foregroundStyle(C.heroFgSoft)
-                    .lineLimit(1)
-
                 Rectangle().fill(Color.white.opacity(0.18)).frame(height: 0.7)
-                    .padding(.vertical, 2)
+                    .padding(.top, 12)
+                    .padding(.bottom, 12)
 
                 HStack(spacing: 0) {
                     heroCol("响应", pingMs)
@@ -153,6 +158,12 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    /// 只留 host:port，给离线时当标题用
+    private var bareBase: String {
+        Session.base.replacingOccurrences(of: "http://", with: "")
+            .replacingOccurrences(of: "https://", with: "")
     }
 
     private var pingMs: String {
@@ -273,9 +284,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 0) {
                 CardHead(icon: "iphone", title: "设备信息", sub: "型号、固件、运行时长")
 
-                plainRow(icon: "house", title: "主机名",
-                         note: "局域网里认的就是这个名字", value: board.str("hostname"))
-                Hairline(inset: 62)
+                // 主机名已在上面的 hero 大标题里，这里不再重复
                 plainRow(icon: "desktopcomputer", title: "型号",
                          note: "主板与平台", value: board.str("model"))
                 Hairline(inset: 62)
@@ -318,8 +327,6 @@ struct SettingsView: View {
         Card {
             VStack(alignment: .leading, spacing: 0) {
                 CardHead(icon: "paintpalette", title: "外观", sub: "深浅色")
-                    .padding(.bottom, 8)
-                Hairline(inset: 62)
                 row(icon: "circle.lefthalf.filled", title: "主题",
                     note: "跟随系统会随手机的深浅色自动切换",
                     value: Appearance.name(app.theme)) {
@@ -426,7 +433,6 @@ struct SettingsView: View {
         Card {
             VStack(alignment: .leading, spacing: 0) {
                 CardHead(icon: "power", title: "电源控制", sub: "重启与关机都会短暂断网")
-                    .padding(.bottom, 4)
 
                 row(icon: "arrow.triangle.2.circlepath", title: "重启网络服务",
                     note: "只重拨 WAN，通常 10 秒内恢复") {
@@ -450,8 +456,6 @@ struct SettingsView: View {
         Card {
             VStack(alignment: .leading, spacing: 0) {
                 CardHead(icon: "lock.shield", title: "安全", sub: "两个密码，别记混")
-                    .padding(.bottom, 8)
-                Hairline(inset: 62)
                 row(icon: "key", title: "修改 App 登录密码",
                     note: "只管这个 App") {
                     showPwd = true

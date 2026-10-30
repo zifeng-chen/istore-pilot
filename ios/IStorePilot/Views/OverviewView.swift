@@ -10,6 +10,8 @@ struct OverviewView: View {
     @State private var goWan = false
     @State private var detail: PortDetail?
     @Environment(\.barAxis) private var axis
+    @Environment(\.tabIndex) private var tabIndex
+    @EnvironmentObject private var chrome: TabChrome
 
     /// 每个网口最近 32 次采样，约 1 分半。
     /// 放这里而不是 PortTile 内部：tile 是 struct，每帧重建，存不住历史。
@@ -73,6 +75,10 @@ struct OverviewView: View {
             .onReceive(secTick) { now = $0 }
             .navigationDestination(isPresented: $goHardware) { HardwareView() }
             .navigationDestination(isPresented: $goWan) { WanView() }
+            // 推进到二级页时把底部页签收起来（横条画在导航栈外面，它自己不知道）
+            .onAppear { chrome.set(tabIndex, goHardware || goWan) }
+            .onChange(of: goHardware) { v in chrome.set(tabIndex, v || goWan) }
+            .onChange(of: goWan) { v in chrome.set(tabIndex, v || goHardware) }
             .alert(item: $popup) { p in
                 Alert(title: Text(p.title), message: Text(p.body),
                       dismissButton: .default(Text("好")))
@@ -120,8 +126,8 @@ struct OverviewView: View {
                 Rectangle()
                     .fill(C.heroFg.opacity(0.18))
                     .frame(height: 0.7)
-                    .padding(.top, 16)
-                    .padding(.bottom, 14)
+                    .padding(.top, 10)
+                    .padding(.bottom, 10)
 
                 HStack(spacing: 0) {
                     rateBlock(icon: "arrow.down", label: "当前下载", text: F.rate(up))
@@ -131,7 +137,7 @@ struct OverviewView: View {
 
                 // 趋势图直接长在 hero 里，与安卓一致：网快不快是同一件事，
                 // 拆成下面另一张卡看得来回对照
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 0) {
                     HStack {
                         Text("流量趋势 · 最近 2 分钟")
                             .font(.system(size: 11))
@@ -139,16 +145,20 @@ struct OverviewView: View {
                         Spacer()
                         Text(peakText)
                             .font(.system(size: 11))
-                            .foregroundStyle(C.heroFgSoft)
+                            .foregroundStyle(C.heroFgSoft.opacity(0.85))
                     }
+                    .padding(.bottom, 10)
                     Sparkline(down: rxHist, up: txHist, height: 88)
+                    // 图例离图远一点：贴着画布时总被当成图的一部分，
+                    // 手指也容易点在图例上以为能切换曲线
                     HStack(spacing: 14) {
                         legendDot(color: C.primary, text: "下载")
                         legendDot(color: C.warn, text: "上传")
                         Spacer()
                     }
+                    .padding(.top, 12)
                 }
-                .padding(.top, 14)
+                .padding(.top, 16)
             }
         }
     }
@@ -192,10 +202,10 @@ struct OverviewView: View {
 
     private func legendDot(color: Color, text: String) -> some View {
         HStack(spacing: 5) {
-            Circle().fill(color).frame(width: 7, height: 7)
+            Circle().fill(color).frame(width: 6, height: 6)
             Text(text)
-                .font(.system(size: 10.5))
-                .foregroundStyle(C.heroFgSoft)
+                .font(.system(size: 10))
+                .foregroundStyle(C.heroFgSoft.opacity(0.85))
         }
     }
 

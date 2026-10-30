@@ -51,7 +51,7 @@ struct DevicesView: View {
                         // 就是 55 层圆角和 55 层投影，又卡又碎
                         ListGroup {
                             ForEach(Array(shown.enumerated()), id: \.offset) { idx, dv in
-                                NavigationLink(value: dv.str("mac")) {
+                                NavigationLink(value: SecurityView.Route.device(dv.str("mac"))) {
                                     row(dv)
                                 }
                                 .buttonStyle(.plain)
@@ -77,9 +77,6 @@ struct DevicesView: View {
                 filter = initialFilter
                 didInit = true
             }
-        }
-        .navigationDestination(for: String.self) { mac in
-            DeviceDetailView(mac: mac, seed: all.first { $0.str("mac") == mac } ?? [:])
         }
         .task { await load() }
         .onReceive(tick) { _ in Task { await load() } }

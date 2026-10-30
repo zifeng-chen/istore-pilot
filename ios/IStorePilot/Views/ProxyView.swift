@@ -26,6 +26,9 @@ struct ProxyView: View {
     /// 刚测出来的延迟，优先级高于接口里带的历史值
     @State private var tested: [String: Int] = [:]
 
+    @Environment(\.tabIndex) private var tabIndex
+    @EnvironmentObject private var chrome: TabChrome
+
     private let tick = Timer.publish(every: 6, on: .main, in: .common).autoconnect()
 
     private var backends: [J] { d.objs("backends") }
@@ -69,6 +72,8 @@ struct ProxyView: View {
             .navigationBarTitleDisplayMode(.large)
             .navBarChrome()
             .navigationDestination(isPresented: $goSubs) { SubscriptionView() }
+            .onAppear { chrome.set(tabIndex, goSubs) }
+            .onChange(of: goSubs) { chrome.set(tabIndex, $0) }
             .task { await load() }
             .onReceive(tick) { _ in Task { await load() } }
             .sheet(isPresented: $showCfg) {
@@ -141,18 +146,27 @@ struct ProxyView: View {
                     }
                 }
                 .padding(.top, 4)
+                .padding(.horizontal, -8)
             }
         }
     }
 
-    /// hero 深色底上的小胶囊：白字 + 半透明底
+    /// hero 深色底上的小胶囊。
+    ///
+    /// 「运行中」用实心薄荷色 + 深色字，未运行只是描边 —— 原来两者都是
+    /// 一层半透明白，两个后端的名字又都压到 62% 灰，扫一眼分不出谁在跑。
     private func heroPill(_ text: String, on: Bool) -> some View {
         Text(text)
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(C.heroFg.opacity(on ? 1 : 0.78))
-            .padding(.horizontal, 9).padding(.vertical, 3)
-            .background(C.heroFg.opacity(on ? 0.22 : 0.10))
-            .clipShape(Capsule())
+            .font(.system(size: 11, weight: on ? .semibold : .medium))
+            .foregroundStyle(on ? Color(hex: 0x073128) : C.heroFg.opacity(0.72))
+            .padding(.horizontal, 10).padding(.vertical, 3.5)
+            .background {
+                if on {
+                    Capsule().fill(Color(hex: 0x5FE7C4))
+                } else {
+                    Capsule().strokeBorder(C.heroFg.opacity(0.28), lineWidth: 0.9)
+                }
+            }
     }
 
     private func backendRow(_ b: J) -> some View {
@@ -169,25 +183,40 @@ struct ProxyView: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "power")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(C.heroFg.opacity(on ? 1 : 0.62))
+                    .font(.system(size: 13, weight: on ? .semibold : .medium))
+                    .foregroundStyle(on ? Color(hex: 0x073128) : C.heroFg.opacity(0.55))
                     .frame(width: 30, height: 30)
-                    .background(C.heroFg.opacity(on ? 0.22 : 0.10))
-                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .background {
+                        if on {
+                            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                .fill(Color(hex: 0x5FE7C4))
+                        } else {
+                            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                .fill(C.heroFg.opacity(0.09))
+                        }
+                    }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(name)
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(C.heroFg.opacity(on ? 1 : 0.62))
+                        .font(.system(size: 15, weight: on ? .semibold : .medium))
+                        .foregroundStyle(on ? C.heroFg : C.heroFg.opacity(0.55))
                     if !sub.isEmpty {
                         Text(sub)
                             .font(.system(size: 11.5))
-                            .foregroundStyle(C.heroFg.opacity(0.62))
+                            .foregroundStyle(C.heroFg.opacity(on ? 0.72 : 0.45))
                     }
                 }
                 Spacer(minLength: 6)
                 heroPill(on ? "运行中" : (installed ? "未运行" : "未安装"), on: on)
             }
+            .padding(.horizontal, 8)
             .padding(.vertical, 10)
+            // 正在跑的那个垫一层浅底：光靠文字深浅在深绿渐变上不够看
+            .background {
+                if on {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(C.heroFg.opacity(0.10))
+                }
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
