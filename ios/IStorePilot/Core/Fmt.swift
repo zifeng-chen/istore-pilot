@@ -21,6 +21,20 @@ extension F {
         return bytes(bps) + "/s"
     }
 
+    /// 图表 Y 轴刻度用的极短写法：0 / 128K / 4.2M。
+    /// 与安卓 `Fmt.bpsAxis` 逐档对齐，两端刻度文字必须一模一样，
+    /// 否则同一张图在手机上看到的量程读法会不同。
+    static func bpsAxis(_ v: Double) -> String {
+        guard v.isFinite, v > 0 else { return "0" }
+        if v < 1024 { return String(format: "%.0fB", v) }
+        if v < 1024 * 1024 { return String(format: "%.0fK", v / 1024) }
+        if v < 1024 * 1024 * 1024 {
+            let m = v / (1024 * 1024)
+            return String(format: m >= 10 ? "%.0fM" : "%.1fM", m)
+        }
+        return String(format: "%.1fG", v / (1024 * 1024 * 1024))
+    }
+
     /// hero 三列并排时的极短时长：6 天 / 23 小时 / 45 分。
     /// 每列只有屏宽 1/3，「6 天 5 小时」在那里必被截断。
     static func shortDur(_ sec: Double) -> String {

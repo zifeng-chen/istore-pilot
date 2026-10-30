@@ -134,8 +134,8 @@ struct OverviewView: View {
                     }
                     Sparkline(down: rxHist, up: txHist, height: 88)
                     HStack(spacing: 14) {
-                        legendDot(color: Color(hex: 0x5FE7C4), text: "下载")
-                        legendDot(color: Color(hex: 0xFFC46B), text: "上传")
+                        legendDot(color: C.primary, text: "下载")
+                        legendDot(color: C.warn, text: "上传")
                         Spacer()
                     }
                 }

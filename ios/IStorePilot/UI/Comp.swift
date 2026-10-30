@@ -1,3 +1,4 @@
+import Charts
 import SwiftUI
 
 // MARK: - 卡片
@@ -50,118 +51,69 @@ struct Hairline: View {
 
 // MARK: - 流量曲线
 
-/// hero 卡里的流量趋势：两条折线 + 四条横向网格线。
-/// 只描线不填充 —— 深色底上填充会盖住另一条线。
+/// hero 卡里的流量趋势（Swift Charts）。
+///
+/// 之前是手写的 Path 逐点连折线；换成系统框架后，平滑、坐标轴刻度、
+/// 渐变填充都由 Swift Charts 负责，不再自己算切线。
+/// 视觉参数与安卓 `widget/TrendChart.java` 对齐：左轴 4 个刻度、虚线网格、
+/// 下行线带 28%→2% 的渐变，上行线不填充。
 struct Sparkline: View {
     let down: [Double]
     let up: [Double]
     var height: CGFloat = 88
 
+    /// 两条线共用一个 x 轴，长度不一致时以长的为准，缺的补 0
+    private var n: Int { max(down.count, up.count) }
+    private var peak: Double { max(down.max() ?? 0, up.max() ?? 0, 1) }
+
     var body: some View {
-        GeometryReader { geo in
-            let peak = max(down.max() ?? 0, up.max() ?? 0, 1)
-            ZStack(alignment: .topLeading) {
-                VStack(spacing: 0) {
-                    ForEach(0..<4, id: \.self) { i in
-                        Rectangle()
-                            .fill(Color.white.opacity(0.10))
-                            .frame(height: 0.5)
-                        if i < 3 { Spacer(minLength: 0) }
-                    }
-                }
-                // 曲线下方的极淡渐变。只填 down 一条，透明度压到 0.20 ——
-                // 再高就会把上面那条琥珀色的上行线盖掉（原来一直不填就是为了这个）
-                curve(down, size: geo.size, peak: peak, closed: true)
-                    .fill(LinearGradient(
-                        colors: [Color(hex: 0x5FE7C4).opacity(0.20),
-                                 Color(hex: 0x5FE7C4).opacity(0.02)],
+        Chart {
+            // 先铺渐变再画线：顺序反了填充会盖住线
+            ForEach(0..<n, id: \.self) { i in
+                AreaMark(x: .value("t", i), y: .value("bps", value(down, i)))
+                    .interpolationMethod(.monotone)
+                    .foregroundStyle(LinearGradient(
+                        colors: [C.primary.opacity(0.28), C.primary.opacity(0.02)],
                         startPoint: .top, endPoint: .bottom))
-                curve(up, size: geo.size, peak: peak, closed: false)
-                    .stroke(Color(hex: 0xFFC46B).opacity(0.85),
-                            style: StrokeStyle(lineWidth: 1.3, lineCap: .round, lineJoin: .round))
-                curve(down, size: geo.size, peak: peak, closed: false)
-                    .stroke(Color(hex: 0x5FE7C4),
-                            style: StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round))
+            }
+            ForEach(0..<n, id: \.self) { i in
+                LineMark(x: .value("t", i), y: .value("bps", value(up, i)),
+                         series: .value("s", "up"))
+                    .interpolationMethod(.monotone)
+                    .foregroundStyle(C.warn)
+                    .lineStyle(StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round))
+            }
+            ForEach(0..<n, id: \.self) { i in
+                LineMark(x: .value("t", i), y: .value("bps", value(down, i)),
+                         series: .value("s", "down"))
+                    .interpolationMethod(.monotone)
+                    .foregroundStyle(C.primary)
+                    .lineStyle(StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round))
             }
         }
+        .chartLegend(.hidden)
+        .chartXAxis(.hidden)
+        .chartYScale(domain: 0...peak)
+        .chartYAxis {
+            AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { v in
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.6, dash: [6, 7]))
+                    .foregroundStyle(C.heroFg.opacity(0.16))
+                AxisValueLabel {
+                    if let bps = v.as(Double.self) {
+                        Text(F.bpsAxis(bps))
+                            .font(.system(size: 9))
+                            .foregroundStyle(C.heroFg.opacity(0.55))
+                    }
+                }
+            }
+        }
+        // 上下各留 3pt，否则最顶/最底的刻度文字会被画布切掉一半
+        .chartPlotStyle { $0.padding(.vertical, 3) }
         .frame(height: height)
     }
 
-    /// 单调三次插值（Fritsch–Carlson），把折线画成平滑曲线。
-    ///
-    /// 为什么不用 Catmull-Rom：它会在峰值外侧过冲 —— 流量曲线会鼓到网格上方，
-    /// 甚至掉到 0 以下，看着像数据坏了。单调插值保证把切线夹在相邻斜率的
-    /// 3 倍以内，极值点既不会被超过，也不会凭空多出波浪。
-    ///
-    /// `closed == true` 时额外沿基线闭合，用来做曲线下方的渐变填充。
-    private func curve(_ data: [Double], size: CGSize, peak: Double, closed: Bool) -> Path {
-        Path { p in
-            guard data.count > 1, size.width > 0 else { return }
-            let stepX = size.width / CGFloat(data.count - 1)
-            var pts: [CGPoint] = []
-            pts.reserveCapacity(data.count)
-            for (i, v) in data.enumerated() {
-                let ratio = min(1, max(0, v / peak))
-                let y = size.height - CGFloat(ratio) * (size.height - 6) - 3
-                pts.append(CGPoint(x: CGFloat(i) * stepX, y: y))
-            }
-
-            let n = pts.count
-            guard n > 2 else {
-                // 只有两个点就是一条直线，插值没有意义
-                p.move(to: pts[0])
-                p.addLine(to: pts[1])
-                if closed {
-                    p.addLine(to: CGPoint(x: pts[1].x, y: size.height))
-                    p.addLine(to: CGPoint(x: pts[0].x, y: size.height))
-                    p.closeSubpath()
-                }
-                return
-            }
-
-            // 每段的斜率
-            var d = [CGFloat](repeating: 0, count: n - 1)
-            for i in 0..<(n - 1) {
-                d[i] = (pts[i + 1].y - pts[i].y) / (pts[i + 1].x - pts[i].x)
-            }
-            // 每个点的切线：首尾取相邻斜率，中间取两侧平均
-            var m = [CGFloat](repeating: 0, count: n)
-            m[0] = d[0]
-            m[n - 1] = d[n - 2]
-            for i in 1..<(n - 1) {
-                m[i] = (d[i - 1] + d[i]) / 2
-            }
-            // 夹紧切线，这是「单调」的关键一步
-            for i in 0..<(n - 1) {
-                if d[i] == 0 {
-                    m[i] = 0
-                    m[i + 1] = 0
-                    continue
-                }
-                let a = m[i] / d[i]
-                let b = m[i + 1] / d[i]
-                let s = a * a + b * b
-                if s > 9 {
-                    let t = 3 / s.squareRoot()
-                    m[i] = t * a * d[i]
-                    m[i + 1] = t * b * d[i]
-                }
-            }
-
-            p.move(to: pts[0])
-            for i in 0..<(n - 1) {
-                let dx = pts[i + 1].x - pts[i].x
-                // 控制点放在每段 1/3 处，纵坐标按切线走
-                let c1 = CGPoint(x: pts[i].x + dx / 3, y: pts[i].y + m[i] * dx / 3)
-                let c2 = CGPoint(x: pts[i + 1].x - dx / 3, y: pts[i + 1].y - m[i + 1] * dx / 3)
-                p.addCurve(to: pts[i + 1], control1: c1, control2: c2)
-            }
-            if closed {
-                p.addLine(to: CGPoint(x: pts[n - 1].x, y: size.height))
-                p.addLine(to: CGPoint(x: pts[0].x, y: size.height))
-                p.closeSubpath()
-            }
-        }
+    private func value(_ a: [Double], _ i: Int) -> Double {
+        i < a.count ? a[i] : 0
     }
 }
 
@@ -418,37 +370,30 @@ struct Hero<Content: View>: View {
 
 // MARK: - 分段控件
 
+/// 分段选择。原来是自己拼 HStack + 圆角滑块 + onTapGesture，
+/// 换成系统的 `Picker(.segmented)` —— 外观本来就是同一套（灰槽 + 白滑块），
+/// 换来的是系统的按压反馈、VoiceOver 支持、动态字体和选中动画。
+/// 保留 `Seg` 这个外壳是为了两个调用方（设备筛选、AGH 日志筛选）不用改。
 struct Seg: View {
     let items: [String]
     @Binding var index: Int
     var onChange: ((Int) -> Void)? = nil
 
     var body: some View {
-        HStack(spacing: 3) {
+        Picker("", selection: Binding(
+            get: { index },
+            set: { v in
+                guard v != index else { return }
+                index = v
+                onChange?(v)
+            }
+        )) {
             ForEach(items.indices, id: \.self) { i in
-                let on = i == index
-                Text(items[i])
-                    .font(.system(size: 13.5, weight: on ? .semibold : .regular))
-                    .foregroundStyle(on ? C.textPrimary : C.textSecondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 7)
-                    .background(
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .fill(on ? C.segmentThumb : Color.clear)
-                            .shadow(color: on ? Color.black.opacity(0.07) : .clear,
-                                    radius: 1.5, y: 0.6)
-                    )
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        guard i != index else { return }
-                        index = i
-                        onChange?(i)
-                    }
+                Text(items[i]).tag(i)
             }
         }
-        .padding(3)
-        .background(C.segmentTrack)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .pickerStyle(.segmented)
+        .labelsHidden()
     }
 }
 

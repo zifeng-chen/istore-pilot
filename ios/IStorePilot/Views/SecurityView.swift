@@ -239,7 +239,11 @@ struct SecurityView: View {
         let b = bps(dv)
         let name = [dv.str("label"), dv.str("hostname"), dv.str("vendor"), dv.str("ip"), dv.str("mac")]
             .first { !$0.isEmpty } ?? "—"
-        return HStack(spacing: 10) {
+        return Button {
+            subFilter = 0
+            sub = 1
+        } label: {
+            HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(name)
                     .font(F.body)
@@ -260,12 +264,10 @@ struct SecurityView: View {
                 }
             }
         }
-        .padding(.vertical, 9)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            subFilter = 0
-            sub = 1
+            .padding(.vertical, 9)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 
     // MARK: - 应用流量卡

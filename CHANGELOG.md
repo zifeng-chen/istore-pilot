@@ -15,6 +15,37 @@
 
 ## 未发布
 
+### 改动 · iOS 图表换成 Swift Charts，并做系统控件审查
+
+**图表**：`Sparkline` 从手写 Path 整体换成 Swift Charts（部署目标 16.0，系统自带）。
+参数逐项对齐安卓 `widget/TrendChart.java`：
+
+| 项 | 安卓 | iOS 现在 |
+|---|---|---|
+| 曲线 | CUBIC_BEZIER，强度 0.16 | `.interpolationMethod(.monotone)` |
+| 线宽 | 1.8 | 1.8 |
+| 下行线填充 | 28% → 2% 渐变 | 同 |
+| 网格 | 虚线 6/7，宽 0.6，`heroFg` 16% | `StrokeStyle(dash: [6, 7])`，同色同透明度 |
+| 刻度 | 左轴 4 个，9sp，`bpsAxis` | `AxisMarks(desiredCount: 4)`，9pt，`F.bpsAxis` |
+| 横轴 | 关 | `.chartXAxis(.hidden)` |
+
+`F.bpsAxis` 是新补的（与安卓逐档一致：B / K / M / G），两端刻度文字必须一模一样。
+
+**系统控件审查**（全项目扫了一遍）：
+
+- `Seg` 分段控件：原来是 HStack + 圆角滑块 + `onTapGesture`，
+  改用系统 `Picker(.segmented)`。保留 `Seg` 外壳，两个调用方（设备筛选、AGH 日志筛选）零改动
+- `SecurityView.recentRow` 行点击：`onTapGesture` 改成 `Button` + `.buttonStyle(.plain)`，
+  外观不变，补上按压反馈和 VoiceOver
+- `ProxyView` 的折叠分组行仍是 `onTapGesture`：里面有嵌套的「测速」按钮，
+  直接套 Button 会变成按钮套按钮，要换得用 `DisclosureGroup`（视觉会变），**留着待定**
+
+**没换、也不该换的**：`PortGrid` 的 RJ45 接口是纯装饰图形；
+`MiniSpark` 是端口行里 12pt 的迷你曲线，用 Canvas 比每行挂一个 Chart 划算得多。
+
+**样式对齐核对**：把 iOS `Theme.swift` 的 `dyn(浅, 深)` 与安卓 `colors.xml` + `values-night`
+逐项比了一遍，**25 项全部一致、0 处偏差**；卡片圆角两端都是 22。
+
 ### 改动 · iOS 流量曲线改用单调三次插值
 
 原来 `Sparkline` 是手写的 `Path`，逐点 `addLine(to:)` 连折线 —— 看着「太直」不是库的问题，
