@@ -69,10 +69,17 @@ struct Sparkline: View {
                         if i < 3 { Spacer(minLength: 0) }
                     }
                 }
-                line(up, size: geo.size, peak: peak)
+                // 曲线下方的极淡渐变。只填 down 一条，透明度压到 0.20 ——
+                // 再高就会把上面那条琥珀色的上行线盖掉（原来一直不填就是为了这个）
+                curve(down, size: geo.size, peak: peak, closed: true)
+                    .fill(LinearGradient(
+                        colors: [Color(hex: 0x5FE7C4).opacity(0.20),
+                                 Color(hex: 0x5FE7C4).opacity(0.02)],
+                        startPoint: .top, endPoint: .bottom))
+                curve(up, size: geo.size, peak: peak, closed: false)
                     .stroke(Color(hex: 0xFFC46B).opacity(0.85),
                             style: StrokeStyle(lineWidth: 1.3, lineCap: .round, lineJoin: .round))
-                line(down, size: geo.size, peak: peak)
+                curve(down, size: geo.size, peak: peak, closed: false)
                     .stroke(Color(hex: 0x5FE7C4),
                             style: StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round))
             }
@@ -80,19 +87,79 @@ struct Sparkline: View {
         .frame(height: height)
     }
 
-    private func line(_ data: [Double], size: CGSize, peak: Double) -> Path {
+    /// 单调三次插值（Fritsch–Carlson），把折线画成平滑曲线。
+    ///
+    /// 为什么不用 Catmull-Rom：它会在峰值外侧过冲 —— 流量曲线会鼓到网格上方，
+    /// 甚至掉到 0 以下，看着像数据坏了。单调插值保证把切线夹在相邻斜率的
+    /// 3 倍以内，极值点既不会被超过，也不会凭空多出波浪。
+    ///
+    /// `closed == true` 时额外沿基线闭合，用来做曲线下方的渐变填充。
+    private func curve(_ data: [Double], size: CGSize, peak: Double, closed: Bool) -> Path {
         Path { p in
             guard data.count > 1, size.width > 0 else { return }
             let stepX = size.width / CGFloat(data.count - 1)
+            var pts: [CGPoint] = []
+            pts.reserveCapacity(data.count)
             for (i, v) in data.enumerated() {
-                let x = CGFloat(i) * stepX
                 let ratio = min(1, max(0, v / peak))
                 let y = size.height - CGFloat(ratio) * (size.height - 6) - 3
-                if i == 0 {
-                    p.move(to: CGPoint(x: x, y: y))
-                } else {
-                    p.addLine(to: CGPoint(x: x, y: y))
+                pts.append(CGPoint(x: CGFloat(i) * stepX, y: y))
+            }
+
+            let n = pts.count
+            guard n > 2 else {
+                // 只有两个点就是一条直线，插值没有意义
+                p.move(to: pts[0])
+                p.addLine(to: pts[1])
+                if closed {
+                    p.addLine(to: CGPoint(x: pts[1].x, y: size.height))
+                    p.addLine(to: CGPoint(x: pts[0].x, y: size.height))
+                    p.closeSubpath()
                 }
+                return
+            }
+
+            // 每段的斜率
+            var d = [CGFloat](repeating: 0, count: n - 1)
+            for i in 0..<(n - 1) {
+                d[i] = (pts[i + 1].y - pts[i].y) / (pts[i + 1].x - pts[i].x)
+            }
+            // 每个点的切线：首尾取相邻斜率，中间取两侧平均
+            var m = [CGFloat](repeating: 0, count: n)
+            m[0] = d[0]
+            m[n - 1] = d[n - 2]
+            for i in 1..<(n - 1) {
+                m[i] = (d[i - 1] + d[i]) / 2
+            }
+            // 夹紧切线，这是「单调」的关键一步
+            for i in 0..<(n - 1) {
+                if d[i] == 0 {
+                    m[i] = 0
+                    m[i + 1] = 0
+                    continue
+                }
+                let a = m[i] / d[i]
+                let b = m[i + 1] / d[i]
+                let s = a * a + b * b
+                if s > 9 {
+                    let t = 3 / s.squareRoot()
+                    m[i] = t * a * d[i]
+                    m[i + 1] = t * b * d[i]
+                }
+            }
+
+            p.move(to: pts[0])
+            for i in 0..<(n - 1) {
+                let dx = pts[i + 1].x - pts[i].x
+                // 控制点放在每段 1/3 处，纵坐标按切线走
+                let c1 = CGPoint(x: pts[i].x + dx / 3, y: pts[i].y + m[i] * dx / 3)
+                let c2 = CGPoint(x: pts[i + 1].x - dx / 3, y: pts[i + 1].y - m[i + 1] * dx / 3)
+                p.addCurve(to: pts[i + 1], control1: c1, control2: c2)
+            }
+            if closed {
+                p.addLine(to: CGPoint(x: pts[n - 1].x, y: size.height))
+                p.addLine(to: CGPoint(x: pts[0].x, y: size.height))
+                p.closeSubpath()
             }
         }
     }
