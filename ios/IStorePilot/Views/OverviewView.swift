@@ -110,16 +110,24 @@ struct OverviewView: View {
                     .font(F.tiny)
                     .foregroundStyle(C.heroFgSoft)
 
-                // 三栏：下载 / 上传 / 在线设备。第三栏是安卓 hero 里就有的 ——
-                // 「现在有多少台设备在用这条宽带」和速率是同一件事的两面
+                // 横线在上、三栏在下 —— 与安卓 hero 一致（`heroLine` 是一条通栏的
+                // 0.7dp 白线，不是三栏之间的竖线）。
+                //
+                // 这两条竖线是 iOS 自己加的，安卓没有。加的时候三栏还是
+                // 「图标 | 标签上、数值下」挤在一起的两列，竖线看着像分隔；
+                // 改成数值独占一行后，每栏都是一个左对齐的字块，竖线就只是
+                // 贴在「当前上传」「在线设备」左边的一根孤线，反而像画错了。
+                Rectangle()
+                    .fill(C.heroFg.opacity(0.18))
+                    .frame(height: 0.7)
+                    .padding(.top, 16)
+                    .padding(.bottom, 14)
+
                 HStack(spacing: 0) {
                     rateBlock(icon: "arrow.down", label: "当前下载", text: F.rate(up))
-                    Rectangle().fill(Color.white.opacity(0.18)).frame(width: 0.8, height: 34)
                     rateBlock(icon: "arrow.up", label: "当前上传", text: F.rate(down))
-                    Rectangle().fill(Color.white.opacity(0.18)).frame(width: 0.8, height: 34)
                     rateBlock(icon: "wifi", label: "在线设备", text: "\(onlineCount)")
                 }
-                .padding(.top, 2)
 
                 // 趋势图直接长在 hero 里，与安卓一致：网快不快是同一件事，
                 // 拆成下面另一张卡看得来回对照
@@ -164,7 +172,7 @@ struct OverviewView: View {
                     .lineLimit(1)
             }
             Text(text)
-                .font(F.num(16, .semibold))
+                .font(F.num(17, .semibold))
                 .foregroundStyle(C.heroFg)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)

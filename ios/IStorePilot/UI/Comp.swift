@@ -133,6 +133,15 @@ struct Sparkline: View {
         // 上下各留 3pt，否则最顶/最底的刻度文字会被画布切掉一半
         .chartPlotStyle { $0.padding(.vertical, 3) }
         .frame(height: height)
+        // 刚打开时只有 1 个采样点，Chart 画不出一条线，整块只剩网格 ——
+        // 看着像坏了。给一句说明，等两个点到位自然消失
+        .overlay {
+            if n < 2 {
+                Text("正在采样…")
+                    .font(.system(size: 11))
+                    .foregroundStyle(C.heroFg.opacity(0.55))
+            }
+        }
     }
 
     private func value(_ a: [Double], _ i: Int) -> Double {
