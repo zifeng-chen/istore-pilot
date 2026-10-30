@@ -37,7 +37,6 @@ public class SettingsFragment extends BaseFragment {
     /** hero 卡：连接状态 / Agent 版本 / 延迟 */
     private TextView tvHeroState;
     private TextView tvHeroBadge;
-    private TextView tvHeroMeta;
     /** hero 大标题：在线时是主机名，拿不到才退回服务器地址 */
     private TextView tvHeroHost;
 
@@ -86,7 +85,18 @@ public class SettingsFragment extends BaseFragment {
         Ui.Card hero = Ui.gradient(c, R.color.hero_from, R.color.hero_to);
         hero.setPadding(Ui.dp(c, 20), Ui.dp(c, 18), Ui.dp(c, 20), Ui.dp(c, 16));
 
-        LinearLayout topRow = Ui.row(c);
+        // 左「这是谁」：状态 / 主机名 / 地址；右「它现在怎么样」：三项体征。
+        // 原来是「状态行 + 大标题 + meta + 地址行 + 分隔线 + 三栏指标」六段竖排，
+        // 三枚胶囊挤在顶行，窄屏上像工具栏，不像一张信息卡。
+        LinearLayout top = Ui.row(c);
+        top.setGravity(Gravity.TOP);
+
+        LinearLayout idCol = Ui.column(c);
+        top.addView(idCol, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        LinearLayout stateRow = Ui.row(c);
+        stateRow.setGravity(Gravity.CENTER_VERTICAL);
         View dot = new View(c);
         GradientDrawable hd = new GradientDrawable();
         hd.setShape(GradientDrawable.OVAL);
@@ -95,33 +105,21 @@ public class SettingsFragment extends BaseFragment {
         LinearLayout.LayoutParams hdlp = new LinearLayout.LayoutParams(
                 Ui.dp(c, 7), Ui.dp(c, 7));
         hdlp.rightMargin = Ui.dp(c, 7);
-        topRow.addView(dot, hdlp);
+        stateRow.addView(dot, hdlp);
 
         tvHeroState = Ui.heroNote(c, "检测中…", 1.0f);
         tvHeroState.setTextSize(12.5f);
         tvHeroState.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        topRow.addView(tvHeroState);
-        topRow.addView(new View(c), new LinearLayout.LayoutParams(0, 1, 1f));
+        stateRow.addView(tvHeroState);
 
-        tvHeroBadge = Ui.heroNote(c, "—", 0.86f);
-        tvHeroBadge.setTextSize(11f);
-        tvHeroBadge.setPadding(Ui.dp(c, 8), Ui.dp(c, 3), Ui.dp(c, 8), Ui.dp(c, 3));
-        GradientDrawable bb = new GradientDrawable();
-        bb.setCornerRadius(Ui.dp(c, 100));
-        bb.setColor(Ui.alpha(Ui.color(c, R.color.hero_fg), 0.16f));
-        tvHeroBadge.setBackground(bb);
-        topRow.addView(tvHeroBadge);
+        // 版本号跟着状态走：不再单独做成胶囊，胶囊留给真正要点的东西
+        tvHeroBadge = Ui.heroNote(c, "", 0.86f);
+        tvHeroBadge.setTextSize(11.5f);
+        LinearLayout.LayoutParams bglp = new LinearLayout.LayoutParams(wrap, wrap);
+        bglp.leftMargin = Ui.dp(c, 6);
+        stateRow.addView(tvHeroBadge, bglp);
+        idCol.addView(stateRow);
 
-        // 主题放 hero 右上角：它只影响这个 App 的长相，
-        // 原来单独占「外观」卡的第一行，和网络、维护那些真配置混在一起
-        tvHeroTheme = heroChip(c, Theme.name(c), this::pickTheme);
-        LinearLayout.LayoutParams thlp = new LinearLayout.LayoutParams(wrap, wrap);
-        thlp.leftMargin = Ui.dp(c, 6);
-        topRow.addView(tvHeroTheme, thlp);
-        hero.addView(topRow);
-
-        // 大标题放主机名（拿不到才退回地址）：地址在下面「连接」卡里有一行，
-        // 主机名原来又在「设备信息」卡里重复一次 —— 同一件事说三遍
         tvHeroHost = Ui.text(c,
                 Session.base(c).replaceFirst("^https?://", ""), 24f, R.color.hero_fg);
         tvHeroHost.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
@@ -131,54 +129,47 @@ public class SettingsFragment extends BaseFragment {
         tvHeroHost.setEllipsize(android.text.TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, wrap);
-        hlp.topMargin = Ui.dp(c, 12);
-        hero.addView(tvHeroHost, hlp);
-
-        tvHeroMeta = Ui.heroNote(c, "正在检测连接…", 0.86f);
-        tvHeroMeta.setPadding(0, Ui.dp(c, 5), 0, 0);
-        tvHeroMeta.setSingleLine(true);
-        tvHeroMeta.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        hero.addView(tvHeroMeta);
-
-        // 连接卡并进 hero：地址、重新登录、清缓存都是「这台连接」的属性，
-        // 原来单独一张卡占掉半屏，却只有三行
-        LinearLayout connRow = Ui.row(c);
-        connRow.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams crlp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, wrap);
-        crlp.topMargin = Ui.dp(c, 10);
-        hero.addView(connRow, crlp);
+        hlp.topMargin = Ui.dp(c, 7);
+        idCol.addView(tvHeroHost, hlp);
 
         tvBase = Ui.heroNote(c,
                 Session.base(c).replaceFirst("^https?://", ""), 0.86f);
         tvBase.setTextSize(11.5f);
         tvBase.setSingleLine(true);
         tvBase.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        connRow.addView(tvBase, new LinearLayout.LayoutParams(0, wrap, 1f));
+        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, wrap);
+        blp.topMargin = Ui.dp(c, 3);
+        idCol.addView(tvBase, blp);
 
-        TextView heroRelogin = heroChip(c, "重新登录", this::relogin);
-        LinearLayout.LayoutParams hl1 = new LinearLayout.LayoutParams(wrap, wrap);
-        hl1.leftMargin = Ui.dp(c, 6);
-        connRow.addView(heroRelogin, hl1);
-        TextView heroClear = heroChip(c, "清缓存", this::clearCache);
-        LinearLayout.LayoutParams hl2 = new LinearLayout.LayoutParams(wrap, wrap);
-        hl2.leftMargin = Ui.dp(c, 6);
-        connRow.addView(heroClear, hl2);
+        LinearLayout statCol = Ui.column(c);
+        statCol.setGravity(Gravity.END);
+        tvLatency = heroVital(c, statCol, "响应");
+        tvToken = heroVital(c, statCol, "凭证");
+        tvAgent = heroVital(c, statCol, "Agent");
+        top.addView(statCol, new LinearLayout.LayoutParams(wrap, wrap));
+        hero.addView(top);
 
         View heroLine = new View(c);
         heroLine.setBackgroundColor(Ui.alpha(Ui.color(c, R.color.hero_fg), 0.18f));
         LinearLayout.LayoutParams hllp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, Ui.dp(c, 0.7f)));
         hllp.topMargin = Ui.dp(c, 14);
-        hllp.bottomMargin = Ui.dp(c, 12);
+        hllp.bottomMargin = Ui.dp(c, 9);
         hero.addView(heroLine, hllp);
 
-        LinearLayout stats = Ui.row(c);
-        stats.setBaselineAligned(false);
-        tvLatency = heroStat(c, stats, "响应");
-        tvToken = heroStat(c, stats, "凭证");
-        tvAgent = heroStat(c, stats, "Agent");
-        hero.addView(stats);
+        // 动作压成一行文字：胶囊太抢眼，三个叠在一起会把「这是哪台机器」压住。
+        // 主题放最右 —— 它是这张卡上唯一「改长相」而不是「看状态」的东西
+        LinearLayout acts = Ui.row(c);
+        acts.setGravity(Gravity.CENTER_VERTICAL);
+        acts.addView(heroLink(c, "重新登录", this::relogin));
+        LinearLayout.LayoutParams gap1 = new LinearLayout.LayoutParams(wrap, wrap);
+        gap1.leftMargin = Ui.dp(c, 16);
+        acts.addView(heroLink(c, "清缓存", this::clearCache), gap1);
+        acts.addView(new View(c), new LinearLayout.LayoutParams(0, 1, 1f));
+        tvHeroTheme = heroLink(c, "主题 · " + Theme.name(c), this::pickTheme);
+        acts.addView(tvHeroTheme);
+        hero.addView(acts);
         root.addView(hero);
 
         // 原来「网络」页的内容挪到这里：设备列表占了那个页签，
@@ -369,37 +360,32 @@ public class SettingsFragment extends BaseFragment {
     }
 
     /** hero 里的一个小统计块：上面小字，下面数值 */
-    /** hero 深色底上的小动作：描边胶囊，不填色 —— 填色会跟「已连接」抢注意力 */
-    private TextView heroChip(Context c, String text, Runnable onClick) {
-        TextView t = Ui.heroNote(c, text, 0.92f);
-        t.setTextSize(11f);
-        t.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        t.setPadding(Ui.dp(c, 9), Ui.dp(c, 3.5f), Ui.dp(c, 9), Ui.dp(c, 3.5f));
-        t.setSingleLine(true);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setCornerRadius(Ui.dp(c, 100));
-        bg.setColor(0);
-        bg.setStroke(Math.max(1, Ui.dp(c, 0.9f)),
-                Ui.alpha(Ui.color(c, R.color.hero_fg), 0.28f));
-        t.setBackground(bg);
+    /** hero 底部的一行文字动作：不做胶囊，避免一张卡上三四个抢眼的块 */
+    private TextView heroLink(Context c, String text, Runnable onClick) {
+        TextView t = Ui.heroNote(c, text, 0.86f);
+        t.setTextSize(12f);
+        t.setPadding(Ui.dp(c, 2), Ui.dp(c, 3), Ui.dp(c, 2), Ui.dp(c, 3));
         t.setOnClickListener(v -> onClick.run());
         return t;
     }
 
-    private TextView heroStat(Context c, LinearLayout parent, String label) {
-        LinearLayout box = Ui.column(c);
+    /** 右上角的一行体征：标签 10.5、值 12.5，右对齐成一列 */
+    private TextView heroVital(Context c, LinearLayout parent, String label) {
+        LinearLayout row = Ui.row(c);
+        row.setGravity(Gravity.CENTER_VERTICAL);
         TextView l = Ui.heroNote(c, label, 0.86f);
+        l.setTextSize(10.5f);
         l.setIncludeFontPadding(false);
-        box.addView(l);
-        TextView v = Ui.text(c, "—", 16f, R.color.hero_fg);
+        row.addView(l);
+        TextView v = Ui.text(c, "—", 12.5f, R.color.hero_fg);
         v.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         v.setIncludeFontPadding(false);
-        v.setPadding(0, Ui.dp(c, 4), 0, 0);
         v.setSingleLine(true);
-        v.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        box.addView(v);
-        parent.addView(box, new LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        int w = ViewGroup.LayoutParams.WRAP_CONTENT;
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(w, w);
+        lp.leftMargin = Ui.dp(c, 7);
+        row.addView(v, lp);
+        parent.addView(row, new LinearLayout.LayoutParams(w, w));
         return v;
     }
 
@@ -454,7 +440,6 @@ public class SettingsFragment extends BaseFragment {
                 if (tvHeroState != null) {
                     tvHeroState.setText("已连接");
                     tvHeroBadge.setText(ver);
-                    tvHeroMeta.setText("响应 " + ms + " ms · 与路由器同一局域网");
                 }
             }
 
@@ -469,7 +454,6 @@ public class SettingsFragment extends BaseFragment {
                 if (tvHeroState != null) {
                     tvHeroState.setText("连不上");
                     tvHeroBadge.setText("离线");
-                    tvHeroMeta.setText(message);
                 }
             }
         });

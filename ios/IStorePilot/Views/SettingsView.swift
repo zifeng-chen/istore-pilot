@@ -118,82 +118,95 @@ struct SettingsView: View {
 
         return Hero {
             VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(ping.str("version").isEmpty ? C.heroFgSoft : Color(hex: 0x5FE7C4))
-                        .frame(width: 7, height: 7)
-                    Text(ping.str("version").isEmpty ? "连不上" : "已连接")
-                        .font(.system(size: 12.5, weight: .medium))
-                        .foregroundStyle(C.heroFg)
-                    Spacer(minLength: 6)
-                    Text(ping.str("version").isEmpty ? "离线" : "v" + ping.str("version"))
-                        .font(F.tiny)
-                        .foregroundStyle(C.heroFgSoft)
-                        .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(Color.white.opacity(0.16))
-                        .clipShape(Capsule())
-                    // 主题收进 hero 的右上角：它只影响这一个 App 的长相，
-                    // 原来单独占一张「外观」卡，和连接、网络那些真配置混在一起
-                    themeMenu
+                // 左边是「这是谁」：状态、主机名、地址；右边是「它现在怎么样」：三项体征。
+                // 原来是「状态一行 + 大标题 + 地址一行 + 分隔线 + 三栏指标」五段竖排，
+                // 三枚胶囊（版本、主题、两个动作）挤在窄屏上像工具栏，不像一张信息卡。
+                HStack(alignment: .top, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(ok ? Color(hex: 0x5FE7C4) : C.heroFgSoft)
+                                .frame(width: 7, height: 7)
+                            Text(ok ? "已连接" : "连不上")
+                                .font(.system(size: 12.5, weight: .medium))
+                                .foregroundStyle(C.heroFg)
+                            if ok {
+                                Text("v" + ping.str("version"))
+                                    .font(F.num(11.5, .regular))
+                                    .foregroundStyle(C.heroFgSoft)
+                            }
+                        }
+
+                        Text(b.str("hostname").isEmpty ? bareBase : b.str("hostname"))
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundStyle(C.heroFg)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .padding(.top, 7)
+
+                        Text(bareBase)
+                            .font(F.num(11.5, .regular))
+                            .foregroundStyle(C.heroFgSoft)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                            .padding(.top, 2)
+                    }
+                    .layoutPriority(1)
+
+                    Spacer(minLength: 8)
+
+                    VStack(alignment: .trailing, spacing: 5) {
+                        vital("响应", pingMs)
+                        vital("凭证", tokenLeft)
+                        vital("温度", hotTemp)
+                    }
                 }
 
-                // 大标题放**主机名**，不再放服务器地址：
-                // 地址在下面那行（而且只有那里能核对），主机名只在这里出现一次。
-                // 离线时拿不到主机名，退回显示试过的地址 —— 那时地址才是关键信息
-                Text(b.str("hostname").isEmpty ? bareBase : b.str("hostname"))
-                    .font(.system(size: 23, weight: .bold))
-                    .foregroundStyle(C.heroFg)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .padding(.top, 8)
+                Rectangle().fill(C.heroFg.opacity(0.18)).frame(height: 0.7)
+                    .padding(.top, 14)
+                    .padding(.bottom, 9)
 
-                // 连接卡并进 hero：地址、重新登录、清缓存都是「这台连接」的属性，
-                // 原来单独一张卡，占掉半个屏却只有三行
-                HStack(spacing: 8) {
-                    Image(systemName: "server.rack")
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(C.heroFgSoft)
-                    Text(bareBase)
-                        .font(F.num(11.5, .regular))
-                        .foregroundStyle(C.heroFgSoft)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                    Spacer(minLength: 6)
-                    heroAction("重新登录") {
+                // 动作压成一行纯文字：胶囊太抢眼，三个叠在一起把「主机的信息」压住了。
+                // 主题放最右 —— 它是这张卡上唯一「改长相」而不是「看状态」的东西
+                HStack(spacing: 16) {
+                    heroLink("重新登录") {
                         Api.onAuthFail?()
                         app.signOut()
                     }
-                    heroAction("清缓存") {
+                    heroLink("清缓存") {
                         SnapCache.shared.clear()
                         popup = Popup(title: "已清除", body: "下次进入各页面会重新从路由器读取。")
                     }
-                }
-                .padding(.top, 10)
-
-                Rectangle().fill(Color.white.opacity(0.18)).frame(height: 0.7)
-                    .padding(.top, 12)
-                    .padding(.bottom, 12)
-
-                HStack(spacing: 0) {
-                    heroCol("响应", pingMs)
-                    heroCol("凭证", tokenLeft)
-                    heroCol("温度", hotTemp)
+                    Spacer(minLength: 6)
+                    themeMenu
                 }
             }
         }
     }
 
-    /// hero 深色底上的小动作：描边胶囊，不填色 —— 填色会跟「已连接」抢注意力。
-    private func heroAction(_ title: String, _ tap: @escaping () -> Void) -> some View {
+    private var ok: Bool { !ping.str("version").isEmpty }
+
+    /// 右上角的一行体征：标签压到 10.5、值 12.5，右对齐成一列，扫一眼就知道哪项不对
+    private func vital(_ k: String, _ v: String) -> some View {
+        HStack(spacing: 7) {
+            Text(k)
+                .font(.system(size: 10.5))
+                .foregroundStyle(C.heroFgSoft)
+            Text(v)
+                .font(F.num(12.5, .semibold))
+                .foregroundStyle(C.heroFg)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+    }
+
+    private func heroLink(_ title: String, _ tap: @escaping () -> Void) -> some View {
         Button(action: tap) {
             Text(title)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(C.heroFg.opacity(0.92))
-                .padding(.horizontal, 9)
-                .padding(.vertical, 3.5)
-                .background(
-                    Capsule().strokeBorder(C.heroFg.opacity(0.28), lineWidth: 0.9)
-                )
+                .font(.system(size: 12))
+                .foregroundStyle(C.heroFgSoft)
+                .padding(.vertical, 3)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -206,7 +219,8 @@ struct SettingsView: View {
         }
     }
 
-    /// 角上的主题按钮：点开是三个选项，按钮本身只显示当前是哪一个。
+    /// 主题入口：文字形态（「主题 · 跟随系统」），点开是三个选项。
+    /// 不再用胶囊 —— 一张卡上胶囊多了就没有主次
     private var themeMenu: some View {
         Menu {
             ForEach(Array(Appearance.modes.enumerated()), id: \.offset) { i, m in
@@ -219,16 +233,13 @@ struct SettingsView: View {
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: themeIcon)
-                    .font(.system(size: 11, weight: .medium))
-                Text(Appearance.name(app.theme))
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 10.5))
+                Text("主题 · " + Appearance.name(app.theme))
+                    .font(.system(size: 12))
                     .lineLimit(1)
             }
-            .foregroundStyle(C.heroFg)
-            .padding(.horizontal, 9)
+            .foregroundStyle(C.heroFgSoft)
             .padding(.vertical, 3)
-            .background(Color.white.opacity(0.16))
-            .clipShape(Capsule())
         }
     }
 
@@ -246,22 +257,13 @@ struct SettingsView: View {
 
     private var tokenLeft: String {
         let left = Session.expiresAt - Date().timeIntervalSince1970
-        // 三列并排，长了必截断，这里用短写（F.dur 会给出「6 天 5 小时」）
+        // 右上角那一列很窄，长了必截断，这里用短写（F.shortDur 会给出「6 天 5 小时」）
         return left > 0 ? F.shortDur(left) : "已过期"
     }
 
     private var hotTemp: String {
         let t = d.objs("temperature").map { $0.dbl("celsius") }.max() ?? 0
         return t > 0 ? F.temp(t) : "—"
-    }
-
-    private func heroCol(_ k: String, _ v: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(k).font(.system(size: 10)).foregroundStyle(C.heroFgSoft)
-            Text(v).font(F.num(13.5, .semibold)).foregroundStyle(C.heroFg)
-                .lineLimit(1).minimumScaleFactor(0.75)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - 网络
