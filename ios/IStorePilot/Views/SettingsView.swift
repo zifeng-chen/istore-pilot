@@ -118,56 +118,44 @@ struct SettingsView: View {
 
         return Hero {
             VStack(alignment: .leading, spacing: 0) {
-                // 左边是「这是谁」：状态、主机名、地址；右边是「它现在怎么样」：三项体征。
-                // 原来是「状态一行 + 大标题 + 地址一行 + 分隔线 + 三栏指标」五段竖排，
-                // 三枚胶囊（版本、主题、两个动作）挤在窄屏上像工具栏，不像一张信息卡。
-                HStack(alignment: .top, spacing: 14) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        HStack(spacing: 6) {
-                            Circle()
-                                .fill(ok ? Color(hex: 0x5FE7C4) : C.heroFgSoft)
-                                .frame(width: 7, height: 7)
-                            Text(ok ? "已连接" : "连不上")
-                                .font(.system(size: 12.5, weight: .medium))
-                                .foregroundStyle(C.heroFg)
-                            if ok {
-                                Text("v" + ping.str("version"))
-                                    .font(F.num(11.5, .regular))
-                                    .foregroundStyle(C.heroFgSoft)
-                            }
-                        }
-
-                        Text(b.str("hostname").isEmpty ? bareBase : b.str("hostname"))
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundStyle(C.heroFg)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                            .padding(.top, 7)
-
-                        Text(bareBase)
+                // 三行信息 + 一行动作，从上往下只有一条阅读顺序：
+                // 通不通 → 是哪台 → 现在什么状态 → 能做什么。
+                // 上一版左右分栏，在 Duo 展开的 820pt 里两块被顶到两边，
+                // 中间空出一大片绿，看着像没排完。
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(ok ? Color(hex: 0x5FE7C4) : C.heroFgSoft)
+                        .frame(width: 7, height: 7)
+                    Text(ok ? "已连接" : "连不上")
+                        .font(.system(size: 12.5, weight: .medium))
+                        .foregroundStyle(C.heroFg)
+                    if ok {
+                        Text("v" + ping.str("version"))
                             .font(F.num(11.5, .regular))
                             .foregroundStyle(C.heroFgSoft)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.85)
-                            .padding(.top, 2)
-                    }
-                    .layoutPriority(1)
-
-                    Spacer(minLength: 8)
-
-                    VStack(alignment: .trailing, spacing: 5) {
-                        vital("响应", pingMs)
-                        vital("凭证", tokenLeft)
-                        vital("温度", hotTemp)
                     }
                 }
 
+                Text(b.str("hostname").isEmpty ? bareBase : b.str("hostname"))
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundStyle(C.heroFg)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .padding(.top, 6)
+
+                // 地址和三项体征压成一行：它们都是「这台机器现在什么样」的读数，
+                // 竖着排三行会把卡片撑高一倍，横着排一行刚好铺满宽度
+                Text(metaLine)
+                    .font(F.num(11.5, .regular))
+                    .foregroundStyle(C.heroFgSoft)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .padding(.top, 4)
+
                 Rectangle().fill(C.heroFg.opacity(0.18)).frame(height: 0.7)
-                    .padding(.top, 14)
+                    .padding(.top, 12)
                     .padding(.bottom, 9)
 
-                // 动作压成一行纯文字：胶囊太抢眼，三个叠在一起把「主机的信息」压住了。
-                // 主题放最右 —— 它是这张卡上唯一「改长相」而不是「看状态」的东西
                 HStack(spacing: 16) {
                     heroLink("重新登录") {
                         Api.onAuthFail?()
@@ -186,18 +174,11 @@ struct SettingsView: View {
 
     private var ok: Bool { !ping.str("version").isEmpty }
 
-    /// 右上角的一行体征：标签压到 10.5、值 12.5，右对齐成一列，扫一眼就知道哪项不对
-    private func vital(_ k: String, _ v: String) -> some View {
-        HStack(spacing: 7) {
-            Text(k)
-                .font(.system(size: 10.5))
-                .foregroundStyle(C.heroFgSoft)
-            Text(v)
-                .font(F.num(12.5, .semibold))
-                .foregroundStyle(C.heroFg)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
+    /// 地址 · 响应 · 凭证 · 温度：一行铺满，宽屏不留空、窄屏按比例缩
+    private var metaLine: String {
+        var bits = [bareBase, "响应 " + pingMs, "凭证 " + tokenLeft]
+        if hotTemp != "—" { bits.append(hotTemp) }
+        return bits.joined(separator: "　·　")
     }
 
     private func heroLink(_ title: String, _ tap: @escaping () -> Void) -> some View {
@@ -219,8 +200,7 @@ struct SettingsView: View {
         }
     }
 
-    /// 主题入口：文字形态（「主题 · 跟随系统」），点开是三个选项。
-    /// 不再用胶囊 —— 一张卡上胶囊多了就没有主次
+    /// 主题入口：文字形态，落在卡片右下角。一张卡上不再出现任何胶囊
     private var themeMenu: some View {
         Menu {
             ForEach(Array(Appearance.modes.enumerated()), id: \.offset) { i, m in

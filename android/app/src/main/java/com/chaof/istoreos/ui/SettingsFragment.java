@@ -31,12 +31,12 @@ import org.json.JSONObject;
 public class SettingsFragment extends BaseFragment {
 
     private TextView tvBase;
-    private TextView tvToken;
-    private TextView tvAgent;
-    private TextView tvLatency;
     /** hero 卡：连接状态 / Agent 版本 / 延迟 */
     private TextView tvHeroState;
     private TextView tvHeroBadge;
+    /** hero 那行读数用的缓存：地址走后，响应和凭证跟着变 */
+    private String heroLatency = "—";
+    private String heroToken = "—";
     /** hero 大标题：在线时是主机名，拿不到才退回服务器地址 */
     private TextView tvHeroHost;
 
@@ -85,16 +85,8 @@ public class SettingsFragment extends BaseFragment {
         Ui.Card hero = Ui.gradient(c, R.color.hero_from, R.color.hero_to);
         hero.setPadding(Ui.dp(c, 20), Ui.dp(c, 18), Ui.dp(c, 20), Ui.dp(c, 16));
 
-        // 左「这是谁」：状态 / 主机名 / 地址；右「它现在怎么样」：三项体征。
-        // 原来是「状态行 + 大标题 + meta + 地址行 + 分隔线 + 三栏指标」六段竖排，
-        // 三枚胶囊挤在顶行，窄屏上像工具栏，不像一张信息卡。
-        LinearLayout top = Ui.row(c);
-        top.setGravity(Gravity.TOP);
-
-        LinearLayout idCol = Ui.column(c);
-        top.addView(idCol, new LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
+        // 三行信息 + 一行动作，只有一条阅读顺序：通不通 → 是哪台 → 现在什么状态 → 能做什么。
+        // 上一版左右分栏，在平板上两块被顶到两边，中间空出一大片绿，像没排完。
         LinearLayout stateRow = Ui.row(c);
         stateRow.setGravity(Gravity.CENTER_VERTICAL);
         View dot = new View(c);
@@ -112,13 +104,13 @@ public class SettingsFragment extends BaseFragment {
         tvHeroState.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         stateRow.addView(tvHeroState);
 
-        // 版本号跟着状态走：不再单独做成胶囊，胶囊留给真正要点的东西
+        // 版本跟着状态走，不再单独做一枚胶囊
         tvHeroBadge = Ui.heroNote(c, "", 0.86f);
         tvHeroBadge.setTextSize(11.5f);
         LinearLayout.LayoutParams bglp = new LinearLayout.LayoutParams(wrap, wrap);
         bglp.leftMargin = Ui.dp(c, 6);
         stateRow.addView(tvHeroBadge, bglp);
-        idCol.addView(stateRow);
+        hero.addView(stateRow);
 
         tvHeroHost = Ui.text(c,
                 Session.base(c).replaceFirst("^https?://", ""), 24f, R.color.hero_fg);
@@ -129,37 +121,28 @@ public class SettingsFragment extends BaseFragment {
         tvHeroHost.setEllipsize(android.text.TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, wrap);
-        hlp.topMargin = Ui.dp(c, 7);
-        idCol.addView(tvHeroHost, hlp);
+        hlp.topMargin = Ui.dp(c, 6);
+        hero.addView(tvHeroHost, hlp);
 
-        tvBase = Ui.heroNote(c,
-                Session.base(c).replaceFirst("^https?://", ""), 0.86f);
+        // 地址 + 响应 + 凭证压成一行：竖着排三行会把卡片撑高一倍
+        tvBase = Ui.heroNote(c, "", 0.86f);
         tvBase.setTextSize(11.5f);
         tvBase.setSingleLine(true);
         tvBase.setEllipsize(android.text.TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, wrap);
-        blp.topMargin = Ui.dp(c, 3);
-        idCol.addView(tvBase, blp);
-
-        LinearLayout statCol = Ui.column(c);
-        statCol.setGravity(Gravity.END);
-        tvLatency = heroVital(c, statCol, "响应");
-        tvToken = heroVital(c, statCol, "凭证");
-        tvAgent = heroVital(c, statCol, "Agent");
-        top.addView(statCol, new LinearLayout.LayoutParams(wrap, wrap));
-        hero.addView(top);
+        blp.topMargin = Ui.dp(c, 4);
+        hero.addView(tvBase, blp);
+        renderHeroMeta();
 
         View heroLine = new View(c);
         heroLine.setBackgroundColor(Ui.alpha(Ui.color(c, R.color.hero_fg), 0.18f));
         LinearLayout.LayoutParams hllp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, Ui.dp(c, 0.7f)));
-        hllp.topMargin = Ui.dp(c, 14);
+        hllp.topMargin = Ui.dp(c, 12);
         hllp.bottomMargin = Ui.dp(c, 9);
         hero.addView(heroLine, hllp);
 
-        // 动作压成一行文字：胶囊太抢眼，三个叠在一起会把「这是哪台机器」压住。
-        // 主题放最右 —— 它是这张卡上唯一「改长相」而不是「看状态」的东西
         LinearLayout acts = Ui.row(c);
         acts.setGravity(Gravity.CENTER_VERTICAL);
         acts.addView(heroLink(c, "重新登录", this::relogin));
@@ -369,24 +352,13 @@ public class SettingsFragment extends BaseFragment {
         return t;
     }
 
-    /** 右上角的一行体征：标签 10.5、值 12.5，右对齐成一列 */
-    private TextView heroVital(Context c, LinearLayout parent, String label) {
-        LinearLayout row = Ui.row(c);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        TextView l = Ui.heroNote(c, label, 0.86f);
-        l.setTextSize(10.5f);
-        l.setIncludeFontPadding(false);
-        row.addView(l);
-        TextView v = Ui.text(c, "—", 12.5f, R.color.hero_fg);
-        v.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        v.setIncludeFontPadding(false);
-        v.setSingleLine(true);
-        int w = ViewGroup.LayoutParams.WRAP_CONTENT;
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(w, w);
-        lp.leftMargin = Ui.dp(c, 7);
-        row.addView(v, lp);
-        parent.addView(row, new LinearLayout.LayoutParams(w, w));
-        return v;
+    /** hero 那行读数：地址 · 响应 · 凭证 */
+    private void renderHeroMeta() {
+        if (tvBase == null) {
+            return;
+        }
+        String base = Session.base(ctx()).replaceFirst("^https?://", "");
+        tvBase.setText(base + "　·　响应 " + heroLatency + "　·　凭证 " + heroToken);
     }
 
     private void pickTheme() {
@@ -422,8 +394,9 @@ public class SettingsFragment extends BaseFragment {
     protected void load(boolean quiet) {
         long exp = Session.expiresAt(ctx());
         long left = exp - System.currentTimeMillis() / 1000L;
-        // 三列并排，每列只有屏宽 1/3，长了必截断，所以这里用短写
-        tvToken.setText(left > 0 ? Fmt.shortDur(left) : "已过期");
+        // 整行宽度有限，这里用短写（Fmt.shortDur 会给「6 天 5 小时」）
+        heroToken = left > 0 ? Fmt.shortDur(left) : "已过期";
+        renderHeroMeta();
 
         final long started = System.currentTimeMillis();
         Api.ping(Session.base(ctx()), new Cb() {
@@ -435,11 +408,11 @@ public class SettingsFragment extends BaseFragment {
                 setRefreshing(false);
                 String ver = "v" + body.optString("version", "?");
                 long ms = System.currentTimeMillis() - started;
-                tvAgent.setText(ver);
-                tvLatency.setText(ms + " ms");
+                heroLatency = ms + " ms";
                 if (tvHeroState != null) {
                     tvHeroState.setText("已连接");
                     tvHeroBadge.setText(ver);
+                    renderHeroMeta();
                 }
             }
 
@@ -449,11 +422,11 @@ public class SettingsFragment extends BaseFragment {
                     return;
                 }
                 setRefreshing(false);
-                tvAgent.setText("连不上");
-                tvLatency.setText("—");
+                heroLatency = "—";
                 if (tvHeroState != null) {
                     tvHeroState.setText("连不上");
                     tvHeroBadge.setText("离线");
+                    renderHeroMeta();
                 }
             }
         });
@@ -678,7 +651,7 @@ public class SettingsFragment extends BaseFragment {
                         return false;
                     }
                     Session.setBase(ctx(), values[0]);
-                    tvBase.setText(Session.base(ctx()).replaceFirst("^https?://", ""));
+                    renderHeroMeta();
                     Toast.makeText(ctx(), "地址已更新", Toast.LENGTH_SHORT).show();
                     requireActivity().recreate();
                     return true;
