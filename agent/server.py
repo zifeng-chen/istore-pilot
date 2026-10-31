@@ -376,7 +376,12 @@ class Handler(BaseHTTPRequestHandler):
     def _api_get(self, path: str, query: dict):
         try:
             if path == "/api/v1/overview":
-                self._json(cached("overview", 1.0, sysinfo.overview))
+                # 这里不再整份缓存：sysinfo.overview() 自己把慢变量缓存 1 秒，
+                # 网口那段每次取共享采样。整份缓存会把速率一起冻住，
+                # 和 /traffic、/network 对不上（同一秒能差出一个数量级）。
+                # 也别试图把缓存提到 3 秒：客户端正好 3 秒轮询一次，
+                # 曲线上会冒出平段；冷计算本身只有 1–5ms，不值得。
+                self._json(sysinfo.overview())
             elif path == "/api/v1/traffic":
                 net = sysinfo.interfaces()
                 self._json({

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import os
 import subprocess
@@ -16,6 +17,16 @@ _cpu_cache: tuple[float, float, list[float]] = (0.0, 0.0, [])
 _prev_net: dict[str, tuple[float, float]] = {}
 _prev_net_ts: float = 0.0
 _net_cache: dict[str, dict[str, float]] = {}
+_IFACE_TTL = 0.5
+_iface_lock = threading.Lock()
+# 可变字典：写成 global 容易漏，直接原地更新
+_iface_cache: dict = {"ts": 0.0, "val": {}}
+_ROLES_TTL = 15.0
+_roles_lock = threading.Lock()
+_roles_cache: dict = {"ts": 0.0, "val": {}}
+_OV_BASE_TTL = 1.0
+_ov_lock = threading.Lock()
+_ov_cache: dict = {"ts": 0.0, "val": {}}
 
 
 def _read(path: str, default: str = "") -> str:
@@ -128,10 +139,23 @@ def uptime() -> float:
         return 0.0
 
 
+_BOARD_TTL = 60.0
+_board_lock = threading.Lock()
+_board_cache: dict = {"ts": 0.0, "val": {}}
+
+
 def board() -> dict:
+    """主机名 / 型号 / 固件版本。只有升级固件或改主机名才会变，缓存 60 秒。
+
+    一次 `ubus call system board` 要 3.9ms，它在概览的冷路径上白占四分之一的
+    时间；而这个值一分钟内不可能变。
+    """
+    with _board_lock:
+        if _board_cache["val"] and time.monotonic() - _board_cache["ts"] < _BOARD_TTL:
+            return _board_cache["val"]
     data = _ubus("system", "board")
     rel = data.get("release", {}) if isinstance(data, dict) else {}
-    return {
+    out = {
         "hostname": data.get("hostname", ""),
         "model": data.get("model", ""),
         "system": data.get("system", ""),
@@ -142,15 +166,21 @@ def board() -> dict:
         "target": rel.get("target", ""),
         "description": rel.get("description", ""),
     }
+    with _board_lock:
+        _board_cache["ts"] = time.monotonic()
+        _board_cache["val"] = out
+    return out
 
 
 def cpu_model() -> dict:
     name = "unknown"
+    cores = 0
+    # 只读一次：原来是两遍 _read("/proc/cpuinfo")
     for line in _read("/proc/cpuinfo").splitlines():
-        if line.lower().startswith("model name"):
+        if line.startswith("processor"):
+            cores += 1
+        elif name == "unknown" and line.lower().startswith("model name"):
             name = line.split(":", 1)[1].strip()
-            break
-    cores = sum(1 for ln in _read("/proc/cpuinfo").splitlines() if ln.startswith("processor"))
     return {"model": name, "cores": cores}
 
 
@@ -265,7 +295,14 @@ def _port_roles() -> dict[str, str]:
     uci 读：WAN 绑的那个口写在 network.wan.device，LAN 口是 br-lan 这类桥的成员。
     DSA 架构下 wan.device 可能是逻辑名（wan / lan1），那种情况靠桥成员反推，
     剩下没归到任何桥的口留空，不瞎猜。
+
+    结果缓存 15 秒：它只在改网络配置时才变，而 `uci show network` 要 2.7ms。
     """
+    now = time.monotonic()
+    with _roles_lock:
+        if _roles_cache["val"] and now - _roles_cache["ts"] < _ROLES_TTL:
+            return _roles_cache["val"]
+
     flat: dict[str, str] = {}
     for line in _run(["uci", "show", "network"]).splitlines():
         key, sep, val = line.partition("=")
@@ -287,12 +324,17 @@ def _port_roles() -> dict[str, str]:
         # uci 把多口写成 'eth1' 'eth2'，引号在中间，去掉引号再切
         for port in val.replace("'", " ").split():
             roles.setdefault(port, role)
+    with _roles_lock:
+        _roles_cache["ts"] = now
+        _roles_cache["val"] = roles
     return roles
 
 
-def physical_ports() -> list[dict]:
+def physical_ports(addrs: dict[str, dict] | None = None) -> list[dict]:
+    """物理网口列表。`addrs` 可由调用方传进来复用，省一次 `ip -j addr`。"""
     rates = net_rates()
-    addrs = {d["name"]: d for d in ip_addrs()}
+    if addrs is None:
+        addrs = {d["name"]: d for d in ip_addrs()}
     roles = _port_roles()
     out = []
     names = sorted(n for n in os.listdir("/sys/class/net") if n.startswith(("eth", "enp", "eno")))
@@ -317,8 +359,46 @@ def physical_ports() -> list[dict]:
 
 
 def interfaces() -> dict:
-    wan = _ubus("network.interface.wan", "status")
-    lan = _ubus("network.interface.lan", "status")
+    """网口快照，0.5 秒内复用同一次采样。
+
+    `interfaces()` 要起一个 ubus 进程 + 一次 `ip -j addr`，约 9ms；而
+    `/overview`、`/traffic`、`/network` 三个接口都会调它，客户端又是「一次刷新
+    连着打一串请求」—— 不共享的话同一个刷新周期要采两三遍，还彼此相差几十毫秒，
+    顶栏的速率和曲线会互相打架。
+
+    0.5 秒只够盖住这种突发，不会让速率发木（客户端本身 3 秒才刷一次）。
+    返回深拷贝：调用方往下写不会污染缓存。
+    """
+    now = time.monotonic()
+    with _iface_lock:
+        if _iface_cache["val"] and now - _iface_cache["ts"] < _IFACE_TTL:
+            return copy.deepcopy(_iface_cache["val"])
+    val = _interfaces_sample()
+    with _iface_lock:
+        _iface_cache["ts"] = now
+        _iface_cache["val"] = val
+    return copy.deepcopy(val)
+
+
+def _iface_statuses() -> tuple[dict, dict]:
+    """一次 `ubus call network.interface dump` 取回 wan / lan 两份状态。
+
+    原来分两次单查（`...wan status` / `...lan status`）：一个 ubus 进程约 4ms，
+    两次就 8ms，是网口采样里最大的一笔。dump 返回的字段跟单查完全一致
+    （up / proto / device / l3_device / uptime / ipv4-address / ipv6-address /
+    dns-server / route），只是多带一个 interface 名字。
+    """
+    data = _ubus("network.interface", "dump")
+    items = data.get("interface") if isinstance(data, dict) else None
+    if isinstance(items, list) and items:
+        by = {it.get("interface"): it for it in items if isinstance(it, dict)}
+        return by.get("wan", {}), by.get("lan", {})
+    # 万一这版固件的 dump 行为不同，退回两次单查，宁可慢也不能报错
+    return _ubus("network.interface.wan", "status"), _ubus("network.interface.lan", "status")
+
+
+def _interfaces_sample() -> dict:
+    wan, lan = _iface_statuses()
     rates = net_rates()
     all_addrs = ip_addrs()
 
@@ -374,7 +454,8 @@ def interfaces() -> dict:
             "tx_total": rate.get("tx_total", 0.0),
         }
 
-    return {"wan": shape(wan, "WAN"), "lan": shape(lan, "LAN"), "ports": physical_ports()}
+    return {"wan": shape(wan, "WAN"), "lan": shape(lan, "LAN"),
+            "ports": physical_ports({d["name"]: d for d in all_addrs})}
 
 
 def clients() -> list[dict]:
@@ -446,11 +527,20 @@ def storage() -> list[dict]:
     return out
 
 
-def overview() -> dict:
+def _overview_base() -> dict:
+    """概览里变化慢的那几块，1 秒内复用。
+
+    CPU 占用、内存、负载这些本来就没有「毫秒级」的意义，1 秒一采和之前
+    服务端那层 1 秒缓存是同一档精度；把它们单独缓存，是为了让 `network`
+    每次都能拿最新的一份 —— 见 `overview()`。
+    """
+    now = time.monotonic()
+    with _ov_lock:
+        if _ov_cache["val"] and now - _ov_cache["ts"] < _OV_BASE_TTL:
+            return _ov_cache["val"]
     cpu_info = cpu()
     info = cpu_model()
-    return {
-        "ts": int(time.time()),
+    val = {
         "board": board(),
         "cpu": {
             "model": info["model"],
@@ -462,6 +552,23 @@ def overview() -> dict:
         "load": load(),
         "uptime": uptime(),
         "temperature": temperature(),
-        "network": interfaces(),
         "storage": storage(),
     }
+    with _ov_lock:
+        _ov_cache["ts"] = now
+        _ov_cache["val"] = val
+    return val
+
+
+def overview() -> dict:
+    """概览。网口那一段每次都走 `interfaces()` 的共享采样。
+
+    之前整份 overview 缓存在服务端 1 秒，而 `/traffic`、`/network` 各走各的采样：
+    同一秒内三个接口能给出一大一小两组速率（实测 126KB/s 对 7KB/s），
+    顶栏和曲线就会互相打架。拆开之后，慢变量仍缓存 1 秒，
+    网口数据固定来自同一份 0.5 秒采样 —— 三个接口天然一致。
+    """
+    out = dict(_overview_base())
+    out["ts"] = int(time.time())
+    out["network"] = interfaces()
+    return out

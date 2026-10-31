@@ -15,6 +15,41 @@
 
 ## 未发布
 
+### 性能 · 概览 / 流量 / 网口三个接口各算一遍，速率还互相对不上
+
+**现象**：同一秒里 `/overview`、`/traffic`、`/network` 给出的 WAN 速率能差一个数量级
+（实测 126351 B/s 对 7073 B/s），顶栏和曲线互相打架。原因是概览在服务端整份缓存 1 秒
+（把速率一起冻住了），另外两个各走各的采样。
+
+**改动**
+
+1. `sysinfo.overview()` 拆两段：慢变量（board / cpu / memory / load / uptime /
+   temperature / storage）自己缓存 1 秒，`network` 每次都从 `interfaces()` 取；
+   `server.py` 去掉整份缓存
+2. `interfaces()` 加 0.5 秒共享采样（返回深拷贝）：一次刷新里三个接口共用同一份网口快照
+3. `board()` 缓存 60 秒（`ubus call system board` 3.9ms → 0.05ms，主机名/固件版本一分钟内不会变）
+4. 端口角色缓存 15 秒（`uci show network` 2.7ms → 0.05ms，只有改网络配置才变）
+5. 两次 `ubus call network.interface.wan/lan status` 合并成一次
+   `ubus call network.interface dump` —— 逐字段比对过，值完全一致，只多一个 interface 名；
+   `physical_ports()` 复用同一次 `ip -j addr` 的结果（原来一次采样里跑两遍）
+6. `cpu_model()` 只读一次 `/proc/cpuinfo`
+
+**结果**（路由器本机测，每次新建连接、间隔 2 秒让缓存过期）
+
+| | 优化前 | 优化后 |
+| --- | --- | --- |
+| 概览冷路径 | 14.1 ms | 12.5 ms |
+| 概览慢变量 | 7.3 ms | 2.6 ms |
+| 网口共享采样（第二次起） | 3.6 ms | 0.06 ms |
+| 三个接口速率一致 | 时对时错 | 6/6 一致 |
+
+**没有把概览缓存提到 3 秒**：客户端正好 3 秒轮询一次，缓存和轮询同周期会让曲线上出现平段；
+而且从电脑测到的 60ms 是「闲置后首包」的链路唤醒（同一条连接上背靠背只要 1–3ms，
+对照 LuCI 的 80 端口每次 55–63ms 也一样），不是服务端算得慢。
+
+**踩坑记录**：`cpu_model()` 改单次读取时写成了 `if not cores`，结果核数永远只算到 1，
+已修正（本机 `grep -c '^processor' /proc/cpuinfo` = 6）。
+
 ### 性能 · Agent API 每个请求固定多 40ms（Nagle + 延迟 ACK）
 
 **现象**：从局域网测 `/api/v1/health`（什么活都不干）要 **48.8ms**，但路由器本机
