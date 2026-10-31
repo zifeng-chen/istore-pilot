@@ -38,7 +38,6 @@ import random
 import re
 import shutil
 import socket
-import ssl
 import struct
 import subprocess
 import tarfile
@@ -1386,17 +1385,38 @@ def _arch() -> str:
 
 
 def _fetch(url: str, dst: str, timeout: int = 120):
-    """下载到 dst。证书链不全的自定义固件退回不校验 —— 反正校验了也没用。"""
+    """下载到 dst，**证书必须校验通过**。
+
+    以前证书链不全时会静默退回 `_create_unverified_context()`，理由是
+    「自定义固件证书不全，校验了也没用」。但这正好把中间人放进来了：
+    回来的是要装进 /usr/bin 并以 root 运行的二进制。证书坏了就让用户
+    修证书（或手动放文件），不要用「不校验」换便利。
+    """
     req = urllib.request.Request(url, headers={"User-Agent": "istore-pilot"})
     try:
         resp = urllib.request.urlopen(req, timeout=timeout)
     except urllib.error.URLError as exc:
-        if "CERTIFICATE" not in str(exc).upper():
-            raise
-        resp = urllib.request.urlopen(req, timeout=timeout,
-                                      context=ssl._create_unverified_context())
+        raise RuntimeError(
+            "下载失败（证书校验未通过或网络不可达）：%s — 请检查路由器时间是否准确、"
+            "或系统证书是否完整" % (getattr(exc, "reason", exc),))
     with resp, open(dst, "wb") as fh:
         shutil.copyfileobj(resp, fh)
+
+
+def _safe_extract(tf: tarfile.TarFile, dst: str) -> None:
+    """解包前逐条检查：绝对路径、`..`、链接和设备文件一律拒绝。
+
+    `extractall` 自己不做这些判断（CVE-2007-4559 那一类）。这里下的是
+    要装成 root 二进制的包，宁可解不开也不能让它往 /etc 里写东西。
+    """
+    for m in tf.getmembers():
+        name = m.name or ""
+        parts = name.replace("\\", "/").split("/")
+        if name.startswith("/") or ".." in parts:
+            raise RuntimeError("压缩包里有异常路径：" + name)
+        if m.issym() or m.islnk() or m.isdev():
+            raise RuntimeError("压缩包里有链接/设备文件，已拒绝：" + name)
+    tf.extractall(dst)
 
 
 def _install_binary(tar_path: str):
@@ -1404,7 +1424,7 @@ def _install_binary(tar_path: str):
     shutil.rmtree(stage, ignore_errors=True)
     os.makedirs(stage, exist_ok=True)
     with tarfile.open(tar_path, "r:gz") as tf:
-        tf.extractall(stage)
+        _safe_extract(tf, stage)
     src = os.path.join(stage, "AdGuardHome")
     if not os.path.isdir(src) or not os.path.exists(os.path.join(src, "AdGuardHome")):
         raise RuntimeError("压缩包里没有 AdGuardHome 目录")

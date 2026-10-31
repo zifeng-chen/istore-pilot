@@ -53,6 +53,25 @@ struct WebPage {
   }
 
   /** Agent 在 8443、LuCI 在 80：直接拿 Session.base 会把 API 端口当网页打开 */
+  /** 只取 host（去协议、去端口、小写），用来核对票据地址 */
+  private hostOf(u: string): string {
+    let s: string = u.length > 0 ? u : '';
+    const scheme: number = s.indexOf('://');
+    if (scheme > 0) {
+      s = s.substring(scheme + 3);
+    }
+    const slash: number = s.indexOf('/');
+    if (slash >= 0) {
+      s = s.substring(0, slash);
+    }
+    if (s.startsWith('[')) {
+      const end: number = s.indexOf(']');
+      return end > 0 ? s.substring(1, end).toLowerCase() : s.toLowerCase();
+    }
+    const colon: number = s.lastIndexOf(':');
+    return (colon > 0 ? s.substring(0, colon) : s).toLowerCase();
+  }
+
   private guessUrl(): string {
     let host: string = Session.base().replace('https://', '').replace('http://', '');
     const slash: number = host.indexOf('/');
@@ -99,7 +118,12 @@ struct WebPage {
     if (r.ok && r.data.bool('ok', false)) {
       const name: string = r.data.str('cookie_name', '');
       const value: string = r.data.str('cookie_value', '');
-      const u: string = r.data.str('url', fallback);
+      // 票据里的地址必须是「我们连的这台路由器」：否则这张 root 会话
+      // cookie 会被种到别的域上（篡改响应 / Host 头带偏都能做到）
+      let u: string = r.data.str('url', fallback);
+      if (this.hostOf(u) !== this.hostOf(fallback)) {
+        u = fallback;
+      }
       if (name.length > 0 && value.length > 0) {
         try {
           // 先清空：LuCI 自己下发的 cookie 路径是 /cgi-bin/luci/，我们这张是 /，

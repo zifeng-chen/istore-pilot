@@ -136,16 +136,19 @@ def main() -> int:
     auth["password"] = password
     auth.setdefault("token_ttl", 604800)
     auth.setdefault("rate_limit_per_min", 30)
-    with sftp.open(CONF_PATH, "w") as fh:
-        fh.write(json.dumps(conf, ensure_ascii=False, indent=2))
-    run(client, f"chmod 600 {CONF_PATH}")
 
-    # 从 OpenClash 读取 clash secret，自动填进配置
+    # 从 OpenClash 读 secret 并**在本地**写进 JSON。
+    # 原来是写完文件再 `sed -i`：secret 里只要有一个 `'` 或 `/`，
+    # 这条命令就断了（甚至能把后面的 shell 一起改写）。
     code, secret = run(client, "uci get openclash.config.dashboard_password 2>/dev/null")
     secret = secret.strip()
     if secret and code == 0:
-        run(client, f"sed -i 's/\"secret\": *\"[^\"]*\"/\"secret\": \"{secret}\"/' {CONF_PATH}")
+        conf.setdefault("clash", {})["secret"] = secret
         print("已同步 OpenClash secret")
+
+    with sftp.open(CONF_PATH, "w") as fh:
+        fh.write(json.dumps(conf, ensure_ascii=False, indent=2))
+    run(client, f"chmod 600 {CONF_PATH}")
 
     run(client, f"{INITD} enable")
     run(client, f"{INITD} restart")
@@ -161,7 +164,8 @@ def main() -> int:
 
     sftp.close()
     client.close()
-    print(f"\n访问地址: http://{bind}:{port}  (管理密码: {password}，与 SSH / 后台 / AdGuard 一致)")
+    # 不打印口令：CI 日志、终端回滚区、共享屏幕都会把它带走
+    print(f"\n访问地址: http://{bind}:{port}  (管理密码与 SSH / 后台 / AdGuard 一致)")
     return 0
 
 

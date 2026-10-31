@@ -201,7 +201,12 @@ public class WebActivity extends BaseActivity {
                 if (isFinishing() || web == null) {
                     return;
                 }
-                String url = body.optString("url", fallbackUrl);
+                String rawUrl = body.optString("url", fallbackUrl);
+                // 票据里的地址必须是「我们连的这台路由器」。否则（被篡改、
+                // 或被 Host 头带偏）这张 root 会话 cookie 就会被种到别的域上。
+                // 用 final 局部变量：下面两层 lambda 要捕获它
+                final String url = hostOnly(rawUrl).equals(hostOnly(Session.base(WebActivity.this)))
+                        ? rawUrl : fallbackUrl;
                 String name = body.optString("cookie_name", "");
                 String value = body.optString("cookie_value", "");
                 if (body.optBoolean("ok", false) && !name.isEmpty() && !value.isEmpty()) {
@@ -290,6 +295,16 @@ public class WebActivity extends BaseActivity {
             }
         }
         return "http://" + host + "/cgi-bin/luci/";
+    }
+
+    /** 只取 host（不含端口、统一小写），用来核对票据地址 */
+    private static String hostOnly(String url) {
+        try {
+            String h = android.net.Uri.parse(url == null ? "" : url).getHost();
+            return h == null ? "" : h.toLowerCase();
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     private static String hostOf(String url) {

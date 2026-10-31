@@ -22,6 +22,7 @@ import threading
 import time
 import urllib.parse
 
+from . import sysinfo
 from .config import get as cfg
 
 # uhttpd 的默认口；能从 /etc/config/uhttpd 读到时以配置为准
@@ -167,13 +168,60 @@ def _probe(name: str, sid: str, port: int, secure: bool) -> bool:
             pass
 
 
+def _normalize_host(raw: str) -> str:
+    h = (raw or "").strip().lower().rstrip(".")
+    if h.startswith("["):
+        h = h[1:h.find("]")] if "]" in h else h[1:]
+    # 去掉可能带上的端口（IPv6 已经去括号，这里只切 host:port 形态）
+    if h.count(":") == 1:
+        h = h.rsplit(":", 1)[0]
+    return h
+
+
+def _local_hosts() -> set[str]:
+    """本机认可的访问地址：LAN/回环 IP、主机名、主机名.lan。
+
+    `ticket()` 的 host 来自请求头，以前不加校验就拼进 `url` 返回给客户端；
+    而客户端会拿这个 url 去种 Sysauth cookie（root 会话）。把 host 锁死在
+    本机地址上，中间人就没法把会话 cookie 引到别的域。
+    """
+    hosts = {"localhost", "127.0.0.1", "::1"}
+    try:
+        for entry in sysinfo.ip_addrs():
+            for a in entry.get("addresses") or []:
+                if a.get("address"):
+                    hosts.add(str(a["address"]).lower())
+    except Exception:
+        pass
+    try:
+        info = sysinfo.board()
+        name = str(info.get("hostname") or "").lower()
+        if name:
+            hosts.update({name, name + ".lan", name + ".local"})
+    except Exception:
+        pass
+    return hosts
+
+
+def _lan_host() -> str:
+    """LAN 地址，作为不可信 host 的兜底。"""
+    try:
+        for a in (sysinfo.interfaces().get("lan", {}).get("ipv4") or []):
+            if a.get("address"):
+                return str(a["address"])
+    except Exception:
+        pass
+    return "192.168.100.1"
+
+
 def ticket(host: str) -> dict:
     """给客户端一张可以直接塞进 WebView 的 cookie。
 
     `host` 是客户端访问 Agent 用的地址（去掉端口后的主机名或 IP），
     LuCI 在 80 口，所以最终打开的是 `http://<host>/cgi-bin/luci/`。
     """
-    host = (host or "").strip() or "192.168.100.1"
+    want = _normalize_host(host)
+    host = want if want and want in _local_hosts() else _lan_host()
     port, secure = _uhttpd()
 
     with _lock:

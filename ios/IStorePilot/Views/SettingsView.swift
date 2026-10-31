@@ -30,6 +30,8 @@ struct SettingsView: View {
     @State private var goBackups = false
     /// 待确认的电源动作：nil 表示没有弹窗
     @State private var confirmPower: String? = nil
+    /// 待确认的安装包：装包 = 用 root 跑对方的代码，先问一句
+    @State private var confirmInstall: String? = nil
 
     private var appVersion: String {
         let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
@@ -90,6 +92,19 @@ struct SettingsView: View {
                 Button("取消", role: .cancel) { confirmPower = nil }
             } message: {
                 Text(powerBody)
+            }
+            // 装包确认：写清楚「会以管理员权限执行」，类型不明的直接不给装
+            .confirmationDialog(confirmInstall ?? "安装", isPresented: Binding(
+                get: { confirmInstall != nil },
+                set: { if !$0 { confirmInstall = nil } }
+            ), titleVisibility: .visible) {
+                Button(installVerb, role: .destructive) {
+                    if let n = confirmInstall { install(n, confirm: installKind(n)) }
+                    confirmInstall = nil
+                }
+                Button("取消", role: .cancel) { confirmInstall = nil }
+            } message: {
+                Text("这个文件会以管理员权限\(installVerb)在路由器上。只装你自己上传的包。")
             }
             .sheet(isPresented: $showPwd) {
                 PasswordSheet(title: "修改 App 登录密码",
@@ -416,7 +431,7 @@ struct SettingsView: View {
                                     .foregroundStyle(C.textSecondary)
                             }
                             Spacer()
-                            Button("安装") { install(u.str("name")) }
+                            Button("安装") { confirmInstall = u.str("name") }
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundStyle(C.primary)
                         }
@@ -707,13 +722,28 @@ struct SettingsView: View {
         }
     }
 
-    private func install(_ name: String) {
+    /// 文件类型 → 后端要求的确认串（后端按真实类型再核一遍）
+    private func installKind(_ name: String) -> String {
+        let low = name.lowercased()
+        if low.hasSuffix(".run") { return "run" }
+        if low.hasSuffix(".ipk") { return "ipk" }
+        if low.hasSuffix(".apk") { return "apk" }
+        return ""
+    }
+
+    private var installVerb: String { "安装" }
+
+    private func install(_ name: String, confirm: String) {
         busy = "install"
         Task {
-            let j = try? await Api.post("/api/v1/system/install", ["name": name], slow: true)
+            let j = try? await Api.post("/api/v1/system/install",
+                                        ["name": name, "confirm": confirm], slow: true)
             await MainActor.run {
                 busy = ""
-                if let j, j.bool("ok") || j["ok"] == nil {
+                if let j, j.str("need_confirm") != "" {
+                    // 后端认为还得再确认一次：把弹窗重新拉起来
+                    confirmInstall = name
+                } else if let j, j.bool("ok") || j["ok"] == nil {
                     popup = Popup(title: "安装完成", body: name)
                 } else {
                     popup = Popup(title: "安装失败", body: j?.str("error", "未知错误") ?? "未知错误")

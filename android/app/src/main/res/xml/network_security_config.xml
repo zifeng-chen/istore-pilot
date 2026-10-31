@@ -5,9 +5,10 @@
 -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="true">
+        <!-- 只信系统证书。user 证书等于让「谁装了 CA 谁就能中间人」，
+             而这里传的是登录口令和令牌 -->
         <trust-anchors>
             <certificates src="system" />
-            <certificates src="user" />
         </trust-anchors>
     </base-config>
 </network-security-config>

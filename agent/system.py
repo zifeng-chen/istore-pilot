@@ -27,7 +27,9 @@ UPLOAD_DIR = "/tmp/istore-upload"
 PUBLISH_DIR = "/www/istore-agent"
 OPKG_LOG = "/tmp/istore-opkg.log"
 SELF_PKG = "luci-app-istore-agent"
-MAX_BYTES = 256 * 1024 * 1024
+# 64MB：本项目的安装包最大的 .run 也只有 20MB 上下，固件不走这里。
+# 原来是 256MB，而 /tmp 是 tmpfs —— 连续上传就能把路由器内存吃满。
+MAX_BYTES = 64 * 1024 * 1024
 _NAME_RE = re.compile(r"[^A-Za-z0-9._\-+]")
 
 _SAFE_EXT = (".ipk", ".apk", ".run", ".img", ".bin", ".sh", ".tar", ".gz", ".zip")
@@ -60,6 +62,15 @@ def receive_upload(rfile, length: int, raw_name: str) -> dict:
         return {"ok": False, "error": "没有收到文件内容"}
     if length > MAX_BYTES:
         return {"ok": False, "error": f"文件太大（上限 {MAX_BYTES // 1048576} MB）"}
+    # /tmp 是 tmpfs：写多少就吃多少内存，留出一半余量再收
+    try:
+        free = shutil.disk_usage(os.path.dirname(UPLOAD_DIR) or "/tmp").free
+        if length > free // 2:
+            return {"ok": False,
+                    "error": "路由器临时空间不够（安装包会占用内存），"
+                             "先清理「安装包管理」里的旧文件再试"}
+    except OSError:
+        pass
 
     os.makedirs(UPLOAD_DIR, mode=0o700, exist_ok=True)
     path = os.path.join(UPLOAD_DIR, name)
@@ -186,13 +197,33 @@ def _install_self(path: str) -> dict:
                     "重新连上就是新版本（日志见 /tmp/istore-opkg.log）。"}
 
 
-def install(name: str) -> dict:
+# 每种类型要求的确认串。装包本质上就是「用 root 执行对方给的东西」，
+# 一次误点或者一个被盗的令牌都不该直接变成 root 权限。
+_NEED_CONFIRM = {
+    "ipk": "ipk",
+    "run": "run",
+    "alpine-apk": "apk",
+    "android-apk": "apk",
+}
+
+
+def install(name: str, confirm: str = "") -> dict:
     name = _safe_name(name)
     path = os.path.join(UPLOAD_DIR, name)
     if not os.path.isfile(path):
         return {"ok": False, "error": "文件不存在，请重新上传"}
 
     kind = _kind(path, name)
+    want = _NEED_CONFIRM.get(kind)
+    if want and confirm != want:
+        return {
+            "ok": False,
+            "need_confirm": want,
+            "kind": kind,
+            "name": name,
+            "error": ("这个文件会以管理员权限%s，需要先确认"
+                      % ("执行" if kind == "run" else "安装")),
+        }
 
     if kind == "ipk":
         if _ipk_package(path) == SELF_PKG:

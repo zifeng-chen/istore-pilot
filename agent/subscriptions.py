@@ -23,9 +23,11 @@
 
 from __future__ import annotations
 
+import ipaddress
 import os
 import re
 import subprocess
+import urllib.parse
 
 PKG = {"openclash": "openclash", "passwall": "passwall"}
 STYPE = {"openclash": "config_subscribe", "passwall": "subscribe_list"}
@@ -34,6 +36,31 @@ LABEL = {"openclash": "OpenClash", "passwall": "Passwall"}
 # 主键只允许这两种形态：@type[3] 或 cfg0a1b2c，避免拼接进 shell
 _SEC_RE = re.compile(r"^(?:@[A-Za-z0-9_]+\[\d+\]|[A-Za-z0-9_\-]{1,64})$")
 _URL_RE = re.compile(r"^https?://[^\s]+$", re.I)
+
+
+def _url_ok(url: str) -> bool:
+    """订阅地址白名单：http(s) + **不能指向本机/链路本地**。
+
+    这个地址最终是让 OpenClash / Passwall 去 fetch 的，等于路由器替用户
+    发请求 —— 填 `http://127.0.0.1:9090/...` 就成了打内网服务的跳板
+    （SSRF）。域名放行（可能是自建订阅站），只挡明确的回环/本地地址。
+    """
+    if not _URL_RE.match(url or ""):
+        return False
+    try:
+        host = (urllib.parse.urlparse(url).hostname or "").strip().lower()
+    except ValueError:
+        return False
+    if not host:
+        return False
+    if host == "localhost" or host.endswith(".localhost"):
+        return False
+    try:
+        ip = ipaddress.ip_address(host.strip("[]"))
+    except ValueError:
+        return True                     # 域名：交给后端自己去解析
+    return not (ip.is_loopback or ip.is_link_local or ip.is_unspecified
+                or ip.is_multicast or ip.is_reserved)
 
 
 def _run(args: list[str], timeout: float = 10.0) -> tuple[int, str]:
@@ -134,8 +161,9 @@ def add(backend: str, name: str, url: str, enabled: bool = True) -> dict:
     if not _installed(backend):
         return _bad(backend, f"{LABEL[backend]} 没有安装")
     url = (url or "").strip()
-    if not _URL_RE.match(url):
-        return _bad(backend, "订阅地址必须以 http:// 或 https:// 开头")
+    if not _url_ok(url):
+        return _bad(backend, "订阅地址必须是可以公网访问的 http:// 或 https:// 地址"
+                             "（不能填本机地址）")
     name = (name or "").strip()[:64] or "新订阅"
 
     code, out = _run(["uci", "add", PKG[backend], STYPE[backend]])
@@ -182,8 +210,9 @@ def update(backend: str, sec: str, name: str = "", url: str = "",
         changed.append("名称")
     if url is not None and url.strip():
         url = url.strip()
-        if not _URL_RE.match(url):
-            return _bad(backend, "订阅地址必须以 http:// 或 https:// 开头")
+        if not _url_ok(url):
+            return _bad(backend, "订阅地址必须是可以公网访问的 http:// 或 https:// 地址"
+                                 "（不能填本机地址）")
         key = "address" if backend == "openclash" else "url"
         _run(["uci", "set", f"{PKG[backend]}.{sec}.{key}={url}"])
         changed.append("地址")

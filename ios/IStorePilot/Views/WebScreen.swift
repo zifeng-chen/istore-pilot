@@ -171,8 +171,13 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate {
         let value = res?.str("cookie_value") ?? ""
         let urlStr = res?.str("url") ?? ""
 
+        // 票据里的地址必须是「我们连的这台路由器」。否则（响应被篡改、
+        // 或 Host 头被带偏）这张 root 会话 cookie 就会被种到别的域上。
+        let baseHost = (URL(string: Session.base)?.host ?? "").lowercased()
+
         guard let res, res.bool("ok"), !name.isEmpty, !value.isEmpty,
-              let url = URL(string: urlStr), let urlHost = url.host else {
+              let url = URL(string: urlStr), let urlHost = url.host,
+              baseHost.isEmpty || urlHost.lowercased() == baseHost else {
             // 拿不到票据：不是错误，退回「打开网页端，自己登」
             await load(withPath(fallback), cookie: nil)
             return

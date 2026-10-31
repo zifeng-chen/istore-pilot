@@ -6,6 +6,7 @@ import json
 import mimetypes
 import os
 import posixpath
+import sys
 import threading
 import time
 import urllib.parse
@@ -23,6 +24,16 @@ VERSION = "0.1.3"
 
 _cache_lock = threading.Lock()
 _cache: dict[str, tuple[float, object]] = {}
+
+
+def _log(msg: str) -> None:
+    """内部错误只写日志（procd 会收 stderr），不回给客户端。
+
+    以前是 `f"处理请求失败：{exc}"` 直接回给客户端 —— 路径、命令输出、
+    堆栈里的实现细节都跟着泄露，等于给对方发了张结构图。
+    """
+    print("[istore-agent] %s %s" % (time.strftime("%Y-%m-%dT%H:%M:%S"), msg),
+          file=sys.stderr, flush=True)
 
 
 def cached(key: str, ttl: float, producer):
@@ -62,14 +73,38 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):  # 静音，避免刷屏 procd 日志
         return
 
+    def _cors_origin(self) -> str:
+        """只有同源才回 CORS 头。
+
+        以前一律 `Access-Control-Allow-Origin: *`，等于允许任意网页读本机
+        接口的响应 —— 登录接口因此能在他人的浏览器里当爆破靶子（响应码就是
+        「猜对没猜对」）。App 与 WebView 发的是同源请求（不带 Origin），不受影响。
+        """
+        origin = (self.headers.get("Origin") or "").strip()
+        if not origin:
+            return ""
+        try:
+            netloc = urllib.parse.urlparse(origin).netloc
+        except ValueError:
+            return ""
+        host = (self.headers.get("Host") or "").strip()
+        return origin if netloc and netloc == host else ""
+
     def _send(self, code: int, body: bytes, ctype: str = "application/json; charset=utf-8", extra: dict | None = None):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, OPTIONS")
+        origin = self._cors_origin()
+        if origin:
+            self.send_header("Access-Control-Allow-Origin", origin)
+        # 无论有没有 Origin 都要带 Vary，否则中间缓存可能把 A 站的结果发给 B 站
+        self.send_header("Vary", "Origin")
+        if self.command == "OPTIONS":
+            self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, OPTIONS")
         self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("X-Frame-Options", "DENY")
         for k, v in (extra or {}).items():
             self.send_header(k, v)
         # 头 + 正文合成一次 write。
@@ -118,10 +153,13 @@ class Handler(BaseHTTPRequestHandler):
         self._json(result, 200 if result.get("ok") else 400)
 
     def _authed(self) -> bool:
+        """只认 Authorization 头。
+
+        以前还允许 `?token=`，但三端客户端没有一个在用（都发头）——
+        留着只会把令牌泄进访问日志、Referer 和浏览器历史。
+        """
         header = self.headers.get("Authorization", "")
         token = header[7:] if header.lower().startswith("bearer ") else ""
-        if not token:
-            token = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("token", [""])[0]
         return auth.verify_token(token)
 
     def _client_ip(self) -> str:
@@ -158,8 +196,9 @@ class Handler(BaseHTTPRequestHandler):
             # 这里的 version 一定要用 VERSION 常量。
             # 之前写死了一个 "0.1"，App 设置页就一直显示「Agent 版本 v0.1」，
             # 而 /health 报的是真版本，两个接口自相矛盾
+            # 不回 listen.host：探活只需要 ok/version，监听地址属于内部信息
             self._json({"ok": True, "service": "istore-agent", "version": VERSION,
-                        "host": cfg("listen", {}).get("host"), "ts": int(time.time())})
+                        "ts": int(time.time())})
             return
 
         if path.startswith("/api/"):
@@ -238,7 +277,9 @@ class Handler(BaseHTTPRequestHandler):
 
             # ---- 系统维护：安装包、路由器密码、软件包更新
             elif path == "/api/v1/system/install":
-                self._json(system.install(str(body.get("name", ""))))
+                # 装包 = 用 root 跑对方的代码，必须二次确认（按文件类型核对）
+                self._json(system.install(str(body.get("name", "")),
+                                          str(body.get("confirm", ""))))
             elif path == "/api/v1/system/uploads/delete":
                 self._json(system.remove_upload(str(body.get("name", ""))))
             elif path == "/api/v1/system/root_password":
@@ -358,12 +399,16 @@ class Handler(BaseHTTPRequestHandler):
                 if not save_cfg(conf):
                     self._json({"ok": False, "error": "写入配置失败"}, 500)
                     return
-                self._json({"ok": True})
+                # 换签名密钥：旧口令签发的令牌立刻作废，否则改完密码
+                # 之前泄漏的令牌还能用满 7 天
+                auth.rotate_key()
+                self._json({"ok": True, "reauth": True})
             else:
                 self._error(404, "not found")
 
         except Exception as exc:  # 兜底：宁可回一个 JSON 500，也别把连接直接掐了
-            self._json({"ok": False, "error": f"处理请求失败：{exc}"}, 500)
+            _log("POST %s 失败: %r" % (path, exc))
+            self._json({"ok": False, "error": "操作失败，详情见路由器系统日志"}, 500)
 
     def do_PUT(self):
         self.do_POST()
@@ -531,19 +576,29 @@ class Handler(BaseHTTPRequestHandler):
                 self._error(404, "not found")
 
         except Exception as exc:  # 兜底：宁可回一个 JSON 500，也别把连接直接掐了
-            self._json({"ok": False, "error": f"读取数据失败：{exc}"}, 500)
+            _log("GET %s 失败: %r" % (path, exc))
+            self._json({"ok": False, "error": "读取失败，详情见路由器系统日志"}, 500)
 
     # ------------------------------------------------------------ 静态资源
 
     def _static(self, raw_path: str):
-        rel = posixpath.normpath(urllib.parse.unquote(raw_path)).lstrip("/")
+        try:
+            rel = posixpath.normpath(urllib.parse.unquote(raw_path)).lstrip("/")
+        except (UnicodeDecodeError, ValueError):
+            self._error(400, "bad path")
+            return
         if rel in ("", "."):
             rel = "index.html"
-        if rel.startswith(".."):
+        if rel.startswith("..") or "\x00" in rel:
             self._error(403, "forbidden")
             return
         full = os.path.join(WEB_ROOT, *rel.split("/"))
-        if not os.path.isfile(full):
+        try:
+            exists = os.path.isfile(full)
+        except (ValueError, OSError):       # 含 %00：isfile 会抛 ValueError
+            self._error(400, "bad path")
+            return
+        if not exists:
             if "." not in posixpath.basename(rel):
                 full = os.path.join(WEB_ROOT, "index.html")
                 rel = "index.html"
@@ -562,7 +617,17 @@ class Handler(BaseHTTPRequestHandler):
         # 代码类资源必须每次回源，否则改完前端客户端还在用旧版本
         volatile = full.endswith((".html", ".js", ".css", ".webmanifest", ".json"))
         cache = "no-cache, must-revalidate" if volatile else "public, max-age=3600"
-        self._send(200, body, ctype, {"Cache-Control": cache})
+        extra = {"Cache-Control": cache}
+        if ctype.startswith("text/html"):
+            # 面板是单页 + 外链脚本，没有内联 script，可以收得很紧
+            # connect-src 必须放开 http/https：面板自己会去探若干候选地址
+            # （局域网 IP、主机名），只写 'self' 会把「换地址」功能掐死
+            extra["Content-Security-Policy"] = (
+                "default-src 'self'; img-src 'self' data:; "
+                "style-src 'self' 'unsafe-inline'; script-src 'self'; "
+                "connect-src 'self' http: https:; base-uri 'none'; "
+                "form-action 'none'; frame-ancestors 'none'")
+        self._send(200, body, ctype, extra)
 
 
 def _local_v4() -> set[str]:

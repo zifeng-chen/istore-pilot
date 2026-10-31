@@ -744,8 +744,8 @@ public class SettingsFragment extends BaseFragment {
                     fail(data.optString("error", "上传失败"));
                     return;
                 }
-                notice("上传完成，正在安装 " + name + "…");
-                installPackage(name);
+                notice("");
+                askInstall(name);
             }
 
             @Override
@@ -757,10 +757,36 @@ public class SettingsFragment extends BaseFragment {
         });
     }
 
+    /** 装包 = 用 root 安装或执行对方的文件，先问一句再动手 */
+    private void askInstall(String name) {
+        Sheet.Builder box = Sheet.custom(ctx(), "安装 " + name);
+        box.bodyLeft("这个文件会以管理员权限在路由器上安装或执行。"
+                + "只装你自己上传的包，来源不明的一律不要装。");
+        box.primary("安装", true, (d, w) -> installPackage(name));
+        box.cancel("取消");
+        box.show();
+    }
+
+    /** .run / .ipk / .apk → 后端要求的确认串（后端会按真实类型再核一遍） */
+    private static String confirmKind(String name) {
+        String low = name == null ? "" : name.toLowerCase();
+        if (low.endsWith(".run")) {
+            return "run";
+        }
+        if (low.endsWith(".ipk")) {
+            return "ipk";
+        }
+        if (low.endsWith(".apk")) {
+            return "apk";
+        }
+        return "";
+    }
+
     private void installPackage(String name) {
         JSONObject body = new JSONObject();
         try {
             body.put("name", name);
+            body.put("confirm", confirmKind(name));
         } catch (Exception ignored) {
             return;
         }
@@ -770,6 +796,13 @@ public class SettingsFragment extends BaseFragment {
                 if (!isAdded()) {
                     return;
                 }
+                // 后端认为还需要确认（类型没对上）：不装，提示一下就退回
+                if (!data.optString("need_confirm", "").isEmpty()) {
+                    Toast.makeText(ctx(), data.optString("error", "需要确认后才能安装"),
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
+
                 String output = data.optString("output", "");
                 String note = data.optString("note", "");
                 String detail = data.optString("error", "");
