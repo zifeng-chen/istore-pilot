@@ -1,6 +1,14 @@
 #!/bin/sh
-# 给 OpenClash 注入两条 DIRECT 规则（走官方 custom_rules 机制），
+# 给 OpenClash 注入绿联（UGREEN NAS）全套 DIRECT 规则（走官方 custom_rules 机制），
 # 并自带「超时验收 + 自动回滚 + 连 uci 开关一起还原」。
+#
+# 域名来源（2026-10-31 从 AGH 查询日志里实捞的，不是猜的）：
+#   sync-cn1.relay.ug.link      远程访问中继（TCP 22067）
+#   api-zh.ugnas.com            账号 / 设备 API
+#   discovery-*.syncthing.ugnas.com  局域网发现
+#   zlink.ugsdk.cn              SDK 信令
+#   ugreen.com / ugreen.com.cn  官网、固件
+# 注意别把 ugdtimg.com 加进来：那是广告 SDK，和 NAS 无关。
 #
 # 为什么必须这么做：
 #   openclash_custom_rules.list 是给 yml_rules_change.sh 做 YAML 合并的，
@@ -69,14 +77,18 @@ apply() {
 
     cat > "$TMP" <<'YAML'
 # OpenClash 自定义规则（由 istore-pilot 写入，插入在订阅规则顶部）
-# 目的：ug.link / ugreen.com 在国内，走代理既慢又经常超时，直接放行
+# 目的：绿联 NAS 的全部域名在国内，走代理既慢又会让 App 连不上（远程访问要靠
+# 中继 sync-cn1.relay.ug.link:22067 的长连接，被代理转发就会断），一律直连。
 rules:
   - DOMAIN-SUFFIX,ug.link,DIRECT
+  - DOMAIN-SUFFIX,ugnas.com,DIRECT
+  - DOMAIN-SUFFIX,ugsdk.cn,DIRECT
   - DOMAIN-SUFFIX,ugreen.com,DIRECT
+  - DOMAIN-SUFFIX,ugreen.com.cn,DIRECT
 YAML
 
     cp "$TMP" "$FILE" || { log "写规则文件失败"; exit 1; }
-    log "已写入 YAML 规则（2 条）"
+    log "已写入 YAML 规则（5 条：ug.link / ugnas.com / ugsdk.cn / ugreen.com / ugreen.com.cn）"
 
     uci set openclash.config.enable_custom_clash_rules='1'
     uci commit openclash
