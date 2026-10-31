@@ -15,6 +15,37 @@
 
 ## 未发布
 
+### 性能 · Agent API 每个请求固定多 40ms（Nagle + 延迟 ACK）
+
+**现象**：从局域网测 `/api/v1/health`（什么活都不干）要 **48.8ms**，但路由器本机
+`curl 127.0.0.1:8443/api/v1/health` 只要 **0.6ms**；`ping` 1ms、TCP 握手 15ms。
+37 个 GET 接口的中位延迟全卡在 47ms 这条线上。
+
+**根因**：`_send()` 先 `end_headers()` 发一排响应头小包、再 `wfile.write(body)` 发正文。
+服务端的 Nagle 压住正文等 ACK，客户端的延迟 ACK 又等 40ms —— 一请求一停。
+
+**改动**
+
+1. `_send()` 把响应头和正文拼成**一次 write**（HEAD 只发头）
+2. `Handler.disable_nagle_algorithm = True`，keep-alive 下的零散小包（OPTIONS 预检）也不压
+3. `proxy.active()` 加 3 秒缓存 —— 它要 pgrep + uci，20–30ms，却被 mode / connections /
+   groups / select 每个请求都调一遍；切后端时 `forget_active()` 主动失效
+4. `/adblock/log` 缓存 2 秒（AGH 日志一次 40KB / 200ms，这页只是打开看一眼）、
+   `/adblock/preflight` 缓存 5 秒（读 meminfo + DNS 链路 + 上游，一次 130ms）
+
+**结果**（37 个 GET，热路径各 5 次取中位）
+
+| | 优化前 | 优化后 |
+| --- | --- | --- |
+| 中位 | 47.1 ms | **2.5 ms** |
+| 平均 | 48.7 ms | **8.4 ms** |
+| P90 | 78.4 ms | **13.8 ms** |
+| 最慢 | 213 ms（拦截日志） | 105 ms（DNS 校验） |
+
+剩下唯一超过 30ms 的是 `/adblock/verify`：它真的去查三条 DNS 链路（国内/国外/IPv6），
+是用户点「校验」才触发的诊断动作，不做缓存。冷路径（缓存刚过期）实测：
+overview 62ms、订阅 53ms、apps 46ms、network 35ms、clash 27ms，都在可接受范围。
+
 ### 改动 · Duo 展开态第二轮修正（7 项，三端）
 
 **① 应用流量弹窗底部被裁**：Duo 展开时系统 form sheet 按比窗口更大的尺寸布了一遍，

@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import time
 
 from . import clash
 
@@ -217,11 +218,30 @@ def backends() -> list[dict]:
     ]
 
 
+_ACTIVE_TTL = 3.0
+_active_cache = {"ts": 0.0, "id": "none"}
+
+
+def forget_active() -> None:
+    """切换后端之后立刻失效，否则接下来的 3 秒还会读到旧的"""
+    _active_cache["ts"] = 0.0
+
+
 def active() -> str:
-    """当前生效的后端。两个都在跑时以 OpenClash 为准（它抢占了 53/7892）。"""
+    """当前生效的后端。两个都在跑时以 OpenClash 为准（它抢占了 53/7892）。
+
+    `backends()` 要 pgrep + uci，一次 20–30ms；这个函数被 mode/connections/
+    groups/select 每次请求都调一遍，实测占掉这些接口的一半时间。
+    后端状态不会 3 秒内反复变，缓存 3 秒；写操作（切后端）会主动失效。
+    """
+    now = time.time()
+    if now - _active_cache["ts"] < _ACTIVE_TTL:
+        return _active_cache["id"]
     for item in backends():
         if item["running"]:
+            _active_cache.update(ts=now, id=item["id"])
             return item["id"]
+    _active_cache.update(ts=now, id="none")
     return "none"
 
 
@@ -317,6 +337,8 @@ def service(action: str, backend: str = "") -> dict:
         _run(["uci", "commit", target if target == "openclash" else "passwall"], timeout=5)
 
     code, out = _run([INIT[target], action], timeout=120)
+    # 刚切过后端，缓存里的 active 立刻作废
+    forget_active()
     return {
         "ok": code == 0,
         "backend": target,

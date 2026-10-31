@@ -52,6 +52,10 @@ def cache_drop(*keys: str) -> None:
 class Handler(BaseHTTPRequestHandler):
     server_version = "istore-agent/0.1"
     protocol_version = "HTTP/1.1"
+    # 关掉 Nagle：下面 _send 已经把响应头和正文合成一次写，
+    # 但 keep-alive 下零散的小包（比如 OPTIONS 预检）还会走 Nagle，
+    # 和客户端的延迟 ACK 凑一起就是每请求固定 40ms
+    disable_nagle_algorithm = True
 
     # ------------------------------------------------------------ 基础工具
 
@@ -68,9 +72,17 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         for k, v in (extra or {}).items():
             self.send_header(k, v)
-        self.end_headers()
-        if self.command != "HEAD":
-            self.wfile.write(body)
+        # 头 + 正文合成一次 write。
+        # 原来是 end_headers() 先发一排小包、再 wfile.write(body) 发正文：
+        # 服务端 Nagle 会压住正文等 ACK，客户端的延迟 ACK 又等 40ms ——
+        # 局域网里每个请求都白白多出 ~40ms（实测 /health 47ms，回环 0.6ms）。
+        self._headers_buffer.append(b"\r\n")
+        head = b"".join(self._headers_buffer)
+        self._headers_buffer = []
+        if self.command == "HEAD":
+            self.wfile.write(head)
+        else:
+            self.wfile.write(head + body)
 
     def _json(self, data, code: int = 200):
         self._send(code, json.dumps(data, ensure_ascii=False).encode("utf-8"))
@@ -477,16 +489,22 @@ class Handler(BaseHTTPRequestHandler):
                 # 安装进度：1 秒一跳，不走缓存（装了才会用到，平时成本为零）
                 self._json(adblock.install_status())
             elif path == "/api/v1/adblock/preflight":
-                self._json(adblock.preflight())
+                # 体检要读 meminfo、DNS 链路、dnsmasq 上游、AGH 状态，一次 130ms；
+                # 结果是「当前状态」，5 秒内重复问没有意义
+                self._json(cached("adblock_preflight", 5.0, adblock.preflight))
             elif path == "/api/v1/adblock/verify":
                 # 独立校验：现在这条 DNS 链路到底通不通（国内 / 国外 / IPv6 各查一次）
                 self._json(adblock.verify())
             elif path == "/api/v1/adblock/log":
-                self._json(adblock.log(
-                    limit=int(query.get("limit", ["120"])[0] or 120),
-                    only_blocked=query.get("only_blocked", ["0"])[0] in ("1", "true", "yes"),
-                    search=query.get("search", [""])[0],
-                ))
+                # 拉一次 AGH 查询日志要 200ms（40KB 回包 + 过滤），
+                # 而这一页只是「打开看一眼」，2 秒内重复请求直接复用
+                log_limit = int(query.get("limit", ["120"])[0] or 120)
+                log_only = query.get("only_blocked", ["0"])[0] in ("1", "true", "yes")
+                log_search = query.get("search", [""])[0]
+                self._json(cached(
+                    f"adblock_log:{log_limit}:{int(log_only)}:{log_search}", 2.0,
+                    lambda: adblock.log(limit=log_limit, only_blocked=log_only,
+                                        search=log_search)))
             elif path == "/api/v1/adblock/top":
                 # 首屏只放拦截次数最多的几条，明细在二级页面看。
                 # 统计窗口是 AGH 启动以来，变化很慢，缓存 4 秒足够，省得跟着刷新节拍反复查日志
