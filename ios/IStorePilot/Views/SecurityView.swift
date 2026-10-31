@@ -87,6 +87,7 @@ struct SecurityView: View {
     private var level1: some View {
             ScrollView {
                 VStack(spacing: 14) {
+                    scrollTopProbe()
                     heroCard
 
                     if loading {
@@ -114,13 +115,12 @@ struct SecurityView: View {
                     Color.clear.barBottomGap()
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 8)
+                .padding(.top, 6)
             }
             .scrollIndicators(.hidden)
             .background(C.appBg)
             .navigationTitle("设备")
-            .navigationBarTitleDisplayMode(.large)
-            .navBarChrome()
+            .pageTitle("设备")
             .adaptiveSheet(isPresented: $goApps) {
                 NavigationStack { AppsView(asSheet: true) }
             }

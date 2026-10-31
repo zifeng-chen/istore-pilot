@@ -4,7 +4,7 @@ import { J } from '../../core/Json';
 import { Fmt } from '../../util/Fmt';
 import { Bp } from '../Breakpoint';
 import { Pal, T } from '../Theme';
-import { CardTitle, Chip, Note, Pill, RowCard } from '../Comp';
+import { Card, CardTitle, Chip, Hairline, Note, Pill, RowCard } from '../Comp';
 import { Glyph } from '../comp/Icons';
 
 interface RankItem {
@@ -46,6 +46,35 @@ const INTERVAL_TEXT: string[] = ['关闭', '6 小时', '12 小时', '每天', '2
  * 这一版把「规则更新」单独做成一张卡：在此之前界面上根本看不出规则
  * 到底是谁在更新 —— AGH 自带定时任务（默认 24 小时），按钮只是补一次。
  */
+/** 体检项：一条检查 = 名称 + 是否通过 + 一句人话解释 */
+interface CheckItem {
+  label: string;
+  ok: boolean;
+  detail: string;
+}
+
+/** 查询日志的一行 */
+interface LogItem {
+  domain: string;
+  client: string;
+  blocked: boolean;
+  clock: string;
+}
+
+/** 日志里的客户端：IPv6 太长，只留最后一段（和清单里的短地址一个思路） */
+function shortClient(c: string): string {
+  if (c.length === 0) {
+    return '—';
+  }
+  if (c.indexOf(':') >= 0) {
+    const parts: string[] = c.split(':');
+    const tail: string = parts[parts.length - 1];
+    return tail.length > 0 ? ('…' + tail) : c;
+  }
+  const seg: string[] = c.split('.');
+  return seg.length === 4 ? (seg[2] + '.' + seg[3]) : c;
+}
+
 @Component
 export struct ShieldPage {
   @State blocked: number = 0;
@@ -58,6 +87,14 @@ export struct ShieldPage {
   @State top: RankItem[] = [];
   @State hops: DnsHop[] = [];
   @State loaded: boolean = false;
+  /** 拦截体检：原来只有安卓有，鸿蒙/iOS 都没有入口 */
+  @State checks: CheckItem[] = [];
+  @State preflightReady: boolean = false;
+  @State preflightMode: string = '';
+  /** 查询日志（最近几十条），默认只看被拦的 */
+  @State logItems: LogItem[] = [];
+  @State logOnlyBlocked: boolean = true;
+  @State logTotal: number = 0;
 
   // ---- 规则更新
   @State ruleAuto: boolean = false;
@@ -140,6 +177,13 @@ export struct ShieldPage {
     if (this.ruleLists.length === 0) {
       this.loadRules();
     }
+    // 体检和日志只在第一次进来时拉一次：它们不是每 5 秒都会变的东西
+    if (this.checks.length === 0) {
+      this.loadPreflight();
+    }
+    if (this.logItems.length === 0) {
+      this.loadLog();
+    }
     this.loaded = true;
   }
 
@@ -216,6 +260,49 @@ export struct ShieldPage {
   }
 
   // ================================================================ 规则更新
+
+  /** 拦截体检：8 项检查，一次读全 */
+  private async loadPreflight(): Promise<void> {
+    const r: ApiResult = await Api.get(this.ctx(), '/api/v1/adblock/preflight');
+    if (!r.ok) {
+      return;
+    }
+    this.preflightReady = r.data.bool('ready', false);
+    this.preflightMode = r.data.str('mode_label', '');
+    const list: J[] = r.data.arr('checks');
+    const out: CheckItem[] = [];
+    for (let i = 0; i < list.length; i++) {
+      out.push({
+        label: list[i].str('label', ''),
+        ok: list[i].bool('ok', false),
+        detail: list[i].str('detail', '')
+      });
+    }
+    this.checks = out;
+  }
+
+  /** 查询日志。只被拦截的 / 全部由 `logOnlyBlocked` 决定 */
+  private async loadLog(): Promise<void> {
+    const flag: string = this.logOnlyBlocked ? '1' : '0';
+    const r: ApiResult = await Api.get(this.ctx(),
+      '/api/v1/adblock/log?limit=40&only_blocked=' + flag);
+    if (!r.ok) {
+      return;
+    }
+    this.logTotal = r.data.num('total', 0);
+    const list: J[] = r.data.arr('items');
+    const out: LogItem[] = [];
+    for (let i = 0; i < list.length && i < 20; i++) {
+      const t: string = list[i].str('time', '');
+      out.push({
+        domain: list[i].str('domain', ''),
+        client: shortClient(list[i].str('client', '')),
+        blocked: list[i].bool('blocked', false),
+        clock: t.length >= 19 ? t.substring(11, 19) : t
+      });
+    }
+    this.logItems = out;
+  }
 
   private async loadRules(): Promise<void> {
     const r: ApiResult = await Api.get(this.ctx(), '/api/v1/adblock/rules');
@@ -341,7 +428,9 @@ export struct ShieldPage {
           Row({ space: Bp.gap(this.winW) }) {
             Column() {
               this.heroCard();
+              this.preflightCard();
               this.dnsCard();
+              this.logCard();
             }
             .layoutWeight(1)
             .alignItems(HorizontalAlign.Start);
@@ -358,9 +447,11 @@ export struct ShieldPage {
         } else {
           Column() {
             this.heroCard();
+            this.preflightCard();
             this.dnsCard();
             this.rankCard();
             this.rulesCard();
+            this.logCard();
           }
           .width('100%');
         }
@@ -381,6 +472,139 @@ export struct ShieldPage {
     .edgeEffect(EdgeEffect.Spring)
     .backgroundColor($r('app.color.app_bg'))
     .align(Alignment.Top);
+  }
+
+  @Builder
+  preflightCard() {
+    Card({ gapTop: T.GAP }) {
+      Column() {
+        Row() {
+          Text('拦截体检')
+            .fontSize(T.F_H2)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.text_primary'))
+            .layoutWeight(1);
+          Text(this.preflightReady ? '全部就绪' : '有待处理')
+            .fontSize(T.F_TINY)
+            .fontColor(this.preflightReady
+              ? $r('app.color.primary')
+              : $r('app.color.warn'))
+            .padding({ left: 8, right: 8, top: 2, bottom: 2 })
+            .borderRadius(99)
+            .backgroundColor(this.preflightReady
+              ? $r('app.color.accent_soft')
+              : Pal.alpha(Pal.warn(), 0.14));
+        }
+        .width('100%')
+        .margin({ bottom: 8 });
+
+        if (this.checks.length === 0) {
+          Text('读取中…')
+            .fontSize(T.F_SUB)
+            .fontColor($r('app.color.text_secondary'));
+        } else {
+          ForEach(this.checks, (c: CheckItem, i: number) => {
+            Row({ space: 8 }) {
+              Row()
+                .width(6)
+                .height(6)
+                .borderRadius(3)
+                .backgroundColor(c.ok
+                  ? $r('app.color.primary')
+                  : $r('app.color.warn'))
+                .margin({ top: 6 });
+              Column() {
+                Text(c.label)
+                  .fontSize(T.F_BODY)
+                  .fontColor($r('app.color.text_primary'));
+                Text(c.detail)
+                  .fontSize(T.F_TINY)
+                  .fontColor($r('app.color.text_tertiary'))
+                  .margin({ top: 2 });
+              }
+              .alignItems(HorizontalAlign.Start)
+              .layoutWeight(1);
+            }
+            .width('100%')
+            .alignItems(VerticalAlign.Top)
+            .padding({ top: 7, bottom: 7 });
+            if (i < this.checks.length - 1) {
+              Hairline({ indent: 14 });
+            }
+          }, (c: CheckItem, i: number) => c.label + i);
+        }
+      }
+      .width('100%');
+    }
+  }
+
+  @Builder
+  logCard() {
+    Card({ gapTop: T.GAP }) {
+      Column() {
+        Row() {
+          Text('最近查询')
+            .fontSize(T.F_H2)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.text_primary'))
+            .layoutWeight(1);
+          Text(this.logOnlyBlocked ? '只看拦截' : '全部')
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.primary'))
+            .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+            .borderRadius(99)
+            .backgroundColor($r('app.color.accent_soft'))
+            .onClick(() => {
+              this.logOnlyBlocked = !this.logOnlyBlocked;
+              this.logItems = [];
+              this.loadLog();
+            });
+        }
+        .width('100%')
+        .margin({ bottom: 6 });
+
+        if (this.logItems.length === 0) {
+          Text(this.logTotal > 0 ? '这段时间没有被拦截的记录' : '还没有查询记录')
+            .fontSize(T.F_SUB)
+            .fontColor($r('app.color.text_secondary'))
+            .padding({ top: 6, bottom: 6 });
+        } else {
+          ForEach(this.logItems, (it: LogItem, i: number) => {
+            Row({ space: 8 }) {
+              Text(it.clock)
+                .fontSize(10.5)
+                .fontColor($r('app.color.text_tertiary'))
+                .fontFeature("\"tnum\" on")
+                .width(52);
+              Text(it.domain)
+                .fontSize(T.F_SUB)
+                .fontColor($r('app.color.text_primary'))
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .layoutWeight(1);
+              Text(it.client)
+                .fontSize(10.5)
+                .fontColor($r('app.color.text_tertiary'))
+                .maxLines(1)
+                .width(76)
+                .textAlign(TextAlign.End);
+              if (it.blocked) {
+                Text('拦')
+                  .fontSize(9.5)
+                  .fontColor($r('app.color.danger'))
+                  .padding({ left: 5, right: 5, top: 1, bottom: 1 })
+                  .borderRadius(5)
+                  .backgroundColor(Pal.alpha(Pal.danger(), 0.14));
+              }
+            }
+            .width('100%')
+            .padding({ top: 5, bottom: 5 })
+            .alignItems(VerticalAlign.Center);
+          }, (it: LogItem, i: number) => it.clock + it.domain + i);
+        }
+      }
+      .width('100%');
+    }
   }
 
   @Builder

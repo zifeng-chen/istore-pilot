@@ -43,6 +43,8 @@ struct DeviceDetailView: View {
         .background(C.appBg)
         .navigationTitle(d.str("label", "设备"))
         .navigationBarTitleDisplayMode(.inline)
+        // 一级页把系统导航栏藏了，二级页显式声明「要显示」，免得跟着一起消失
+        .toolbar(.visible, for: .navigationBar)
         .navBarChrome()
         .task { await load() }
         .onReceive(tick) { _ in Task { await load() } }

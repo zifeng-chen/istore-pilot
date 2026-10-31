@@ -1,4 +1,5 @@
 import { common } from '@kit.AbilityKit';
+import { router } from '@kit.ArkUI';
 import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
 import { Bp } from '../Breakpoint';
@@ -29,6 +30,14 @@ interface NodeGroup {
   members: NodeItem[];
 }
 
+interface ConfigItem {
+  name: string;
+  file: string;
+  path: string;
+  current: boolean;
+  size: number;
+}
+
 /**
  * 代理页。
  *
@@ -55,6 +64,12 @@ export struct ProxyPage {
 
   @StorageProp('tab') @Watch('onTab') tab: number = 2;
   @State winW: number = 360;
+  /** 后端启停中，占位防止连点 */
+  @State busyBackend: string = '';
+  /** 配置文件列表与当前生效的那个 */
+  @State configs: ConfigItem[] = [];
+  @State currentPath: string = '';
+  @State configBusy: boolean = false;
   @StorageProp('winW') @Watch('onWidth') winWStore: number = 360;
 
   private timer: number = -1;
@@ -121,6 +136,7 @@ export struct ProxyPage {
     }
     await this.loadGroups();
     await this.loadMode();
+    await this.loadConfigs();
     this.loaded = true;
   }
 
@@ -173,6 +189,54 @@ export struct ProxyPage {
       });
     }
     this.groups = out;
+  }
+
+  private async loadConfigs(): Promise<void> {
+    const r: ApiResult = await Api.get(this.ctx(), '/api/v1/proxy/configs');
+    if (!r.ok) {
+      return;
+    }
+    this.currentPath = r.data.str('current', '');
+    const list: J[] = r.data.arr('configs');
+    const out: ConfigItem[] = [];
+    for (let i = 0; i < list.length; i++) {
+      const c: J = list[i];
+      out.push({
+        name: c.str('name', ''),
+        file: c.str('file', ''),
+        path: c.str('path', ''),
+        current: c.bool('current', false),
+        size: c.num('size', 0)
+      });
+    }
+    this.configs = out;
+  }
+
+  /** 后端启停：两个后端互斥，切过去 = 改 uci + 重启内核 */
+  private async toggleBackend(id: string, start: boolean): Promise<void> {
+    if (this.busyBackend.length > 0) {
+      return;
+    }
+    this.busyBackend = id;
+    const body: Record<string, Object> = { 'action': start ? 'start' : 'stop', 'backend': id };
+    const r: ApiResult = await Api.post(this.ctx(), '/api/v1/proxy/service', body);
+    this.busyBackend = '';
+    this.toast = r.ok ? (start ? '已启动，正在生效' : '已停止')
+      : ('操作失败：' + (r.error.length > 0 ? r.error : '未知错误'));
+    await this.load(false);
+  }
+
+  /** 切换配置文件 = uci set + commit + 重启内核，断网十几秒 */
+  private async switchConfig(path: string): Promise<void> {
+    if (this.configBusy) {
+      return;
+    }
+    this.configBusy = true;
+    this.toast = '切换中（会重启内核，断网十几秒）…';
+    const r: ApiResult = await Api.post(this.ctx(), '/api/v1/proxy/config', { 'path': path });
+    this.configBusy = false;
+    this.toast = r.ok ? '已切换' : ('切换失败：' + r.error);
+    await this.loadConfigs();
   }
 
   private async loadMode(): Promise<void> {
@@ -301,6 +365,8 @@ export struct ProxyPage {
             Column() {
               this.backendCard();
               this.modeCard();
+              this.configCard();
+              this.subsEntry();
             }
             .layoutWeight(1)
             .alignItems(HorizontalAlign.Start);
@@ -317,6 +383,8 @@ export struct ProxyPage {
           Column() {
             this.backendCard();
             this.modeCard();
+            this.configCard();
+            this.subsEntry();
             this.groupList();
           }
           .width('100%');
@@ -381,6 +449,22 @@ export struct ProxyPage {
             } else {
               Pill({ text: '已停止', tone: Pal.textSecondary() });
             }
+
+            if (b.installed) {
+              Text(this.busyBackend === b.id ? '处理中…'
+                : (b.running ? '停止' : '启动'))
+                .fontSize(T.F_SUB)
+                .fontColor(b.running ? $r('app.color.danger') : $r('app.color.primary'))
+                .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                .borderRadius(99)
+                .backgroundColor(b.running
+                  ? Pal.alpha(Pal.danger(), 0.12)
+                  : $r('app.color.accent_soft'))
+                .margin({ left: 8 })
+                .onClick(() => {
+                  this.toggleBackend(b.id, !b.running);
+                });
+            }
           }
           .width('100%')
           .padding({ top: 10, bottom: 10 })
@@ -408,6 +492,103 @@ export struct ProxyPage {
       .backgroundColor($r('app.color.surface_hi'))
       .margin({ top: 12 });
     }
+  }
+
+  @Builder
+  configCard() {
+    Card({ gapTop: T.GAP }) {
+      Column() {
+        CardTitle({
+          glyph: Glyph.BOX,
+          title: '配置文件',
+          sub: this.configs.length > 0
+            ? ('共 ' + this.configs.length + ' 个，点一个切换')
+            : '切换会重启内核、断网十几秒'
+        });
+        ForEach(this.configs, (c: ConfigItem, i: number) => {
+          Row({ space: 8 }) {
+            Row()
+              .width(6)
+              .height(6)
+              .borderRadius(3)
+              .backgroundColor(c.current
+                ? $r('app.color.primary')
+                : $r('app.color.text_tertiary'))
+              .margin({ top: 6 });
+            Column() {
+              Text(c.name)
+                .fontSize(T.F_BODY)
+                .fontColor(c.current
+                  ? $r('app.color.primary')
+                  : $r('app.color.text_primary'))
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis });
+              Text(this.fmtSize(c.size))
+                .fontSize(T.F_TINY)
+                .fontColor($r('app.color.text_tertiary'))
+                .fontFeature("\"tnum\" on")
+                .margin({ top: 2 });
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1);
+
+            if (c.current) {
+              Text('使用中')
+                .fontSize(T.F_TINY)
+                .fontColor($r('app.color.primary'))
+                .padding({ left: 8, right: 8, top: 2, bottom: 2 })
+                .borderRadius(99)
+                .backgroundColor($r('app.color.accent_soft'));
+            }
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Top)
+          .padding({ top: 9, bottom: 9 })
+          .onClick(() => {
+            if (!c.current) {
+              this.switchConfig(c.path);
+            }
+          });
+          if (i < this.configs.length - 1) {
+            Hairline({ indent: 14 });
+          }
+        }, (c: ConfigItem) => c.path + (c.current ? '1' : '0'));
+      }
+      .width('100%');
+    }
+  }
+
+  @Builder
+  subsEntry() {
+    Card({ gapTop: T.GAP }) {
+      Row() {
+        LineIcon({ glyph: Glyph.LINK, size: 18, color: $r('app.color.primary') })
+          .margin({ right: 10 });
+        Text('订阅管理')
+          .fontSize(T.F_BODY)
+          .fontColor($r('app.color.text_primary'))
+          .layoutWeight(1);
+        Text('›')
+          .fontSize(18)
+          .fontColor($r('app.color.text_tertiary'));
+      }
+      .width('100%')
+      .padding({ top: 4, bottom: 4 })
+      .alignItems(VerticalAlign.Center)
+      .onClick(() => {
+        router.pushUrl({ url: 'pages/SubscriptionPage' });
+      });
+    }
+  }
+
+  private fmtSize(n: number): string {
+    if (n <= 0) {
+      return '—';
+    }
+    if (n < 1048576) {
+      return Math.round(n / 1024) + ' KB';
+    }
+    return (n / 1048576).toFixed(1) + ' MB';
   }
 
   @Builder

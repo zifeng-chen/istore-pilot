@@ -30,6 +30,10 @@ struct ShieldView: View {
     }
     private var install: J { d.obj("install") ?? [:] }
 
+    /// 拦截体检。安卓一直有这一块，iOS 之前没有入口
+    @State private var checks: [J] = []
+    @State private var preflightReady = false
+
     var body: some View {
         ScrollView {
                 VStack(spacing: 14) {
@@ -44,6 +48,7 @@ struct ShieldView: View {
                         installCard
                     } else {
                         statCard
+                        preflightCard
                         topCard
                         dnsCard
                         RulesCard { Task { await load() } }
@@ -61,6 +66,9 @@ struct ShieldView: View {
         .background(C.appBg)
         .navigationTitle("拦截")
         .navigationBarTitleDisplayMode(.inline)
+        // 一级页把系统导航栏藏了，二级页必须自己声明「要显示」并把底色补回来
+        .toolbar(.visible, for: .navigationBar)
+        .navBarChrome()
         .navigationDestination(isPresented: $goLog) { AdblockLogView() }
         .sheet(isPresented: $goInstall) {
             WebScreen(title: "安装 AdGuard Home",
@@ -267,6 +275,52 @@ struct ShieldView: View {
 
     // MARK: - 统计
 
+    /// 拦截体检：8 项检查逐条列出，没过的画橙色点
+    private var preflightCard: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 8) {
+                    Text("拦截体检")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(C.textPrimary)
+                    Spacer(minLength: 6)
+                    Text(preflightReady ? "全部就绪" : "有待处理")
+                        .font(F.tiny)
+                        .foregroundStyle(preflightReady ? C.primary : C.warn)
+                        .padding(.horizontal, 8).padding(.vertical, 2)
+                        .background(preflightReady ? C.accentSoft : C.warn.opacity(0.14))
+                        .clipShape(Capsule())
+                }
+                .padding(.bottom, 8)
+
+                if checks.isEmpty {
+                    Text("读取中…").font(F.caption).foregroundStyle(C.textSecondary)
+                } else {
+                    ForEach(Array(checks.enumerated()), id: \.offset) { i, c in
+                        HStack(alignment: .top, spacing: 8) {
+                            Circle()
+                                .fill(c.bool("ok") ? C.primary : C.warn)
+                                .frame(width: 6, height: 6)
+                                .padding(.top, 5)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(c.str("label"))
+                                    .font(F.caption)
+                                    .foregroundStyle(C.textPrimary)
+                                Text(c.str("detail"))
+                                    .font(F.tiny)
+                                    .foregroundStyle(C.textTertiary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.vertical, 6)
+                        if i < checks.count - 1 { Hairline(inset: 14) }
+                    }
+                }
+            }
+        }
+    }
+
     private var statCard: some View {
         let s = stats
         let f = d.obj("filters") ?? [:]
@@ -428,6 +482,11 @@ struct ShieldView: View {
             d = try await Api.get("/api/v1/adblock")
             if let t = try? await Api.get("/api/v1/adblock/top?limit=8") {
                 top = t.objs("items")
+            }
+            // 体检结果不是每几秒就变，成功一次就不再重复拉
+            if checks.isEmpty, let p = try? await Api.get("/api/v1/adblock/preflight") {
+                checks = p.objs("checks")
+                preflightReady = p.bool("ready")
             }
             loading = false
             err = ""

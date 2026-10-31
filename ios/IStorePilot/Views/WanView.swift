@@ -71,6 +71,8 @@ struct WanView: View {
         .background(C.appBg)
         .navigationTitle("网络")
         .navigationBarTitleDisplayMode(.inline)
+        // 一级页把系统导航栏藏了，二级页显式声明「要显示」，免得跟着一起消失
+        .toolbar(.visible, for: .navigationBar)
         .navBarChrome()
         .task { await load() }
         .sheet(isPresented: $showWeb) {

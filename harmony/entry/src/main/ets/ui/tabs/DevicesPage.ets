@@ -1,4 +1,5 @@
 import { common } from '@kit.AbilityKit';
+import { router } from '@kit.ArkUI';
 import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
 import { Fmt } from '../../util/Fmt';
@@ -449,7 +450,18 @@ export struct DevicesPage {
       .padding({ left: 16, right: 16, top: 11, bottom: 11 })
       .alignItems(VerticalAlign.Center);
     }
-    .width('100%');
+    .width('100%')
+    .onClick(() => {
+      this.openDetail(d.mac);
+    });
+  }
+
+  /** 打开设备详情（独立路由页，见 pages/DeviceDetailPage） */
+  private openDetail(mac: string): void {
+    if (mac.length === 0) {
+      return;
+    }
+    router.pushUrl({ url: 'pages/DeviceDetailPage', params: { mac: mac } });
   }
 
   // MARK: - 宽屏网格
@@ -670,6 +682,9 @@ export struct DevicesPage {
     .padding({ left: 10, right: 10, top: 10, bottom: 10 })
     .borderRadius(14)
     .backgroundColor(d.online ? $r('app.color.surface') : $r('app.color.surface_sunken'))
-    .border({ width: 0.5, color: $r('app.color.divider') });
+    .border({ width: 0.5, color: $r('app.color.divider') })
+    .onClick(() => {
+      this.openDetail(d.mac);
+    });
   }
 }

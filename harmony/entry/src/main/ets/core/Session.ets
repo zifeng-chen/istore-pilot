@@ -37,6 +37,36 @@ export class Session {
     return Session.baseUrl;
   }
 
+  /**
+   * 把用户随手输入的地址整理成可用的 base url。
+   *
+   * 和安卓 `Session.normalize`、iOS `Session.normalize` 完全同一套规则：
+   * 不写协议补 http://，不写端口补 8443，去掉尾斜杠。
+   * 三端都能只输 `192.168.100.1`。
+   */
+  static normalize(raw: string): string {
+    let v: string = raw.length > 0 ? raw.trim() : '';
+    if (v.length === 0) {
+      return 'http://192.168.100.1:8443';
+    }
+    if (!v.startsWith('http://') && !v.startsWith('https://')) {
+      v = 'http://' + v;
+    }
+    while (v.endsWith('/')) {
+      v = v.substring(0, v.length - 1);
+    }
+    const after: string = v.substring(v.indexOf('://') + 3);
+    if (after.indexOf(':') < 0 && after.indexOf('/') < 0) {
+      v = v + ':8443';
+    }
+    return v;
+  }
+
+  /** 不含协议的展示用地址（输入框占位符） */
+  static defaultHost(): string {
+    return '192.168.100.1:8443';
+  }
+
   static token(): string {
     return Session.authToken;
   }

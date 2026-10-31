@@ -262,3 +262,85 @@ struct MetricsReader: ViewModifier {
         }
     }
 }
+
+// MARK: - 一级页的收起式标题栏
+
+/// 滚动位置探针的 namespace。四个一级页各自一个导航栈，名字一样也不会串。
+enum PageSpace {
+    static let name = "pageScroll"
+}
+
+private struct ScrollTopKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+extension View {
+    /// 放在 ScrollView 内容的第一行（`VStack` 里最上面），用来量「往上滚了多少」。
+    /// 高度 0，不占版面。
+    func scrollTopProbe() -> some View {
+        GeometryReader { g in
+            Color.clear.preference(key: ScrollTopKey.self,
+                                   value: g.frame(in: .named(PageSpace.name)).minY)
+        }
+        .frame(height: 0)
+    }
+
+    /// 一级页的标题栏：内容直接顶到安全区，往上滚过 24pt 才浮出标题条。
+    ///
+    /// 原来用的是系统大标题（`.navigationBarTitleDisplayMode(.large)`）：它常年
+    /// 占掉 52pt 甚至 96pt，页面第一张卡永远离顶部很远，折叠屏展开后那段空白更明显。
+    /// 现在把系统导航栏藏掉，自己画一条 44pt 的浮层 —— 不参与布局，所以
+    /// 卡片是真的贴着安全区；滚起来才盖出来，也不会把内容顶下去。
+    func pageTitle(_ title: String) -> some View {
+        modifier(PageTitleBar(title: title))
+    }
+}
+
+private struct PageTitleBar: ViewModifier {
+    let title: String
+    @State private var lifted = false
+
+    #if DEBUG
+    private let forced = DebugRoute.titlebar
+    #endif
+
+    /// 正常看 `lifted`（滚出来的）；DEBUG 下可以强制打开，方便截图核对版式
+    private var showing: Bool {
+        #if DEBUG
+        return lifted || forced
+        #else
+        return lifted
+        #endif
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .coordinateSpace(name: PageSpace.name)
+            .onPreferenceChange(ScrollTopKey.self) { y in
+                let on = y < -24
+                guard on != lifted else { return }
+                withAnimation(.easeOut(duration: 0.18)) { lifted = on }
+            }
+            .toolbar(.hidden, for: .navigationBar)
+            .overlay(alignment: .top) {
+                Text(title)
+                    .font(.system(size: 16.5, weight: .semibold))
+                    .foregroundStyle(C.textPrimary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background {
+                        // 底色往上吃掉状态栏那一块，标题条才不是悬空的
+                        C.appBg
+                            .ignoresSafeArea(edges: .top)
+                            .overlay(alignment: .bottom) {
+                                Rectangle().fill(C.divider).frame(height: 0.5)
+                            }
+                    }
+                    .opacity(showing ? 1 : 0)
+                    .allowsHitTesting(false)
+            }
+    }
+}

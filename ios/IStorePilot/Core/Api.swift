@@ -1,4 +1,5 @@
 import Foundation
+import Network
 
 struct ApiError: LocalizedError {
     let code: Int
@@ -145,5 +146,42 @@ enum Api {
         default:
             return e.localizedDescription
         }
+    }
+}
+
+// MARK: - 本地网络权限
+
+/// 提前把「本地网络」授权问出来。
+///
+/// iOS 第一次访问局域网时会弹授权框，而这个弹窗**出现之前那几个请求会一直挂着**
+/// —— 登录页点「连接」时它才弹，用户看到的就是按了没反应、停在启动画面。
+/// 所以 App 一启动就用一次 Bonjour 浏览把弹窗顶出来：用户还在看启动页，
+/// 授权框已经在上面等着了，点头之后第一次登录就是通的。
+///
+/// 只用 `NWBrowser`（不真连任何地址）：它足够触发权限，又不会在没授权时
+/// 在日志里刷一堆连接失败。
+enum LocalNetwork {
+    private static var priming = false
+
+    static func prime() {
+        guard !priming else { return }
+        priming = true
+
+        let params = NWParameters.tcp
+        params.includePeerToPeer = true
+        let browser = NWBrowser(for: .bonjour(type: "_http._tcp", domain: nil),
+                                using: params)
+        browser.stateUpdateHandler = { state in
+            switch state {
+            case .ready:
+                // 权限已给：立刻收工，别真去浏览局域网里的服务
+                browser.cancel()
+            case .failed, .cancelled:
+                priming = false
+            default:
+                break
+            }
+        }
+        browser.start(queue: .global(qos: .utility))
     }
 }

@@ -8,7 +8,7 @@ import { Fmt } from '../../util/Fmt';
 import { Appearance } from '../Appearance';
 import { Bp } from '../Breakpoint';
 import { Pal, T } from '../Theme';
-import { CardTitle, GlyphIcon, LineIcon, Note, RowCard, SettingRow } from '../Comp';
+import { Card, CardTitle, GlyphIcon, Hairline, LineIcon, Note, RowCard, SettingRow } from '../Comp';
 import { Glyph, Ico } from '../comp/Icons';
 import { BackupsPage } from './BackupsPage';
 
@@ -63,6 +63,12 @@ export struct SettingsPage {
   @State toast: string = '';
 
   @State winW: number = 360;
+  /** 电源：先点一次变「再点一次确认」，避免误触 */
+  @State pendingPower: string = '';
+  @State powerBusy: boolean = false;
+  /** 硬件信息（system/hardware 只读） */
+  @State hw: J = J.empty();
+  @State hwLoaded: boolean = false;
   @StorageProp('winW') @Watch('onWidth') winWStore: number = 360;
   @StorageProp('tab') @Watch('onTab') tab: number = 4;
 
@@ -100,6 +106,8 @@ export struct SettingsPage {
     const ctx = this.ctx();
     this.server = Session.base();
     this.tokenOk = Session.token().length > 0;
+
+    this.loadHardware();
 
     const started: number = Date.now();
     const ping: ApiResult = await Api.getFresh(ctx, '/api/v1/ping');
@@ -228,6 +236,8 @@ export struct SettingsPage {
               Column() {
                 this.lookCard();
                 this.systemCard();
+                this.powerCard();
+                this.hardwareCard();
                 this.securityCard();
                 this.aboutCard();
               }
@@ -243,6 +253,8 @@ export struct SettingsPage {
               this.netCard();
               this.lookCard();
               this.systemCard();
+              this.powerCard();
+              this.hardwareCard();
               this.securityCard();
               this.aboutCard();
             }
@@ -544,6 +556,145 @@ export struct SettingsPage {
       });
     }
   }
+
+
+  /** 电源：重启网络 / 重启 / 关机。点一次只进入「再点确认」，第二次才真发 */
+  @Builder
+  powerCard() {
+    Card({ gapTop: T.GAP }) {
+      Column() {
+        Text('电源')
+          .fontSize(T.F_H2)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'))
+          .width('100%')
+          .margin({ bottom: 6 });
+        this.powerRow('重启网络服务', '只重拨 WAN，局域网不掉线', 'restart_network');
+        Hairline({ indent: 0 });
+        this.powerRow('重启路由器', '整机重启，约一分钟', 'reboot');
+        Hairline({ indent: 0 });
+        this.powerRow('关机', '关机后只能按电源键开机', 'poweroff');
+      }
+      .width('100%');
+    }
+  }
+
+  @Builder
+  powerRow(title: string, sub: string, action: string) {
+    Row({ space: 8 }) {
+      Column() {
+        Text(this.pendingPower === action ? '再点一次确认' : title)
+          .fontSize(T.F_BODY)
+          .fontColor(this.pendingPower === action
+            ? $r('app.color.danger')
+            : $r('app.color.text_primary'));
+        Text(sub)
+          .fontSize(T.F_TINY)
+          .fontColor($r('app.color.text_tertiary'))
+          .margin({ top: 2 });
+      }
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1);
+
+      Text(this.powerBusy && this.pendingPower === action ? '执行中…' : '›')
+        .fontSize(this.powerBusy && this.pendingPower === action ? 12 : 18)
+        .fontColor($r('app.color.text_tertiary'));
+    }
+    .width('100%')
+    .padding({ top: 9, bottom: 9 })
+    .alignItems(VerticalAlign.Center)
+    .onClick(() => {
+      this.doPower(action);
+    });
+  }
+
+  private async doPower(action: string): Promise<void> {
+    if (this.powerBusy) {
+      return;
+    }
+    if (this.pendingPower !== action) {
+      this.pendingPower = action;
+      return;
+    }
+    this.powerBusy = true;
+    const body: Record<string, Object> = { 'action': action, 'confirm': action };
+    const r: ApiResult = await Api.post(this.ctx(), '/api/v1/power', body);
+    this.powerBusy = false;
+    this.pendingPower = '';
+    this.toast = r.ok ? (action === 'poweroff' ? '正在关机' : '已重启')
+      : ('失败：' + (r.error.length > 0 ? r.error : '未知错误'));
+  }
+
+  @Builder
+  hardwareCard() {
+    Card({ gapTop: T.GAP }) {
+      Column() {
+        Row() {
+          Text('硬件信息')
+            .fontSize(T.F_H2)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.text_primary'))
+            .layoutWeight(1);
+          if (!this.hwLoaded) {
+            Text('读取中…')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_secondary'));
+          }
+        }
+        .width('100%')
+        .margin({ bottom: 6 });
+
+        if (!this.hwLoaded) {
+          Text('')
+            .fontSize(T.F_SUB);
+        } else {
+          const cpu: J = this.hw.obj('cpu');
+          const m: J = this.hw.obj('machine');
+          this.hwRow('处理器', cpu.str('model', '—'));
+          this.hwRow('核心 / 线程', cpu.num('cores', 0) + ' / ' + cpu.num('threads', 0));
+          this.hwRow('主频', (cpu.num('mhz', 0) / 1000).toFixed(1) + ' GHz');
+          this.hwRow('缓存', Fmt.orDash(cpu.str('cache', '')));
+          this.hwRow('机型', Fmt.orDash(m.str('chassis', '')));
+          this.hwRow('BIOS', Fmt.orDash(m.str('bios_vendor', '')) + ' ' + m.str('bios_version', ''));
+        }
+      }
+      .width('100%');
+    }
+  }
+
+  @Builder
+  hwRow(label: string, value: string) {
+    Row() {
+      Text(label)
+        .fontSize(T.F_SUB)
+        .fontColor($r('app.color.text_secondary'))
+        .flexShrink(0);
+      Blank();
+      Text(value)
+        .fontSize(T.F_SUB)
+        .fontColor($r('app.color.text_primary'))
+        .fontFeature("\"tnum\" on")
+        .textAlign(TextAlign.End)
+        .layoutWeight(1)
+        .margin({ left: 12 })
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis });
+    }
+    .width('100%')
+    .padding({ top: 7, bottom: 7 });
+  }
+
+  private async loadHardware(): Promise<void> {
+    if (this.hwLoaded) {
+      return;
+    }
+    const r: ApiResult = await Api.get(this.ctx(), '/api/v1/system/hardware');
+    if (r.ok) {
+      this.hw = r.data;
+      this.hwLoaded = true;
+    }
+  }
+
 
   @Builder
   systemCard() {

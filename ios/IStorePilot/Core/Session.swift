@@ -44,7 +44,18 @@ enum Session {
         d.removeObject(forKey: kExpires)
     }
 
-    /// 补协议、去尾斜杠、去多余空白。用户只会输入 `192.168.100.1:8443` 这种。
+    /// 不含协议的主机地址，拿来当输入框的占位符。三端展示的是同一个串。
+    static var defaultHost: String {
+        defaultBase.replacingOccurrences(of: "http://", with: "")
+                   .replacingOccurrences(of: "https://", with: "")
+    }
+
+    /// 补协议、补默认端口、去尾斜杠、去多余空白。
+    ///
+    /// 用户输入什么都认：`192.168.100.1` / `192.168.100.1:8443` /
+    /// `http://192.168.100.1:8443` / `https://nas.lan`。
+    /// 不写协议就补 http://（Agent 本身就是明文），不写端口补 8443 ——
+    /// 这一条和安卓 `Session.normalize` 完全一致，鸿蒙也照抄了一份。
     static func normalize(_ raw: String) -> String {
         var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !s.isEmpty else { return defaultBase }
@@ -52,6 +63,15 @@ enum Session {
             s = "http://" + s
         }
         while s.hasSuffix("/") { s.removeLast() }
+
+        // 没写端口时补 8443：`http://192.168.100.1` 直接连会打到 80 端口上，
+        // 那儿是 LuCI，不是 Agent
+        if let r = s.range(of: "://") {
+            let rest = String(s[r.upperBound...])
+            if !rest.contains(":") && !rest.contains("/") {
+                s += ":8443"
+            }
+        }
         return s
     }
 }

@@ -51,6 +51,8 @@ struct SubscriptionView: View {
         .background(C.appBg)
         .navigationTitle("订阅管理")
         .navigationBarTitleDisplayMode(.inline)
+        // 一级页把系统导航栏藏了，二级页显式声明「要显示」，免得跟着一起消失
+        .toolbar(.visible, for: .navigationBar)
         .navBarChrome()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {

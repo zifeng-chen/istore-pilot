@@ -3,6 +3,8 @@
     "pages/Index",
     "pages/LoginPage",
     "pages/NetSettingsPage",
-    "pages/WebPage"
+    "pages/WebPage",
+    "pages/DeviceDetailPage",
+    "pages/SubscriptionPage"
   ]
 }

@@ -44,6 +44,7 @@ struct ProxyView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
+                    scrollTopProbe()
                     hero
                     // 窄屏顺序 = 安卓：先模式、后配置与节点。
                     // 宽屏把节点摊到左边，配置/模式挤右栏，省一次长滚动
@@ -66,13 +67,12 @@ struct ProxyView: View {
                     Color.clear.barBottomGap()
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 8)
+                .padding(.top, 6)
             }
             .scrollIndicators(.hidden)
             .background(C.appBg)
             .navigationTitle("代理")
-            .navigationBarTitleDisplayMode(.large)
-            .navBarChrome()
+            .pageTitle("代理")
             .navigationDestination(isPresented: $goSubs) { SubscriptionView() }
             .onAppear { chrome.set(tabIndex, goSubs) }
             .onChange(of: goSubs) { chrome.set(tabIndex, $0) }

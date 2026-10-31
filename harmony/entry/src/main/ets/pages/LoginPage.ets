@@ -47,8 +47,10 @@ struct LoginPage {
     this.err = '';
     this.probe = '';
 
+    const target: string = Session.normalize(this.host);
+    this.host = target;
     try {
-      const res: ApiResult = await Api.login(this.host, this.password);
+      const res: ApiResult = await Api.login(target, this.password);
       if (!res.ok) {
         this.err = res.error;
         this.busy = false;
@@ -63,7 +65,7 @@ struct LoginPage {
       const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
       // 换了服务器等于换了数据源，旧快照必须清掉，否则会先看到上一台路由的数字
       await Snap.clear(ctx);
-      await Session.signIn(ctx, this.host, token, 'admin');
+      await Session.signIn(ctx, target, token, 'admin');
       router.replaceUrl({ url: 'pages/Index' });
     } catch (e) {
       this.err = '登录失败，请检查地址与网络';
@@ -73,7 +75,7 @@ struct LoginPage {
 
   private async doProbe(): Promise<void> {
     this.probe = '正在连接…';
-    const res: ApiResult = await Api.ping(this.host);
+    const res: ApiResult = await Api.ping(Session.normalize(this.host));
     if (res.ok) {
       const v: string = res.data.str('version', '');
       this.probe = v.length > 0 ? ('已连接 · Agent v' + v) : '已连接';

@@ -113,6 +113,12 @@ export class Http {
     if (!b.startsWith('http://') && !b.startsWith('https://')) {
       b = 'http://' + b;
     }
+    // 没写端口补 8443：http://192.168.100.1 会打到 80（LuCI），不是 Agent。
+    // 和 iOS `Session.normalize` / 安卓 `Session.normalize` 同一套规则
+    const afterScheme: string = b.substring(b.indexOf('://') + 3);
+    if (afterScheme.indexOf(':') < 0 && afterScheme.indexOf('/') < 0) {
+      b = b + ':8443';
+    }
     if (!path.startsWith('/')) {
       return b + '/' + path;
     }

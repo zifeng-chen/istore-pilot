@@ -80,6 +80,9 @@ struct DevicesView: View {
         // 以前是原地换视图 + 自己画一个 chevron，iOS 26 把它渲染成浮在右上角的玻璃圆钮
         .navigationTitle("设备清单")
         .navigationBarTitleDisplayMode(.inline)
+        // 一级页把系统导航栏藏了，二级页必须自己声明「要显示」并把底色补回来
+        .toolbar(.visible, for: .navigationBar)
+        .navBarChrome()
         .onAppear {
             if !didInit {
                 filter = initialFilter

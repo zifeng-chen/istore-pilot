@@ -36,8 +36,23 @@
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>需要访问局域网，才能连上你的 iStoreOS 路由器。</string>
+	<!-- 启动时用一次 Bonjour 浏览把「本地网络」授权框提前顶出来，
+	     这里得声明要浏览的服务类型，否则浏览会被系统直接拒掉 -->
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_http._tcp</string>
+	</array>
+	<!-- 启动画面：底色 + 应用图标。原来是空 dict，系统只给一块纯色，
+	     深色模式下就是一片黑，看着像卡住了 -->
 	<key>UILaunchScreen</key>
-	<dict/>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBg</string>
+		<key>UIImageName</key>
+		<string>LaunchLogo</string>
+		<key>UIImageRespectsSafeAreaInsets</key>
+		<false/>
+	</dict>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>arm64</string>

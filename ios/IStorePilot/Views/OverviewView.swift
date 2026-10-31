@@ -33,19 +33,16 @@ struct OverviewView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
+                    scrollTopProbe()
                     heroCard
 
                     if loading {
                         skeleton
                     } else if axis == .rail {
-                        // 宽屏：上面「系统状态 | 局域网设备」两栏，网口单独占一整行。
-                        // 网口挤在左栏里只有 479pt，6 个口得两两排成三行；
-                        // 摊成整行后一行能看全，拔插网线时不用来回扫
-                        DuoColumns {
-                            systemCard
-                        } right: {
-                            deviceCard
-                        }
+                        // 宽屏也走单列：右栏原来是「局域网设备」，
+                        // 这块已经去掉了（设备有自己的页签），留着就是一个空洞。
+                        // 网口摊成整行，一行能看全，拔插网线时不用来回扫
+                        systemCard
                         wanCard
                         portCard(tileMin: 120)
                     } else {
@@ -54,7 +51,6 @@ struct OverviewView: View {
                         systemCard
                         wanCard
                         portCard(tileMin: 156)
-                        deviceCard
                     }
 
                     if !err.isEmpty {
@@ -63,13 +59,14 @@ struct OverviewView: View {
                     Color.clear.barBottomGap()
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 8)
+                .padding(.top, 6)
             }
             .scrollIndicators(.hidden)
             .background(C.appBg)
+            // 标题自己画（见 pageTitle）：系统大标题常占 52–96pt，
+            // 第一张卡永远贴不到安全区
             .navigationTitle("概览")
-            .navigationBarTitleDisplayMode(.large)
-            .navBarChrome()
+            .pageTitle("概览")
             .task { await load() }
             .onReceive(tick) { _ in Task { await load() } }
             .onReceive(secTick) { now = $0 }
@@ -427,64 +424,6 @@ struct OverviewView: View {
     }
 
     // MARK: - 设备
-
-    private var deviceCard: some View {
-        let list = dev.objs("devices")
-        let online = list.filter { $0.bool("online") }
-        let blocked = list.filter { $0.bool("blocked") }
-        let top = list.sorted { $0.obj("net")?.dbl("avg_bps") ?? 0 > $1.obj("net")?.dbl("avg_bps") ?? 0 }
-            .prefix(3)
-
-        return Card {
-            VStack(alignment: .leading, spacing: 12) {
-                CardHead(icon: "link", title: "局域网设备",
-                         sub: "点行看详情") {
-                    if !list.isEmpty {
-                        Text("\(online.count) / \(list.count) 在线")
-                            .font(F.caption)
-                            .foregroundStyle(C.textSecondary)
-                    }
-                }
-
-                HStack(spacing: 10) {
-                    statBlock("在线", "\(online.count)", C.primary)
-                    statBlock("离线", "\(max(0, list.count - online.count))", C.textSecondary)
-                    statBlock("已禁网", "\(blocked.count)", blocked.isEmpty ? C.textSecondary : C.warn)
-                }
-
-                if !top.isEmpty {
-                    Hairline(inset: 0)
-                    ForEach(Array(top.enumerated()), id: \.offset) { _, dv in
-                        let net = dv.obj("net") ?? [:]
-                        HStack(spacing: 9) {
-                            Circle().fill(dv.bool("online") ? C.ok : C.textTertiary)
-                                .frame(width: 6, height: 6)
-                            Text(dv.str("label", dv.str("ip")))
-                                .font(F.caption)
-                                .foregroundStyle(C.textPrimary)
-                                .lineLimit(1)
-                            Spacer()
-                            Text(F.rate(net.dbl("avg_bps")))
-                                .font(F.num(12, .regular))
-                                .foregroundStyle(C.textSecondary)
-                        }
-                        .padding(.vertical, 3)
-                    }
-                }
-            }
-        }
-    }
-
-    private func statBlock(_ k: String, _ v: String, _ c: Color) -> some View {
-        VStack(spacing: 3) {
-            Text(v).font(F.num(22, .bold)).foregroundStyle(c)
-            Text(k).font(.system(size: 10.5)).foregroundStyle(C.textSecondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 10)
-        .background(C.surfaceSunken)
-        .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-    }
 
     // MARK: - 电源
 
