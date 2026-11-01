@@ -280,6 +280,20 @@ public class SettingsFragment extends BaseFragment {
         security.addView(note);
         root.addView(security);
 
+        // ---------------------------------------------------------------- 操作
+        // 退出 / 清缓存 / 主题：都是低频操作，单独一张卡
+        Ui.Card act = Ui.card(c);
+        Ui.cardPadding(act, 11);
+        Ui.cardTitle(c, act, com.chaof.istoreos.widget.Glyph.LIST,
+                "操作", "登录、缓存与主题");
+        Ui.settingRow(c, act, com.chaof.istoreos.widget.Glyph.LOGOUT,
+                "退出登录", "清除凭证并返回登录页", "", true, false, this::relogin);
+        Ui.settingRow(c, act, com.chaof.istoreos.widget.Glyph.TRASH,
+                "清缓存", "只清手机上的快照，不动路由器", "", false, false, this::clearCache);
+        tvTheme = Ui.settingRow(c, act, com.chaof.istoreos.widget.Glyph.MOON,
+                "主题", "跟随系统或固定深浅色", Theme.name(c), false, false, this::pickTheme);
+        root.addView(act);
+
         // ---------------------------------------------------------------- 关于
         // 只放四样：图标、名称、版本、一句话介绍。剩下的（界面实现、数据来源）
         // 属于开发细节，用户不需要在「关于」里读文档
@@ -315,20 +329,6 @@ public class SettingsFragment extends BaseFragment {
         tip.setPadding(0, Ui.dp(c, 14), 0, 0);
         about.addView(tip);
         root.addView(about);
-
-        // ---------------------------------------------------------------- 操作
-        // 退出 / 清缓存 / 主题：都是低频操作，单独一张卡收在页面底部
-        Ui.Card act = Ui.card(c);
-        Ui.cardPadding(act, 11);
-        Ui.cardTitle(c, act, com.chaof.istoreos.widget.Glyph.LIST,
-                "操作", "登录、缓存与主题");
-        Ui.settingRow(c, act, com.chaof.istoreos.widget.Glyph.LOGOUT,
-                "退出登录", "清除凭证并返回登录页", "", true, false, this::relogin);
-        Ui.settingRow(c, act, com.chaof.istoreos.widget.Glyph.TRASH,
-                "清缓存", "只清手机上的快照，不动路由器", "", false, false, this::clearCache);
-        tvTheme = Ui.settingRow(c, act, com.chaof.istoreos.widget.Glyph.MOON,
-                "主题", "跟随系统或固定深浅色", Theme.name(c), false, false, this::pickTheme);
-        root.addView(act);
     }
 
     /** hero 底部的一格读数：上面小标签，下面数值，均分一行 */
