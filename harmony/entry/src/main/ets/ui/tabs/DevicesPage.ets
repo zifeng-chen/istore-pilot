@@ -395,12 +395,14 @@ export struct DevicesPage {
         // 接入方式徽标（5G / 2.4G / LAN）替掉原来的首字方块：
         // 一排方块看不出「插线还是无线、连的哪个频段」，而那才是用户想知道的
         Text(d.badge)
-          .fontSize(10)
+          .fontSize(9)
           .fontWeight(FontWeight.Medium)
           .fontColor(this.badgeColor(d))
           .textAlign(TextAlign.Center)
-          .padding({ left: 6, right: 6, top: 3, bottom: 3 })
-          .borderRadius(7)
+          // 正方形：5G / 2.4G / WiFi / LAN / — 一律同尺寸，不再随文字长短忽宽忽窄
+          .width(30)
+          .height(30)
+          .borderRadius(9)
           .backgroundColor(d.badgeReal ? Pal.alpha(this.badgeColor(d), 0.14) : Color.Transparent)
           .border({ width: d.badgeReal ? 0 : 1, color: Pal.alpha(this.badgeColor(d), 0.42) });
 

@@ -343,20 +343,21 @@ struct AccessBadge: View {
 
     var body: some View {
         Text(F.accessShort(access))
-            .font(.system(size: 10, weight: .semibold))
+            .font(.system(size: 9, weight: .semibold))
             .foregroundStyle(tint)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            // 正方形：5G / 2.4G / WiFi / LAN / — 一律同尺寸，不再随文字长短忽宽忽窄
+            .frame(width: 30, height: 30)
             .background {
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .fill(F.isAccessReal(access) ? tint.opacity(0.14) : .clear)
                     .overlay {
-                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
                             .strokeBorder(tint.opacity(F.isAccessReal(access) ? 0 : 0.42),
                                           lineWidth: 1)
                     }
             }
-            .fixedSize()
     }
 
     private var tint: Color {

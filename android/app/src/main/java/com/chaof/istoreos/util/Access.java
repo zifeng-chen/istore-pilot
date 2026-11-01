@@ -75,16 +75,17 @@ public final class Access {
 
         TextView v = new TextView(c);
         v.setText(text);
-        v.setTextSize(10f);
+        v.setTextSize(9f);
         v.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         v.setTextColor(color);
         v.setGravity(Gravity.CENTER);
         v.setIncludeFontPadding(false);
         v.setSingleLine(true);
-        v.setPadding(Ui.dp(c, 6), Ui.dp(c, 3), Ui.dp(c, 6), Ui.dp(c, 3));
+        // 正方形：5G / 2.4G / WiFi / LAN / — 一律同尺寸，不再随文字长短忽宽忽窄
+        v.setPadding(0, 0, 0, 0);
 
         GradientDrawable bg = new GradientDrawable();
-        bg.setCornerRadius(Ui.dp(c, 7));
+        bg.setCornerRadius(Ui.dp(c, 9));
         if (real) {
             bg.setColor(Ui.alpha(color, 0.14f));
         } else {
@@ -94,7 +95,7 @@ public final class Access {
         v.setBackground(bg);
 
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                Ui.dp(c, 30), Ui.dp(c, 30));
         lp.rightMargin = Ui.dp(c, 9);
         v.setLayoutParams(lp);
         return v;
