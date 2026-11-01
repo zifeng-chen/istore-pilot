@@ -28,7 +28,7 @@ CONF_DIR = "/etc/istore-agent"
 CONF_PATH = f"{CONF_DIR}/config.json"
 INITD = "/etc/init.d/istore-agent"
 
-INCLUDE = ["agent", "web", "run.py"]
+INCLUDE = ["agent", "run.py"]
 
 
 def agent_version() -> str:

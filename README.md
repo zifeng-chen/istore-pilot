@@ -110,7 +110,6 @@ iStore Pilot 想做的是**一个合格的手机端仪表盘**：
   整理成一份稳定的 JSON 契约。
 - **客户端**（`android/` `harmony/` `ios/`）只认这份契约。三端看到的数据必然一致，
   因为它们请求的是同一份。
-- **Web 控制台**（`web/`）是同一套接口的浏览器版（PWA），给不想装 App 的场景。
 
 这样设计的好处是：换代理后端、改数据源、加字段，只动 Agent，
 三端不需要各改一遍。
@@ -150,7 +149,6 @@ istoreOS/
 ├── harmony/          HarmonyOS NEXT      ArkTS + ArkUI（Stage 模型）
 ├── ios/              iOS 客户端          SwiftUI，无 WebView
 ├── agent/            路由器端 Agent      Python 3 标准库，零依赖
-├── web/              浏览器控制台        HTML/CSS/JS（PWA）
 ├── deploy/           ipk 打包与部署      Python + shell
 ├── scripts/          构建/版本/运维脚本   Python + shell
 ├── docs/             文档与成品截图
@@ -163,7 +161,6 @@ istoreOS/
 | `android/` | 47 个 .java | 15,939 |
 | `harmony/` | 31 个 .ets | 9,283 |
 | `ios/` | 26 个 .swift | 7,963 |
-| `web/` | 2 个 .js | 847 |
 | `deploy/` + `scripts/` | 38 个 .py | 5,848 |
 
 ## 六、构建与打包
@@ -299,8 +296,8 @@ ROUTER_PW='...' python deploy/install_ipk.py
 > 请把 `/etc/config/istore-agent` 的 `bind` 改成 LAN 地址
 > （例如 `192.168.1.1`），避免管理面暴露在 WAN / IPv6 公网侧。
 >
-> **2. 打包顺序**：`build_ipk.py` 直接从项目根 `web/` 复制前端资源。
-> 先打包后改 web，会导致包内永远是旧文件，装完还会把手工上传的新文件覆盖回去。
+> **2. 打包顺序**：改完 Agent 代码再打 ipk —— 先打包后改，会导致包内永远是旧代码，
+> 装完还会把手工上传的新文件覆盖回去。
 > **正确顺序：改代码 → build_ipk / build_run → install。**
 >
 > **3. `.run` 与 ipk 互斥**：两种装法不能并存，否则 `opkg remove` 会把 `.run`
@@ -423,7 +420,7 @@ python scripts/check_version.py         # 校验六处是否一致（提交前�
 [MIT](LICENSE) © 2026 chaof
 
 可以自由使用、修改、分发，也可以商用 —— 保留版权声明与免责声明即可，不提供任何担保。
-三端客户端、Agent、Web 控制台、打包与运维脚本、文档都在同一许可下。
+三端客户端、Agent、打包与运维脚本、文档都在同一许可下。
 
 有三点需要单独说明：
 

@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import json
-import mimetypes
 import os
-import posixpath
 import sys
 import threading
 import time
@@ -16,7 +14,6 @@ from . import (adblock, apps, auth, cfgbak, clash, devices, hardware, lanedit, l
                mask, netapply, netcfg, power, proxy, subscriptions, sysinfo, system)
 from .config import get as cfg, load as load_cfg, save as save_cfg
 
-WEB_ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web")
 START_TS = time.time()
 
 # Agent 自身版本：随 ipk 一起发版，硬件详情页与「关于」都会显示
@@ -208,7 +205,8 @@ class Handler(BaseHTTPRequestHandler):
             self._api_get(path, query)
             return
 
-        self._static(parsed.path)
+        # 不再服务内置 Web 面板（已从项目里分离），非 API 的 GET 一律 404
+        self._error(404, "not found")
 
     def do_POST(self):
         parsed = urllib.parse.urlparse(self.path)
@@ -578,56 +576,6 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as exc:  # 兜底：宁可回一个 JSON 500，也别把连接直接掐了
             _log("GET %s 失败: %r" % (path, exc))
             self._json({"ok": False, "error": "读取失败，详情见路由器系统日志"}, 500)
-
-    # ------------------------------------------------------------ 静态资源
-
-    def _static(self, raw_path: str):
-        try:
-            rel = posixpath.normpath(urllib.parse.unquote(raw_path)).lstrip("/")
-        except (UnicodeDecodeError, ValueError):
-            self._error(400, "bad path")
-            return
-        if rel in ("", "."):
-            rel = "index.html"
-        if rel.startswith("..") or "\x00" in rel:
-            self._error(403, "forbidden")
-            return
-        full = os.path.join(WEB_ROOT, *rel.split("/"))
-        try:
-            exists = os.path.isfile(full)
-        except (ValueError, OSError):       # 含 %00：isfile 会抛 ValueError
-            self._error(400, "bad path")
-            return
-        if not exists:
-            if "." not in posixpath.basename(rel):
-                full = os.path.join(WEB_ROOT, "index.html")
-                rel = "index.html"
-            if not os.path.isfile(full):
-                self._error(404, "not found")
-                return
-        ctype = mimetypes.guess_type(full)[0] or "application/octet-stream"
-        if full.endswith(".webmanifest"):
-            ctype = "application/manifest+json"
-        try:
-            with open(full, "rb") as fh:
-                body = fh.read()
-        except OSError:
-            self._error(500, "read error")
-            return
-        # 代码类资源必须每次回源，否则改完前端客户端还在用旧版本
-        volatile = full.endswith((".html", ".js", ".css", ".webmanifest", ".json"))
-        cache = "no-cache, must-revalidate" if volatile else "public, max-age=3600"
-        extra = {"Cache-Control": cache}
-        if ctype.startswith("text/html"):
-            # 面板是单页 + 外链脚本，没有内联 script，可以收得很紧
-            # connect-src 必须放开 http/https：面板自己会去探若干候选地址
-            # （局域网 IP、主机名），只写 'self' 会把「换地址」功能掐死
-            extra["Content-Security-Policy"] = (
-                "default-src 'self'; img-src 'self' data:; "
-                "style-src 'self' 'unsafe-inline'; script-src 'self'; "
-                "connect-src 'self' http: https:; base-uri 'none'; "
-                "form-action 'none'; frame-ancestors 'none'")
-        self._send(200, body, ctype, extra)
 
 
 def _local_v4() -> set[str]:

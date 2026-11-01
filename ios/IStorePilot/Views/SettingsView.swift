@@ -132,46 +132,43 @@ struct SettingsView: View {
         let b = d.obj("board") ?? [:]
 
         return Hero {
-            VStack(alignment: .leading, spacing: 0) {
-                // 三行信息 + 一行动作，从上往下只有一条阅读顺序：
-                // 通不通 → 是哪台 → 现在什么状态 → 能做什么。
-                // 上一版左右分栏，在 Duo 展开的 820pt 里两块被顶到两边，
-                // 中间空出一大片绿，看着像没排完。
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(ok ? Color(hex: 0x5FE7C4) : C.heroFgSoft)
-                        .frame(width: 7, height: 7)
-                    Text(ok ? "已连接" : "连不上")
-                        .font(.system(size: 12.5, weight: .medium))
-                        .foregroundStyle(C.heroFg)
-                    if ok {
-                        Text("v" + ping.str("version"))
-                            .font(F.num(11.5, .regular))
-                            .foregroundStyle(C.heroFgSoft)
+            // 左信息右按钮：状态 / 主机名 / 地址占满左侧，三个动作竖排在右侧。
+            // 三端（iOS / Android / 鸿蒙）同一套结构，按钮右对齐竖排。
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(ok ? Color(hex: 0x5FE7C4) : C.heroFgSoft)
+                            .frame(width: 7, height: 7)
+                        Text(ok ? "已连接" : "连不上")
+                            .font(.system(size: 12.5, weight: .medium))
+                            .foregroundStyle(C.heroFg)
+                        if ok {
+                            Text("v" + ping.str("version"))
+                                .font(F.num(11.5, .regular))
+                                .foregroundStyle(C.heroFgSoft)
+                        }
                     }
+
+                    Text(b.str("hostname").isEmpty ? bareBase : b.str("hostname"))
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(C.heroFg)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .padding(.top, 6)
+
+                    // 地址和体征压成一行：它们都是「这台机器现在什么样」的读数
+                    Text(metaLine)
+                        .font(F.num(11.5, .regular))
+                        .foregroundStyle(C.heroFgSoft)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .padding(.top, 4)
                 }
 
-                Text(b.str("hostname").isEmpty ? bareBase : b.str("hostname"))
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(C.heroFg)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .padding(.top, 6)
+                Spacer(minLength: 4)
 
-                // 地址和三项体征压成一行：它们都是「这台机器现在什么样」的读数，
-                // 竖着排三行会把卡片撑高一倍，横着排一行刚好铺满宽度
-                Text(metaLine)
-                    .font(F.num(11.5, .regular))
-                    .foregroundStyle(C.heroFgSoft)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .padding(.top, 4)
-
-                Rectangle().fill(C.heroFg.opacity(0.18)).frame(height: 0.7)
-                    .padding(.top, 12)
-                    .padding(.bottom, 9)
-
-                HStack(spacing: 16) {
+                VStack(alignment: .trailing, spacing: 9) {
                     heroLink("重新登录") {
                         Api.onAuthFail?()
                         app.signOut()
@@ -180,7 +177,6 @@ struct SettingsView: View {
                         SnapCache.shared.clear()
                         popup = Popup(title: "已清除", body: "下次进入各页面会重新从路由器读取。")
                     }
-                    Spacer(minLength: 6)
                     themeMenu
                 }
             }

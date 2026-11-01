@@ -80,13 +80,18 @@ public class SettingsFragment extends BaseFragment {
         int wrap = ViewGroup.LayoutParams.WRAP_CONTENT;
 
         // ---------------------------------------------------------------- hero
-        // 这一版把「响应 / 凭证 / Agent」三件事直接画进 hero，
-        // 原来它们是三行 kv，既占了半张卡的篇幅，又把「连的是哪台」这件事压住了。
+        // 左信息右按钮：状态 / 主机名 / 地址占满左侧，三个动作竖着排在右侧。
+        // 按钮从底部横排挪到右列、右对齐，一眼扫过去「能做什么」都在右手边，
+        // 也不用在横排里挤占大标题的空间。三端（iOS / Android / 鸿蒙）同一套结构。
         Ui.Card hero = Ui.gradient(c, R.color.hero_from, R.color.hero_to);
-        hero.setPadding(Ui.dp(c, 20), Ui.dp(c, 18), Ui.dp(c, 20), Ui.dp(c, 16));
+        hero.setPadding(Ui.dp(c, 20), Ui.dp(c, 18), Ui.dp(c, 14), Ui.dp(c, 16));
 
-        // 三行信息 + 一行动作，只有一条阅读顺序：通不通 → 是哪台 → 现在什么状态 → 能做什么。
-        // 上一版左右分栏，在平板上两块被顶到两边，中间空出一大片绿，像没排完。
+        LinearLayout split = Ui.row(c);
+        split.setGravity(Gravity.TOP);
+
+        // 左列：通不通 → 是哪台 → 现在什么状态，一条阅读顺序
+        LinearLayout info = Ui.column(c);
+
         LinearLayout stateRow = Ui.row(c);
         stateRow.setGravity(Gravity.CENTER_VERTICAL);
         View dot = new View(c);
@@ -110,7 +115,7 @@ public class SettingsFragment extends BaseFragment {
         LinearLayout.LayoutParams bglp = new LinearLayout.LayoutParams(wrap, wrap);
         bglp.leftMargin = Ui.dp(c, 6);
         stateRow.addView(tvHeroBadge, bglp);
-        hero.addView(stateRow);
+        info.addView(stateRow);
 
         tvHeroHost = Ui.text(c,
                 Session.base(c).replaceFirst("^https?://", ""), 24f, R.color.hero_fg);
@@ -122,7 +127,7 @@ public class SettingsFragment extends BaseFragment {
         LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, wrap);
         hlp.topMargin = Ui.dp(c, 6);
-        hero.addView(tvHeroHost, hlp);
+        info.addView(tvHeroHost, hlp);
 
         // 地址 + 响应 + 凭证压成一行：竖着排三行会把卡片撑高一倍
         tvBase = Ui.heroNote(c, "", 0.86f);
@@ -132,27 +137,28 @@ public class SettingsFragment extends BaseFragment {
         LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, wrap);
         blp.topMargin = Ui.dp(c, 4);
-        hero.addView(tvBase, blp);
+        info.addView(tvBase, blp);
         renderHeroMeta();
 
-        View heroLine = new View(c);
-        heroLine.setBackgroundColor(Ui.alpha(Ui.color(c, R.color.hero_fg), 0.18f));
-        LinearLayout.LayoutParams hllp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, Ui.dp(c, 0.7f)));
-        hllp.topMargin = Ui.dp(c, 12);
-        hllp.bottomMargin = Ui.dp(c, 9);
-        hero.addView(heroLine, hllp);
+        split.addView(info, new LinearLayout.LayoutParams(0, wrap, 1f));
 
-        LinearLayout acts = Ui.row(c);
-        acts.setGravity(Gravity.CENTER_VERTICAL);
-        acts.addView(heroLink(c, "重新登录", this::relogin));
-        LinearLayout.LayoutParams gap1 = new LinearLayout.LayoutParams(wrap, wrap);
-        gap1.leftMargin = Ui.dp(c, 16);
-        acts.addView(heroLink(c, "清缓存", this::clearCache), gap1);
-        acts.addView(new View(c), new LinearLayout.LayoutParams(0, 1, 1f));
+        // 右列：三个动作竖排、右对齐
+        LinearLayout btns = Ui.column(c);
+        LinearLayout.LayoutParams b1 = new LinearLayout.LayoutParams(wrap, wrap);
+        b1.gravity = Gravity.END;
+        btns.addView(heroLink(c, "重新登录", this::relogin), b1);
+        LinearLayout.LayoutParams b2 = new LinearLayout.LayoutParams(wrap, wrap);
+        b2.gravity = Gravity.END;
+        b2.topMargin = Ui.dp(c, 9);
+        btns.addView(heroLink(c, "清缓存", this::clearCache), b2);
         tvHeroTheme = heroLink(c, "主题 · " + Theme.name(c), this::pickTheme);
-        acts.addView(tvHeroTheme);
-        hero.addView(acts);
+        LinearLayout.LayoutParams b3 = new LinearLayout.LayoutParams(wrap, wrap);
+        b3.gravity = Gravity.END;
+        b3.topMargin = Ui.dp(c, 9);
+        btns.addView(tvHeroTheme, b3);
+        split.addView(btns, new LinearLayout.LayoutParams(wrap, wrap));
+
+        hero.addView(split);
         root.addView(hero);
 
         // 原来「网络」页的内容挪到这里：设备列表占了那个页签，
@@ -342,12 +348,12 @@ public class SettingsFragment extends BaseFragment {
         root.addView(about);
     }
 
-    /** hero 里的一个小统计块：上面小字，下面数值 */
     /** hero 底部的一行文字动作：不做胶囊，避免一张卡上三四个抢眼的块 */
     private TextView heroLink(Context c, String text, Runnable onClick) {
         TextView t = Ui.heroNote(c, text, 0.86f);
         t.setTextSize(12f);
-        t.setPadding(Ui.dp(c, 2), Ui.dp(c, 3), Ui.dp(c, 2), Ui.dp(c, 3));
+        t.setGravity(Gravity.END);
+        t.setPadding(Ui.dp(c, 2), Ui.dp(c, 4), Ui.dp(c, 2), Ui.dp(c, 4));
         t.setOnClickListener(v -> onClick.run());
         return t;
     }

@@ -232,7 +232,6 @@ def stage_data(stage: str, with_apk: bool) -> None:
 
     # --- Agent 本体
     copy_tree(os.path.join(ROOT, "agent"), "usr/lib/istore-agent/agent")
-    copy_tree(os.path.join(ROOT, "web"), "usr/lib/istore-agent/web")
     shutil.copy2(os.path.join(ROOT, "run.py"), os.path.join(stage, "usr/lib/istore-agent/run.py"))
     shutil.copy2(os.path.join(IPK_SRC, "setup.py"),
                  os.path.join(stage, "usr/lib/istore-agent/setup.py"))

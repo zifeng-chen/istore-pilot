@@ -38,7 +38,6 @@ export struct SettingsPage {
   @State agentVersion: string = '';
   @State latency: string = '';
   @State online: boolean = false;
-  @State heroMeta: string = '正在检测连接…';
   @State userName: string = '';
   @State tokenOk: boolean = false;
   /** 是否正在看「配置备份」子页。设置页的子页用状态切换，不另开路由 */
@@ -117,15 +116,10 @@ export struct SettingsPage {
       this.agentVersion = v;
       this.latency = ms.toString();
       this.online = true;
-      this.heroMeta = '响应 ' + ms + ' ms · 与路由器同一局域网';
     } else {
       this.agentVersion = '';
       this.latency = '';
       this.online = false;
-      // 左边已经写着「连不上」了，这里再重复一遍没有信息量，改成下一步该做什么
-      this.heroMeta = ping.error.indexOf('凭证') >= 0
-        ? ping.error
-        : '确认手机与路由器在同一网络，或点下面「服务器地址」改地址';
     }
 
     // 主机名：hero 的大标题用它。服务器地址只在下面「连接」卡里出现一次，
@@ -234,7 +228,6 @@ export struct SettingsPage {
               .alignItems(HorizontalAlign.Start);
 
               Column() {
-                this.lookCard();
                 this.systemCard();
                 this.powerCard();
                 this.hardwareCard();
@@ -251,7 +244,6 @@ export struct SettingsPage {
               this.heroCard();
               this.connCard();
               this.netCard();
-              this.lookCard();
               this.systemCard();
               this.powerCard();
               this.hardwareCard();
@@ -342,58 +334,77 @@ export struct SettingsPage {
   heroCard() {
     Column() {
       Row() {
-        Row()
-          .width(7)
-          .height(7)
-          .borderRadius(4)
-          .backgroundColor(this.online ? $r('app.color.hero_fg') : Pal.warn())
-          .margin({ right: 7 });
-        Text(this.online ? '已连接' : '连不上')
-          .fontSize(12.5)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.hero_fg'))
-          .layoutWeight(1);
-        Text(this.online && this.agentVersion.length > 0 ? ('v' + this.agentVersion) : '离线')
-          .fontSize(11)
-          .fontColor($r('app.color.hero_fg'))
-          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-          .borderRadius(T.R_PILL)
-          .backgroundColor(Pal.heroStroke());
+        Column() {
+          Row() {
+            Row()
+              .width(7)
+              .height(7)
+              .borderRadius(4)
+              .backgroundColor(this.online ? $r('app.color.hero_fg') : Pal.warn())
+              .margin({ right: 7 });
+            Text(this.online ? '已连接' : '连不上')
+              .fontSize(12.5)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.hero_fg'))
+              .layoutWeight(1);
+            Text(this.online && this.agentVersion.length > 0 ? ('v' + this.agentVersion) : '离线')
+              .fontSize(11)
+              .fontColor($r('app.color.hero_fg'))
+              .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+              .borderRadius(T.R_PILL)
+              .backgroundColor(Pal.heroStroke());
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Center);
+
+          Text(this.hostname.length > 0 ? this.hostname : this.hostText())
+            .fontSize(24)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.hero_fg'))
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .textAlign(TextAlign.Start)
+            .width('100%')
+            .margin({ top: 12 });
+
+          Text(this.metaLine())
+            .fontSize(12.5)
+            .fontColor($r('app.color.hero_fg_soft'))
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .textAlign(TextAlign.Start)
+            .width('100%')
+            .margin({ top: 5 });
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1);
+
+        // 右列：三个动作竖排、右对齐
+        Column({ space: 9 }) {
+          Text('重新登录')
+            .fontSize(12)
+            .fontColor($r('app.color.hero_fg_soft'))
+            .textAlign(TextAlign.End)
+            .padding({ top: 4, bottom: 4 })
+            .onClick(() => { this.relogin(); });
+          Text('清缓存')
+            .fontSize(12)
+            .fontColor($r('app.color.hero_fg_soft'))
+            .textAlign(TextAlign.End)
+            .padding({ top: 4, bottom: 4 })
+            .onClick(() => { this.clearCache(); });
+          Text('主题 · ' + this.themeName)
+            .fontSize(12)
+            .fontColor($r('app.color.hero_fg_soft'))
+            .textAlign(TextAlign.End)
+            .padding({ top: 4, bottom: 4 })
+            .onClick(() => { this.pickTheme(); });
+        }
+        .alignItems(HorizontalAlign.End)
+        .margin({ left: 12 });
       }
       .width('100%')
-      .alignItems(VerticalAlign.Center);
-
-      Text(this.hostname.length > 0 ? this.hostname : this.hostText())
-        .fontSize(24)
-        .fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.hero_fg'))
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .textAlign(TextAlign.Start)
-        .width('100%')
-        .margin({ top: 12 });
-
-      Text(this.heroMeta)
-        .fontSize(12.5)
-        .fontColor($r('app.color.hero_fg_soft'))
-        .maxLines(2)
-        .textAlign(TextAlign.Start)
-        .width('100%')
-        .margin({ top: 5 });
-
-      Row()
-        .width('100%')
-        .height(0.7)
-        .backgroundColor(Pal.heroStroke())
-        .margin({ top: 14, bottom: 12 });
-
-      Row() {
-        SettingStat({ label: '响应', value: this.latency.length > 0 ? this.latency + ' ms' : '—' }).layoutWeight(1);
-        SettingStat({ label: '凭证',
-          value: this.tokenOk ? (this.online ? '有效' : '已保存') : '缺失' }).layoutWeight(1);
-        SettingStat({ label: 'Agent', value: this.agentVersion.length > 0 ? ('v' + this.agentVersion) : '—' }).layoutWeight(1);
-      }
-      .width('100%');
+      .alignItems(VerticalAlign.Top);
     }
     .width('100%')
     .padding(20)
@@ -434,32 +445,6 @@ export struct SettingsPage {
         danger: false,
         arrow: false,
         onTap: () => {
-        }
-      });
-      SettingRow({
-        glyph: Glyph.REFRESH,
-        title: '重新登录',
-        subtitle: '凭证过期、或换了密码时用',
-        value: '',
-        valueSize: 0,
-        first: false,
-        danger: false,
-        arrow: true,
-        onTap: () => {
-          this.relogin();
-        }
-      });
-      SettingRow({
-        glyph: Glyph.LIST,
-        title: '清除本地缓存',
-        subtitle: '只清手机上的快照，不动路由器',
-        value: '',
-        valueSize: 0,
-        first: false,
-        danger: false,
-        arrow: true,
-        onTap: () => {
-          this.clearCache();
         }
       });
     }
@@ -537,28 +522,6 @@ export struct SettingsPage {
     }
   }
 
-  @Builder
-  lookCard() {
-    RowCard({ gapBottom: T.GAP }) {
-      CardTitle({ glyph: Glyph.PALETTE, title: '外观', sub: '深浅色' });
-      SettingRow({
-        glyph: Glyph.PALETTE,
-        title: '主题',
-        subtitle: '跟随系统会随手机自动切换',
-        value: this.themeName,
-        valueSize: 0,
-        first: true,
-        danger: false,
-        arrow: true,
-        onTap: () => {
-          this.pickTheme();
-        }
-      });
-    }
-  }
-
-
-  /** 电源：重启网络 / 重启 / 关机。点一次只进入「再点确认」，第二次才真发 */
   @Builder
   powerCard() {
     Card({ gapTop: T.GAP }) {
@@ -839,6 +802,13 @@ export struct SettingsPage {
       s = s.substring(8);
     }
     return s.length > 0 ? s : '—';
+  }
+
+  /** hero meta 行：地址 · 响应 · 凭证，和安卓 / iOS 同一套口径 */
+  private metaLine(): string {
+    const resp: string = this.online && this.latency.length > 0 ? (this.latency + ' ms') : '—';
+    const cred: string = this.tokenOk ? (this.online ? '有效' : '已保存') : '缺失';
+    return this.hostText() + '　·　响应 ' + resp + '　·　凭证 ' + cred;
   }
 
   // ================================================================ 动作
@@ -1289,34 +1259,5 @@ export struct SettingsPage {
     this.sheetTitle = this.infoTitle;
     this.infoBody = (running ? '后台任务还在跑…\n\n' : '') +
       (log.length > 0 ? log : '还没有升级记录。');
-  }
-}
-
-/**
- * 连接卡的三格。用 @Component 而不是 @Builder —— ArkUI 里 @Builder 按值传参
- * 时状态变化不会刷新，页面上会一直停在初始的「—」。
- */
-@Component
-struct SettingStat {
-  @Prop label: string = '';
-  @Prop value: string = '';
-
-  build() {
-    Column() {
-      Text(this.label)
-        .fontSize(11.5)
-        .fontColor($r('app.color.hero_fg_soft'));
-      Text(this.value)
-        .fontSize(16)
-        .fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.hero_fg'))
-        .fontFeature("\"tnum\" on")
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .margin({ top: 4 });
-    }
-    .alignItems(HorizontalAlign.Start)
-    .width('100%')
-    .layoutWeight(1);
   }
 }

@@ -52,9 +52,11 @@ sh /tmp/pilot.run             # 安装或升级
 ### 3. 打开界面
 
 ```
-网页控制台   http://<路由器IP>:8443
 LuCI 管理    http://<路由器IP>/cgi-bin/luci/admin/services/istore_agent
 ```
+
+客户端（Android / HarmonyOS / iOS）连的是 Agent 的 API 端口 `:8443`（`http://<路由器IP>:8443`），
+它不是网页，浏览器里打开看不到界面。
 
 首次安装的随机密码可以直接看：
 
@@ -107,7 +109,6 @@ opkg install luci-app-istore-agent_0.1.3-1_all.ipk
 /usr/lib/istore-agent/MANIFEST          文件清单，卸载用
 /usr/lib/istore-agent/agent/            后端，约 20 个 .py
 /usr/lib/istore-agent/agent/data/       OUI 厂商库、应用域名特征库
-/usr/lib/istore-agent/web/              浏览器控制台（PWA）
 /etc/init.d/istore-agent                procd 服务脚本
 /etc/config/istore-agent                uci 配置（端口、bind、开关）
 /usr/lib/lua/luci/controller/istore_agent.lua
