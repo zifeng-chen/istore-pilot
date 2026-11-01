@@ -8,6 +8,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -26,6 +27,7 @@ import org.json.JSONObject;
 
 import java.util.HashMap;
 import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -71,6 +73,9 @@ public class ProxyFragment extends BaseFragment {
     private String backendLabel = "";
     private String signature = "";
     private final Set<String> expanded = new LinkedHashSet<>();
+    /** 节点行当前要加到哪个容器：清单 or 分组弹窗 */
+    private LinearLayout nodeHost;
+    private android.app.Dialog nodeSheet;
     private String modeValue = "";
     /** GLOBAL 组当前指向谁，切全局模式前用来判断会不会一把拒掉所有流量 */
     private String globalNow = "";
@@ -636,6 +641,7 @@ public class ProxyFragment extends BaseFragment {
     private void renderNodes(JSONObject body) {
         Context c = nodesBox.getContext();
         nodesBox.removeAllViews();
+        nodeHost = nodesBox;
 
         JSONArray groups = body.optJSONArray("groups");
         if (groups == null || groups.length() == 0) {
@@ -678,22 +684,12 @@ public class ProxyFragment extends BaseFragment {
                 globalNow = now;
             }
             JSONArray members = g.optJSONArray("members");
-            boolean open = expanded.contains(gname);
             boolean testing = gname.equals(testingGroup);
 
             if (i > 0) {
-                nodesBox.addView(Ui.hairline(c, 16));
+                Ui.space(c, nodesBox, 10);
             }
-            nodesBox.addView(groupHead(c, g, gname, now, members, open, testing));
-            if (open && members != null) {
-                for (int k = 0; k < members.length(); k++) {
-                    JSONObject m = members.optJSONObject(k);
-                    if (m == null) {
-                        continue;
-                    }
-                    addNodeRow(c, m, gname, now);
-                }
-            }
+            nodesBox.addView(groupCard(c, g, gname, now, members, testing));
         }
 
         setRefreshing(false);
@@ -711,17 +707,26 @@ public class ProxyFragment extends BaseFragment {
      *
      * 第二行即使折叠也保留 —— 收起分组时「这组现在用哪个节点」正是最想知道的。
      */
-    private View groupHead(Context c, JSONObject g, String gname, String now,
-                           JSONArray members, boolean open, boolean testing) {
-        LinearLayout block = Ui.column(c);
+    /**
+     * 一张分组卡：类型胶囊 + 组名 + 当前节点 + 节点数。点开是弹窗里的完整节点表。
+     * 对齐 iOS / 鸿蒙：不再就地展开几十个节点 —— 展开两三个组就把整页撑没了。
+     */
+    private View groupCard(Context c, JSONObject g, String gname, String now,
+                           JSONArray members, boolean testing) {
+        Ui.Card card = Ui.card(c);
 
         LinearLayout head = Ui.row(c);
-        head.setPadding(Ui.dp(c, 10), Ui.dp(c, 9), Ui.dp(c, 10), Ui.dp(c, 3));
-        block.addView(head);
+        head.setGravity(Gravity.CENTER_VERTICAL);
 
-        TextView caret = Ui.text(c, open ? "\u25BE" : "\u25B8", 11f, R.color.text_secondary);
-        caret.setPadding(Ui.dp(c, 2), 0, Ui.dp(c, 6), 0);
-        head.addView(caret);
+        TextView type = Ui.text(c, groupType(g.optString("type", "")), 10f,
+                R.color.text_secondary);
+        type.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        type.setPadding(Ui.dp(c, 6), Ui.dp(c, 2), Ui.dp(c, 6), Ui.dp(c, 2));
+        GradientDrawable tbg = new GradientDrawable();
+        tbg.setCornerRadius(Ui.dp(c, 100));
+        tbg.setColor(Ui.color(c, R.color.surface_hi));
+        type.setBackground(tbg);
+        head.addView(type);
 
         TextView name = Ui.text(c, pretty(gname), 15f, R.color.text_primary);
         name.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
@@ -730,68 +735,72 @@ public class ProxyFragment extends BaseFragment {
         head.addView(name, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        TextView btn = Ui.text(c, testing ? "测速中" : "测速", 11.5f,
-                testing ? R.color.text_secondary : R.color.primary);
-        btn.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        btn.setPadding(Ui.dp(c, 9), Ui.dp(c, 4), Ui.dp(c, 9), Ui.dp(c, 4));
-        GradientDrawable bg = new GradientDrawable();
-        bg.setCornerRadius(Ui.dp(c, 100));
-        bg.setColor(Ui.color(c, testing ? R.color.surface_sunken : R.color.accent_soft));
-        btn.setBackground(bg);
-        // 测速按钮要在外层之前消费点击，否则会被折叠动作吃掉
-        btn.setClickable(true);
-        btn.setFocusable(true);
-        btn.setOnClickListener(v -> testGroup(gname));
-        head.addView(btn);
+        TextView chev = Ui.text(c, "›", 14f, R.color.text_tertiary);
+        head.addView(chev);
+        card.addView(head);
 
-        // ---- 第二行：当前节点 + 节点数
+        // 第二行：当前节点 + 节点数
         LinearLayout sub = Ui.row(c);
-        sub.setPadding(Ui.dp(c, 30), 0, Ui.dp(c, 10), Ui.dp(c, 9));
-        block.addView(sub);
-
+        sub.setGravity(Gravity.CENTER_VERTICAL);
+        sub.setPadding(0, Ui.dp(c, 9), 0, 0);
         String cur = pretty(now);
-        // 订阅常把「剩余流量：xxx」塞进节点列表还设成当前项，
-        // 照实显示会让人以为流量走了个叫「剩余流量」的节点，说清楚更好
-        boolean info = now.isEmpty()
-                && (g.optBoolean("now_info", false) || isInfoNode(g.optString("now", "")));
-        TextView nowText;
-        if (!cur.isEmpty()) {
-            nowText = Ui.text(c, "当前 " + cur, 11.5f,
-                    isPolicyName(cur) ? R.color.text_secondary : R.color.primary);
-        } else if (info) {
-            nowText = Ui.text(c, "未选中可用节点", 11.5f, R.color.text_secondary);
-        } else {
-            nowText = Ui.text(c, "未选择", 11.5f, R.color.text_tertiary);
-        }
+        TextView nowText = Ui.text(c, cur.isEmpty() ? "未选择" : ("当前 " + cur), 11.5f,
+                cur.isEmpty() ? R.color.text_tertiary
+                        : (isPolicyName(cur) ? R.color.text_secondary : R.color.primary));
         nowText.setSingleLine(true);
         nowText.setEllipsize(android.text.TextUtils.TruncateAt.END);
         sub.addView(nowText, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         int total = members == null ? 0 : members.length();
-        TextView count = Ui.num(c, total + " 个", 11.5f, R.color.text_tertiary);
-        count.setPadding(Ui.dp(c, 8), 0, 0, 0);
+        TextView count = Ui.num(c, total + " 个节点", 11f, R.color.text_tertiary);
         sub.addView(count);
+        card.addView(sub);
 
-        block.setClickable(true);
-        block.setFocusable(true);
-        GradientDrawable mask = new GradientDrawable();
-        mask.setColor(0xFFFFFFFF);
-        block.setBackground(new android.graphics.drawable.RippleDrawable(
-                android.content.res.ColorStateList.valueOf(Ui.color(c, R.color.ripple)),
-                null, mask));
-        block.setOnClickListener(v -> {
-            if (expanded.contains(gname)) {
-                expanded.remove(gname);
-            } else {
-                expanded.add(gname);
+        card.tap(v -> openGroupSheet(c, g, gname, now, members, testing));
+        return card;
+    }
+
+    /** 分组类型 → 中文（和 iOS / 鸿蒙同一套映射） */
+    private String groupType(String raw) {
+        switch (raw == null ? "" : raw.toLowerCase(Locale.ROOT)) {
+            case "selector": return "手动";
+            case "urltest": return "自动测速";
+            case "fallback": return "故障转移";
+            case "loadbalance": return "负载均衡";
+            case "relay": return "链式";
+            default: return (raw == null || raw.isEmpty()) ? "分组" : raw;
+        }
+    }
+
+    /** 分组弹窗：整组节点一列，带测速，选完自动关 */
+    private void openGroupSheet(Context c, JSONObject g, String gname, String now,
+                                JSONArray members, boolean testing) {
+        if (members == null || members.length() == 0) {
+            Toast.makeText(c, "这一组没有可选节点", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        LinearLayout list = Ui.column(c);
+        LinearLayout prev = nodeHost;
+        nodeHost = list;
+        for (int k = 0; k < members.length(); k++) {
+            JSONObject m = members.optJSONObject(k);
+            if (m == null) {
+                continue;
             }
-            // 折叠是纯本地动作，不用再问服务器
-            if (lastGroups != null) {
-                renderNodes(lastGroups);
-            }
-        });
-        return block;
+            addNodeRow(c, m, gname, now);
+        }
+        nodeHost = prev;
+
+        ScrollView scroll = new ScrollView(c);
+        scroll.setClipToPadding(false);
+        scroll.addView(list);
+
+        nodeSheet = Sheet.custom(c, pretty(gname))
+                .content(scroll)
+                .primary(testing ? "测速中…" : "测速", false, (d, w) -> testGroup(gname))
+                .cancel("关闭")
+                .show();
     }
 
     /**
@@ -905,7 +914,7 @@ public class ProxyFragment extends BaseFragment {
                 android.content.res.ColorStateList.valueOf(Ui.color(c, R.color.ripple)),
                 null, mask));
         line.setOnClickListener(v -> selectNode(group, name, true));
-        nodesBox.addView(line);
+        nodeHost.addView(line);
     }
 
     /** 延迟胶囊：绿 / 琥珀 / 红三档，一列扫下来不用逐个读数字 */
@@ -1004,6 +1013,10 @@ public class ProxyFragment extends BaseFragment {
                     return;
                 }
                 if (data.optBoolean("ok", false)) {
+                    if (nodeSheet != null) {
+                        nodeSheet.dismiss();
+                        nodeSheet = null;
+                    }
                     String chosen = data.optString("name", name);
                     Toast.makeText(ctx(), "已切换到 " + pretty(chosen), Toast.LENGTH_SHORT).show();
                     boolean restarted = data.optBoolean("restarted", false);
