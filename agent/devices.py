@@ -306,15 +306,19 @@ def _vendor_raw(mac: str) -> str:
 
     MAC 第二字符是 2/6/A/E 时属于本地管理地址，说明设备开了隐私地址
     （iOS/Android 的"随机 MAC"），此时厂商无从判断，直接说明原因。
+
+    但 QEMU 的 `52:54:00` 也落在这个范围（第二字符是 2），所以**必须先查手工
+    覆盖层再判随机 MAC** —— 否则群晖这类跑在 QEMU 上的虚机全被误判成
+    「随机 MAC」，界面上就显示成「私有地址」了。
     """
     clean = mac.replace(":", "").replace("-", "").upper()
     if len(clean) < 6:
         return ""
-    if clean[1] in "26AE":
-        return "随机 MAC"
     oui = clean[:6]
     if oui in _OUI:
         return _OUI[oui]
+    if clean[1] in "26AE":
+        return "随机 MAC"
     return _load_oui().get(oui, "")
 
 
