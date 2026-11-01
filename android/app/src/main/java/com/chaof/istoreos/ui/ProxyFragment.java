@@ -8,7 +8,6 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -26,10 +25,8 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * 代理：同时管 OpenClash 与 Passwall。
@@ -72,10 +69,14 @@ public class ProxyFragment extends BaseFragment {
     private String backendId = "";
     private String backendLabel = "";
     private String signature = "";
-    private final Set<String> expanded = new LinkedHashSet<>();
-    /** 节点行当前要加到哪个容器：清单 or 分组弹窗 */
-    private LinearLayout nodeHost;
     private android.app.Dialog nodeSheet;
+    /** 弹窗里正在展示的分组：测速完成后要就地刷新延迟，这些是重建素材 */
+    private String sheetGroup = "";
+    private JSONArray sheetMembers;
+    private String sheetNow = "";
+    /** 弹窗里的节点表容器 + 测速按钮（测速期间要改文案） */
+    private LinearLayout sheetList;
+    private TextView sheetTestBtn;
     private String modeValue = "";
     /** GLOBAL 组当前指向谁，切全局模式前用来判断会不会一把拒掉所有流量 */
     private String globalNow = "";
@@ -641,7 +642,6 @@ public class ProxyFragment extends BaseFragment {
     private void renderNodes(JSONObject body) {
         Context c = nodesBox.getContext();
         nodesBox.removeAllViews();
-        nodeHost = nodesBox;
 
         JSONArray groups = body.optJSONArray("groups");
         if (groups == null || groups.length() == 0) {
@@ -708,57 +708,123 @@ public class ProxyFragment extends BaseFragment {
      * 第二行即使折叠也保留 —— 收起分组时「这组现在用哪个节点」正是最想知道的。
      */
     /**
-     * 一张分组卡：类型胶囊 + 组名 + 当前节点 + 节点数。点开是弹窗里的完整节点表。
-     * 对齐 iOS / 鸿蒙：不再就地展开几十个节点 —— 展开两三个组就把整页撑没了。
+     * 一张分组卡：内嵌式「凹槽」小卡。坐进「配置与节点」那张白卡里时，
+     * 用比白卡更暗一档的底 + 一圈细描边，一眼认出这是一块可点的独立区域，
+     * 而不是又一行文字。
+     *
+     *   手动                                  ›
+     *   自动选择
+     *   ● 日本高速06|BGP|CTCU
+     *   57 个节点
+     *
+     * 结构对齐鸿蒙：类型胶囊 + 右箭头徽标做头部，组名做主标题，
+     * 当前节点用「主色圆点 + 主色字」标正在用哪条线，节点数压到最底。
      */
     private View groupCard(Context c, JSONObject g, String gname, String now,
                            JSONArray members, boolean testing) {
-        Ui.Card card = Ui.card(c);
+        LinearLayout card = Ui.column(c);
+        card.setPadding(Ui.dp(c, 14), Ui.dp(c, 12), Ui.dp(c, 14), Ui.dp(c, 12));
+        card.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        LinearLayout head = Ui.row(c);
-        head.setGravity(Gravity.CENTER_VERTICAL);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(Ui.dp(c, 16));
+        bg.setColor(Ui.color(c, R.color.surface_sunken));
+        bg.setStroke(Math.max(1, Ui.dp(c, 0.7f)), Ui.color(c, R.color.divider));
+        card.setBackground(new android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(Ui.color(c, R.color.ripple)),
+                bg, bg));
+        card.setClickable(true);
+        card.setFocusable(true);
+        card.setOnClickListener(v -> openGroupSheet(c, g, gname, now, members, testing));
 
-        TextView type = Ui.text(c, groupType(g.optString("type", "")), 10f,
-                R.color.text_secondary);
-        type.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        type.setPadding(Ui.dp(c, 6), Ui.dp(c, 2), Ui.dp(c, 6), Ui.dp(c, 2));
-        GradientDrawable tbg = new GradientDrawable();
-        tbg.setCornerRadius(Ui.dp(c, 100));
-        tbg.setColor(Ui.color(c, R.color.surface_hi));
-        type.setBackground(tbg);
-        head.addView(type);
+        // 第一行：类型胶囊 + 右箭头徽标
+        LinearLayout top = Ui.row(c);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        top.addView(typePill(c, groupType(g.optString("type", ""))));
+        top.addView(new View(c), new LinearLayout.LayoutParams(0, 1, 1f));
+        top.addView(chevBadge(c));
+        card.addView(top);
 
-        TextView name = Ui.text(c, pretty(gname), 15f, R.color.text_primary);
+        // 组名
+        TextView name = Ui.text(c, pretty(gname), 15.5f, R.color.text_primary);
         name.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         name.setSingleLine(true);
         name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        head.addView(name, new LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        LinearLayout.LayoutParams nlp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        nlp.topMargin = Ui.dp(c, 8);
+        card.addView(name, nlp);
 
-        TextView chev = Ui.text(c, "›", 14f, R.color.text_tertiary);
-        head.addView(chev);
-        card.addView(head);
-
-        // 第二行：当前节点 + 节点数
-        LinearLayout sub = Ui.row(c);
-        sub.setGravity(Gravity.CENTER_VERTICAL);
-        sub.setPadding(0, Ui.dp(c, 9), 0, 0);
+        // 当前节点：主色圆点 + 主色字（策略项用灰），一眼看出「正在用哪条线」
         String cur = pretty(now);
-        TextView nowText = Ui.text(c, cur.isEmpty() ? "未选择" : ("当前 " + cur), 11.5f,
-                cur.isEmpty() ? R.color.text_tertiary
-                        : (isPolicyName(cur) ? R.color.text_secondary : R.color.primary));
+        int curColor = cur.isEmpty() ? R.color.text_tertiary
+                : (isPolicyName(cur) ? R.color.text_secondary : R.color.primary);
+        LinearLayout curRow = Ui.row(c);
+        curRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        clp.topMargin = Ui.dp(c, 6);
+        View dot = dotView(c, cur.isEmpty() ? R.color.text_tertiary : curColor, 6);
+        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(
+                Ui.dp(c, 6), Ui.dp(c, 6));
+        dlp.rightMargin = Ui.dp(c, 6);
+        curRow.addView(dot, dlp);
+        TextView nowText = Ui.text(c, cur.isEmpty() ? "未选择" : cur, 12.5f, curColor);
         nowText.setSingleLine(true);
         nowText.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        sub.addView(nowText, new LinearLayout.LayoutParams(0,
+        curRow.addView(nowText, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        card.addView(curRow, clp);
 
+        // 底部：节点数
         int total = members == null ? 0 : members.length();
-        TextView count = Ui.num(c, total + " 个节点", 11f, R.color.text_tertiary);
-        sub.addView(count);
-        card.addView(sub);
+        TextView count = Ui.num(c, total + " 个节点", 10.5f, R.color.text_tertiary);
+        LinearLayout.LayoutParams clp2 = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        clp2.topMargin = Ui.dp(c, 6);
+        card.addView(count, clp2);
 
-        card.tap(v -> openGroupSheet(c, g, gname, now, members, testing));
         return card;
+    }
+
+    /** 类型胶囊：主色淡底 + 主色字，比灰底灰字更有识别度，也跟鸿蒙一致 */
+    private TextView typePill(Context c, String text) {
+        TextView v = Ui.text(c, text, 10f, R.color.primary);
+        v.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        v.setPadding(Ui.dp(c, 7), Ui.dp(c, 2), Ui.dp(c, 7), Ui.dp(c, 2));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(Ui.dp(c, 100));
+        bg.setColor(Ui.color(c, R.color.accent_soft));
+        v.setBackground(bg);
+        return v;
+    }
+
+    /** 右箭头徽标：小圆角方块里的 ›，替代原来光秃秃的单个字符 */
+    private TextView chevBadge(Context c) {
+        TextView v = Ui.text(c, "\u203A", 13f, R.color.text_secondary);
+        v.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        v.setGravity(Gravity.CENTER);
+        v.setIncludeFontPadding(false);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(Ui.dp(c, 6));
+        bg.setColor(Ui.color(c, R.color.surface_hi));
+        v.setBackground(bg);
+        int s = Ui.dp(c, 18);
+        v.setLayoutParams(new LinearLayout.LayoutParams(s, s));
+        return v;
+    }
+
+    /** 实心小圆点，标「正在用」的节点 */
+    private View dotView(Context c, int colorRes, int sizeDp) {
+        View d = new View(c);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.OVAL);
+        bg.setColor(Ui.color(c, colorRes));
+        d.setBackground(bg);
+        int s = Ui.dp(c, sizeDp);
+        d.setLayoutParams(new LinearLayout.LayoutParams(s, s));
+        return d;
     }
 
     /** 分组类型 → 中文（和 iOS / 鸿蒙同一套映射） */
@@ -773,34 +839,95 @@ public class ProxyFragment extends BaseFragment {
         }
     }
 
-    /** 分组弹窗：整组节点一列，带测速，选完自动关 */
+    /**
+     * 分组弹窗：固定头（组名 + 副标题在左，测速胶囊 + 关闭在右）+ 一组圆角节点表。
+     * 测速不再是占一整条的实心主按钮 —— 它是次要操作，收成胶囊和「关闭」并排。
+     */
     private void openGroupSheet(Context c, JSONObject g, String gname, String now,
                                 JSONArray members, boolean testing) {
         if (members == null || members.length() == 0) {
             Toast.makeText(c, "这一组没有可选节点", Toast.LENGTH_SHORT).show();
             return;
         }
-        LinearLayout list = Ui.column(c);
-        LinearLayout prev = nodeHost;
-        nodeHost = list;
-        for (int k = 0; k < members.length(); k++) {
-            JSONObject m = members.optJSONObject(k);
-            if (m == null) {
+        sheetGroup = gname;
+        sheetMembers = members;
+        sheetNow = now;
+
+        LinearLayout head = Ui.row(c);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.setPadding(0, Ui.dp(c, 4), 0, Ui.dp(c, 8));
+
+        LinearLayout titleCol = Ui.column(c);
+        TextView title = Ui.text(c, pretty(gname), 17f, R.color.text_primary);
+        title.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        title.setSingleLine(true);
+        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        titleCol.addView(title);
+        TextView sub = Ui.text(c, groupType(g.optString("type", ""))
+                + " · " + members.length() + " 个节点", 11.5f, R.color.text_secondary);
+        sub.setPadding(0, Ui.dp(c, 3), 0, 0);
+        titleCol.addView(sub);
+        head.addView(titleCol, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        sheetTestBtn = testPill(c, testing);
+        sheetTestBtn.setOnClickListener(v -> testGroup(gname));
+        head.addView(sheetTestBtn);
+
+        TextView close = Ui.text(c, "关闭", 14f, R.color.text_secondary);
+        close.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        close.setPadding(Ui.dp(c, 10), Ui.dp(c, 6), Ui.dp(c, 2), Ui.dp(c, 6));
+        close.setOnClickListener(v -> {
+            if (nodeSheet != null) {
+                nodeSheet.dismiss();
+            }
+        });
+        head.addView(close);
+
+        // 节点表：整组共用一个圆角容器，行间细线，跟设备列表同一套骨架
+        sheetList = Ui.group(c);
+        fillSheetList(c);
+
+        nodeSheet = Sheet.custom(c, "")
+                .header(head)
+                .content(sheetList)
+                .show();
+    }
+
+    /** 往弹窗节点容器里填行（打开时 + 测速完成后各填一次，延迟原地刷新） */
+    private void fillSheetList(Context c) {
+        if (sheetList == null) {
+            return;
+        }
+        sheetList.removeAllViews();
+        if (sheetMembers == null) {
+            return;
+        }
+        int added = 0;
+        for (int k = 0; k < sheetMembers.length(); k++) {
+            JSONObject m = sheetMembers.optJSONObject(k);
+            if (m == null || isInfoNode(m.optString("name", ""))) {
                 continue;
             }
-            addNodeRow(c, m, gname, now);
+            if (added > 0) {
+                sheetList.addView(Ui.hairline(c, 42));
+            }
+            if (addNodeRow(c, sheetList, m, sheetGroup, sheetNow)) {
+                added++;
+            }
         }
-        nodeHost = prev;
+    }
 
-        ScrollView scroll = new ScrollView(c);
-        scroll.setClipToPadding(false);
-        scroll.addView(list);
-
-        nodeSheet = Sheet.custom(c, pretty(gname))
-                .content(scroll)
-                .primary(testing ? "测速中…" : "测速", false, (d, w) -> testGroup(gname))
-                .cancel("关闭")
-                .show();
+    /** 测速胶囊：主色淡底 + 主色字 */
+    private TextView testPill(Context c, boolean testing) {
+        TextView v = Ui.text(c, testing ? "测速中…" : "测速", 12f, R.color.primary);
+        v.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        v.setPadding(Ui.dp(c, 10), Ui.dp(c, 5), Ui.dp(c, 10), Ui.dp(c, 5));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(Ui.dp(c, 100));
+        bg.setColor(Ui.color(c, R.color.accent_soft));
+        v.setBackground(bg);
+        return v;
     }
 
     /**
@@ -853,11 +980,12 @@ public class ProxyFragment extends BaseFragment {
         return false;
     }
 
-    /** 节点行：缩进一级（34dp 对齐分组名的文字起点），左侧单选点，右侧延迟胶囊 */
-    private void addNodeRow(Context c, JSONObject m, String group, String current) {
+    /** 节点行：左侧单选点，中间名字，右侧延迟胶囊。缩进对齐设备列表那套 */
+    private boolean addNodeRow(Context c, LinearLayout host, JSONObject m,
+                               String group, String current) {
         String name = m.optString("name", "");
         if (isInfoNode(name)) {
-            return;
+            return false;
         }
         boolean isGroup = m.optBoolean("is_group", false);
         boolean selected = name.equals(current);
@@ -869,7 +997,8 @@ public class ProxyFragment extends BaseFragment {
                 : (policy ? R.color.text_secondary : R.color.primary);
 
         LinearLayout line = Ui.row(c);
-        line.setPadding(Ui.dp(c, 34), Ui.dp(c, 8), Ui.dp(c, 16), Ui.dp(c, 8));
+        line.setGravity(Gravity.CENTER_VERTICAL);
+        line.setPadding(Ui.dp(c, 16), Ui.dp(c, 11), Ui.dp(c, 16), Ui.dp(c, 11));
         line.setClickable(true);
         line.setFocusable(true);
 
@@ -877,7 +1006,7 @@ public class ProxyFragment extends BaseFragment {
         radio.setOn(selected);
         LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
                 Ui.dp(c, 15), Ui.dp(c, 15));
-        rlp.rightMargin = Ui.dp(c, 10);
+        rlp.rightMargin = Ui.dp(c, 11);
         line.addView(radio, rlp);
 
         TextView label = Ui.text(c, pretty(name), 14f,
@@ -890,7 +1019,7 @@ public class ProxyFragment extends BaseFragment {
         // 延迟有三种态，不能混为一谈：
         //   本次手动测速的结果    → 0 就是真的连不上，显示「超时」
         //   接口带回来的历史值    → 0 只代表「还没测过」，显示「—」
-        //   两者都没有（组节点）  → 显示「组」
+        //   两者都没有（组节点）  → 显示「组」；选中的直接标「使用中」
         Integer fresh = tested.get(name);
         if (fresh != null) {
             line.addView(delayChip(c, fresh, fresh > 0 ? delayColor(fresh) : R.color.danger));
@@ -900,11 +1029,13 @@ public class ProxyFragment extends BaseFragment {
             if (ms > 0) {
                 line.addView(delayChip(c, ms, delayColor(ms)));
             } else if (isGroup) {
-                TextView d = Ui.text(c, "组", 11f, R.color.text_secondary);
-                line.addView(d);
+                line.addView(Ui.text(c, "组", 11f, R.color.text_secondary));
+            } else if (selected) {
+                TextView use = Ui.text(c, "使用中", 11f, R.color.primary);
+                use.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+                line.addView(use);
             } else {
-                TextView d = Ui.text(c, "—", 11f, R.color.text_tertiary);
-                line.addView(d);
+                line.addView(Ui.text(c, "—", 11f, R.color.text_tertiary));
             }
         }
 
@@ -914,7 +1045,8 @@ public class ProxyFragment extends BaseFragment {
                 android.content.res.ColorStateList.valueOf(Ui.color(c, R.color.ripple)),
                 null, mask));
         line.setOnClickListener(v -> selectNode(group, name, true));
-        nodeHost.addView(line);
+        host.addView(line);
+        return true;
     }
 
     /** 延迟胶囊：绿 / 琥珀 / 红三档，一列扫下来不用逐个读数字 */
@@ -939,6 +1071,10 @@ public class ProxyFragment extends BaseFragment {
         }
         testingGroup = group;
         tested.clear();
+        if (sheetTestBtn != null) {
+            sheetTestBtn.setText("测速中…");
+            sheetTestBtn.setTextColor(Ui.color(sheetTestBtn.getContext(), R.color.text_secondary));
+        }
         if (lastGroups != null) {
             renderNodes(lastGroups);
         }
@@ -978,9 +1114,11 @@ public class ProxyFragment extends BaseFragment {
                 } else if (!data.optBoolean("ok", false)) {
                     notice("测速失败：" + data.optString("error", "无结果"));
                 }
+                resetTestBtn();
                 if (lastGroups != null) {
                     renderNodes(lastGroups);
                 }
+                refreshSheet();
             }
 
             @Override
@@ -988,12 +1126,29 @@ public class ProxyFragment extends BaseFragment {
                 testingGroup = "";
                 if (isAdded()) {
                     fail(message);
+                    resetTestBtn();
                     if (lastGroups != null) {
                         renderNodes(lastGroups);
                     }
+                    refreshSheet();
                 }
             }
         });
+    }
+
+    /** 测速按钮复位成「测速」 */
+    private void resetTestBtn() {
+        if (sheetTestBtn != null) {
+            sheetTestBtn.setText("测速");
+            sheetTestBtn.setTextColor(Ui.color(sheetTestBtn.getContext(), R.color.primary));
+        }
+    }
+
+    /** 弹窗还开着时，测速完成后把延迟原地刷进节点表 */
+    private void refreshSheet() {
+        if (sheetList != null && nodeSheet != null && nodeSheet.isShowing()) {
+            fillSheetList(sheetList.getContext());
+        }
     }
 
     private void selectNode(String group, String name, boolean topLevel) {

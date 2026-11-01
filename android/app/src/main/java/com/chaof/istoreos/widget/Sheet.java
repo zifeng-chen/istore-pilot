@@ -297,6 +297,13 @@ public final class Sheet {
             return this;
         }
 
+        /** 固定头部：插在拖拽条和滚动内容之间，不随内容滚动（标题栏 / 工具栏用） */
+        public Builder header(View v) {
+            root.addView(v, 1, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            return this;
+        }
+
         /**
          * 列表行。checked 为 true 时右侧显示勾号（单选）；
          * 放进 rows 容器而不是 stack，是为了左右留白更小、行更宽。
