@@ -39,15 +39,16 @@ public class SettingsFragment extends BaseFragment {
     private String heroToken = "—";
     /** hero 大标题：在线时是主机名，拿不到才退回服务器地址 */
     private TextView tvHeroHost;
-    /** hero 底部三个读数块：响应 / 凭证 / Agent 版本 */
+    /** hero 底部三个读数块：响应 / 时长 / 凭证 */
     private TextView tvHeroLatency;
     private TextView tvHeroToken;
-    private TextView tvHeroAgent;
+    private TextView tvHeroUptime;
+    /** hero 右上角「更多」菜单 */
+    private android.widget.PopupWindow heroMenu;
 
     private TextView tvWanState;
     private TextView tvWanV4;
     private TextView tvWanV6;
-    private TextView tvWanUp;
     private TextView tvLanV4;
 
     // 设备信息（原概览页的「机器信息」）
@@ -82,8 +83,7 @@ public class SettingsFragment extends BaseFragment {
         int wrap = ViewGroup.LayoutParams.WRAP_CONTENT;
 
         // ---------------------------------------------------------------- hero
-        // 单列：第一行「状态 + 右侧三个小图标按钮」，往下「主机名 → 地址 → 三项读数」。
-        // 按钮收进右上角横排、缩小，不再单独竖一列抢戏；读数块占满整卡宽度。
+        // 单列：第一行「状态 + 右上角一个更多按钮」，往下「主机名 → 地址 → 三项读数」。
         Ui.Card hero = Ui.gradient(c, R.color.hero_from, R.color.hero_to);
         hero.setPadding(Ui.dp(c, 20), Ui.dp(c, 22), Ui.dp(c, 20), Ui.dp(c, 22));
 
@@ -104,11 +104,8 @@ public class SettingsFragment extends BaseFragment {
         tvHeroState.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         top.addView(tvHeroState, new LinearLayout.LayoutParams(0, wrap, 1f));
 
-        LinearLayout.LayoutParams ib2 = new LinearLayout.LayoutParams(wrap, wrap);
-        ib2.leftMargin = Ui.dp(c, 8);
-        top.addView(heroIconBtn(c, Glyph.REFRESH, this::relogin));
-        top.addView(heroIconBtn(c, Glyph.TRASH, this::clearCache), ib2);
-        top.addView(heroIconBtn(c, Glyph.MOON, this::pickTheme), ib2);
+        // 右上角：一个「更多」图标按钮，点击展开菜单（重新登录 / 清缓存 / 主题）
+        top.addView(heroIconBtn(c, Glyph.MORE, v -> showHeroMenu(c, v)));
         hero.addView(top);
 
         tvHeroHost = Ui.text(c,
@@ -132,11 +129,11 @@ public class SettingsFragment extends BaseFragment {
         blp.topMargin = Ui.dp(c, 4);
         hero.addView(tvBase, blp);
 
-        // 三项读数：响应 / 凭证 / Agent，占满整卡宽度
+        // 三项读数：响应 / 时长 / 凭证，占满整卡宽度
         LinearLayout stats = Ui.row(c);
         tvHeroLatency = heroStat(c, stats, "响应", "—");
+        tvHeroUptime = heroStat(c, stats, "时长", "—");
         tvHeroToken = heroStat(c, stats, "凭证", "—");
-        tvHeroAgent = heroStat(c, stats, "Agent", "—");
         LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, wrap);
         slp.topMargin = Ui.dp(c, 16);
@@ -160,8 +157,6 @@ public class SettingsFragment extends BaseFragment {
                 "IPv6", "外网入口", "—", false, false, null);
         // 完整 IPv6 是 39 个字符，13.5sp 刚好一行放下
         tvWanV6.setTextSize(12.5f);
-        tvWanUp = Ui.settingRow(c, net, com.chaof.istoreos.widget.Glyph.CLOCK,
-                "连接时长", "本次拨号已持续", "—", false, false, null);
         tvLanV4 = Ui.settingRow(c, net, com.chaof.istoreos.widget.Glyph.CHIP,
                 "内网网关", "设备默认走这个地址", "—", false, false, null);
         TextView netNote = Ui.text(c,
@@ -333,15 +328,76 @@ public class SettingsFragment extends BaseFragment {
     }
 
     /** hero 右侧的图标按钮：白色淡底圆角块，里面一个白色线性图标，不带文字 */
-    private View heroIconBtn(Context c, int glyph, Runnable onClick) {
+    private View heroIconBtn(Context c, int glyph, android.view.View.OnClickListener onClick) {
         int boxDp = 34;
         LinearLayout box = Ui.glyphTile(c, glyph, boxDp, R.color.hero_fg);
         box.setClickable(true);
         box.setFocusable(true);
-        box.setOnClickListener(v -> onClick.run());
+        box.setOnClickListener(onClick);
         box.setLayoutParams(new LinearLayout.LayoutParams(
                 Ui.dp(c, boxDp), Ui.dp(c, boxDp)));
         return box;
+    }
+
+    /** 右上角「更多」菜单：三项图标 + 文字，锚定在按钮下方 */
+    private void showHeroMenu(Context c, View anchor) {
+        LinearLayout menu = Ui.column(c);
+        int pad = Ui.dp(c, 6);
+        menu.setPadding(pad, pad, pad, pad);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Ui.color(c, R.color.surface));
+        bg.setCornerRadius(Ui.dp(c, 16));
+        bg.setStroke(Math.max(1, Ui.dp(c, 0.7f)), Ui.color(c, R.color.glass_stroke));
+        menu.setBackground(bg);
+
+        menu.addView(menuRow(c, Glyph.REFRESH, "重新登录", v -> {
+            hideHeroMenu();
+            relogin();
+        }));
+        menu.addView(menuRow(c, Glyph.TRASH, "清缓存", v -> {
+            hideHeroMenu();
+            clearCache();
+        }));
+        menu.addView(menuRow(c, Glyph.MOON, "主题", v -> {
+            hideHeroMenu();
+            pickTheme();
+        }));
+
+        heroMenu = new android.widget.PopupWindow(menu,
+                Ui.dp(c, 150), ViewGroup.LayoutParams.WRAP_CONTENT, true);
+        heroMenu.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(
+                android.graphics.Color.TRANSPARENT));
+        heroMenu.setElevation(Ui.dp(c, 8));
+        heroMenu.showAsDropDown(anchor, -Ui.dp(c, 150) + anchor.getWidth(), Ui.dp(c, 6));
+    }
+
+    /** 菜单里的一行：图标 + 文字，点击后回调 */
+    private LinearLayout menuRow(Context c, int glyph, String text,
+                                 View.OnClickListener l) {
+        LinearLayout row = Ui.row(c);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(Ui.dp(c, 12), Ui.dp(c, 11), Ui.dp(c, 16), Ui.dp(c, 11));
+        Glyph g = Glyph.of(c, glyph, R.color.text_primary);
+        int s = Ui.dp(c, 17);
+        LinearLayout.LayoutParams glp = new LinearLayout.LayoutParams(s, s);
+        glp.rightMargin = Ui.dp(c, 11);
+        row.addView(g, glp);
+        TextView t = Ui.text(c, text, 14f, R.color.text_primary);
+        row.addView(t);
+        GradientDrawable mask = new GradientDrawable();
+        mask.setColor(0xFFFFFFFF);
+        row.setBackground(new android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(Ui.color(c, R.color.ripple)),
+                null, mask));
+        row.setOnClickListener(l);
+        return row;
+    }
+
+    private void hideHeroMenu() {
+        if (heroMenu != null && heroMenu.isShowing()) {
+            heroMenu.dismiss();
+        }
+        heroMenu = null;
     }
 
     /** hero 底部的一格读数：上面小标签，下面数值，均分一行 */
@@ -421,10 +477,7 @@ public class SettingsFragment extends BaseFragment {
                 long ms = System.currentTimeMillis() - started;
                 heroLatency = ms + " ms";
                 if (tvHeroState != null) {
-                    tvHeroState.setText("已连接");
-                    if (tvHeroAgent != null) {
-                        tvHeroAgent.setText(ver);
-                    }
+                    tvHeroState.setText("已连接 " + ver);
                     renderHeroMeta();
                 }
             }
@@ -438,9 +491,6 @@ public class SettingsFragment extends BaseFragment {
                 heroLatency = "—";
                 if (tvHeroState != null) {
                     tvHeroState.setText("连不上");
-                    if (tvHeroAgent != null) {
-                        tvHeroAgent.setText("—");
-                    }
                     renderHeroMeta();
                 }
             }
@@ -460,7 +510,9 @@ public class SettingsFragment extends BaseFragment {
                     tvWanV4.setText(firstAddr(wan.optJSONArray("ipv4")));
                     tvWanV6.setText(ipv6Summary(wan.optJSONArray("ipv6")));
                     long upSec = wan.optLong("uptime", 0);
-                    tvWanUp.setText(upSec > 0 ? Fmt.dur(upSec) : "—");
+                    if (tvHeroUptime != null) {
+                        tvHeroUptime.setText(upSec > 0 ? Fmt.dur(upSec) : "—");
+                    }
                 }
                 JSONObject lan = body.optJSONObject("lan");
                 if (lan != null) {

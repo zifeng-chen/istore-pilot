@@ -49,6 +49,8 @@ export struct SettingsPage {
   @State ipv6: string = '—';
   @State wanUptime: string = '—';
   @State lanV4: string = '—';
+  /** hero 右上角「更多」菜单是否展开 */
+  @State showHeroMenu: boolean = false;
 
   @State sheet: string = '';
   @State sheetTitle: string = '';
@@ -330,7 +332,7 @@ export struct SettingsPage {
   @Builder
   heroCard() {
     Column() {
-      // 第一行：状态（左）+ 三个小图标按钮（右横排）
+      // 第一行：状态（左）+ 右上角一个更多按钮
       Row() {
         Row()
           .width(7)
@@ -345,31 +347,24 @@ export struct SettingsPage {
           .layoutWeight(1);
 
         Stack() {
-          GlyphIcon({ kind: Glyph.REFRESH, color: Pal.heroFg(), side: 16, lineWidth: 1.8 });
+          GlyphIcon({ kind: Glyph.MORE, color: Pal.heroFg(), side: 16, lineWidth: 1.8 });
         }
         .width(34)
         .height(34)
         .borderRadius(11)
         .backgroundColor(Pal.heroStroke())
-        .onClick(() => { this.relogin(); });
-        Stack() {
-          GlyphIcon({ kind: Glyph.TRASH, color: Pal.heroFg(), side: 16, lineWidth: 1.8 });
-        }
-        .width(34)
-        .height(34)
-        .borderRadius(11)
-        .backgroundColor(Pal.heroStroke())
-        .margin({ left: 8 })
-        .onClick(() => { this.clearCache(); });
-        Stack() {
-          GlyphIcon({ kind: Glyph.MOON, color: Pal.heroFg(), side: 16, lineWidth: 1.8 });
-        }
-        .width(34)
-        .height(34)
-        .borderRadius(11)
-        .backgroundColor(Pal.heroStroke())
-        .margin({ left: 8 })
-        .onClick(() => { this.pickTheme(); });
+        .onClick(() => { this.showHeroMenu = !this.showHeroMenu; })
+        .bindPopup(this.showHeroMenu, {
+          builder: () => { this.heroMenuContent(); },
+          placement: Placement.BottomRight,
+          popupColor: $r('app.color.surface'),
+          enableArrow: true,
+          onStateChange: (e) => {
+            if (!e.isVisible) {
+              this.showHeroMenu = false;
+            }
+          }
+        });
       }
       .width('100%')
       .alignItems(VerticalAlign.Center);
@@ -395,8 +390,8 @@ export struct SettingsPage {
 
       Row() {
         HeroStat({ label: '响应', value: this.latency.length > 0 ? this.latency + ' ms' : '—' });
+        HeroStat({ label: '时长', value: this.wanUptime });
         HeroStat({ label: '凭证', value: this.tokenOk ? (this.online ? '有效' : '已保存') : '缺失' });
-        HeroStat({ label: 'Agent', value: this.agentVersion.length > 0 ? ('v' + this.agentVersion) : '—' });
       }
       .width('100%')
       .margin({ top: 16 });
@@ -410,6 +405,47 @@ export struct SettingsPage {
     })
     .border({ width: 0.7, color: $r('app.color.hero_stroke') })
     .margin({ bottom: this.rail() ? Bp.gap(this.winW) : T.GAP });
+  }
+
+  /** 右上角「更多」菜单：三项图标 + 文字 */
+  @Builder
+  heroMenuContent() {
+    Column({ space: 2 }) {
+      Row({ space: 10 }) {
+        GlyphIcon({ kind: Glyph.REFRESH, color: Pal.textPrimary(), side: 16, lineWidth: 1.9 });
+        Text('重新登录')
+          .fontSize(14)
+          .fontColor($r('app.color.text_primary'));
+      }
+      .width('100%')
+      .padding({ left: 12, right: 16, top: 10, bottom: 10 })
+      .borderRadius(10)
+      .onClick(() => { this.showHeroMenu = false; this.relogin(); });
+
+      Row({ space: 10 }) {
+        GlyphIcon({ kind: Glyph.TRASH, color: Pal.textPrimary(), side: 16, lineWidth: 1.9 });
+        Text('清缓存')
+          .fontSize(14)
+          .fontColor($r('app.color.text_primary'));
+      }
+      .width('100%')
+      .padding({ left: 12, right: 16, top: 10, bottom: 10 })
+      .borderRadius(10)
+      .onClick(() => { this.showHeroMenu = false; this.clearCache(); });
+
+      Row({ space: 10 }) {
+        GlyphIcon({ kind: Glyph.MOON, color: Pal.textPrimary(), side: 16, lineWidth: 1.9 });
+        Text('主题')
+          .fontSize(14)
+          .fontColor($r('app.color.text_primary'));
+      }
+      .width('100%')
+      .padding({ left: 12, right: 16, top: 10, bottom: 10 })
+      .borderRadius(10)
+      .onClick(() => { this.showHeroMenu = false; this.pickTheme(); });
+    }
+    .width(150)
+    .padding(6);
   }
 
 
@@ -483,18 +519,6 @@ export struct SettingsPage {
         subtitle: '外网入口',
         value: this.ipv6,
         valueSize: 12,
-        first: false,
-        danger: false,
-        arrow: false,
-        onTap: () => {
-        }
-      });
-      SettingRow({
-        glyph: Glyph.CLOCK,
-        title: '连接时长',
-        subtitle: '本次拨号已持续',
-        value: this.wanUptime,
-        valueSize: 0,
         first: false,
         danger: false,
         arrow: false,

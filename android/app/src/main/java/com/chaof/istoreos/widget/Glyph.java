@@ -41,6 +41,7 @@ public final class Glyph extends View {
     public static final int BOLT = 14;
     public static final int TRASH = 15;
     public static final int MOON = 16;
+    public static final int MORE = 17;
 
     private final Paint pen = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -260,6 +261,13 @@ public final class Glyph extends View {
                 path.cubicTo(7.8f, 8.6f, 10.3f, 5.8f, 15.6f, 4.2f);
                 path.close();
                 c.drawPath(path, pen);
+                break;
+
+            case MORE:
+                // 三个横排实心点：更多菜单入口
+                dot(c, 6f, 12f, 1.7f);
+                dot(c, 12f, 12f, 1.7f);
+                dot(c, 18f, 12f, 1.7f);
                 break;
 
             default:

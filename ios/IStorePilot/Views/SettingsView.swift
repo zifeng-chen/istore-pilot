@@ -132,7 +132,7 @@ struct SettingsView: View {
         let b = d.obj("board") ?? [:]
 
         return Hero {
-            // 单列：第一行「状态 + 右侧三个小图标按钮」，往下「主机名 → 地址 → 三项读数」。
+            // 单列：第一行「状态 + 右上角一个更多按钮」，往下「主机名 → 地址 → 三项读数」。
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 8) {
                     Circle()
@@ -142,15 +142,7 @@ struct SettingsView: View {
                         .font(.system(size: 12.5, weight: .medium))
                         .foregroundStyle(C.heroFg)
                     Spacer(minLength: 6)
-                    heroIcon("arrow.clockwise") {
-                        Api.onAuthFail?()
-                        app.signOut()
-                    }
-                    heroIcon("trash") {
-                        SnapCache.shared.clear()
-                        popup = Popup(title: "已清除", body: "下次进入各页面会重新从路由器读取。")
-                    }
-                    themeMenu
+                    heroMenu
                 }
 
                 Text(b.str("hostname").isEmpty ? bareBase : b.str("hostname"))
@@ -169,8 +161,8 @@ struct SettingsView: View {
 
                 HStack(spacing: 0) {
                     heroStat("响应", pingMs)
+                    heroStat("时长", wanUptime)
                     heroStat("凭证", tokenLeft)
-                    heroStat("Agent", ok ? "v" + ping.str("version") : "—")
                 }
                 .padding(.top, 16)
             }
@@ -179,6 +171,12 @@ struct SettingsView: View {
     }
 
     private var ok: Bool { !ping.str("version").isEmpty }
+
+    /// 拨号连接时长（从网络卡挪到顶部卡片）
+    private var wanUptime: String {
+        let up = net.obj("wan")?.dbl("uptime") ?? 0
+        return up > 0 ? F.dur(up) : "—"
+    }
 
     /// hero 底部的一格读数：上面小标签，下面数值，均分一行
     private func heroStat(_ label: String, _ value: String) -> some View {
@@ -195,19 +193,6 @@ struct SettingsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// hero 右侧的图标按钮：白色淡底圆角块，里面一个 SF Symbol 图标，不带文字
-    private func heroIcon(_ system: String, _ tap: @escaping () -> Void) -> some View {
-        Button(action: tap) {
-            Image(systemName: system)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(C.heroFg)
-                .frame(width: 34, height: 34)
-                .background(C.heroFg.opacity(0.16))
-                .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
-        }
-        .buttonStyle(.plain)
-    }
-
     private var themeIcon: String {
         switch app.theme {
         case 1: return "sun.max.fill"
@@ -216,18 +201,34 @@ struct SettingsView: View {
         }
     }
 
-    /// 主题入口：图标形态，和右侧另两个图标按钮一致
-    private var themeMenu: some View {
+    /// 右上角「更多」菜单：重新登录 / 清缓存 / 主题（图标 + 文字）
+    private var heroMenu: some View {
         Menu {
-            ForEach(Array(Appearance.modes.enumerated()), id: \.offset) { i, m in
-                Button {
-                    app.setTheme(m)
-                } label: {
-                    Text((app.theme == m ? "✓ " : "") + Appearance.names[i])
+            Button {
+                Api.onAuthFail?()
+                app.signOut()
+            } label: {
+                Label("重新登录", systemImage: "arrow.clockwise")
+            }
+            Button {
+                SnapCache.shared.clear()
+                popup = Popup(title: "已清除", body: "下次进入各页面会重新从路由器读取。")
+            } label: {
+                Label("清缓存", systemImage: "trash")
+            }
+            Menu {
+                ForEach(Array(Appearance.modes.enumerated()), id: \.offset) { i, m in
+                    Button {
+                        app.setTheme(m)
+                    } label: {
+                        Text((app.theme == m ? "✓ " : "") + Appearance.names[i])
+                    }
                 }
+            } label: {
+                Label("主题", systemImage: themeIcon)
             }
         } label: {
-            Image(systemName: themeIcon)
+            Image(systemName: "ellipsis")
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(C.heroFg)
                 .frame(width: 34, height: 34)
@@ -282,9 +283,6 @@ struct SettingsView: View {
                 Hairline(inset: 62)
                 plainRow(icon: "number", title: "IPv6", note: "外网入口",
                          value: v6.isEmpty ? "—" : v6)
-                Hairline(inset: 62)
-                plainRow(icon: "clock", title: "连接时长", note: "本次拨号已持续",
-                         value: wan.dbl("uptime") > 0 ? F.dur(wan.dbl("uptime")) : "—")
                 Hairline(inset: 62)
                 plainRow(icon: "house", title: "内网网关", note: "设备默认走这个地址",
                          value: lan.objs("ipv4").first?.str("address") ?? "—")
