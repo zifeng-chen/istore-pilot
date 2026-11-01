@@ -43,6 +43,7 @@ public final class Glyph extends View {
     public static final int MOON = 16;
     public static final int MORE = 17;
     public static final int LOGOUT = 18;
+    public static final int CLOSE = 19;
 
     private final Paint pen = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -292,6 +293,12 @@ public final class Glyph extends View {
                 path.lineTo(20.2f, 12f);
                 path.lineTo(16.2f, 15.6f);
                 c.drawPath(path, pen);
+                break;
+
+            case CLOSE:
+                // 两条斜线组成的 ×
+                line(c, 6.6f, 6.6f, 17.4f, 17.4f);
+                line(c, 17.4f, 6.6f, 6.6f, 17.4f);
                 break;
 
             default:

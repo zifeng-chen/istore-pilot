@@ -686,145 +686,55 @@ public class ProxyFragment extends BaseFragment {
             JSONArray members = g.optJSONArray("members");
             boolean testing = gname.equals(testingGroup);
 
-            if (i > 0) {
-                Ui.space(c, nodesBox, 10);
-            }
-            nodesBox.addView(groupCard(c, g, gname, now, members, testing));
+            groupRow(c, g, gname, now, members, testing, i == 0);
         }
 
         setRefreshing(false);
     }
 
     /**
-     * 分组标题，两行：
+     * 分组入口：一行列表（类型图标 + 组名 + 当前节点 + 节点数 + 箭头）。
      *
-     *   ▾ 自动选择                                    [测速]
-     *     当前 日本高速06|BGP|CTCU              57 个
-     *
-     * 原来把「分组名 + 当前节点 + 节点数 + 测速」全塞一行，中文节点名动辄十几字，
-     * 结果当前节点被压成「日本高速06|BGP|CT…」，而孤零零一个「57」也不知道是什么。
-     * 拆成两行后：名字能全显示，数字带上量词，测速还在原位。
-     *
-     * 第二行即使折叠也保留 —— 收起分组时「这组现在用哪个节点」正是最想知道的。
+     * 原来是一张「凹槽大卡」（类型胶囊 + 组名 + 当前节点 + 节点数四层），
+     * 四组叠在「配置与节点」白卡里又厚又碎。改回和设置页同一条 settingRow：
+     * 信息一条不少，但一眼扫完、点开才看节点。
      */
-    /**
-     * 一张分组卡：内嵌式「凹槽」小卡。坐进「配置与节点」那张白卡里时，
-     * 用比白卡更暗一档的底 + 一圈细描边，一眼认出这是一块可点的独立区域，
-     * 而不是又一行文字。
-     *
-     *   手动                                  ›
-     *   自动选择
-     *   ● 日本高速06|BGP|CTCU
-     *   57 个节点
-     *
-     * 结构对齐鸿蒙：类型胶囊 + 右箭头徽标做头部，组名做主标题，
-     * 当前节点用「主色圆点 + 主色字」标正在用哪条线，节点数压到最底。
-     */
-    private View groupCard(Context c, JSONObject g, String gname, String now,
-                           JSONArray members, boolean testing) {
-        LinearLayout card = Ui.column(c);
-        card.setPadding(Ui.dp(c, 14), Ui.dp(c, 12), Ui.dp(c, 14), Ui.dp(c, 12));
-        card.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        GradientDrawable bg = new GradientDrawable();
-        bg.setCornerRadius(Ui.dp(c, 16));
-        bg.setColor(Ui.color(c, R.color.surface_sunken));
-        bg.setStroke(Math.max(1, Ui.dp(c, 0.7f)), Ui.color(c, R.color.divider));
-        card.setBackground(new android.graphics.drawable.RippleDrawable(
-                android.content.res.ColorStateList.valueOf(Ui.color(c, R.color.ripple)),
-                bg, bg));
-        card.setClickable(true);
-        card.setFocusable(true);
-        card.setOnClickListener(v -> openGroupSheet(c, g, gname, now, members, testing));
-
-        // 第一行：类型胶囊 + 右箭头徽标
-        LinearLayout top = Ui.row(c);
-        top.setGravity(Gravity.CENTER_VERTICAL);
-        top.addView(typePill(c, groupType(g.optString("type", ""))));
-        top.addView(new View(c), new LinearLayout.LayoutParams(0, 1, 1f));
-        top.addView(chevBadge(c));
-        card.addView(top);
-
-        // 组名
-        TextView name = Ui.text(c, pretty(gname), 15.5f, R.color.text_primary);
-        name.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        name.setSingleLine(true);
-        name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        LinearLayout.LayoutParams nlp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        nlp.topMargin = Ui.dp(c, 8);
-        card.addView(name, nlp);
-
-        // 当前节点：主色圆点 + 主色字（策略项用灰），一眼看出「正在用哪条线」
+    private void groupRow(Context c, JSONObject g, String gname, String now,
+                          JSONArray members, boolean testing, boolean first) {
         String cur = pretty(now);
-        int curColor = cur.isEmpty() ? R.color.text_tertiary
-                : (isPolicyName(cur) ? R.color.text_secondary : R.color.primary);
-        LinearLayout curRow = Ui.row(c);
-        curRow.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        clp.topMargin = Ui.dp(c, 6);
-        View dot = dotView(c, cur.isEmpty() ? R.color.text_tertiary : curColor, 6);
-        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(
-                Ui.dp(c, 6), Ui.dp(c, 6));
-        dlp.rightMargin = Ui.dp(c, 6);
-        curRow.addView(dot, dlp);
-        TextView nowText = Ui.text(c, cur.isEmpty() ? "未选择" : cur, 12.5f, curColor);
-        nowText.setSingleLine(true);
-        nowText.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        curRow.addView(nowText, new LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        card.addView(curRow, clp);
-
-        // 底部：节点数
         int total = members == null ? 0 : members.length();
-        TextView count = Ui.num(c, total + " 个节点", 10.5f, R.color.text_tertiary);
-        LinearLayout.LayoutParams clp2 = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        clp2.topMargin = Ui.dp(c, 6);
-        card.addView(count, clp2);
-
-        return card;
+        Ui.settingRow(c, nodesBox, groupGlyph(g.optString("type", "")),
+                pretty(gname),
+                cur.isEmpty() ? "未选择" : cur,
+                total + " 个",
+                first, false,
+                () -> openGroupSheet(c, g, gname, now, members, testing));
     }
 
-    /** 类型胶囊：主色淡底 + 主色字，比灰底灰字更有识别度，也跟鸿蒙一致 */
-    private TextView typePill(Context c, String text) {
-        TextView v = Ui.text(c, text, 10f, R.color.primary);
-        v.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        v.setPadding(Ui.dp(c, 7), Ui.dp(c, 2), Ui.dp(c, 7), Ui.dp(c, 2));
-        GradientDrawable bg = new GradientDrawable();
-        bg.setCornerRadius(Ui.dp(c, 100));
-        bg.setColor(Ui.color(c, R.color.accent_soft));
-        v.setBackground(bg);
-        return v;
+    /** 分组类型 → 图标 */
+    private int groupGlyph(String raw) {
+        switch (raw == null ? "" : raw.toLowerCase(Locale.ROOT)) {
+            case "urltest": return com.chaof.istoreos.widget.Glyph.BOLT;
+            case "fallback": return com.chaof.istoreos.widget.Glyph.SHIELD;
+            case "relay": return com.chaof.istoreos.widget.Glyph.LINK;
+            default: return com.chaof.istoreos.widget.Glyph.LIST;
+        }
     }
 
-    /** 右箭头徽标：小圆角方块里的 ›，替代原来光秃秃的单个字符 */
-    private TextView chevBadge(Context c) {
-        TextView v = Ui.text(c, "\u203A", 13f, R.color.text_secondary);
-        v.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        v.setGravity(Gravity.CENTER);
-        v.setIncludeFontPadding(false);
+    /** 关闭图标按钮：30dp 圆角方块里的 ×，和测速胶囊并排放在弹窗右上角 */
+    private View closeIconBtn(Context c) {
+        LinearLayout box = Ui.row(c);
+        box.setGravity(Gravity.CENTER);
         GradientDrawable bg = new GradientDrawable();
-        bg.setCornerRadius(Ui.dp(c, 6));
+        bg.setCornerRadius(Ui.dp(c, 9));
         bg.setColor(Ui.color(c, R.color.surface_hi));
-        v.setBackground(bg);
-        int s = Ui.dp(c, 18);
-        v.setLayoutParams(new LinearLayout.LayoutParams(s, s));
-        return v;
-    }
-
-    /** 实心小圆点，标「正在用」的节点 */
-    private View dotView(Context c, int colorRes, int sizeDp) {
-        View d = new View(c);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setShape(GradientDrawable.OVAL);
-        bg.setColor(Ui.color(c, colorRes));
-        d.setBackground(bg);
-        int s = Ui.dp(c, sizeDp);
-        d.setLayoutParams(new LinearLayout.LayoutParams(s, s));
-        return d;
+        box.setBackground(bg);
+        com.chaof.istoreos.widget.Glyph g = new com.chaof.istoreos.widget.Glyph(c);
+        g.setKind(com.chaof.istoreos.widget.Glyph.CLOSE);
+        g.setColor(Ui.color(c, R.color.text_secondary));
+        int s = Ui.dp(c, 16);
+        box.addView(g, new LinearLayout.LayoutParams(s, s));
+        return box;
     }
 
     /** 分组类型 → 中文（和 iOS / 鸿蒙同一套映射） */
@@ -855,34 +765,40 @@ public class ProxyFragment extends BaseFragment {
 
         LinearLayout head = Ui.row(c);
         head.setGravity(Gravity.CENTER_VERTICAL);
-        head.setPadding(0, Ui.dp(c, 4), 0, Ui.dp(c, 8));
+        head.setPadding(0, Ui.dp(c, 6), 0, Ui.dp(c, 12));
 
+        // 左上：组名 + 副标题
         LinearLayout titleCol = Ui.column(c);
-        TextView title = Ui.text(c, pretty(gname), 17f, R.color.text_primary);
+        TextView title = Ui.text(c, pretty(gname), 18f, R.color.text_primary);
         title.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         title.setSingleLine(true);
         title.setEllipsize(android.text.TextUtils.TruncateAt.END);
         titleCol.addView(title);
         TextView sub = Ui.text(c, groupType(g.optString("type", ""))
                 + " · " + members.length() + " 个节点", 11.5f, R.color.text_secondary);
-        sub.setPadding(0, Ui.dp(c, 3), 0, 0);
+        sub.setPadding(0, Ui.dp(c, 4), 0, 0);
         titleCol.addView(sub);
         head.addView(titleCol, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
+        // 右上：测速胶囊 + 关闭图标按钮 —— 一个是「操作」、一个是「退出」，
+        // 用不同形式区分开，不再两坨文字并排挤在一起
         sheetTestBtn = testPill(c, testing);
         sheetTestBtn.setOnClickListener(v -> testGroup(gname));
         head.addView(sheetTestBtn);
 
-        TextView close = Ui.text(c, "关闭", 14f, R.color.text_secondary);
-        close.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        close.setPadding(Ui.dp(c, 10), Ui.dp(c, 6), Ui.dp(c, 2), Ui.dp(c, 6));
-        close.setOnClickListener(v -> {
+        View closeBtn = closeIconBtn(c);
+        LinearLayout.LayoutParams cbLp = new LinearLayout.LayoutParams(
+                Ui.dp(c, 30), Ui.dp(c, 30));
+        cbLp.leftMargin = Ui.dp(c, 8);
+        closeBtn.setClickable(true);
+        closeBtn.setFocusable(true);
+        closeBtn.setOnClickListener(v -> {
             if (nodeSheet != null) {
                 nodeSheet.dismiss();
             }
         });
-        head.addView(close);
+        head.addView(closeBtn, cbLp);
 
         // 节点表：整组共用一个圆角容器，行间细线，跟设备列表同一套骨架
         sheetList = Ui.group(c);
