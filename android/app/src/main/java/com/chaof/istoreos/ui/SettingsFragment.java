@@ -363,7 +363,7 @@ public class SettingsFragment extends BaseFragment {
             pickTheme();
         }));
 
-        int w = Ui.dp(c, 190);
+        int w = Ui.dp(c, 140);
         heroMenu = new android.widget.PopupWindow(menu,
                 w, ViewGroup.LayoutParams.WRAP_CONTENT, true);
         heroMenu.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(

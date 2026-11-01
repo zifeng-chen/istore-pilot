@@ -415,7 +415,7 @@ export struct SettingsPage {
       this.menuRow(Glyph.TRASH, '清缓存', () => { this.showHeroMenu = false; this.clearCache(); });
       this.menuRow(Glyph.MOON, '主题', () => { this.showHeroMenu = false; this.pickTheme(); });
     }
-    .width(170)
+    .width(140)
     .padding(8);
   }
 
