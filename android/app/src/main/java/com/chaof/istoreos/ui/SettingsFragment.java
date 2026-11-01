@@ -23,6 +23,7 @@ import com.chaof.istoreos.util.Fmt;
 import com.chaof.istoreos.util.Hz;
 import com.chaof.istoreos.util.Theme;
 import com.chaof.istoreos.util.Ui;
+import com.chaof.istoreos.widget.Glyph;
 import com.chaof.istoreos.widget.Sheet;
 
 import org.json.JSONObject;
@@ -53,8 +54,6 @@ public class SettingsFragment extends BaseFragment {
     private TextView tvDevDisk;
     private TextView tvDevSys;
     private TextView tvTheme;
-    /** hero 右上角的主题按钮：点开和「外观」卡里的选择器是同一个 */
-    private TextView tvHeroTheme;
 
     /**
      * 选安装包。必须用字段初始化注册 —— 放到 build() 里会抛
@@ -84,7 +83,7 @@ public class SettingsFragment extends BaseFragment {
         // 按钮从底部横排挪到右列、右对齐，一眼扫过去「能做什么」都在右手边，
         // 也不用在横排里挤占大标题的空间。三端（iOS / Android / 鸿蒙）同一套结构。
         Ui.Card hero = Ui.gradient(c, R.color.hero_from, R.color.hero_to);
-        hero.setPadding(Ui.dp(c, 20), Ui.dp(c, 18), Ui.dp(c, 14), Ui.dp(c, 16));
+        hero.setPadding(Ui.dp(c, 20), Ui.dp(c, 24), Ui.dp(c, 16), Ui.dp(c, 24));
 
         LinearLayout split = Ui.row(c);
         split.setGravity(Gravity.TOP);
@@ -142,20 +141,19 @@ public class SettingsFragment extends BaseFragment {
 
         split.addView(info, new LinearLayout.LayoutParams(0, wrap, 1f));
 
-        // 右列：三个动作竖排、右对齐
+        // 右列：三个图标按钮竖排、右对齐，不加文字
         LinearLayout btns = Ui.column(c);
         LinearLayout.LayoutParams b1 = new LinearLayout.LayoutParams(wrap, wrap);
         b1.gravity = Gravity.END;
-        btns.addView(heroLink(c, "重新登录", this::relogin), b1);
+        btns.addView(heroIconBtn(c, Glyph.REFRESH, this::relogin), b1);
         LinearLayout.LayoutParams b2 = new LinearLayout.LayoutParams(wrap, wrap);
         b2.gravity = Gravity.END;
-        b2.topMargin = Ui.dp(c, 9);
-        btns.addView(heroLink(c, "清缓存", this::clearCache), b2);
-        tvHeroTheme = heroLink(c, "主题 · " + Theme.name(c), this::pickTheme);
+        b2.topMargin = Ui.dp(c, 10);
+        btns.addView(heroIconBtn(c, Glyph.TRASH, this::clearCache), b2);
         LinearLayout.LayoutParams b3 = new LinearLayout.LayoutParams(wrap, wrap);
         b3.gravity = Gravity.END;
-        b3.topMargin = Ui.dp(c, 9);
-        btns.addView(tvHeroTheme, b3);
+        b3.topMargin = Ui.dp(c, 10);
+        btns.addView(heroIconBtn(c, Glyph.PALETTE, this::pickTheme), b3);
         split.addView(btns, new LinearLayout.LayoutParams(wrap, wrap));
 
         hero.addView(split);
@@ -348,14 +346,16 @@ public class SettingsFragment extends BaseFragment {
         root.addView(about);
     }
 
-    /** hero 底部的一行文字动作：不做胶囊，避免一张卡上三四个抢眼的块 */
-    private TextView heroLink(Context c, String text, Runnable onClick) {
-        TextView t = Ui.heroNote(c, text, 0.86f);
-        t.setTextSize(12f);
-        t.setGravity(Gravity.END);
-        t.setPadding(Ui.dp(c, 2), Ui.dp(c, 4), Ui.dp(c, 2), Ui.dp(c, 4));
-        t.setOnClickListener(v -> onClick.run());
-        return t;
+    /** hero 右侧的图标按钮：白色淡底圆角块，里面一个白色线性图标，不带文字 */
+    private View heroIconBtn(Context c, int glyph, Runnable onClick) {
+        int boxDp = 38;
+        LinearLayout box = Ui.glyphTile(c, glyph, boxDp, R.color.hero_fg);
+        box.setClickable(true);
+        box.setFocusable(true);
+        box.setOnClickListener(v -> onClick.run());
+        box.setLayoutParams(new LinearLayout.LayoutParams(
+                Ui.dp(c, boxDp), Ui.dp(c, boxDp)));
+        return box;
     }
 
     /** hero 那行读数：地址 · 响应 · 凭证 */
@@ -370,13 +370,7 @@ public class SettingsFragment extends BaseFragment {
     private void pickTheme() {
         Context c = ctx();
         Sheet.choose(c, "外观", Theme.NAMES, Theme.index(Theme.get(c)), which -> {
-            int mode = Theme.MODES[which];
-            Theme.applyMode(c, mode);
-            // 重建是异步的，先把这一行文案改掉，
-            // 否则在「系统本来就是这个颜色」的情况下不重建，会一直显示旧值
-            if (tvHeroTheme != null) {
-                tvHeroTheme.setText(Theme.name(mode));
-            }
+            Theme.applyMode(c, Theme.MODES[which]);
         });
     }
 

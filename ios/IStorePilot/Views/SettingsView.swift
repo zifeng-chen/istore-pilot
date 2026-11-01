@@ -132,8 +132,7 @@ struct SettingsView: View {
         let b = d.obj("board") ?? [:]
 
         return Hero {
-            // 左信息右按钮：状态 / 主机名 / 地址占满左侧，三个动作竖排在右侧。
-            // 三端（iOS / Android / 鸿蒙）同一套结构，按钮右对齐竖排。
+            // 左信息右按钮：状态 / 主机名 / 地址占满左侧，三个图标按钮竖排在右侧。
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(spacing: 6) {
@@ -168,18 +167,19 @@ struct SettingsView: View {
 
                 Spacer(minLength: 4)
 
-                VStack(alignment: .trailing, spacing: 9) {
-                    heroLink("重新登录") {
+                VStack(alignment: .trailing, spacing: 10) {
+                    heroIcon("arrow.clockwise") {
                         Api.onAuthFail?()
                         app.signOut()
                     }
-                    heroLink("清缓存") {
+                    heroIcon("trash") {
                         SnapCache.shared.clear()
                         popup = Popup(title: "已清除", body: "下次进入各页面会重新从路由器读取。")
                     }
                     themeMenu
                 }
             }
+            .padding(.vertical, 6)
         }
     }
 
@@ -192,13 +192,15 @@ struct SettingsView: View {
         return bits.joined(separator: "　·　")
     }
 
-    private func heroLink(_ title: String, _ tap: @escaping () -> Void) -> some View {
+    /// hero 右侧的图标按钮：白色淡底圆角块，里面一个 SF Symbol 图标，不带文字
+    private func heroIcon(_ system: String, _ tap: @escaping () -> Void) -> some View {
         Button(action: tap) {
-            Text(title)
-                .font(.system(size: 12))
-                .foregroundStyle(C.heroFgSoft)
-                .padding(.vertical, 3)
-                .contentShape(Rectangle())
+            Image(systemName: system)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(C.heroFg)
+                .frame(width: 38, height: 38)
+                .background(C.heroFg.opacity(0.14))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -211,7 +213,7 @@ struct SettingsView: View {
         }
     }
 
-    /// 主题入口：文字形态，落在卡片右下角。一张卡上不再出现任何胶囊
+    /// 主题入口：图标形态，和右侧另两个图标按钮一致
     private var themeMenu: some View {
         Menu {
             ForEach(Array(Appearance.modes.enumerated()), id: \.offset) { i, m in
@@ -222,15 +224,12 @@ struct SettingsView: View {
                 }
             }
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: themeIcon)
-                    .font(.system(size: 10.5))
-                Text("主题 · " + Appearance.name(app.theme))
-                    .font(.system(size: 12))
-                    .lineLimit(1)
-            }
-            .foregroundStyle(C.heroFgSoft)
-            .padding(.vertical, 3)
+            Image(systemName: themeIcon)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(C.heroFg)
+                .frame(width: 38, height: 38)
+                .background(C.heroFg.opacity(0.14))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 

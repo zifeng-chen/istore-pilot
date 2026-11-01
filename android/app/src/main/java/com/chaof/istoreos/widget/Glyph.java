@@ -39,6 +39,7 @@ public final class Glyph extends View {
     public static final int POWER = 12;
     public static final int LIST = 13;
     public static final int BOLT = 14;
+    public static final int TRASH = 15;
 
     private final Paint pen = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -231,6 +232,22 @@ public final class Glyph extends View {
                 path.lineTo(12.4f, 10f);
                 path.close();
                 c.drawPath(path, pen);
+                break;
+
+            case TRASH:
+                // 垃圾桶：提手 + 盖沿 + 上宽下窄的桶身 + 两条内竖线
+                line(c, 9.2f, 4.4f, 14.8f, 4.4f);
+                line(c, 12f, 4.4f, 12f, 6.8f);
+                line(c, 5.6f, 6.8f, 18.4f, 6.8f);
+                path.reset();
+                path.moveTo(7.4f, 9.2f);
+                path.lineTo(16.6f, 9.2f);
+                path.lineTo(15.8f, 19.8f);
+                path.lineTo(8.2f, 19.8f);
+                path.close();
+                c.drawPath(path, pen);
+                line(c, 10f, 11.6f, 10f, 17.2f);
+                line(c, 14f, 11.6f, 14f, 17.2f);
                 break;
 
             default:

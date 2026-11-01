@@ -50,8 +50,6 @@ export struct SettingsPage {
   @State wanUptime: string = '—';
   @State lanV4: string = '—';
 
-  @State themeName: string = '跟随系统';
-
   @State sheet: string = '';
   @State sheetTitle: string = '';
   @State infoTitle: string = '';
@@ -75,7 +73,6 @@ export struct SettingsPage {
     this.winW = this.winWStore;
     this.server = Session.base();
     this.userName = Session.user();
-    this.themeName = Appearance.label();
     this.tokenOk = Session.token().length > 0;
     this.load();
   }
@@ -379,26 +376,32 @@ export struct SettingsPage {
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1);
 
-        // 右列：三个动作竖排、右对齐
-        Column({ space: 9 }) {
-          Text('重新登录')
-            .fontSize(12)
-            .fontColor($r('app.color.hero_fg_soft'))
-            .textAlign(TextAlign.End)
-            .padding({ top: 4, bottom: 4 })
-            .onClick(() => { this.relogin(); });
-          Text('清缓存')
-            .fontSize(12)
-            .fontColor($r('app.color.hero_fg_soft'))
-            .textAlign(TextAlign.End)
-            .padding({ top: 4, bottom: 4 })
-            .onClick(() => { this.clearCache(); });
-          Text('主题 · ' + this.themeName)
-            .fontSize(12)
-            .fontColor($r('app.color.hero_fg_soft'))
-            .textAlign(TextAlign.End)
-            .padding({ top: 4, bottom: 4 })
-            .onClick(() => { this.pickTheme(); });
+        // 右列：三个图标按钮竖排、右对齐，不带文字
+        Column({ space: 10 }) {
+          Stack() {
+            GlyphIcon({ kind: Glyph.REFRESH, color: Pal.heroFg(), side: 18, lineWidth: 1.9 });
+          }
+          .width(38)
+          .height(38)
+          .borderRadius(12)
+          .backgroundColor(Pal.heroStroke())
+          .onClick(() => { this.relogin(); });
+          Stack() {
+            GlyphIcon({ kind: Glyph.TRASH, color: Pal.heroFg(), side: 18, lineWidth: 1.9 });
+          }
+          .width(38)
+          .height(38)
+          .borderRadius(12)
+          .backgroundColor(Pal.heroStroke())
+          .onClick(() => { this.clearCache(); });
+          Stack() {
+            GlyphIcon({ kind: Glyph.PALETTE, color: Pal.heroFg(), side: 18, lineWidth: 1.9 });
+          }
+          .width(38)
+          .height(38)
+          .borderRadius(12)
+          .backgroundColor(Pal.heroStroke())
+          .onClick(() => { this.pickTheme(); });
         }
         .alignItems(HorizontalAlign.End)
         .margin({ left: 12 });
@@ -407,7 +410,7 @@ export struct SettingsPage {
       .alignItems(VerticalAlign.Top);
     }
     .width('100%')
-    .padding(20)
+    .padding({ left: 20, right: 20, top: 24, bottom: 24 })
     .borderRadius(T.R_CARD)
     .linearGradient({
       angle: 135,
@@ -1103,9 +1106,6 @@ export struct SettingsPage {
 
   private applyTheme(mode: number): void {
     this.closeSheet();
-    // 立刻改文案：如果系统本来就是那个色，颜色不会变，
-    // 不主动赋值的话这一行会一直显示旧值
-    this.themeName = Appearance.NAMES[mode];
     Appearance.select(this.ctx(), mode);
   }
 
