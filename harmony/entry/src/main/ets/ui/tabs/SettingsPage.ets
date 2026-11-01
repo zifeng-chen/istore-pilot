@@ -330,94 +330,79 @@ export struct SettingsPage {
   @Builder
   heroCard() {
     Column() {
+      // 第一行：状态（左）+ 三个小图标按钮（右横排）
       Row() {
-        Column() {
-          Row() {
-            Row()
-              .width(7)
-              .height(7)
-              .borderRadius(4)
-              .backgroundColor(this.online ? $r('app.color.hero_fg') : Pal.warn())
-              .margin({ right: 7 });
-            Text(this.online ? '已连接' : '连不上')
-              .fontSize(12.5)
-              .fontWeight(FontWeight.Medium)
-              .fontColor($r('app.color.hero_fg'))
-              .layoutWeight(1);
-          }
-          .width('100%')
-          .alignItems(VerticalAlign.Center);
+        Row()
+          .width(7)
+          .height(7)
+          .borderRadius(4)
+          .backgroundColor(this.online ? $r('app.color.hero_fg') : Pal.warn())
+          .margin({ right: 7 });
+        Text(this.online ? '已连接' : '连不上')
+          .fontSize(12.5)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.hero_fg'))
+          .layoutWeight(1);
 
-          Text(this.hostname.length > 0 ? this.hostname : this.hostText())
-            .fontSize(24)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.hero_fg'))
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .textAlign(TextAlign.Start)
-            .width('100%')
-            .margin({ top: 12 });
-
-          Text(this.hostText())
-            .fontSize(12.5)
-            .fontColor($r('app.color.hero_fg_soft'))
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .textAlign(TextAlign.Start)
-            .width('100%')
-            .margin({ top: 5 });
-
-          Row()
-            .width('100%')
-            .height(0.7)
-            .backgroundColor(Pal.heroStroke())
-            .margin({ top: 14, bottom: 14 });
-
-          Row() {
-            HeroStat({ label: '响应', value: this.latency.length > 0 ? this.latency + ' ms' : '—' });
-            HeroStat({ label: '凭证', value: this.tokenOk ? (this.online ? '有效' : '已保存') : '缺失' });
-            HeroStat({ label: 'Agent', value: this.agentVersion.length > 0 ? ('v' + this.agentVersion) : '—' });
-          }
-          .width('100%');
+        Stack() {
+          GlyphIcon({ kind: Glyph.REFRESH, color: Pal.heroFg(), side: 16, lineWidth: 1.8 });
         }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1);
-
-        // 右列：三个图标按钮竖排、右对齐
-        Column({ space: 10 }) {
-          Stack() {
-            GlyphIcon({ kind: Glyph.REFRESH, color: Pal.heroFg(), side: 20, lineWidth: 1.9 });
-          }
-          .width(44)
-          .height(44)
-          .borderRadius(13)
-          .backgroundColor(Pal.heroStroke())
-          .onClick(() => { this.relogin(); });
-          Stack() {
-            GlyphIcon({ kind: Glyph.TRASH, color: Pal.heroFg(), side: 20, lineWidth: 1.9 });
-          }
-          .width(44)
-          .height(44)
-          .borderRadius(13)
-          .backgroundColor(Pal.heroStroke())
-          .onClick(() => { this.clearCache(); });
-          Stack() {
-            GlyphIcon({ kind: Glyph.MOON, color: Pal.heroFg(), side: 20, lineWidth: 1.9 });
-          }
-          .width(44)
-          .height(44)
-          .borderRadius(13)
-          .backgroundColor(Pal.heroStroke())
-          .onClick(() => { this.pickTheme(); });
+        .width(34)
+        .height(34)
+        .borderRadius(11)
+        .backgroundColor(Pal.heroStroke())
+        .onClick(() => { this.relogin(); });
+        Stack() {
+          GlyphIcon({ kind: Glyph.TRASH, color: Pal.heroFg(), side: 16, lineWidth: 1.8 });
         }
-        .alignItems(HorizontalAlign.End)
-        .margin({ left: 12 });
+        .width(34)
+        .height(34)
+        .borderRadius(11)
+        .backgroundColor(Pal.heroStroke())
+        .margin({ left: 8 })
+        .onClick(() => { this.clearCache(); });
+        Stack() {
+          GlyphIcon({ kind: Glyph.MOON, color: Pal.heroFg(), side: 16, lineWidth: 1.8 });
+        }
+        .width(34)
+        .height(34)
+        .borderRadius(11)
+        .backgroundColor(Pal.heroStroke())
+        .margin({ left: 8 })
+        .onClick(() => { this.pickTheme(); });
       }
       .width('100%')
-      .alignItems(VerticalAlign.Top);
+      .alignItems(VerticalAlign.Center);
+
+      Text(this.hostname.length > 0 ? this.hostname : this.hostText())
+        .fontSize(24)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.hero_fg'))
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .textAlign(TextAlign.Start)
+        .width('100%')
+        .margin({ top: 10 });
+
+      Text(this.hostText())
+        .fontSize(12.5)
+        .fontColor($r('app.color.hero_fg_soft'))
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .textAlign(TextAlign.Start)
+        .width('100%')
+        .margin({ top: 4 });
+
+      Row() {
+        HeroStat({ label: '响应', value: this.latency.length > 0 ? this.latency + ' ms' : '—' });
+        HeroStat({ label: '凭证', value: this.tokenOk ? (this.online ? '有效' : '已保存') : '缺失' });
+        HeroStat({ label: 'Agent', value: this.agentVersion.length > 0 ? ('v' + this.agentVersion) : '—' });
+      }
+      .width('100%')
+      .margin({ top: 16 });
     }
     .width('100%')
-    .padding({ left: 20, right: 20, top: 24, bottom: 24 })
+    .padding({ left: 20, right: 20, top: 22, bottom: 22 })
     .borderRadius(T.R_CARD)
     .linearGradient({
       angle: 135,

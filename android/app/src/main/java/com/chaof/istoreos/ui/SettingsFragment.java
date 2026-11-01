@@ -82,19 +82,13 @@ public class SettingsFragment extends BaseFragment {
         int wrap = ViewGroup.LayoutParams.WRAP_CONTENT;
 
         // ---------------------------------------------------------------- hero
-        // 左信息右按钮：左侧从上到下「状态 → 主机名 → 地址 → 三项读数」，
-        // 右侧三个图标按钮竖排、右对齐。三端同一套结构。
+        // 单列：第一行「状态 + 右侧三个小图标按钮」，往下「主机名 → 地址 → 三项读数」。
+        // 按钮收进右上角横排、缩小，不再单独竖一列抢戏；读数块占满整卡宽度。
         Ui.Card hero = Ui.gradient(c, R.color.hero_from, R.color.hero_to);
-        hero.setPadding(Ui.dp(c, 20), Ui.dp(c, 24), Ui.dp(c, 16), Ui.dp(c, 24));
+        hero.setPadding(Ui.dp(c, 20), Ui.dp(c, 22), Ui.dp(c, 20), Ui.dp(c, 22));
 
-        LinearLayout split = Ui.row(c);
-        split.setGravity(Gravity.TOP);
-
-        // 左列：通不通 → 是哪台 → 地址 → 三项读数
-        LinearLayout info = Ui.column(c);
-
-        LinearLayout stateRow = Ui.row(c);
-        stateRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout top = Ui.row(c);
+        top.setGravity(Gravity.CENTER_VERTICAL);
         View dot = new View(c);
         GradientDrawable hd = new GradientDrawable();
         hd.setShape(GradientDrawable.OVAL);
@@ -103,13 +97,19 @@ public class SettingsFragment extends BaseFragment {
         LinearLayout.LayoutParams hdlp = new LinearLayout.LayoutParams(
                 Ui.dp(c, 7), Ui.dp(c, 7));
         hdlp.rightMargin = Ui.dp(c, 7);
-        stateRow.addView(dot, hdlp);
+        top.addView(dot, hdlp);
 
         tvHeroState = Ui.heroNote(c, "检测中…", 1.0f);
         tvHeroState.setTextSize(12.5f);
         tvHeroState.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        stateRow.addView(tvHeroState);
-        info.addView(stateRow);
+        top.addView(tvHeroState, new LinearLayout.LayoutParams(0, wrap, 1f));
+
+        LinearLayout.LayoutParams ib2 = new LinearLayout.LayoutParams(wrap, wrap);
+        ib2.leftMargin = Ui.dp(c, 8);
+        top.addView(heroIconBtn(c, Glyph.REFRESH, this::relogin));
+        top.addView(heroIconBtn(c, Glyph.TRASH, this::clearCache), ib2);
+        top.addView(heroIconBtn(c, Glyph.MOON, this::pickTheme), ib2);
+        hero.addView(top);
 
         tvHeroHost = Ui.text(c,
                 Session.base(c).replaceFirst("^https?://", ""), 24f, R.color.hero_fg);
@@ -120,10 +120,9 @@ public class SettingsFragment extends BaseFragment {
         tvHeroHost.setEllipsize(android.text.TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, wrap);
-        hlp.topMargin = Ui.dp(c, 6);
-        info.addView(tvHeroHost, hlp);
+        hlp.topMargin = Ui.dp(c, 10);
+        hero.addView(tvHeroHost, hlp);
 
-        // 地址单独一行：它是「连的是哪台」的关键，不该和读数挤在一起
         tvBase = Ui.heroNote(c, "", 0.86f);
         tvBase.setTextSize(11.5f);
         tvBase.setSingleLine(true);
@@ -131,43 +130,19 @@ public class SettingsFragment extends BaseFragment {
         LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, wrap);
         blp.topMargin = Ui.dp(c, 4);
-        info.addView(tvBase, blp);
+        hero.addView(tvBase, blp);
 
-        // 分隔线
-        View line = new View(c);
-        line.setBackgroundColor(Ui.alpha(Ui.color(c, R.color.hero_fg), 0.18f));
-        LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, Ui.dp(c, 0.7f)));
-        llp.topMargin = Ui.dp(c, 14);
-        llp.bottomMargin = Ui.dp(c, 14);
-        info.addView(line, llp);
-
-        // 三项读数：响应 / 凭证 / Agent，横排均分
+        // 三项读数：响应 / 凭证 / Agent，占满整卡宽度
         LinearLayout stats = Ui.row(c);
         tvHeroLatency = heroStat(c, stats, "响应", "—");
         tvHeroToken = heroStat(c, stats, "凭证", "—");
         tvHeroAgent = heroStat(c, stats, "Agent", "—");
-        info.addView(stats);
+        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, wrap);
+        slp.topMargin = Ui.dp(c, 16);
+        hero.addView(stats, slp);
         renderHeroMeta();
 
-        split.addView(info, new LinearLayout.LayoutParams(0, wrap, 1f));
-
-        // 右列：三个图标按钮竖排、右对齐
-        LinearLayout btns = Ui.column(c);
-        LinearLayout.LayoutParams b1 = new LinearLayout.LayoutParams(wrap, wrap);
-        b1.gravity = Gravity.END;
-        btns.addView(heroIconBtn(c, Glyph.REFRESH, this::relogin), b1);
-        LinearLayout.LayoutParams b2 = new LinearLayout.LayoutParams(wrap, wrap);
-        b2.gravity = Gravity.END;
-        b2.topMargin = Ui.dp(c, 10);
-        btns.addView(heroIconBtn(c, Glyph.TRASH, this::clearCache), b2);
-        LinearLayout.LayoutParams b3 = new LinearLayout.LayoutParams(wrap, wrap);
-        b3.gravity = Gravity.END;
-        b3.topMargin = Ui.dp(c, 10);
-        btns.addView(heroIconBtn(c, Glyph.MOON, this::pickTheme), b3);
-        split.addView(btns, new LinearLayout.LayoutParams(wrap, wrap));
-
-        hero.addView(split);
         root.addView(hero);
 
         // 原来「网络」页的内容挪到这里：设备列表占了那个页签，
@@ -359,7 +334,7 @@ public class SettingsFragment extends BaseFragment {
 
     /** hero 右侧的图标按钮：白色淡底圆角块，里面一个白色线性图标，不带文字 */
     private View heroIconBtn(Context c, int glyph, Runnable onClick) {
-        int boxDp = 44;
+        int boxDp = 34;
         LinearLayout box = Ui.glyphTile(c, glyph, boxDp, R.color.hero_fg);
         box.setClickable(true);
         box.setFocusable(true);
@@ -373,10 +348,10 @@ public class SettingsFragment extends BaseFragment {
     private TextView heroStat(Context c, LinearLayout parent, String label, String value) {
         LinearLayout col = Ui.column(c);
         TextView l = Ui.heroNote(c, label, 0.82f);
-        l.setTextSize(11f);
+        l.setTextSize(10.5f);
         col.addView(l);
         TextView v = Ui.heroNote(c, value, 1.0f);
-        v.setTextSize(16f);
+        v.setTextSize(15f);
         v.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         v.setIncludeFontPadding(false);
         LinearLayout.LayoutParams vlp = new LinearLayout.LayoutParams(

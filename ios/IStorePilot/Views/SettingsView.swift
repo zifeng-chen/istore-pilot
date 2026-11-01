@@ -132,46 +132,16 @@ struct SettingsView: View {
         let b = d.obj("board") ?? [:]
 
         return Hero {
-            // 左信息右按钮：左侧「状态 → 主机名 → 地址 → 三项读数」，
-            // 右侧三个图标按钮竖排。三端同一套结构。
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 0) {
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(ok ? Color(hex: 0x5FE7C4) : C.heroFgSoft)
-                            .frame(width: 7, height: 7)
-                        Text(ok ? "已连接" : "连不上")
-                            .font(.system(size: 12.5, weight: .medium))
-                            .foregroundStyle(C.heroFg)
-                    }
-
-                    Text(b.str("hostname").isEmpty ? bareBase : b.str("hostname"))
-                        .font(.system(size: 24, weight: .bold))
+            // 单列：第一行「状态 + 右侧三个小图标按钮」，往下「主机名 → 地址 → 三项读数」。
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(ok ? Color(hex: 0x5FE7C4) : C.heroFgSoft)
+                        .frame(width: 7, height: 7)
+                    Text(ok ? "已连接" : "连不上")
+                        .font(.system(size: 12.5, weight: .medium))
                         .foregroundStyle(C.heroFg)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                        .padding(.top, 6)
-
-                    Text(bareBase)
-                        .font(F.num(11.5, .regular))
-                        .foregroundStyle(C.heroFgSoft)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                        .padding(.top, 4)
-
-                    Rectangle().fill(C.heroFg.opacity(0.18)).frame(height: 0.7)
-                        .padding(.vertical, 13)
-
-                    HStack(spacing: 0) {
-                        heroStat("响应", pingMs)
-                        heroStat("凭证", tokenLeft)
-                        heroStat("Agent", ok ? "v" + ping.str("version") : "—")
-                    }
-                }
-
-                Spacer(minLength: 4)
-
-                VStack(alignment: .trailing, spacing: 10) {
+                    Spacer(minLength: 6)
                     heroIcon("arrow.clockwise") {
                         Api.onAuthFail?()
                         app.signOut()
@@ -182,6 +152,27 @@ struct SettingsView: View {
                     }
                     themeMenu
                 }
+
+                Text(b.str("hostname").isEmpty ? bareBase : b.str("hostname"))
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundStyle(C.heroFg)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .padding(.top, 10)
+
+                Text(bareBase)
+                    .font(F.num(11.5, .regular))
+                    .foregroundStyle(C.heroFgSoft)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .padding(.top, 4)
+
+                HStack(spacing: 0) {
+                    heroStat("响应", pingMs)
+                    heroStat("凭证", tokenLeft)
+                    heroStat("Agent", ok ? "v" + ping.str("version") : "—")
+                }
+                .padding(.top, 16)
             }
             .padding(.vertical, 6)
         }
@@ -193,10 +184,10 @@ struct SettingsView: View {
     private func heroStat(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(label)
-                .font(.system(size: 11))
+                .font(.system(size: 10.5))
                 .foregroundStyle(C.heroFgSoft)
             Text(value)
-                .font(F.num(16, .medium))
+                .font(F.num(15, .medium))
                 .foregroundStyle(C.heroFg)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -208,11 +199,11 @@ struct SettingsView: View {
     private func heroIcon(_ system: String, _ tap: @escaping () -> Void) -> some View {
         Button(action: tap) {
             Image(systemName: system)
-                .font(.system(size: 17, weight: .medium))
+                .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(C.heroFg)
-                .frame(width: 44, height: 44)
+                .frame(width: 34, height: 34)
                 .background(C.heroFg.opacity(0.16))
-                .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -237,11 +228,11 @@ struct SettingsView: View {
             }
         } label: {
             Image(systemName: themeIcon)
-                .font(.system(size: 17, weight: .medium))
+                .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(C.heroFg)
-                .frame(width: 44, height: 44)
+                .frame(width: 34, height: 34)
                 .background(C.heroFg.opacity(0.16))
-                .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
         }
     }
 
