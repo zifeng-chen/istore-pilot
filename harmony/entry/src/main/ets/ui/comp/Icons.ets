@@ -78,6 +78,8 @@ export class Glyph {
   static readonly CLOSE: string = 'close';
   /** 垃圾桶：清缓存用 */
   static readonly TRASH: string = 'trash';
+  /** 月牙：主题（深浅色）用 */
+  static readonly MOON: string = 'moon';
 
   /** 只描边的部分 */
   static stroke(kind: string): string {
@@ -123,6 +125,8 @@ export class Glyph {
         return 'M6.6 6.6 L17.4 17.4 M17.4 6.6 L6.6 17.4';
       case Glyph.TRASH:
         return 'M9.2 4.4 L14.8 4.4 M12 4.4 L12 6.8 M5.6 6.8 L18.4 6.8 M7.4 9.2 L16.6 9.2 L15.8 19.8 L8.2 19.8 Z M10 11.6 L10 17.2 M14 11.6 L14 17.2';
+      case Glyph.MOON:
+        return 'M15.6 4.2 C11.9 6.4 11.9 17.6 15.6 19.8 C10.3 18.2 7.8 15.4 7.8 12 C7.8 8.6 10.3 5.8 15.6 4.2 Z';
       default:
         return 'M12 3.6 C15 3.6 17.77 5.2 19.27 7.8 C20.78 10.4 20.78 13.6 19.27 16.2 C17.77 18.8 15 20.4 12 20.4 C9 20.4 6.23 18.8 4.73 16.2 C3.22 13.6 3.22 10.4 4.73 7.8 C6.23 5.2 9 3.6 12 3.6';
     }

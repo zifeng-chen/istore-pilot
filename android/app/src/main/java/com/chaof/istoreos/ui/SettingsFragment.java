@@ -32,14 +32,17 @@ import org.json.JSONObject;
 public class SettingsFragment extends BaseFragment {
 
     private TextView tvBase;
-    /** hero 卡：连接状态 / Agent 版本 / 延迟 */
+    /** hero 卡：连接状态 */
     private TextView tvHeroState;
-    private TextView tvHeroBadge;
     /** hero 那行读数用的缓存：地址走后，响应和凭证跟着变 */
     private String heroLatency = "—";
     private String heroToken = "—";
     /** hero 大标题：在线时是主机名，拿不到才退回服务器地址 */
     private TextView tvHeroHost;
+    /** hero 底部三个读数块：响应 / 凭证 / Agent 版本 */
+    private TextView tvHeroLatency;
+    private TextView tvHeroToken;
+    private TextView tvHeroAgent;
 
     private TextView tvWanState;
     private TextView tvWanV4;
@@ -79,16 +82,15 @@ public class SettingsFragment extends BaseFragment {
         int wrap = ViewGroup.LayoutParams.WRAP_CONTENT;
 
         // ---------------------------------------------------------------- hero
-        // 左信息右按钮：状态 / 主机名 / 地址占满左侧，三个动作竖着排在右侧。
-        // 按钮从底部横排挪到右列、右对齐，一眼扫过去「能做什么」都在右手边，
-        // 也不用在横排里挤占大标题的空间。三端（iOS / Android / 鸿蒙）同一套结构。
+        // 左信息右按钮：左侧从上到下「状态 → 主机名 → 地址 → 三项读数」，
+        // 右侧三个图标按钮竖排、右对齐。三端同一套结构。
         Ui.Card hero = Ui.gradient(c, R.color.hero_from, R.color.hero_to);
         hero.setPadding(Ui.dp(c, 20), Ui.dp(c, 24), Ui.dp(c, 16), Ui.dp(c, 24));
 
         LinearLayout split = Ui.row(c);
         split.setGravity(Gravity.TOP);
 
-        // 左列：通不通 → 是哪台 → 现在什么状态，一条阅读顺序
+        // 左列：通不通 → 是哪台 → 地址 → 三项读数
         LinearLayout info = Ui.column(c);
 
         LinearLayout stateRow = Ui.row(c);
@@ -107,13 +109,6 @@ public class SettingsFragment extends BaseFragment {
         tvHeroState.setTextSize(12.5f);
         tvHeroState.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         stateRow.addView(tvHeroState);
-
-        // 版本跟着状态走，不再单独做一枚胶囊
-        tvHeroBadge = Ui.heroNote(c, "", 0.86f);
-        tvHeroBadge.setTextSize(11.5f);
-        LinearLayout.LayoutParams bglp = new LinearLayout.LayoutParams(wrap, wrap);
-        bglp.leftMargin = Ui.dp(c, 6);
-        stateRow.addView(tvHeroBadge, bglp);
         info.addView(stateRow);
 
         tvHeroHost = Ui.text(c,
@@ -128,7 +123,7 @@ public class SettingsFragment extends BaseFragment {
         hlp.topMargin = Ui.dp(c, 6);
         info.addView(tvHeroHost, hlp);
 
-        // 地址 + 响应 + 凭证压成一行：竖着排三行会把卡片撑高一倍
+        // 地址单独一行：它是「连的是哪台」的关键，不该和读数挤在一起
         tvBase = Ui.heroNote(c, "", 0.86f);
         tvBase.setTextSize(11.5f);
         tvBase.setSingleLine(true);
@@ -137,11 +132,27 @@ public class SettingsFragment extends BaseFragment {
                 ViewGroup.LayoutParams.MATCH_PARENT, wrap);
         blp.topMargin = Ui.dp(c, 4);
         info.addView(tvBase, blp);
+
+        // 分隔线
+        View line = new View(c);
+        line.setBackgroundColor(Ui.alpha(Ui.color(c, R.color.hero_fg), 0.18f));
+        LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, Ui.dp(c, 0.7f)));
+        llp.topMargin = Ui.dp(c, 14);
+        llp.bottomMargin = Ui.dp(c, 14);
+        info.addView(line, llp);
+
+        // 三项读数：响应 / 凭证 / Agent，横排均分
+        LinearLayout stats = Ui.row(c);
+        tvHeroLatency = heroStat(c, stats, "响应", "—");
+        tvHeroToken = heroStat(c, stats, "凭证", "—");
+        tvHeroAgent = heroStat(c, stats, "Agent", "—");
+        info.addView(stats);
         renderHeroMeta();
 
         split.addView(info, new LinearLayout.LayoutParams(0, wrap, 1f));
 
-        // 右列：三个图标按钮竖排、右对齐，不加文字
+        // 右列：三个图标按钮竖排、右对齐
         LinearLayout btns = Ui.column(c);
         LinearLayout.LayoutParams b1 = new LinearLayout.LayoutParams(wrap, wrap);
         b1.gravity = Gravity.END;
@@ -153,7 +164,7 @@ public class SettingsFragment extends BaseFragment {
         LinearLayout.LayoutParams b3 = new LinearLayout.LayoutParams(wrap, wrap);
         b3.gravity = Gravity.END;
         b3.topMargin = Ui.dp(c, 10);
-        btns.addView(heroIconBtn(c, Glyph.PALETTE, this::pickTheme), b3);
+        btns.addView(heroIconBtn(c, Glyph.MOON, this::pickTheme), b3);
         split.addView(btns, new LinearLayout.LayoutParams(wrap, wrap));
 
         hero.addView(split);
@@ -348,7 +359,7 @@ public class SettingsFragment extends BaseFragment {
 
     /** hero 右侧的图标按钮：白色淡底圆角块，里面一个白色线性图标，不带文字 */
     private View heroIconBtn(Context c, int glyph, Runnable onClick) {
-        int boxDp = 38;
+        int boxDp = 44;
         LinearLayout box = Ui.glyphTile(c, glyph, boxDp, R.color.hero_fg);
         box.setClickable(true);
         box.setFocusable(true);
@@ -358,13 +369,38 @@ public class SettingsFragment extends BaseFragment {
         return box;
     }
 
-    /** hero 那行读数：地址 · 响应 · 凭证 */
+    /** hero 底部的一格读数：上面小标签，下面数值，均分一行 */
+    private TextView heroStat(Context c, LinearLayout parent, String label, String value) {
+        LinearLayout col = Ui.column(c);
+        TextView l = Ui.heroNote(c, label, 0.82f);
+        l.setTextSize(11f);
+        col.addView(l);
+        TextView v = Ui.heroNote(c, value, 1.0f);
+        v.setTextSize(16f);
+        v.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        v.setIncludeFontPadding(false);
+        LinearLayout.LayoutParams vlp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        vlp.topMargin = Ui.dp(c, 3);
+        col.addView(v, vlp);
+        parent.addView(col, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        return v;
+    }
+
+    /** hero 读数：地址一行 + 响应 / 凭证两个数；Agent 版本由 ping 回调单独写 */
     private void renderHeroMeta() {
         if (tvBase == null) {
             return;
         }
         String base = Session.base(ctx()).replaceFirst("^https?://", "");
-        tvBase.setText(base + "　·　响应 " + heroLatency + "　·　凭证 " + heroToken);
+        tvBase.setText(base);
+        if (tvHeroLatency != null) {
+            tvHeroLatency.setText(heroLatency);
+        }
+        if (tvHeroToken != null) {
+            tvHeroToken.setText(heroToken);
+        }
     }
 
     private void pickTheme() {
@@ -411,7 +447,9 @@ public class SettingsFragment extends BaseFragment {
                 heroLatency = ms + " ms";
                 if (tvHeroState != null) {
                     tvHeroState.setText("已连接");
-                    tvHeroBadge.setText(ver);
+                    if (tvHeroAgent != null) {
+                        tvHeroAgent.setText(ver);
+                    }
                     renderHeroMeta();
                 }
             }
@@ -425,7 +463,9 @@ public class SettingsFragment extends BaseFragment {
                 heroLatency = "—";
                 if (tvHeroState != null) {
                     tvHeroState.setText("连不上");
-                    tvHeroBadge.setText("离线");
+                    if (tvHeroAgent != null) {
+                        tvHeroAgent.setText("—");
+                    }
                     renderHeroMeta();
                 }
             }

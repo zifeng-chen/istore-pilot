@@ -344,12 +344,6 @@ export struct SettingsPage {
               .fontWeight(FontWeight.Medium)
               .fontColor($r('app.color.hero_fg'))
               .layoutWeight(1);
-            Text(this.online && this.agentVersion.length > 0 ? ('v' + this.agentVersion) : '离线')
-              .fontSize(11)
-              .fontColor($r('app.color.hero_fg'))
-              .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-              .borderRadius(T.R_PILL)
-              .backgroundColor(Pal.heroStroke());
           }
           .width('100%')
           .alignItems(VerticalAlign.Center);
@@ -364,7 +358,7 @@ export struct SettingsPage {
             .width('100%')
             .margin({ top: 12 });
 
-          Text(this.metaLine())
+          Text(this.hostText())
             .fontSize(12.5)
             .fontColor($r('app.color.hero_fg_soft'))
             .maxLines(1)
@@ -372,34 +366,47 @@ export struct SettingsPage {
             .textAlign(TextAlign.Start)
             .width('100%')
             .margin({ top: 5 });
+
+          Row()
+            .width('100%')
+            .height(0.7)
+            .backgroundColor(Pal.heroStroke())
+            .margin({ top: 14, bottom: 14 });
+
+          Row() {
+            HeroStat({ label: '响应', value: this.latency.length > 0 ? this.latency + ' ms' : '—' });
+            HeroStat({ label: '凭证', value: this.tokenOk ? (this.online ? '有效' : '已保存') : '缺失' });
+            HeroStat({ label: 'Agent', value: this.agentVersion.length > 0 ? ('v' + this.agentVersion) : '—' });
+          }
+          .width('100%');
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1);
 
-        // 右列：三个图标按钮竖排、右对齐，不带文字
+        // 右列：三个图标按钮竖排、右对齐
         Column({ space: 10 }) {
           Stack() {
-            GlyphIcon({ kind: Glyph.REFRESH, color: Pal.heroFg(), side: 18, lineWidth: 1.9 });
+            GlyphIcon({ kind: Glyph.REFRESH, color: Pal.heroFg(), side: 20, lineWidth: 1.9 });
           }
-          .width(38)
-          .height(38)
-          .borderRadius(12)
+          .width(44)
+          .height(44)
+          .borderRadius(13)
           .backgroundColor(Pal.heroStroke())
           .onClick(() => { this.relogin(); });
           Stack() {
-            GlyphIcon({ kind: Glyph.TRASH, color: Pal.heroFg(), side: 18, lineWidth: 1.9 });
+            GlyphIcon({ kind: Glyph.TRASH, color: Pal.heroFg(), side: 20, lineWidth: 1.9 });
           }
-          .width(38)
-          .height(38)
-          .borderRadius(12)
+          .width(44)
+          .height(44)
+          .borderRadius(13)
           .backgroundColor(Pal.heroStroke())
           .onClick(() => { this.clearCache(); });
           Stack() {
-            GlyphIcon({ kind: Glyph.PALETTE, color: Pal.heroFg(), side: 18, lineWidth: 1.9 });
+            GlyphIcon({ kind: Glyph.MOON, color: Pal.heroFg(), side: 20, lineWidth: 1.9 });
           }
-          .width(38)
-          .height(38)
-          .borderRadius(12)
+          .width(44)
+          .height(44)
+          .borderRadius(13)
           .backgroundColor(Pal.heroStroke())
           .onClick(() => { this.pickTheme(); });
         }
@@ -805,13 +812,6 @@ export struct SettingsPage {
       s = s.substring(8);
     }
     return s.length > 0 ? s : '—';
-  }
-
-  /** hero meta 行：地址 · 响应 · 凭证，和安卓 / iOS 同一套口径 */
-  private metaLine(): string {
-    const resp: string = this.online && this.latency.length > 0 ? (this.latency + ' ms') : '—';
-    const cred: string = this.tokenOk ? (this.online ? '有效' : '已保存') : '缺失';
-    return this.hostText() + '　·　响应 ' + resp + '　·　凭证 ' + cred;
   }
 
   // ================================================================ 动作
@@ -1259,5 +1259,34 @@ export struct SettingsPage {
     this.sheetTitle = this.infoTitle;
     this.infoBody = (running ? '后台任务还在跑…\n\n' : '') +
       (log.length > 0 ? log : '还没有升级记录。');
+  }
+}
+
+/**
+ * hero 底部的一格读数。用 @Component 而不是 @Builder —— ArkUI 里 @Builder
+ * 按值传参时状态变化不会刷新，页面上会一直停在初始值。
+ */
+@Component
+struct HeroStat {
+  @Prop label: string = '';
+  @Prop value: string = '';
+
+  build() {
+    Column() {
+      Text(this.label)
+        .fontSize(11)
+        .fontColor($r('app.color.hero_fg_soft'));
+      Text(this.value)
+        .fontSize(16)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.hero_fg'))
+        .fontFeature("\"tnum\" on")
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .margin({ top: 3 });
+    }
+    .alignItems(HorizontalAlign.Start)
+    .width('100%')
+    .layoutWeight(1);
   }
 }

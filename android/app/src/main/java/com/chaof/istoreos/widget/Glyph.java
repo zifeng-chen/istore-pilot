@@ -40,6 +40,7 @@ public final class Glyph extends View {
     public static final int LIST = 13;
     public static final int BOLT = 14;
     public static final int TRASH = 15;
+    public static final int MOON = 16;
 
     private final Paint pen = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -248,6 +249,17 @@ public final class Glyph extends View {
                 c.drawPath(path, pen);
                 line(c, 10f, 11.6f, 10f, 17.2f);
                 line(c, 14f, 11.6f, 14f, 17.2f);
+                break;
+
+            case MOON:
+                // 月牙：右侧凸弧 + 左侧凹弧，表示深浅色切换
+                path.reset();
+                path.moveTo(15.6f, 4.2f);
+                path.cubicTo(11.9f, 6.4f, 11.9f, 17.6f, 15.6f, 19.8f);
+                path.cubicTo(10.3f, 18.2f, 7.8f, 15.4f, 7.8f, 12f);
+                path.cubicTo(7.8f, 8.6f, 10.3f, 5.8f, 15.6f, 4.2f);
+                path.close();
+                c.drawPath(path, pen);
                 break;
 
             default:

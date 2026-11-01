@@ -132,7 +132,8 @@ struct SettingsView: View {
         let b = d.obj("board") ?? [:]
 
         return Hero {
-            // 左信息右按钮：状态 / 主机名 / 地址占满左侧，三个图标按钮竖排在右侧。
+            // 左信息右按钮：左侧「状态 → 主机名 → 地址 → 三项读数」，
+            // 右侧三个图标按钮竖排。三端同一套结构。
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(spacing: 6) {
@@ -142,11 +143,6 @@ struct SettingsView: View {
                         Text(ok ? "已连接" : "连不上")
                             .font(.system(size: 12.5, weight: .medium))
                             .foregroundStyle(C.heroFg)
-                        if ok {
-                            Text("v" + ping.str("version"))
-                                .font(F.num(11.5, .regular))
-                                .foregroundStyle(C.heroFgSoft)
-                        }
                     }
 
                     Text(b.str("hostname").isEmpty ? bareBase : b.str("hostname"))
@@ -156,13 +152,21 @@ struct SettingsView: View {
                         .minimumScaleFactor(0.7)
                         .padding(.top, 6)
 
-                    // 地址和体征压成一行：它们都是「这台机器现在什么样」的读数
-                    Text(metaLine)
+                    Text(bareBase)
                         .font(F.num(11.5, .regular))
                         .foregroundStyle(C.heroFgSoft)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                         .padding(.top, 4)
+
+                    Rectangle().fill(C.heroFg.opacity(0.18)).frame(height: 0.7)
+                        .padding(.vertical, 13)
+
+                    HStack(spacing: 0) {
+                        heroStat("响应", pingMs)
+                        heroStat("凭证", tokenLeft)
+                        heroStat("Agent", ok ? "v" + ping.str("version") : "—")
+                    }
                 }
 
                 Spacer(minLength: 4)
@@ -185,22 +189,30 @@ struct SettingsView: View {
 
     private var ok: Bool { !ping.str("version").isEmpty }
 
-    /// 地址 · 响应 · 凭证 · 温度：一行铺满，宽屏不留空、窄屏按比例缩
-    private var metaLine: String {
-        var bits = [bareBase, "响应 " + pingMs, "凭证 " + tokenLeft]
-        if hotTemp != "—" { bits.append(hotTemp) }
-        return bits.joined(separator: "　·　")
+    /// hero 底部的一格读数：上面小标签，下面数值，均分一行
+    private func heroStat(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label)
+                .font(.system(size: 11))
+                .foregroundStyle(C.heroFgSoft)
+            Text(value)
+                .font(F.num(16, .medium))
+                .foregroundStyle(C.heroFg)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// hero 右侧的图标按钮：白色淡底圆角块，里面一个 SF Symbol 图标，不带文字
     private func heroIcon(_ system: String, _ tap: @escaping () -> Void) -> some View {
         Button(action: tap) {
             Image(systemName: system)
-                .font(.system(size: 16, weight: .medium))
+                .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(C.heroFg)
-                .frame(width: 38, height: 38)
-                .background(C.heroFg.opacity(0.14))
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .frame(width: 44, height: 44)
+                .background(C.heroFg.opacity(0.16))
+                .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -225,11 +237,11 @@ struct SettingsView: View {
             }
         } label: {
             Image(systemName: themeIcon)
-                .font(.system(size: 16, weight: .medium))
+                .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(C.heroFg)
-                .frame(width: 38, height: 38)
-                .background(C.heroFg.opacity(0.14))
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .frame(width: 44, height: 44)
+                .background(C.heroFg.opacity(0.16))
+                .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
         }
     }
 
