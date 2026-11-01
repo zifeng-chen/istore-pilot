@@ -49,8 +49,8 @@ export struct SettingsPage {
   @State ipv6: string = '—';
   @State wanUptime: string = '—';
   @State lanV4: string = '—';
-  /** hero 右上角「更多」菜单是否展开 */
-  @State showHeroMenu: boolean = false;
+  /** 主题名，操作卡片里显示 */
+  @State themeName: string = '跟随系统';
 
   @State sheet: string = '';
   @State sheetTitle: string = '';
@@ -75,6 +75,7 @@ export struct SettingsPage {
     this.winW = this.winWStore;
     this.server = Session.base();
     this.userName = Session.user();
+    this.themeName = Appearance.label();
     this.tokenOk = Session.token().length > 0;
     this.load();
   }
@@ -231,6 +232,7 @@ export struct SettingsPage {
                 this.powerCard();
                 this.hardwareCard();
                 this.securityCard();
+                this.actionCard();
                 this.aboutCard();
               }
               .layoutWeight(1)
@@ -247,6 +249,7 @@ export struct SettingsPage {
               this.powerCard();
               this.hardwareCard();
               this.securityCard();
+              this.actionCard();
               this.aboutCard();
             }
             .width('100%');
@@ -332,7 +335,7 @@ export struct SettingsPage {
   @Builder
   heroCard() {
     Column() {
-      // 第一行：状态（左）+ 右上角一个更多按钮
+      // 状态行
       Row() {
         Row()
           .width(7)
@@ -345,26 +348,6 @@ export struct SettingsPage {
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.hero_fg'))
           .layoutWeight(1);
-
-        Stack() {
-          GlyphIcon({ kind: Glyph.MORE, color: Pal.heroFg(), side: 16, lineWidth: 1.8 });
-        }
-        .width(34)
-        .height(34)
-        .borderRadius(11)
-        .backgroundColor(Pal.heroStroke())
-        .onClick(() => { this.showHeroMenu = !this.showHeroMenu; })
-        .bindPopup(this.showHeroMenu, {
-          builder: () => { this.heroMenuContent(); },
-          placement: Placement.BottomRight,
-          popupColor: $r('app.color.surface'),
-          enableArrow: true,
-          onStateChange: (e) => {
-            if (!e.isVisible) {
-              this.showHeroMenu = false;
-            }
-          }
-        });
       }
       .width('100%')
       .alignItems(VerticalAlign.Center);
@@ -407,37 +390,45 @@ export struct SettingsPage {
     .margin({ bottom: this.rail() ? Bp.gap(this.winW) : T.GAP });
   }
 
-  /** 右上角「更多」菜单：三项图标 + 文字 */
+  /** 操作卡片：退出 / 清缓存 / 主题，收在页面底部 */
   @Builder
-  heroMenuContent() {
-    Column({ space: 2 }) {
-      this.menuRow(Glyph.LOGOUT, '退出', () => { this.showHeroMenu = false; this.relogin(); });
-      this.menuRow(Glyph.TRASH, '清缓存', () => { this.showHeroMenu = false; this.clearCache(); });
-      this.menuRow(Glyph.MOON, '主题', () => { this.showHeroMenu = false; this.pickTheme(); });
+  actionCard() {
+    RowCard({ gapBottom: T.GAP }) {
+      CardTitle({ glyph: Glyph.LIST, title: '操作', sub: '登录、缓存与主题' });
+      SettingRow({
+        glyph: Glyph.LOGOUT,
+        title: '退出登录',
+        subtitle: '清除凭证并返回登录页',
+        value: '',
+        valueSize: 0,
+        first: true,
+        danger: false,
+        arrow: true,
+        onTap: () => { this.relogin(); }
+      });
+      SettingRow({
+        glyph: Glyph.TRASH,
+        title: '清缓存',
+        subtitle: '只清手机上的快照，不动路由器',
+        value: '',
+        valueSize: 0,
+        first: false,
+        danger: false,
+        arrow: true,
+        onTap: () => { this.clearCache(); }
+      });
+      SettingRow({
+        glyph: Glyph.MOON,
+        title: '主题',
+        subtitle: '跟随系统或固定深浅色',
+        value: this.themeName,
+        valueSize: 0,
+        first: false,
+        danger: false,
+        arrow: true,
+        onTap: () => { this.pickTheme(); }
+      });
     }
-    .width(140)
-    .padding(8);
-  }
-
-  @Builder
-  menuRow(glyph: string, label: string, act: () => void) {
-    Row({ space: 11 }) {
-      Stack() {
-        GlyphIcon({ kind: glyph, color: Pal.primary(), side: 16, lineWidth: 1.9 });
-      }
-      .width(30)
-      .height(30)
-      .borderRadius(9)
-      .backgroundColor($r('app.color.accent_soft'));
-      Text(label)
-        .fontSize(14)
-        .fontWeight(FontWeight.Medium)
-        .fontColor($r('app.color.text_primary'));
-    }
-    .width('100%')
-    .padding({ left: 8, right: 12, top: 5, bottom: 5 })
-    .borderRadius(10)
-    .onClick(() => { act(); });
   }
 
 
@@ -1107,6 +1098,7 @@ export struct SettingsPage {
 
   private applyTheme(mode: number): void {
     this.closeSheet();
+    this.themeName = Appearance.NAMES[mode];
     Appearance.select(this.ctx(), mode);
   }
 

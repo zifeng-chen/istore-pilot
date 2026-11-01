@@ -43,8 +43,6 @@ public class SettingsFragment extends BaseFragment {
     private TextView tvHeroLatency;
     private TextView tvHeroToken;
     private TextView tvHeroUptime;
-    /** hero 右上角「更多」菜单 */
-    private android.widget.PopupWindow heroMenu;
 
     private TextView tvWanState;
     private TextView tvWanV4;
@@ -83,7 +81,7 @@ public class SettingsFragment extends BaseFragment {
         int wrap = ViewGroup.LayoutParams.WRAP_CONTENT;
 
         // ---------------------------------------------------------------- hero
-        // 单列：第一行「状态 + 右上角一个更多按钮」，往下「主机名 → 地址 → 三项读数」。
+        // 单列：状态行 → 主机名 → 地址 → 三项读数。
         Ui.Card hero = Ui.gradient(c, R.color.hero_from, R.color.hero_to);
         hero.setPadding(Ui.dp(c, 20), Ui.dp(c, 22), Ui.dp(c, 20), Ui.dp(c, 22));
 
@@ -102,10 +100,7 @@ public class SettingsFragment extends BaseFragment {
         tvHeroState = Ui.heroNote(c, "检测中…", 1.0f);
         tvHeroState.setTextSize(12.5f);
         tvHeroState.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        top.addView(tvHeroState, new LinearLayout.LayoutParams(0, wrap, 1f));
-
-        // 右上角：一个「更多」图标按钮，点击展开菜单（重新登录 / 清缓存 / 主题）
-        top.addView(heroIconBtn(c, Glyph.MORE, v -> showHeroMenu(c, v)));
+        top.addView(tvHeroState);
         hero.addView(top);
 
         tvHeroHost = Ui.text(c,
@@ -196,17 +191,12 @@ public class SettingsFragment extends BaseFragment {
         Ui.Card look = Ui.card(c);
         Ui.cardPadding(look, 11);
         Ui.cardTitle(c, look, com.chaof.istoreos.widget.Glyph.PALETTE,
-                "显示", "刷新率与主题");
-        // 主题挪到 hero 右上角了，这里只留一句指路，免得用户翻遍整页找
-        tvTheme = Ui.text(c, "深浅色主题在上方卡片的右上角切换。",
-                11.5f, R.color.text_secondary);
-        tvTheme.setPadding(Ui.dp(c, 16), Ui.dp(c, 2), Ui.dp(c, 16), Ui.dp(c, 2));
-        look.addView(tvTheme);
+                "显示", "画面刷新率");
         // 高刷是这一版新加的：窗口不主动申请，120Hz 屏也只有 60 帧，
         // 把结果显示出来，用户能自己确认是不是真的跑在高刷上
         Ui.settingRow(c, look, com.chaof.istoreos.widget.Glyph.BOLT,
                 "画面刷新率", "已按本机最高刷新率申请", Hz.label(getActivity()),
-                false, false, null);
+                true, false, null);
         root.addView(look);
 
         // ---------------------------------------------------------------- 系统维护
@@ -325,82 +315,20 @@ public class SettingsFragment extends BaseFragment {
         tip.setPadding(0, Ui.dp(c, 14), 0, 0);
         about.addView(tip);
         root.addView(about);
-    }
 
-    /** hero 右侧的图标按钮：白色淡底圆角块，里面一个白色线性图标，不带文字 */
-    private View heroIconBtn(Context c, int glyph, android.view.View.OnClickListener onClick) {
-        int boxDp = 34;
-        LinearLayout box = Ui.glyphTile(c, glyph, boxDp, R.color.hero_fg);
-        box.setClickable(true);
-        box.setFocusable(true);
-        box.setOnClickListener(onClick);
-        box.setLayoutParams(new LinearLayout.LayoutParams(
-                Ui.dp(c, boxDp), Ui.dp(c, boxDp)));
-        return box;
-    }
-
-    /** 右上角「更多」菜单：三项图标 + 文字，锚定在按钮下方 */
-    private void showHeroMenu(Context c, View anchor) {
-        LinearLayout menu = Ui.column(c);
-        int pad = Ui.dp(c, 8);
-        menu.setPadding(pad, pad, pad, pad);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(Ui.color(c, R.color.surface));
-        bg.setCornerRadius(Ui.dp(c, 18));
-        bg.setStroke(Math.max(1, Ui.dp(c, 0.7f)), Ui.color(c, R.color.glass_stroke));
-        menu.setBackground(bg);
-
-        menu.addView(menuRow(c, Glyph.LOGOUT, "退出", v -> {
-            hideHeroMenu();
-            relogin();
-        }));
-        menu.addView(menuRow(c, Glyph.TRASH, "清缓存", v -> {
-            hideHeroMenu();
-            clearCache();
-        }));
-        menu.addView(menuRow(c, Glyph.MOON, "主题", v -> {
-            hideHeroMenu();
-            pickTheme();
-        }));
-
-        int w = Ui.dp(c, 140);
-        heroMenu = new android.widget.PopupWindow(menu,
-                w, ViewGroup.LayoutParams.WRAP_CONTENT, true);
-        heroMenu.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(
-                android.graphics.Color.TRANSPARENT));
-        heroMenu.setElevation(Ui.dp(c, 10));
-        heroMenu.setAnimationStyle(android.R.style.Animation_Dialog);
-        heroMenu.showAsDropDown(anchor, -w + anchor.getWidth(), Ui.dp(c, 6));
-    }
-
-    /** 菜单里的一行：图标块 + 文字，点击后回调 */
-    private LinearLayout menuRow(Context c, int glyph, String text,
-                                 View.OnClickListener l) {
-        LinearLayout row = Ui.row(c);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(Ui.dp(c, 8), Ui.dp(c, 5), Ui.dp(c, 14), Ui.dp(c, 5));
-        LinearLayout iconWrap = Ui.glyphTile(c, glyph, 30, R.color.primary);
-        LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(
-                Ui.dp(c, 30), Ui.dp(c, 30));
-        ilp.rightMargin = Ui.dp(c, 11);
-        row.addView(iconWrap, ilp);
-        TextView t = Ui.text(c, text, 14f, R.color.text_primary);
-        t.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        row.addView(t);
-        GradientDrawable mask = new GradientDrawable();
-        mask.setColor(0xFFFFFFFF);
-        row.setBackground(new android.graphics.drawable.RippleDrawable(
-                android.content.res.ColorStateList.valueOf(Ui.color(c, R.color.ripple)),
-                null, mask));
-        row.setOnClickListener(l);
-        return row;
-    }
-
-    private void hideHeroMenu() {
-        if (heroMenu != null && heroMenu.isShowing()) {
-            heroMenu.dismiss();
-        }
-        heroMenu = null;
+        // ---------------------------------------------------------------- 操作
+        // 退出 / 清缓存 / 主题：都是低频操作，单独一张卡收在页面底部
+        Ui.Card act = Ui.card(c);
+        Ui.cardPadding(act, 11);
+        Ui.cardTitle(c, act, com.chaof.istoreos.widget.Glyph.LIST,
+                "操作", "登录、缓存与主题");
+        Ui.settingRow(c, act, com.chaof.istoreos.widget.Glyph.LOGOUT,
+                "退出登录", "清除凭证并返回登录页", "", true, false, this::relogin);
+        Ui.settingRow(c, act, com.chaof.istoreos.widget.Glyph.TRASH,
+                "清缓存", "只清手机上的快照，不动路由器", "", false, false, this::clearCache);
+        tvTheme = Ui.settingRow(c, act, com.chaof.istoreos.widget.Glyph.MOON,
+                "主题", "跟随系统或固定深浅色", Theme.name(c), false, false, this::pickTheme);
+        root.addView(act);
     }
 
     /** hero 底部的一格读数：上面小标签，下面数值，均分一行 */
@@ -441,6 +369,9 @@ public class SettingsFragment extends BaseFragment {
         Context c = ctx();
         Sheet.choose(c, "外观", Theme.NAMES, Theme.index(Theme.get(c)), which -> {
             Theme.applyMode(c, Theme.MODES[which]);
+            if (tvTheme != null) {
+                tvTheme.setText(Theme.name(c));
+            }
         });
     }
 

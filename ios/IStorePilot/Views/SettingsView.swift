@@ -56,6 +56,7 @@ struct SettingsView: View {
                         uploadCard
                         powerCard
                         securityCard
+                        actionCard
                         aboutCard
                     }
                     Color.clear.barBottomGap()
@@ -132,7 +133,7 @@ struct SettingsView: View {
         let b = d.obj("board") ?? [:]
 
         return Hero {
-            // 单列：第一行「状态 + 右上角一个更多按钮」，往下「主机名 → 地址 → 三项读数」。
+            // 单列：状态 → 主机名 → 地址 → 三项读数。
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 8) {
                     Circle()
@@ -141,8 +142,6 @@ struct SettingsView: View {
                     Text(ok ? "已连接" : "连不上")
                         .font(.system(size: 12.5, weight: .medium))
                         .foregroundStyle(C.heroFg)
-                    Spacer(minLength: 6)
-                    heroMenu
                 }
 
                 Text(b.str("hostname").isEmpty ? bareBase : b.str("hostname"))
@@ -201,39 +200,54 @@ struct SettingsView: View {
         }
     }
 
-    /// 右上角「更多」菜单：重新登录 / 清缓存 / 主题（图标 + 文字）
-    private var heroMenu: some View {
-        Menu {
-            Button {
-                Api.onAuthFail?()
-                app.signOut()
-            } label: {
-                Label("退出", systemImage: "rectangle.portrait.and.arrow.right")
-            }
-            Button {
-                SnapCache.shared.clear()
-                popup = Popup(title: "已清除", body: "下次进入各页面会重新从路由器读取。")
-            } label: {
-                Label("清缓存", systemImage: "trash")
-            }
-            Menu {
-                ForEach(Array(Appearance.modes.enumerated()), id: \.offset) { i, m in
-                    Button {
-                        app.setTheme(m)
-                    } label: {
-                        Text((app.theme == m ? "✓ " : "") + Appearance.names[i])
-                    }
+    /// 操作卡片：退出 / 清缓存 / 主题，收在页面底部
+    private var actionCard: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 0) {
+                CardHead(icon: "slider.horizontal.3", title: "操作", sub: "登录、缓存与主题")
+                row(icon: "rectangle.portrait.and.arrow.right", title: "退出登录",
+                    note: "清除凭证并返回登录页") {
+                    Api.onAuthFail?()
+                    app.signOut()
                 }
-            } label: {
-                Label("主题", systemImage: themeIcon)
+                Hairline(inset: 62)
+                row(icon: "trash", title: "清缓存",
+                    note: "只清手机上的快照，不动路由器") {
+                    SnapCache.shared.clear()
+                    popup = Popup(title: "已清除", body: "下次进入各页面会重新从路由器读取。")
+                }
+                Hairline(inset: 62)
+                themeRow
+            }
+        }
+    }
+
+    /// 主题行：Menu 形式，展开选深浅色
+    private var themeRow: some View {
+        Menu {
+            ForEach(Array(Appearance.modes.enumerated()), id: \.offset) { i, m in
+                Button {
+                    app.setTheme(m)
+                } label: {
+                    Text((app.theme == m ? "✓ " : "") + Appearance.names[i])
+                }
             }
         } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(C.heroFg)
-                .frame(width: 34, height: 34)
-                .background(C.heroFg.opacity(0.16))
-                .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+            HStack(spacing: 12) {
+                iconTile(themeIcon, danger: false)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("主题").font(F.body).foregroundStyle(C.textPrimary)
+                    Text("跟随系统或固定深浅色")
+                        .font(.system(size: 11)).foregroundStyle(C.textSecondary).lineLimit(1)
+                }
+                Spacer(minLength: 6)
+                Text(Appearance.name(app.theme))
+                    .font(.system(size: 13, weight: .medium)).foregroundStyle(C.textSecondary)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold)).foregroundStyle(C.textTertiary)
+            }
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
         }
     }
 
