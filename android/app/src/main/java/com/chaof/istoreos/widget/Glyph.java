@@ -42,6 +42,7 @@ public final class Glyph extends View {
     public static final int TRASH = 15;
     public static final int MOON = 16;
     public static final int MORE = 17;
+    public static final int LOGOUT = 18;
 
     private final Paint pen = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -253,14 +254,14 @@ public final class Glyph extends View {
                 break;
 
             case MOON:
-                // 月牙：右侧凸弧 + 左侧凹弧，表示深浅色切换
+                // 实心月牙：右侧大圆弧 + 左侧凹弧，比描边更圆润、像 iOS 的 moon.fill
                 path.reset();
-                path.moveTo(15.6f, 4.2f);
-                path.cubicTo(11.9f, 6.4f, 11.9f, 17.6f, 15.6f, 19.8f);
-                path.cubicTo(10.3f, 18.2f, 7.8f, 15.4f, 7.8f, 12f);
-                path.cubicTo(7.8f, 8.6f, 10.3f, 5.8f, 15.6f, 4.2f);
+                path.moveTo(15.5f, 3.2f);
+                path.cubicTo(12.0f, 5.0f, 12.0f, 19.0f, 15.5f, 20.8f);
+                path.cubicTo(10.0f, 19.5f, 7.0f, 16.1f, 7.0f, 12.0f);
+                path.cubicTo(7.0f, 7.9f, 10.0f, 4.5f, 15.5f, 3.2f);
                 path.close();
-                c.drawPath(path, pen);
+                c.drawPath(path, fill);
                 break;
 
             case MORE:
@@ -268,6 +269,29 @@ public final class Glyph extends View {
                 dot(c, 6f, 12f, 1.7f);
                 dot(c, 12f, 12f, 1.7f);
                 dot(c, 18f, 12f, 1.7f);
+                break;
+
+            case LOGOUT:
+                // 退出：左侧门框 + 向右箭头（门里走出去）
+                path.reset();
+                path.moveTo(3f, 5f);
+                path.cubicTo(2.2f, 5f, 1.6f, 5.6f, 1.6f, 6.4f);
+                path.lineTo(1.6f, 17.6f);
+                path.cubicTo(1.6f, 18.4f, 2.2f, 19f, 3f, 19f);
+                path.lineTo(11f, 19f);
+                path.lineTo(11f, 16.6f);
+                path.lineTo(4.2f, 16.6f);
+                path.lineTo(4.2f, 7.4f);
+                path.lineTo(11f, 7.4f);
+                path.lineTo(11f, 5f);
+                path.close();
+                c.drawPath(path, pen);
+                line(c, 11.5f, 12f, 20.2f, 12f);
+                path.reset();
+                path.moveTo(16.2f, 8.4f);
+                path.lineTo(20.2f, 12f);
+                path.lineTo(16.2f, 15.6f);
+                c.drawPath(path, pen);
                 break;
 
             default:

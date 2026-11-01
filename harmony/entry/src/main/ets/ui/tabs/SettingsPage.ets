@@ -411,41 +411,33 @@ export struct SettingsPage {
   @Builder
   heroMenuContent() {
     Column({ space: 2 }) {
-      Row({ space: 10 }) {
-        GlyphIcon({ kind: Glyph.REFRESH, color: Pal.textPrimary(), side: 16, lineWidth: 1.9 });
-        Text('重新登录')
-          .fontSize(14)
-          .fontColor($r('app.color.text_primary'));
-      }
-      .width('100%')
-      .padding({ left: 12, right: 16, top: 10, bottom: 10 })
-      .borderRadius(10)
-      .onClick(() => { this.showHeroMenu = false; this.relogin(); });
-
-      Row({ space: 10 }) {
-        GlyphIcon({ kind: Glyph.TRASH, color: Pal.textPrimary(), side: 16, lineWidth: 1.9 });
-        Text('清缓存')
-          .fontSize(14)
-          .fontColor($r('app.color.text_primary'));
-      }
-      .width('100%')
-      .padding({ left: 12, right: 16, top: 10, bottom: 10 })
-      .borderRadius(10)
-      .onClick(() => { this.showHeroMenu = false; this.clearCache(); });
-
-      Row({ space: 10 }) {
-        GlyphIcon({ kind: Glyph.MOON, color: Pal.textPrimary(), side: 16, lineWidth: 1.9 });
-        Text('主题')
-          .fontSize(14)
-          .fontColor($r('app.color.text_primary'));
-      }
-      .width('100%')
-      .padding({ left: 12, right: 16, top: 10, bottom: 10 })
-      .borderRadius(10)
-      .onClick(() => { this.showHeroMenu = false; this.pickTheme(); });
+      this.menuRow(Glyph.LOGOUT, '退出', () => { this.showHeroMenu = false; this.relogin(); });
+      this.menuRow(Glyph.TRASH, '清缓存', () => { this.showHeroMenu = false; this.clearCache(); });
+      this.menuRow(Glyph.MOON, '主题', () => { this.showHeroMenu = false; this.pickTheme(); });
     }
-    .width(150)
-    .padding(6);
+    .width(170)
+    .padding(8);
+  }
+
+  @Builder
+  menuRow(glyph: string, label: string, act: () => void) {
+    Row({ space: 11 }) {
+      Stack() {
+        GlyphIcon({ kind: glyph, color: Pal.primary(), side: 16, lineWidth: 1.9 });
+      }
+      .width(30)
+      .height(30)
+      .borderRadius(9)
+      .backgroundColor($r('app.color.accent_soft'));
+      Text(label)
+        .fontSize(14)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.text_primary'));
+    }
+    .width('100%')
+    .padding({ left: 8, right: 12, top: 5, bottom: 5 })
+    .borderRadius(10)
+    .onClick(() => { act(); });
   }
 
 

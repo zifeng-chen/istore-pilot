@@ -208,7 +208,7 @@ struct SettingsView: View {
                 Api.onAuthFail?()
                 app.signOut()
             } label: {
-                Label("重新登录", systemImage: "arrow.clockwise")
+                Label("退出", systemImage: "rectangle.portrait.and.arrow.right")
             }
             Button {
                 SnapCache.shared.clear()

@@ -342,15 +342,15 @@ public class SettingsFragment extends BaseFragment {
     /** 右上角「更多」菜单：三项图标 + 文字，锚定在按钮下方 */
     private void showHeroMenu(Context c, View anchor) {
         LinearLayout menu = Ui.column(c);
-        int pad = Ui.dp(c, 6);
+        int pad = Ui.dp(c, 8);
         menu.setPadding(pad, pad, pad, pad);
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(Ui.color(c, R.color.surface));
-        bg.setCornerRadius(Ui.dp(c, 16));
+        bg.setCornerRadius(Ui.dp(c, 18));
         bg.setStroke(Math.max(1, Ui.dp(c, 0.7f)), Ui.color(c, R.color.glass_stroke));
         menu.setBackground(bg);
 
-        menu.addView(menuRow(c, Glyph.REFRESH, "重新登录", v -> {
+        menu.addView(menuRow(c, Glyph.LOGOUT, "退出", v -> {
             hideHeroMenu();
             relogin();
         }));
@@ -363,26 +363,29 @@ public class SettingsFragment extends BaseFragment {
             pickTheme();
         }));
 
+        int w = Ui.dp(c, 190);
         heroMenu = new android.widget.PopupWindow(menu,
-                Ui.dp(c, 150), ViewGroup.LayoutParams.WRAP_CONTENT, true);
+                w, ViewGroup.LayoutParams.WRAP_CONTENT, true);
         heroMenu.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(
                 android.graphics.Color.TRANSPARENT));
-        heroMenu.setElevation(Ui.dp(c, 8));
-        heroMenu.showAsDropDown(anchor, -Ui.dp(c, 150) + anchor.getWidth(), Ui.dp(c, 6));
+        heroMenu.setElevation(Ui.dp(c, 10));
+        heroMenu.setAnimationStyle(android.R.style.Animation_Dialog);
+        heroMenu.showAsDropDown(anchor, -w + anchor.getWidth(), Ui.dp(c, 6));
     }
 
-    /** 菜单里的一行：图标 + 文字，点击后回调 */
+    /** 菜单里的一行：图标块 + 文字，点击后回调 */
     private LinearLayout menuRow(Context c, int glyph, String text,
                                  View.OnClickListener l) {
         LinearLayout row = Ui.row(c);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(Ui.dp(c, 12), Ui.dp(c, 11), Ui.dp(c, 16), Ui.dp(c, 11));
-        Glyph g = Glyph.of(c, glyph, R.color.text_primary);
-        int s = Ui.dp(c, 17);
-        LinearLayout.LayoutParams glp = new LinearLayout.LayoutParams(s, s);
-        glp.rightMargin = Ui.dp(c, 11);
-        row.addView(g, glp);
+        row.setPadding(Ui.dp(c, 8), Ui.dp(c, 5), Ui.dp(c, 14), Ui.dp(c, 5));
+        LinearLayout iconWrap = Ui.glyphTile(c, glyph, 30, R.color.primary);
+        LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(
+                Ui.dp(c, 30), Ui.dp(c, 30));
+        ilp.rightMargin = Ui.dp(c, 11);
+        row.addView(iconWrap, ilp);
         TextView t = Ui.text(c, text, 14f, R.color.text_primary);
+        t.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         row.addView(t);
         GradientDrawable mask = new GradientDrawable();
         mask.setColor(0xFFFFFFFF);
