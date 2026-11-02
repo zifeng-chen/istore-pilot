@@ -318,18 +318,40 @@ private struct PageTitleBar: ViewModifier {
         #endif
     }
 
-    func body(content: Content) -> some View {
-        content
-            .onPreferenceChange(ScrollTopKey.self) { y in
+    /// 量「往上滚了多少」。
+    ///
+    /// iOS 18 起用 `onScrollGeometryChange` —— 这是 ScrollView 自己报的偏移量，
+    /// 不靠几何探针 + 偏好值回传，在 ZStack 叠四个页签的情况下也稳。
+    /// 16/17 只留旧那套探针当兜底（老系统上它至少能用）。
+    ///
+    /// 之前一直不显示的原因：探针的 preference 在 NavigationStack + ZStack
+    /// 里根本回不到 ScrollView 外层，`lifted` 永远是 false。
+    @ViewBuilder
+    private func observed<V: View>(_ content: V) -> some View {
+        if #available(iOS 18.0, *) {
+            content.onScrollGeometryChange(for: CGFloat.self) { geo in
+                // contentOffset 的起点是 -contentInsets.top，减掉才是真实位移
+                geo.contentOffset.y - geo.contentInsets.top
+            } action: { _, y in
+                setLifted(y > 6)
+            }
+        } else {
+            content.onPreferenceChange(ScrollTopKey.self) { y in
                 if baseY == nil {
                     baseY = y
                 }
-                // 探针就在内容最上面：全局 y 比初始值小 4pt 就是「卡片顶贴到
-                // 状态栏」，此刻浮出标题条 —— 再往下滚只会盖得更实
-                let on = y < (baseY ?? y) - 4
-                guard on != lifted else { return }
-                withAnimation(.easeOut(duration: 0.2)) { lifted = on }
+                setLifted(y < (baseY ?? y) - 4)
             }
+        }
+    }
+
+    private func setLifted(_ on: Bool) {
+        guard on != lifted else { return }
+        withAnimation(.easeOut(duration: 0.18)) { lifted = on }
+    }
+
+    func body(content: Content) -> some View {
+        observed(content)
             .toolbar(.hidden, for: .navigationBar)
             .overlay(alignment: .top) {
                 Text(title)

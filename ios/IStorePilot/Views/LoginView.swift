@@ -174,6 +174,10 @@ private struct LoginHeader: View {
 
 private struct AddrField: View {
     @ObservedObject var form: LoginForm
+    /// 点整行（含上面那行小标签）都聚焦到输入框。
+    /// 以前只有输入框那一条细线能点，手指落在「路由器地址」上完全没反应，
+    /// 看着就像「点了不弹键盘」。
+    @FocusState private var focused: Bool
 
     var body: some View {
         HStack(spacing: 12) {
@@ -195,7 +199,10 @@ private struct AddrField: View {
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
                     .submitLabel(.next)
+                    .focused($focused)
             }
+            .contentShape(Rectangle())
+            .onTapGesture { focused = true }
         }
         .padding(.vertical, 13)
     }
@@ -204,6 +211,8 @@ private struct AddrField: View {
 private struct PwdField: View {
     @ObservedObject var form: LoginForm
     @State private var show = false
+    /// 同 AddrField：整块可点才像「点输入框弹键盘」
+    @FocusState private var focused: Bool
 
     var body: some View {
         HStack(spacing: 12) {
@@ -228,7 +237,11 @@ private struct PwdField: View {
                 .foregroundStyle(C.textPrimary)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
+                .focused($focused)
             }
+            // 只圈左边这一块：右边是眼睛按钮，整行加手势会把它吃掉
+            .contentShape(Rectangle())
+            .onTapGesture { focused = true }
 
             Button {
                 show.toggle()

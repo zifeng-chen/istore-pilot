@@ -3,6 +3,13 @@ import SwiftUI
 @main
 struct IStorePilotApp: App {
     @StateObject private var app = AppState()
+    /// 外观模式只在这里和设置页读写。
+    ///
+    /// 以前挂在 AppState 上：它是全局 EnvironmentObject，改一次主题，
+    /// 所有观察它的页面 body 全部重算一遍（四个页签全在里面），
+    /// 叠上系统换配色本身的开销，切一次能卡半秒。
+    /// 挪到 @AppStorage 之后，只有这个 App 结构体和设置页会跟着重算。
+    @AppStorage("istore.theme") private var theme: Int = 0
 
     init() {
         // 启动画面还在的时候就把「本地网络」授权问出来。
@@ -18,7 +25,7 @@ struct IStorePilotApp: App {
                 .tint(C.primary)
                 // 启动页是深绿底，状态栏图标必须是白的 —— 这时候按"暗色"报，
                 // 结束后再切回用户选的模式。主题模式交给用户选：nil = 跟随系统
-                .preferredColorScheme(app.booting ? .dark : Appearance.scheme(app.theme))
+                .preferredColorScheme(app.booting ? .dark : Appearance.scheme(theme))
         }
     }
 }
@@ -53,18 +60,11 @@ final class AppState: ObservableObject {
     /// 启动页还盖在上面。安卓那边是独立的 SplashActivity，这边用一个覆盖层，
     /// 好处是启动期的网络探测能直接预热首页缓存
     @Published var booting: Bool = true
-    /// 外观模式，改了立刻生效（preferredColorScheme 是环境级的，不用重启）
-    @Published var theme: Int = Appearance.get()
 
     init() {
         Api.onAuthFail = { [weak self] in
             DispatchQueue.main.async { self?.loggedIn = false }
         }
-    }
-
-    func setTheme(_ mode: Int) {
-        Appearance.apply(mode)
-        theme = mode
     }
 
     func signIn() {

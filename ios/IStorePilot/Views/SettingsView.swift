@@ -13,6 +13,8 @@ import UniformTypeIdentifiers
 ///    退出没有任何意义（令牌过期会自动回登录页），所以整块移除
 struct SettingsView: View {
     @EnvironmentObject private var app: AppState
+    /// 外观模式：和 App 结构体读同一个键，改完立刻生效（不用重启）
+    @AppStorage("istore.theme") private var theme: Int = 0
     @Environment(\.tabIndex) private var tabIndex
     @EnvironmentObject private var chrome: TabChrome
 
@@ -193,7 +195,7 @@ struct SettingsView: View {
     }
 
     private var themeIcon: String {
-        switch app.theme {
+        switch theme {
         case 1: return "sun.max.fill"
         case 2: return "moon.fill"
         default: return "circle.lefthalf.filled"
@@ -227,9 +229,9 @@ struct SettingsView: View {
         Menu {
             ForEach(Array(Appearance.modes.enumerated()), id: \.offset) { i, m in
                 Button {
-                    app.setTheme(m)
+                    theme = m
                 } label: {
-                    Text((app.theme == m ? "✓ " : "") + Appearance.names[i])
+                    Text((theme == m ? "✓ " : "") + Appearance.names[i])
                 }
             }
         } label: {
@@ -241,7 +243,7 @@ struct SettingsView: View {
                         .font(.system(size: 11)).foregroundStyle(C.textSecondary).lineLimit(1)
                 }
                 Spacer(minLength: 6)
-                Text(Appearance.name(app.theme))
+                Text(Appearance.name(theme))
                     .font(.system(size: 13, weight: .medium)).foregroundStyle(C.textSecondary)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 11, weight: .semibold)).foregroundStyle(C.textTertiary)
