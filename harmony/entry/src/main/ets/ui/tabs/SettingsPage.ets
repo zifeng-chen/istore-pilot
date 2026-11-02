@@ -613,14 +613,16 @@ export struct SettingsPage {
           Text('')
             .fontSize(T.F_SUB);
         } else {
-          const cpu: J = this.hw.obj('cpu');
-          const m: J = this.hw.obj('machine');
-          this.hwRow('处理器', cpu.str('model', '—'));
-          this.hwRow('核心 / 线程', cpu.num('cores', 0) + ' / ' + cpu.num('threads', 0));
-          this.hwRow('主频', (cpu.num('mhz', 0) / 1000).toFixed(1) + ' GHz');
-          this.hwRow('缓存', Fmt.orDash(cpu.str('cache', '')));
-          this.hwRow('机型', Fmt.orDash(m.str('chassis', '')));
-          this.hwRow('BIOS', Fmt.orDash(m.str('bios_vendor', '')) + ' ' + m.str('bios_version', ''));
+          // build() / @Builder 里不能写 const 声明（ArkTS 只认 UI 组件语法），
+          // 所以直接按需取，不先存到局部变量
+          this.hwRow('处理器', this.hw.obj('cpu').str('model', '—'));
+          this.hwRow('核心 / 线程', this.hw.obj('cpu').num('cores', 0) + ' / '
+            + this.hw.obj('cpu').num('threads', 0));
+          this.hwRow('主频', (this.hw.obj('cpu').num('mhz', 0) / 1000).toFixed(1) + ' GHz');
+          this.hwRow('缓存', Fmt.orDash(this.hw.obj('cpu').str('cache', '')));
+          this.hwRow('机型', Fmt.orDash(this.hw.obj('machine').str('chassis', '')));
+          this.hwRow('BIOS', Fmt.orDash(this.hw.obj('machine').str('bios_vendor', '')) + ' '
+            + this.hw.obj('machine').str('bios_version', ''));
         }
       }
       .width('100%');

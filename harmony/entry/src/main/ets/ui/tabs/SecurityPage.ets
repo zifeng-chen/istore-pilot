@@ -1054,7 +1054,7 @@ export struct SecurityPage {
       }
       .width('100%')
       .height('100%')
-      .backgroundColor($r('app.color.app_bg'));
+      .backgroundColor($r('app.color.app_bg'))
       // 从右边推进来：进 / 退都带一点位移 + 淡入淡出，不再是一下子换一屏
       .transition(TransitionEffect.OPACITY
         .combine(TransitionEffect.translate({ x: 32 })))
@@ -1088,7 +1088,7 @@ export struct SecurityPage {
       }
       .width('100%')
       .height('100%')
-      .backgroundColor($r('app.color.app_bg'));
+      .backgroundColor($r('app.color.app_bg'))
       // 从右边推进来：进 / 退都带一点位移 + 淡入淡出，不再是一下子换一屏
       .transition(TransitionEffect.OPACITY
         .combine(TransitionEffect.translate({ x: 32 })))
@@ -1103,7 +1103,7 @@ export struct SecurityPage {
       }
       .width('100%')
       .height('100%')
-      .backgroundColor($r('app.color.app_bg'));
+      .backgroundColor($r('app.color.app_bg'))
       // 从右边推进来：进 / 退都带一点位移 + 淡入淡出，不再是一下子换一屏
       .transition(TransitionEffect.OPACITY
         .combine(TransitionEffect.translate({ x: 32 })))

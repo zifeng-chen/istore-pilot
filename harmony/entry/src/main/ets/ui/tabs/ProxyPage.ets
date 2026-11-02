@@ -4,7 +4,7 @@ import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
 import { Bp } from '../Breakpoint';
 import { Pal, T } from '../Theme';
-import { Card, CardHeader, CardTitle, Comp, GroupBox, Hairline, LineIcon, Pill } from '../Comp';
+import { Card, CardHeader, CardTitle, Comp, GlyphIcon, GroupBox, Hairline, LineIcon, Pill } from '../Comp';
 import { Glyph, Ico } from '../comp/Icons';
 
 interface Backend {
@@ -592,8 +592,11 @@ export struct ProxyPage {
   subsEntry() {
     Card({ gapTop: T.GAP }) {
       Row() {
-        LineIcon({ glyph: Glyph.LINK, size: 18, color: $r('app.color.primary') })
-          .margin({ right: 10 });
+        // 自定义组件后面不能直接链 .margin()，套一层 Row
+        Row() {
+          GlyphIcon({ kind: Glyph.LINK, color: Pal.primary(), side: 18, lineWidth: 1.9 });
+        }
+        .margin({ right: 10 });
         Text('订阅管理')
           .fontSize(T.F_BODY)
           .fontColor($r('app.color.text_primary'))
