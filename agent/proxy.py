@@ -18,6 +18,7 @@ import subprocess
 import time
 
 from . import clash
+from . import config
 
 INIT = {
     "openclash": "/etc/init.d/openclash",
@@ -221,6 +222,12 @@ def backends() -> list[dict]:
 _ACTIVE_TTL = 3.0
 _active_cache = {"ts": 0.0, "id": "none"}
 
+# 最近一次整组测速的结果：{backend: {节点名: 毫秒}}，0 表示超时。
+# 只放内存，不落盘 —— 重启后节点会重新测，旧数据反而误导。
+# 用途：Passwall 的节点表里没有延迟字段，分组接口靠它补上，
+# 「隐藏超时节点」才能在那儿也生效。
+_delay_cache: dict[str, dict[str, int]] = {}
+
 
 def forget_active() -> None:
     """切换后端之后立刻失效，否则接下来的 3 秒还会读到旧的"""
@@ -260,15 +267,75 @@ def groups(backend: str = "") -> dict:
     if target == "openclash":
         data = clash.proxies()
         data["backend"] = "openclash"
-        return data
+        return _shape(data)
     if target == "passwall":
         flat = _uci_show("passwall")
         state = _passwall_state(flat)
         result = _passwall_groups(state["nodes"], state["current_id"])
+        # Passwall 的节点里本来没有延迟，把上一次整组测速的结果补上，
+        # 否则「隐藏超时节点」在 Passwall 上永远筛不出东西
+        cache = _delay_cache.get("passwall", {})
+        for g in result.get("groups") or []:
+            for m in g.get("members") or []:
+                if m.get("delay") is None:
+                    m["delay"] = cache.get(m.get("name"))
         result["backend"] = "passwall"
         result["current"] = state["current"]
-        return result
-    return {"groups": [], "node_count": 0, "error": "没有正在运行的代理后端", "backend": target}
+        return _shape(result)
+    return {"groups": [], "node_count": 0, "error": "没有正在运行的代理后端",
+            "backend": target, "hide_timeout": prefs()["hide_timeout"], "hidden": 0}
+
+
+# ------------------------------------------------------- 显示偏好（隐藏超时节点）
+
+
+def prefs() -> dict:
+    """代理页的显示偏好，存在 /etc/istore-agent/config.json。"""
+    sec = config.get("proxy", {}) or {}
+    return {"hide_timeout": bool(sec.get("hide_timeout", False))}
+
+
+def set_prefs(hide_timeout=None) -> dict:
+    data = config.load()
+    sec = dict(data.get("proxy") or {})
+    if hide_timeout is not None:
+        sec["hide_timeout"] = bool(hide_timeout)
+    data["proxy"] = sec
+    if not config.save(data):
+        return {"ok": False, "error": "写配置失败（/etc/istore-agent/config.json）",
+                **prefs()}
+    return {"ok": True, **prefs()}
+
+
+def _shape(data: dict) -> dict:
+    """按偏好裁掉超时节点，并告诉客户端裁掉了几个。
+
+    两个细节：
+      - 只有 delay == 0 才算「测过且超时」。None 是「还没测」——
+        刚开机时几乎全是 None，按 None 藏就会得到一个空列表。
+      - 当前选中的节点、策略组本身永远保留：藏了它们，界面上就
+        看不出「现在用的是哪条线」，而这条信息比列表整齐重要。
+    """
+    on = prefs()["hide_timeout"]
+    data["hide_timeout"] = on
+    if not on:
+        data["hidden"] = 0
+        return data
+
+    hidden = 0
+    for g in data.get("groups") or []:
+        keep = []
+        for m in g.get("members") or []:
+            if m.get("is_group") or m.get("info") or m.get("name") == g.get("now"):
+                keep.append(m)
+                continue
+            if m.get("delay") == 0:
+                hidden += 1
+                continue
+            keep.append(m)
+        g["members"] = keep
+    data["hidden"] = hidden
+    return data
 
 
 def select(name: str, group: str = "", backend: str = "") -> dict:
@@ -509,6 +576,9 @@ def delays(group: str = "", backend: str = "", timeout_ms: int = 3000) -> dict:
         if not group:
             return {"ok": False, "error": "缺少分组名", "backend": target, "delays": {}}
         result = clash.group_delay(group, timeout_ms=timeout_ms)
+        found = result.get("delays") or {}
+        if found:
+            _delay_cache.setdefault(target, {}).update(found)
         return {**result, "backend": target, "kind": "http"}
 
     if target == "passwall":
@@ -539,6 +609,7 @@ def delays(group: str = "", backend: str = "", timeout_ms: int = 3000) -> dict:
         with ThreadPoolExecutor(max_workers=16) as pool:
             pairs = list(pool.map(probe, nodes[:200]))
         delays = {name: ms for name, ms in pairs}
+        _delay_cache.setdefault(target, {}).update(delays)
         return {
             "ok": any(delays.values()),
             "backend": target,

@@ -13,6 +13,10 @@ import SwiftUI
 struct ProxyView: View {
     @State private var d: J = Api.cached("/api/v1/proxy") ?? [:]
     @State private var groups: [J] = Api.cached("/api/v1/proxy/groups").map { $0.objs("groups") } ?? []
+    /// 「隐藏超时节点」：偏好存在路由器上（不是本机设置），几台设备 + Web 端读的是同一个值
+    @State private var hideTimeout: Bool = false
+    /// 服务端按偏好裁掉了几个
+    @State private var hiddenCount: Int = 0
     @State private var cfg: J = Api.cached("/api/v1/proxy/configs") ?? [:]
     @State private var mode: String = ""
     @State private var loading = true
@@ -402,14 +406,24 @@ struct ProxyView: View {
                 // 节点分组：四个组各一张卡。原来是一行组名 + 就地展开几十个节点，
                 // 展到第二个组就把配置那半屏顶走了；改成卡片点开弹窗，
                 // 一屏永远只占四张卡的高度
-                HStack(alignment: .firstTextBaseline) {
+                HStack(alignment: .center, spacing: 6) {
                     Text("节点分组")
                         .font(.system(size: 11.5, weight: .medium))
                         .foregroundStyle(C.textSecondary)
                     Spacer(minLength: 6)
-                    Text("点一张卡换节点")
+                    Text(hideTimeout
+                         ? (hiddenCount > 0 ? "已隐藏 \(hiddenCount) 个" : "无超时节点")
+                         : "隐藏超时")
                         .font(.system(size: 10.5))
                         .foregroundStyle(C.textTertiary)
+                    Toggle("", isOn: Binding(
+                        get: { hideTimeout },
+                        set: { v in Task { await setHideTimeout(v) } }
+                    ))
+                    .labelsHidden()
+                    .tint(C.primary)
+                    .scaleEffect(0.78)
+                    .frame(width: 40, height: 24)
                 }
                 .padding(.horizontal, 18)
                 .padding(.top, 14)
@@ -672,6 +686,8 @@ struct ProxyView: View {
             await MainActor.run {
                 d = p
                 groups = (g["groups"] as? [Any])?.compactMap { $0 as? J } ?? []
+                hideTimeout = g.bool("hide_timeout")
+                hiddenCount = g.int("hidden")
                 // 分组一律默认折叠（与安卓一致）：一屏先看到所有组的当前节点和节点数，
                 // 想换哪个再展开哪个。以前会自动展开第一个，进来就是几十行节点
                 if let m { mode = m.str("mode") }
@@ -685,6 +701,19 @@ struct ProxyView: View {
                 if groups.isEmpty { err = error.localizedDescription }
             }
         }
+    }
+
+    /// 切换「隐藏超时节点」：写路由器上的偏好，再重拉分组（过滤在服务端做）
+    private func setHideTimeout(_ on: Bool) async {
+        if on == hideTimeout { return }
+        let prev = hideTimeout
+        hideTimeout = on
+        guard let r = try? await Api.post("/api/v1/proxy/prefs", ["hide_timeout": on]) else {
+            hideTimeout = prev
+            return
+        }
+        hideTimeout = r.bool("hide_timeout")
+        await load()
     }
 
     private func switchBackend(_ id: String) async {

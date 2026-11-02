@@ -1093,4 +1093,94 @@ public final class Ui {
         }
         return wrap;
     }
+
+    /** 开关变化回调 */
+    public interface OnToggle {
+        void onToggle(boolean on);
+    }
+
+    /**
+     * 小开关：42×25 的胶囊轨道 + 白色圆钮。
+     *
+     * 不用系统 Switch —— Material 那个拇指带投影和涟漪、字号也跟着系统走，
+     * 和这套自绘控件摆在一张卡里会显得不是一家人。这个版本只有两种颜色：
+     * 开是主色，关是 segment_track，圆钮永远白色。
+     */
+    public static class Toggle extends android.widget.FrameLayout {
+        private final View knob;
+        private final GradientDrawable track = new GradientDrawable();
+        private final int boxW;
+        private final int boxH;
+        private final int pad;
+        private boolean on;
+        private OnToggle listener;
+
+        public Toggle(Context c, boolean on) {
+            super(c);
+            this.on = on;
+            boxW = dp(c, 42);
+            boxH = dp(c, 25);
+            pad = dp(c, 2);
+
+            track.setCornerRadius(boxH / 2f);
+            track.setColor(color(c, on ? R.color.primary : R.color.segment_track));
+            setBackground(track);
+
+            knob = new View(c);
+            GradientDrawable kb = new GradientDrawable();
+            kb.setShape(GradientDrawable.OVAL);
+            kb.setColor(color(c, R.color.surface));
+            knob.setBackground(kb);
+            knob.setElevation(dp(c, 1));
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                    boxH - pad * 2, boxH - pad * 2);
+            lp.leftMargin = pad;
+            lp.topMargin = pad;
+            addView(knob, lp);
+            moveKnob(false);
+
+            setClickable(true);
+            setFocusable(true);
+            setOnClickListener(v -> {
+                boolean next = !this.on;
+                setOn(next, true);
+                if (listener != null) {
+                    listener.onToggle(next);
+                }
+            });
+        }
+
+        public boolean isOn() {
+            return on;
+        }
+
+        /** 外部同步状态用（服务端回来的值）；animate=false 时不播动画 */
+        public void setOn(boolean value, boolean animate) {
+            if (on == value) {
+                return;
+            }
+            on = value;
+            track.setColor(color(getContext(), on ? R.color.primary : R.color.segment_track));
+            moveKnob(animate);
+        }
+
+        public void setOnToggle(OnToggle l) {
+            listener = l;
+        }
+
+        private void moveKnob(boolean animate) {
+            float to = on ? (boxW - boxH) : 0f;
+            if (animate) {
+                knob.animate().translationX(to).setDuration(140).start();
+            } else {
+                knob.setTranslationX(to);
+            }
+        }
+
+        @Override
+        protected void onMeasure(int widthSpec, int heightSpec) {
+            super.onMeasure(MeasureSpec.makeMeasureSpec(boxW, MeasureSpec.EXACTLY),
+                    MeasureSpec.makeMeasureSpec(boxH, MeasureSpec.EXACTLY));
+        }
+    }
 }

@@ -1,5 +1,5 @@
 import { common } from '@kit.AbilityKit';
-import { router } from '@kit.ArkUI';
+import { promptAction, router } from '@kit.ArkUI';
 import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
 import { Bp } from '../Breakpoint';
@@ -61,6 +61,10 @@ export struct ProxyPage {
   @State testingGroup: string = '';
   @State toast: string = '';
   @State loaded: boolean = false;
+  /** 「隐藏超时节点」：偏好存在路由器上，不是本机设置，几台设备看到的是同一份列表 */
+  @State hideTimeout: boolean = false;
+  /** 服务端按偏好裁掉了几个，显示在标题右边 */
+  @State hiddenCount: number = 0;
 
   @StorageProp('tab') @Watch('onTab') tab: number = 2;
   @State winW: number = 360;
@@ -165,6 +169,9 @@ export struct ProxyPage {
     }
     this.backend = r.data.str('backend', '');
     this.nodeCount = r.data.num('node_count', 0);
+    // 开关状态跟服务端对齐：可能在另一台手机上改过
+    this.hideTimeout = r.data.bool('hide_timeout', this.hideTimeout);
+    this.hiddenCount = r.data.num('hidden', 0);
 
     const list: J[] = r.data.arr('groups');
     const out: NodeGroup[] = [];
@@ -189,6 +196,29 @@ export struct ProxyPage {
       });
     }
     this.groups = out;
+  }
+
+  /**
+   * 切换「隐藏超时节点」。
+   *
+   * 写的是路由器上的偏好（/api/v1/proxy/prefs），不是这台手机的设置：
+   * 同一张网里每台设备、以及 Web 端读到的是同一个值。
+   * 写完重新拉一次分组 —— 过滤在服务端做，客户端只负责显示。
+   */
+  private async setHideTimeout(on: boolean): Promise<void> {
+    if (on === this.hideTimeout) {
+      return;
+    }
+    this.hideTimeout = on;
+    const r: ApiResult = await Api.post(this.ctx(), '/api/v1/proxy/prefs',
+      { 'hide_timeout': on });
+    if (!r.ok) {
+      this.hideTimeout = !on;
+      promptAction.showToast({ message: r.error.length > 0 ? r.error : '设置没保存' });
+      return;
+    }
+    this.hideTimeout = r.data.bool('hide_timeout', on);
+    await this.loadGroups();
   }
 
   private async loadConfigs(): Promise<void> {
@@ -599,9 +629,19 @@ export struct ProxyPage {
           .fontSize(T.F_SUB)
           .fontColor($r('app.color.text_secondary'));
         Blank();
-        Text('点一张卡换节点')
+        // 隐藏超时节点：开关放标题行右侧，不占一整行；
+        // 状态来自服务端，所以另一台手机 / Web 端改过这里也会跟着变
+        Text(this.hideTimeout
+          ? (this.hiddenCount > 0 ? '已隐藏 ' + this.hiddenCount + ' 个' : '无超时节点')
+          : '隐藏超时')
           .fontSize(T.F_TINY)
-          .fontColor($r('app.color.text_tertiary'));
+          .fontColor($r('app.color.text_secondary'));
+        Toggle({ type: ToggleType.Switch, isOn: this.hideTimeout })
+          .selectedColor($r('app.color.primary'))
+          .margin({ left: 6 })
+          .onChange((on: boolean) => {
+            this.setHideTimeout(on);
+          });
       }
       .width('100%')
       .padding({ left: 4, right: 4 })

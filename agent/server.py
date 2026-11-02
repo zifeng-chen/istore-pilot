@@ -57,6 +57,13 @@ def cache_drop(*keys: str) -> None:
             _cache.pop(k, None)
 
 
+def cache_drop_prefix(prefix: str) -> None:
+    """按前缀清缓存。给「一堆按参数分 key 的接口」用，比如 proxy_groups:<后端>。"""
+    with _cache_lock:
+        for k in [k for k in _cache if k.startswith(prefix)]:
+            _cache.pop(k, None)
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "istore-agent/0.1"
     protocol_version = "HTTP/1.1"
@@ -264,6 +271,13 @@ class Handler(BaseHTTPRequestHandler):
                     str(body.get("backend", "")),
                     int(body.get("timeout", 3000)),
                 ))
+            elif path == "/api/v1/proxy/prefs":
+                want = body.get("hide_timeout")
+                result = proxy.set_prefs(None if want is None else bool(want))
+                # 分组的缓存是按后端分 key 的，改完偏好要把整批打掉，
+                # 否则界面会拿着「没过滤」的旧列表再画一遍
+                cache_drop_prefix("proxy_groups:")
+                self._json(result)
 
             # ---- 订阅地址管理（新增 / 改名改址 / 删除 / 拉取更新）
             elif path == "/api/v1/proxy/subscriptions":
@@ -505,6 +519,8 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/v1/proxy/groups":
                 backend = query.get("backend", [""])[0]
                 self._json(cached(f"proxy_groups:{backend}", 5.0, lambda: proxy.groups(backend)))
+            elif path == "/api/v1/proxy/prefs":
+                self._json(proxy.prefs())
             elif path == "/api/v1/proxy/connections":
                 self._json(proxy.connections(query.get("backend", [""])[0]))
             elif path == "/api/v1/proxy/mode":

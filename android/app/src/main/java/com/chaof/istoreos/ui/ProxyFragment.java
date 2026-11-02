@@ -85,6 +85,10 @@ public class ProxyFragment extends BaseFragment {
     /** 刚测出来的延迟，优先级高于接口里带的历史值 */
     private final Map<String, Integer> tested = new HashMap<>();
     private String testingGroup = "";
+    /** 「隐藏超时节点」：值来自服务端（存路由器），切换后整页节点要重拉 */
+    private Ui.Toggle hideToggle;
+    private TextView tvHideNote;
+    private boolean hideTimeout;
 
     @Override
     protected String title() {
@@ -163,6 +167,27 @@ public class ProxyFragment extends BaseFragment {
         subSlot.addView(tvSubCount);
         subSlot.addView(Ui.chevron(c));
         tapRow(subSlot, this::openSubscriptions);
+
+        // 隐藏超时节点：显示偏好存在路由器上（不是这台手机的设置），
+        // 几台设备看到的是同一份列表；Web 端读的也是这个值
+        combo.addView(Ui.hairline(c, 16));
+        LinearLayout hideRow = Ui.row(c);
+        hideRow.setGravity(Gravity.CENTER_VERTICAL);
+        hideRow.setPadding(Ui.dp(c, 16), Ui.dp(c, 10), Ui.dp(c, 16), Ui.dp(c, 10));
+
+        LinearLayout hideCol = Ui.column(c);
+        TextView hideTitle = Ui.text(c, "隐藏超时节点", 14.5f, R.color.text_primary);
+        hideCol.addView(hideTitle);
+        tvHideNote = Ui.text(c, "只列测速通过的节点", 11.5f, R.color.text_secondary);
+        tvHideNote.setPadding(0, Ui.dp(c, 2), 0, 0);
+        hideCol.addView(tvHideNote);
+        hideRow.addView(hideCol, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        hideToggle = new Ui.Toggle(c, false);
+        hideToggle.setOnToggle(this::setHideTimeout);
+        hideRow.addView(hideToggle);
+        combo.addView(hideRow);
 
         combo.addView(Ui.hairline(c, 16));
         Ui.cardSubTitle(c, combo, "节点");
@@ -552,6 +577,47 @@ public class ProxyFragment extends BaseFragment {
         });
     }
 
+    /**
+     * 切换「隐藏超时节点」。
+     *
+     * 写的是路由器上的偏好（/api/v1/proxy/prefs），不是本机设置 ——
+     * 所以同一张网里的每台手机、以及 Web 端读到的是同一个值。
+     * 写完把缓存签名清掉再拉一次：服务端会按新偏好重新裁节点。
+     */
+    private void setHideTimeout(boolean on) {
+        JSONObject body = new JSONObject();
+        try {
+            body.put("hide_timeout", on);
+        } catch (org.json.JSONException ignored) {
+            // 只放了一个 boolean，不会抛
+        }
+        Api.post(ctx(), "/api/v1/proxy/prefs", body, new Cb() {
+            @Override
+            public void onData(JSONObject data, boolean fromCache) {
+                if (!isAdded()) {
+                    return;
+                }
+                hideTimeout = data.optBoolean("hide_timeout", on);
+                signature = "";
+                loadGroups();
+            }
+
+            @Override
+            public void onError(String message) {
+                if (!isAdded()) {
+                    return;
+                }
+                // 写失败就把开关拨回去，别让界面显示一个没生效的状态
+                if (hideToggle != null) {
+                    hideToggle.setOn(hideTimeout, true);
+                }
+                if (tvHideNote != null) {
+                    tvHideNote.setText("设置没保存：" + message);
+                }
+            }
+        });
+    }
+
     private void loadGroups() {
         Api.get(ctx(), "/api/v1/proxy/groups", new Cb() {
             @Override
@@ -642,6 +708,18 @@ public class ProxyFragment extends BaseFragment {
     private void renderNodes(JSONObject body) {
         Context c = nodesBox.getContext();
         nodesBox.removeAllViews();
+
+        // 开关状态跟服务端对齐：可能在另一台手机上改过，也可能是 Web 端改的
+        hideTimeout = body.optBoolean("hide_timeout", hideTimeout);
+        int hidden = body.optInt("hidden", 0);
+        if (hideToggle != null) {
+            hideToggle.setOn(hideTimeout, false);
+        }
+        if (tvHideNote != null) {
+            tvHideNote.setText(!hideTimeout
+                    ? "只列测速通过的节点"
+                    : (hidden > 0 ? "已隐藏 " + hidden + " 个超时节点" : "当前没有测速超时的节点"));
+        }
 
         JSONArray groups = body.optJSONArray("groups");
         if (groups == null || groups.length() == 0) {

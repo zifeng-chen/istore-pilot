@@ -39,6 +39,12 @@ def defaults() -> dict:
             "api_port": 3000,
         },
         "sample": {"interval": 60, "retain_days": 7},
+        # 代理页的显示偏好。存在路由器上而不是手机里：
+        # 一家人几台设备看到的是同一份节点列表，服务端过滤一次就够，
+        # 客户端不用各算各的（也算不齐 —— 只有服务端拿得到 Mihomo 的 history）
+        "proxy": {
+            "hide_timeout": False,
+        },
         "luci": {
             # App 内置浏览器打开网页端时要免密进后台，Agent 会拿这个口令
             # 代登录一次 LuCI（见 luci.py）。
