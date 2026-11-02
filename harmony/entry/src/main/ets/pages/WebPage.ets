@@ -285,4 +285,18 @@ struct WebPage {
     .height('100%')
     .backgroundColor($r('app.color.app_bg'));
   }
+
+  /**
+   * 系统返回键 / 手势：先退网页历史，再退这一页。
+   *
+   * 和左上角返回按钮同一套逻辑（安卓 WebActivity 也是这么做的）。
+   * 不接管的话，网页里点进去两层再划一下手势，会直接弹回 App —— 用户还在读页面。
+   */
+  onBackPress(): boolean {
+    if (this.ctrl.accessBackward()) {
+      this.ctrl.backward();
+      return true;
+    }
+    return false;
+  }
 }
