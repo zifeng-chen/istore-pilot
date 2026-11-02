@@ -121,6 +121,21 @@ ICONS = [
     ("字节跳动", "今日头条", "cn", "bytedance", "头条"),
 ]
 
+# 不联网也有的品牌图：由 `scripts/make_brand_icons.py` 本地画，
+# 这里只登记映射，抓取时发现图已经在就跳过下载（断点续跑那套逻辑）。
+# 为什么不在 App Store 抓：华为 / 荣耀没有「品牌 App」的官方图标，
+# NAS 是设备不是 App，抓回来都不是品牌标；微软那张抓回来是 Microsoft 365 的。
+MANUAL = [
+    ("华为", "huawei"),
+    ("荣耀", "honor"),
+    ("绿联 NAS", "ugreen"),
+    ("群晖 NAS", "synology"),
+    ("中兴", "zte"),
+    ("Gemini", "gemini"),
+    ("Plex", "plex"),
+    ("Emby / Jellyfin", "jellyfin"),
+]
+
 
 def curl(url: str, proxy: str, binary: bool = False, tries: int = 3):
     args = ["curl", "-sL", "--max-time", "25", "--retry", "2"]
@@ -199,6 +214,13 @@ def main() -> int:
         os.remove(tmp)
         mapping[name] = f"ic_app_{slug}"
         print(f"  ok  {name:<14} -> {slug:<14} {len(blob)//1024} KB")
+
+    # 本地画的品牌图（华为 / 荣耀 / 绿联 / 群晖 / 中兴 / 微软 / Gemini / Plex / Jellyfin）
+    for name, slug in MANUAL:
+        if os.path.exists(os.path.join(RES, f"ic_app_{slug}.png")):
+            mapping[name] = f"ic_app_{slug}"
+        else:
+            missing.append(f"{name}（缺 ic_app_{slug}.png，先跑 scripts/make_brand_icons.py）")
 
     lines = ["package com.chaof.istoreos.util;", "",
              "import com.chaof.istoreos.R;", "",

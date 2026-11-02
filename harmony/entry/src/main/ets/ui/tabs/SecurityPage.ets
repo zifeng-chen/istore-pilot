@@ -2,6 +2,7 @@ import { common } from '@kit.AbilityKit';
 import { router } from '@kit.ArkUI';
 import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
+import { Shell } from '../../core/Shell';
 import { Fmt } from '../../util/Fmt';
 import { Pal, T } from '../Theme';
 import { Bp } from '../Breakpoint';
@@ -50,10 +51,12 @@ export struct SecurityPage {
   @State loaded: boolean = false;
   @State err: string = '';
 
-  /** 0 一级页 / 1 设备清单 / 2 拦截配置 */
-  @State sub: number = 0;
+  /** 0 一级页 / 1 设备清单 / 2 拦截配置 / 3 应用流量 */
+  @State @Watch('onSubChanged') sub: number = 0;
   /** 进二级页时的预设筛选：0 全部 / 1 在线 / 2 离线 */
   @State subFilter: number = 0;
+  /** 壳发来的「返回一级页」请求计数，见 core/Shell.ets */
+  @StorageProp('shellBackTick') @Watch('onBackAsked') backTick: number = 0;
 
   @State online: number = 0;
   @State total: number = 0;
@@ -102,6 +105,9 @@ export struct SecurityPage {
 
   aboutToDisappear(): void {
     this.stopPoll();
+    // 页面被销毁（退出登录、重建）时别把「二级页」状态留在壳上，
+    // 否则底部导航会一直藏着
+    Shell.leave();
   }
 
   private onWidth(): void {
@@ -269,7 +275,28 @@ export struct SecurityPage {
 
   private openSub(n: number, filter: number): void {
     this.subFilter = filter;
-    this.sub = n;
+    // 二级页是从右边推上来的：壳（Index）据此藏掉底部导航，
+    // 返回键也从「退出 App」改成「退回一级页」
+    this.getUIContext().animateTo({ duration: 220, curve: Curve.EaseOut }, () => {
+      this.sub = n;
+    });
+  }
+
+  private onSubChanged(prop: string): void {
+    if (this.sub === 0) {
+      Shell.leave();
+      return;
+    }
+    Shell.enter(this.sub === 1 ? '设备清单' : (this.sub === 3 ? '应用流量' : '拦截'));
+  }
+
+  /** 壳收到系统返回手势：关掉二级页（回到 sub=0，由 onSubChanged 清掉壳状态） */
+  private onBackAsked(prop: string): void {
+    if (this.sub !== 0) {
+      this.getUIContext().animateTo({ duration: 200, curve: Curve.EaseIn }, () => {
+        this.sub = 0;
+      });
+    }
   }
 
   private offline(): number {
@@ -307,7 +334,9 @@ export struct SecurityPage {
       }
       .layoutWeight(0)
       .onClick(() => {
-        this.sub = 0;
+        this.getUIContext().animateTo({ duration: 200, curve: Curve.EaseIn }, () => {
+          this.sub = 0;
+        });
       });
 
       Blank();
@@ -464,7 +493,7 @@ export struct SecurityPage {
     .padding({ top: 11, bottom: 11 })
     .alignItems(VerticalAlign.Center)
     .onClick(() => {
-      this.sub = target;
+      this.openSub(target, this.subFilter);
     });
   }
 
@@ -571,8 +600,179 @@ export struct SecurityPage {
     .width('100%')
     .margin({ top: 0, bottom: T.GAP })
     .onClick(() => {
-      this.sub = 3;
+      this.openSub(3, 0);
     });
+  }
+
+  // ------------------------------------------------------------ 应用流量（二级页）
+
+  /** 下载占比，画汇总卡下面那条双色条 */
+  private downPct(): number {
+    if (this.appTotalBytes <= 0) {
+      return 0;
+    }
+    const p: number = this.appDownBytes * 100 / this.appTotalBytes;
+    return Math.max(1, Math.min(100, p));
+  }
+
+  /**
+   * 汇总卡：一行放「累计用量 + 下载/上传」，下面一条下载/上传占比条。
+   *
+   * 原来是一整张白卡只堆三行字，右边空掉三分之二，看着像没做完；
+   * 现在数字靠左撑起主次，上下行靠右对齐成一组读数，底下那条比例条
+   * 把「下载占大头还是上传占大头」变成一眼能看见的东西。
+   */
+  @Builder
+  appSummary() {
+    Column() {
+      Row() {
+        Column() {
+          Text(this.appDays > 1 ? '累计用量 · 已统计 ' + this.appDays + ' 天' : '累计用量')
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_secondary'));
+          Text(Fmt.bytes(this.appTotalBytes))
+            .fontSize(28)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.text_primary'))
+            .margin({ top: 3 });
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1);
+
+        Column({ space: 5 }) {
+          Text('↓ 下载 ' + Fmt.bytes(this.appDownBytes))
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_secondary'));
+          Text('↑ 上传 ' + Fmt.bytes(this.appUpBytes))
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_secondary'));
+        }
+        .alignItems(HorizontalAlign.End);
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Bottom);
+
+      if (this.appTotalBytes > 0) {
+        Stack({ alignContent: Alignment.Start }) {
+          Row()
+            .width('100%')
+            .height(4)
+            .borderRadius(2)
+            .backgroundColor($r('app.color.accent_soft2'));
+          Row()
+            .width(this.downPct() + '%')
+            .height(4)
+            .borderRadius(2)
+            .backgroundColor($r('app.color.primary'));
+        }
+        .width('100%')
+        .height(4)
+        .margin({ top: 13 });
+      }
+
+      Text('按域名归类；认不出名字的连接归到「IP 直连」')
+        .fontSize(10.5)
+        .fontColor($r('app.color.text_tertiary'))
+        .margin({ top: 9 });
+    }
+    .width('100%')
+    .padding({ left: 16, right: 16, top: 15, bottom: 14 })
+    .margin({ left: T.PAD, right: T.PAD, bottom: 10 })
+    .borderRadius(T.R_CARD)
+    .backgroundColor($r('app.color.surface'))
+    .border({ width: 0.7, color: $r('app.color.glass_stroke') });
+  }
+
+  /** 一个应用一行卡：图标 + 名字/分类 + 右侧用量与占比，底下一根占比条 */
+  @Builder
+  appRow(a: AppRow) {
+    Column() {
+      Row() {
+        AppIcon({ name: a.name, side: 40 });
+
+        Column() {
+          Row() {
+            Text(a.name)
+              .fontSize(T.F_BODY)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.text_primary'))
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .layoutWeight(1);
+            if (a.bps >= 1024) {
+              Text(Fmt.bps(a.bps))
+                .fontSize(T.F_TINY)
+                .fontColor($r('app.color.primary'))
+                .margin({ left: 6 });
+            }
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Center);
+
+          Text((a.category.length > 0 && a.category !== '其他' ? a.category + ' · ' : '')
+            + '↓ ' + Fmt.bytes(a.down) + '　↑ ' + Fmt.bytes(a.up))
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_secondary'))
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .margin({ top: 4 });
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        .margin({ left: 12, right: 8 });
+
+        Column() {
+          Text(Fmt.bytes(a.total))
+            .fontSize(T.F_H2)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.text_primary'));
+          Text('占 ' + Math.round(a.share) + '%')
+            .fontSize(10.5)
+            .fontColor($r('app.color.text_tertiary'))
+            .margin({ top: 4 });
+        }
+        .alignItems(HorizontalAlign.End);
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center);
+
+      Stack({ alignContent: Alignment.Start }) {
+        Row()
+          .width('100%')
+          .height(3)
+          .borderRadius(2)
+          .backgroundColor($r('app.color.accent_soft2'));
+        Row()
+          .width(Math.max(2, Math.min(100, a.share)) + '%')
+          .height(3)
+          .borderRadius(2)
+          .backgroundColor($r('app.color.primary'));
+      }
+      .width('100%')
+      .height(3)
+      .margin({ top: 11 });
+    }
+    .width('100%')
+    .padding({ left: 14, right: 14, top: 12, bottom: 12 })
+    .borderRadius(18)
+    .backgroundColor($r('app.color.surface'))
+    .border({ width: 0.7, color: $r('app.color.glass_stroke') });
+  }
+
+  @Builder
+  appEmpty() {
+    Column({ space: 7 }) {
+      Text('还没有捕获到应用流量')
+        .fontSize(T.F_BODY)
+        .fontColor($r('app.color.text_secondary'));
+      Text('路由器按访问的域名归类 App，联网一会儿再回来')
+        .fontSize(T.F_TINY)
+        .fontColor($r('app.color.text_tertiary'));
+    }
+    .width('100%')
+    .padding({ top: 30, bottom: 30 })
+    .borderRadius(T.R_CARD)
+    .backgroundColor($r('app.color.surface'));
   }
 
   @Builder
@@ -855,75 +1055,31 @@ export struct SecurityPage {
       .width('100%')
       .height('100%')
       .backgroundColor($r('app.color.app_bg'));
+      // 从右边推进来：进 / 退都带一点位移 + 淡入淡出，不再是一下子换一屏
+      .transition(TransitionEffect.OPACITY
+        .combine(TransitionEffect.translate({ x: 32 })))
     } else if (this.sub === 3) {
       Column() {
         this.backBar('应用流量');
 
         // 汇总卡钉在顶部：翻到第 20 个应用时还想拿它跟眼前这行的数字对照。
         // 只有下面的列表滚
-        Column() {
-          Text(this.appDays > 1 ? '累计用量 · 已统计 ' + this.appDays + ' 天' : '累计用量')
-            .fontSize(T.F_TINY)
-            .fontColor($r('app.color.text_secondary'));
-          Text(Fmt.bytes(this.appTotalBytes))
-            .fontSize(30)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.text_primary'))
-            .margin({ top: 2 });
-          Text('↓ ' + Fmt.bytes(this.appDownBytes) + '　↑ ' + Fmt.bytes(this.appUpBytes))
-            .fontSize(T.F_TINY)
-            .fontColor($r('app.color.text_secondary'))
-            .margin({ top: 4 });
-        }
-        .alignItems(HorizontalAlign.Start)
-        .width('100%')
-        .padding({ left: 16, right: 16, top: 14, bottom: 14 })
-        .margin({ left: T.PAD, right: T.PAD, bottom: 10 })
-        .borderRadius(T.R_CARD)
-        .backgroundColor($r('app.color.surface'));
+        this.appSummary();
 
         Scroll() {
           Column({ space: 10 }) {
-            ForEach(this.appRows, (a: AppRow) => {
-              Row() {
-                AppIcon({ name: a.name, side: 36 });
-                Column() {
-                  Text(a.name)
-                    .fontSize(T.F_BODY)
-                    .fontColor($r('app.color.text_primary'))
-                    .maxLines(1)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis });
-                  Text((a.category.length > 0 && a.category !== '其他' ? a.category + ' · ' : '')
-                    + '↓ ' + Fmt.bytes(a.down) + '  ↑ ' + Fmt.bytes(a.up))
-                    .fontSize(T.F_TINY)
-                    .fontColor($r('app.color.text_secondary'))
-                    .maxLines(1)
-                    .margin({ top: 3 });
-                }
-                .alignItems(HorizontalAlign.Start)
-                .layoutWeight(1);
-
-                Column() {
-                  Text(Fmt.bytes(a.total))
-                    .fontSize(T.F_BODY)
-                    .fontWeight(FontWeight.Medium)
-                    .fontColor($r('app.color.text_primary'));
-                  Text('占 ' + Math.round(a.share) + '%')
-                    .fontSize(T.F_TINY)
-                    .fontColor($r('app.color.text_secondary'))
-                    .margin({ top: 3 });
-                }
-                .alignItems(HorizontalAlign.End);
-              }
-              .width('100%')
-              .padding({ top: 8, bottom: 8 })
-              .alignItems(VerticalAlign.Center);
-            }, (a: AppRow) => a.name + '|' + a.bps + '|' + a.total + '|' + a.share);
+            if (this.appRows.length === 0) {
+              this.appEmpty();
+            } else {
+              ForEach(this.appRows, (a: AppRow) => {
+                this.appRow(a);
+              }, (a: AppRow) => a.name + '|' + a.bps + '|' + a.total + '|' + a.share);
+            }
 
             Row().width('100%').height(20);
           }
           .width('100%')
-          .padding({ left: T.PAD, right: T.PAD, top: 4 });
+          .padding({ left: T.PAD, right: T.PAD, top: 2 });
         }
         .layoutWeight(1)
         .width('100%')
@@ -933,6 +1089,9 @@ export struct SecurityPage {
       .width('100%')
       .height('100%')
       .backgroundColor($r('app.color.app_bg'));
+      // 从右边推进来：进 / 退都带一点位移 + 淡入淡出，不再是一下子换一屏
+      .transition(TransitionEffect.OPACITY
+        .combine(TransitionEffect.translate({ x: 32 })))
     } else if (this.sub === 2) {
       Column() {
         this.backBar('拦截');
@@ -945,6 +1104,9 @@ export struct SecurityPage {
       .width('100%')
       .height('100%')
       .backgroundColor($r('app.color.app_bg'));
+      // 从右边推进来：进 / 退都带一点位移 + 淡入淡出，不再是一下子换一屏
+      .transition(TransitionEffect.OPACITY
+        .combine(TransitionEffect.translate({ x: 32 })))
     } else {
       Scroll() {
         Column() {

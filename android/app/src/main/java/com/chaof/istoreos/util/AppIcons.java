@@ -64,13 +64,18 @@ public final class AppIcons {
         MAP.put("12306", R.drawable.ic_app_rail12306);
         MAP.put("滴滴", R.drawable.ic_app_didi);
         MAP.put("小米 / 米家", R.drawable.ic_app_mijia);
-        MAP.put("华为 / 荣耀", R.drawable.ic_app_hilink);
+        MAP.put("华为", R.drawable.ic_app_huawei);
+        MAP.put("荣耀", R.drawable.ic_app_honor);
         MAP.put("OPPO / 欢太", R.drawable.ic_app_oppo);
         MAP.put("vivo 手机服务", R.drawable.ic_app_vivo);
         MAP.put("美的", R.drawable.ic_app_midea);
         MAP.put("海尔", R.drawable.ic_app_haier);
         MAP.put("摄像头 / 涂鸦", R.drawable.ic_app_tuya);
         MAP.put("扫地机", R.drawable.ic_app_roborock);
+        MAP.put("绿联 NAS", R.drawable.ic_app_ugreen);
+        MAP.put("群晖 NAS", R.drawable.ic_app_synology);
+        MAP.put("Plex", R.drawable.ic_app_plex);
+        MAP.put("Emby / Jellyfin", R.drawable.ic_app_jellyfin);
         MAP.put("Apple 服务", R.drawable.ic_app_apple);
         MAP.put("微软服务", R.drawable.ic_app_microsoft);
         MAP.put("Google 服务", R.drawable.ic_app_google);
@@ -82,6 +87,8 @@ public final class AppIcons {
         MAP.put("向日葵", R.drawable.ic_app_oray);
         MAP.put("ToDesk", R.drawable.ic_app_todesk);
         MAP.put("远程控制", R.drawable.ic_app_teamviewer);
+        MAP.put("中兴", R.drawable.ic_app_zte);
+        MAP.put("Gemini", R.drawable.ic_app_gemini);
         MAP.put("钉钉", R.drawable.ic_app_dingtalk);
         MAP.put("企业微信", R.drawable.ic_app_wework);
         MAP.put("飞书", R.drawable.ic_app_feishu);

@@ -22,6 +22,9 @@ struct SecurityView: View {
     enum Route: Hashable {
         case devices(Int)
         case shield
+        /// 应用流量：以前是 sheet（没有推进动画、底栏还留在下面、返回只能下滑），
+        /// 现在和别的二级页一样走导航推进，手势返回、底栏隐藏都由系统给
+        case apps
         /// 三级页：某台设备的详情。放在同一个枚举里 —— `NavigationStack(path:)`
         /// 的 path 是 `[Route]`，只能往里 push `Route`；
         /// 之前清单里用 `NavigationLink(value: mac)`（String）配
@@ -34,6 +37,7 @@ struct SecurityView: View {
         switch DebugRoute.sub {
         case "devices": return [.devices(0)]
         case "shield": return [.shield]
+        case "apps": return [.apps]
         default: return []
         }
         #else
@@ -42,7 +46,6 @@ struct SecurityView: View {
     }()
 
     @State private var appsData: J = Api.cached("/api/v1/apps") ?? [:]
-    @State private var goApps = false
     @Environment(\.barAxis) private var axis
     @Environment(\.tabIndex) private var tabIndex
     @EnvironmentObject private var chrome: TabChrome
@@ -74,6 +77,8 @@ struct SecurityView: View {
                         DevicesView(initialFilter: f)
                     case .shield:
                         ShieldView()
+                    case .apps:
+                        AppsView()
                     case .device(let mac):
                         DeviceDetailView(mac: mac,
                                          seed: devs.first { $0.str("mac") == mac } ?? [:])
@@ -121,20 +126,7 @@ struct SecurityView: View {
             .background(C.appBg)
             .navigationTitle("设备")
             .pageTitle("设备")
-            .adaptiveSheet(isPresented: $goApps) {
-                NavigationStack { AppsView(asSheet: true) }
-            }
             .task { await load() }
-            #if DEBUG
-            // 截图用：-sub apps 时自动把应用流量页弹出来
-            .onAppear {
-                guard DebugRoute.sub == "apps" else { return }
-                Task {
-                    try? await Task.sleep(nanoseconds: 700_000_000)
-                    goApps = true
-                }
-            }
-            #endif
             .onReceive(tick) { _ in Task { await load(quiet: true) } }
             .confirmationDialog(takeover ? "退出 DNS 接管？" : "让所有设备走 AdGuard Home 解析？",
                                 isPresented: Binding(
@@ -351,7 +343,7 @@ struct SecurityView: View {
         let top = arr.filter { $0.dbl("all_total") > 1024 }.prefix(3)
 
         return Button {
-            goApps = true
+            path.append(.apps)
         } label: {
             Card {
                 VStack(alignment: .leading, spacing: 0) {

@@ -2,6 +2,7 @@ import { common } from '@kit.AbilityKit';
 import { router, window } from '@kit.ArkUI';
 import { Api, ApiResult } from '../api/Api';
 import { Session } from '../core/Session';
+import { Shell } from '../core/Shell';
 import { Pal, T } from '../ui/Theme';
 import { Appearance } from '../ui/Appearance';
 import { Bp } from '../ui/Breakpoint';
@@ -41,8 +42,18 @@ struct Index {
   @State winW: number = 360;
   @State hostname: string = '';
   @StorageProp('forceLogin') @Watch('onForceLogin') forceLogin: number = 0;
+  /**
+   * 页内二级页的标题（空串 = 停在一级页）。
+   *
+   * 设备清单 / 应用流量 / 拦截这些二级页是 SecurityPage 里换内容，不是路由页；
+   * 底部导航是这一层画的浮层，不读这个状态就永远压在二级页上面。
+   */
+  @StorageProp('shellSubTitle') subTitle: string = '';
 
   aboutToAppear(): void {
+    // 冷启动 / 重新登录后一定是停在一级页：把上一条会话可能残留的
+    // 「二级页」状态清掉，否则底部导航会一直藏着
+    Shell.leave();
     this.boot();
   }
 
@@ -203,7 +214,7 @@ struct Index {
 
             // 内容区
             Column() {
-              this.pages(0);
+              this.pages();
             }
             .layoutWeight(1)
             .height('100%');
@@ -214,13 +225,20 @@ struct Index {
         } else {
           Stack({ alignContent: Alignment.Bottom }) {
             // 底部要多让 16：导航条上下各留 4 / 12 的边（和安卓 navhost 一致），
-            // 只让 NAV_H 的话最后一屏内容会被胶囊压住
-            this.pages(T.NAV_H + 16 + this.safeBottom);
+            // 只让 NAV_H 的话最后一屏内容会被胶囊压住。进二级页时底栏收起来，
+            // 这段留白跟着撤掉，否则二级页底下会空出一条
+            this.pages();
 
-            NavBar({ current: $current })
-              .width('100%')
-              .padding({ left: 14, right: 14 })
-              .margin({ top: 4, bottom: this.safeBottom + 12 });
+            // 二级页推进来的时候把底部导航收起来（安卓那边整页覆盖、没有横条）。
+            // 淡出 + 下沉，和 iOS 的 transition 同一个节奏
+            if (this.subTitle.length === 0) {
+              NavBar({ current: $current })
+                .width('100%')
+                .padding({ left: 14, right: 14 })
+                .margin({ top: 4, bottom: this.safeBottom + 12 })
+                .transition(TransitionEffect.OPACITY
+                  .combine(TransitionEffect.translate({ y: 24 })));
+            }
           }
           .width('100%')
           .height('100%');
@@ -305,8 +323,26 @@ struct Index {
     });
   }
 
+  /**
+   * 底部要留多少：手机竖屏的浮层导航 62 + 上下边距，所以多让 16。
+   * 进二级页后底栏收起，只需要让出系统手势条；平板侧栏模式一直是 0。
+   *
+   * 注意：不能把这个值当参数塞进 @Builder —— @Builder 按值传参不会刷新，
+   * 进二级页时留白会原地不动。必须在 builder 内部读状态。
+   */
+  private bottomPad(): number {
+    if (this.railMode()) {
+      // 侧栏模式没有底部浮层，原来就是 0，别顺手改掉平板的手势条留白
+      return 0;
+    }
+    if (this.subTitle.length > 0) {
+      return this.safeBottom;
+    }
+    return T.NAV_H + 16 + this.safeBottom;
+  }
+
   @Builder
-  pages(padBottom: number) {
+  pages() {
     Tabs({ barPosition: BarPosition.End, index: this.current }) {
       TabContent() {
         OverviewPage()
@@ -335,7 +371,26 @@ struct Index {
     .height('100%')
     // 顶上让出状态栏，底下让出导航条：这个 App 是全屏窗口
     // （EntryAbility 里 setWindowLayoutFullScreen），不让出来内容会钻到系统栏底下。
-    // 平板模式没有底部栏，padBottom 传 0
-    .padding({ top: this.safeTop, bottom: padBottom });
+    .padding({ top: this.safeTop, bottom: this.bottomPad() });
+  }
+
+  /**
+   * 系统返回键 / 返回手势。
+   *
+   * 页内二级页（设备清单 / 应用流量 / 拦截）没有路由栈，系统默认行为是**直接退出 App** ——
+   * 用户在手势条上一划就回到桌面，看起来像崩了。
+   * 这里接管：二级页先退回一级页，页签不在首页时退回首页；都在最外层才交还给系统。
+   */
+  onBackPress(): boolean {
+    if (this.subTitle.length > 0) {
+      Shell.requestBack();
+      return true;
+    }
+    if (this.current !== 0) {
+      this.current = 0;
+      AppStorage.setOrCreate('tab', 0);
+      return true;
+    }
+    return false;
   }
 }
