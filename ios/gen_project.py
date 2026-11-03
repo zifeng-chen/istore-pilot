@@ -20,8 +20,8 @@ APP = "IStorePilot"
 PROJ = "IStorePilot.xcodeproj"
 BUNDLE_ID = "com.chaof.istoreos"
 NAME = "iStore Pilot"
-VERSION = "0.1.4"
-BUILD = "27"
+VERSION = "0.1.5"
+BUILD = "28"
 DEPLOY = "16.0"
 
 

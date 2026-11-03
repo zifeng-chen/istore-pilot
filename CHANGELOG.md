@@ -13,7 +13,7 @@
 
 ---
 
-## 未发布
+## 0.1.5 · 代码治理（死代码 / 去重 / 规范）
 
 ### 清理 · 未引用代码与残留资源
 
@@ -43,9 +43,15 @@
   - `release.py` 把 `api()` / `upload()` 里重复的 GitHub 错误归一抽成 `_send()`
 - **不合并的地方**：Activity / ArkUI 页面的骨架（工具栏 + 滚动容器 + 分组卡片）。
   每个屏的头部、内边距、空态都不同，抽成多参数 helper 比重复更难读
+- **规范补强**：`docs/CODE_STYLE.md` 新增两节 ——
+  「加新功能时的解耦要求」（依赖单向、跨模块只调公开名、写接口必须可回滚、
+  三端同口径、提交粒度、评审顺序）与「版本与发布节奏」（改动多就切版本号，
+  不许把新改动塞进已发布版本的说明里）
 
-验证：`lint_style.py` 210 文件 0 error/0 warn、`dead_code.py` 0 候选、ruff F 通过；
+验证：`lint_style.py` 206 文件 0 error/0 warn、`dead_code.py` 0 候选、ruff F 通过；
 Android `assembleDebug`、iOS `BUILD SUCCEEDED`、鸿蒙 `BUILD SUCCESSFUL` 各跑一遍。
+
+## 历史版本（0.1.4 及以前）
 
 ### 0.1.4 · 安装器自动装依赖 + iStoreOS 25.12（apk）支持
 
@@ -65,7 +71,7 @@ Android `assembleDebug`、iOS `BUILD SUCCEEDED`、鸿蒙 `BUILD SUCCESSFUL` 各�
 验证：24.10.8 真机 `--check` 通过；造假 opkg / 造假 apk 各跑一遍确认命令分流；
 `--no-deps` 正确跳过；真实安装后服务正常。**未在真 25.12 设备上验证。**
 
-### 补齐 · Android 代理节点分组卡片 + 弹窗
+### Android 代理分组卡片与弹窗（随 0.1.4 发布）
 
 安卓 `ProxyFragment` 原来用 `expanded` 集合就地展开节点，展开两三个组就把整页撑没。
 现在和 iOS / 鸿蒙一致：每组一张卡片（类型胶囊 + 组名 + 当前节点 + 节点数），
