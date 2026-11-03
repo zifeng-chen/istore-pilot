@@ -10,8 +10,12 @@
 为什么要 .run 而不是只用 ipk：
     ipk 必须经过 opkg，遇到「没有网络装不上依赖」「opkg 版本不一致」
     「软件包页面传不上去」就卡住了。.run 是纯 shell + tar.gz 自解压，
-    路由器上只要有 sh / gzip / tar / python3 就能装，不碰 opkg 数据库，
-    也就不会出现「opkg 认为已装、文件却被覆盖」的错位状态。
+    路由器上只要有 sh / gzip / tar 就能装，不碰包管理器数据库，
+    也就不会出现「包管理器认为已装、文件却被覆盖」的错位状态。
+
+    这一条在 iStoreOS 25.12 之后更重要：那版把 opkg 换成了 apk，旧的 ipk
+    在 25.12 上根本装不上，而 .run 不受影响。所以安装器里所有装包动作都
+    按当前系统的包管理器走（opkg / apk 双分支），缺依赖时还会自动补装。
 
 包体结构：
     [sh 安装器头部][tar.gz 载荷]        偏移量写在头部，安装器自己 tail 出来解压
@@ -65,8 +69,9 @@ HEADER = r'''#!/bin/sh
 #  tail 出来直接解压，不需要联网，不需要 opkg。
 #
 #  sh 本文件                 安装或升级（保留现有配置）
-#  sh 本文件 --check         只检查环境，不改任何文件
-#  sh 本文件 --force         已用 opkg 装过时，强制改由本包接管
+#  sh 本文件 --check         只检查环境与依赖，不改任何文件
+#  sh 本文件 --no-deps       不自动装依赖（离线/已手工备齐时用）
+#  sh 本文件 --force         已用 opkg/apk 装过时，强制改由本包接管
 #  sh 本文件 --uninstall     卸载程序，保留 /etc/istore-agent 里的密码
 #  sh 本文件 --purge         卸载并清除全部配置与密码
 #
@@ -85,9 +90,12 @@ SELF="$0"
 ACTION=install
 ASSUME_YES=0
 NO_START=0
+NO_DEPS=0
 FORCE=0
 ROOT_DIR=""
 CFG_BAK=""
+PM=""
+PY=""
 
 # ---------------------------------------------------------------- 输出小工具
 
@@ -108,8 +116,9 @@ usage() {
   用法：sh $SELF [选项]
 
     (无参数)        安装或升级，保留现有配置
-    --check         只检查运行环境，不做任何改动
-    --force         已由 opkg 装过时，强制移除包记录并由本包接管
+    --check         只检查运行环境与依赖，不做任何改动
+    --no-deps       不自动安装缺失的依赖（离线或已手工装好时用）
+    --force         已由 opkg / apk 装过时，强制移除包记录并由本包接管
     --uninstall     卸载程序文件，保留密码与配置
     --purge         卸载并删除 /etc/istore-agent 与 /etc/config/istore-agent
     --no-start      装完不启动服务
@@ -130,6 +139,7 @@ while [ $# -gt 0 ]; do
 		--force|-f)            FORCE=1 ;;
 		--yes|-y)              ASSUME_YES=1 ;;
 		--no-start)            NO_START=1 ;;
+		--no-deps|--offline)   NO_DEPS=1 ;;
 		--root=*)              ROOT_DIR="${1#--root=}" ;;
 		-h|--help)             ACTION=help ;;
 		*)                     printf '未知参数：%s\n' "$1" >&2; ACTION=help ;;
@@ -169,10 +179,9 @@ check_env() {
 	done
 	[ -n "$miss" ] && die "缺少命令：$miss —— 这台设备可能不是 OpenWrt/iStoreOS"
 
-	find_python || die "没有找到 python3。
-     本插件用 Python 3 写后端，请先执行：
-         opkg update && opkg install python3
-     再回来重跑本安装包。"
+	# python3 不在这里判死：缺了交给依赖检查去装（25.12 起是 apk，
+	# 不能再写死 opkg install）。check_env 只保证解包能用。
+	find_python || PY=""
 
 	# 包体完整性：文件总长必须等于「偏移 + 载荷长」
 	local size expect
@@ -224,9 +233,272 @@ agent_port() {
 	printf '%s' "$p"
 }
 
-opkg_has_pkg() {
-	command -v opkg >/dev/null 2>&1 || return 1
-	opkg list-installed 2>/dev/null | grep -q '^luci-app-istore-agent '
+pkg_has_self() {
+	# 24.10 及更早：opkg；25.12 起：apk。两个都没有就当作没装过。
+	if command -v opkg >/dev/null 2>&1; then
+		opkg list-installed 2>/dev/null | grep -q '^luci-app-istore-agent '
+		return $?
+	fi
+	if command -v apk >/dev/null 2>&1; then
+		apk info -e luci-app-istore-agent >/dev/null 2>&1
+		return $?
+	fi
+	return 1
+}
+
+# ---------------------------------------------------------------- 依赖
+
+# 包管理器：24.10 及更早用 opkg，25.12 起 OpenWrt 换成 apk（Alpine 那套），
+# 两者的命令完全不同。所以下面所有装包动作都先看 PM，绝不硬写 opkg。
+detect_pm() {
+	if command -v apk >/dev/null 2>&1; then
+		PM="apk"
+	elif command -v opkg >/dev/null 2>&1; then
+		PM="opkg"
+	else
+		PM=""
+	fi
+}
+
+# 架构归一化。装依赖时包名跨架构一致（包管理器会自己去正确的源取），
+# 这个值主要给「按架构下载二进制」的功能用（AdGuardHome 之类），
+# 也用来在输出里告诉用户当前到底是什么机器。
+norm_arch() {
+	case "$(uname -m 2>/dev/null)" in
+		x86_64|amd64)   printf 'x86_64' ;;
+		aarch64|arm64)  printf 'aarch64' ;;
+		armv7l|armv7)   printf 'armv7' ;;
+		armv6l|armv6)   printf 'armv6' ;;
+		mips64*)        printf 'mips64' ;;
+		mips*)          printf 'mips' ;;
+		riscv64)        printf 'riscv64' ;;
+		*)              uname -m 2>/dev/null ;;
+	esac
+}
+
+distro_line() {
+	if [ -f /etc/openwrt_release ]; then
+		( . /etc/openwrt_release 2>/dev/null
+		  printf '%s %s' "${DISTRIB_ID:-OpenWrt}" "${DISTRIB_RELEASE:-}" )
+	else
+		uname -s 2>/dev/null
+	fi
+}
+
+# 依赖清单：名称|opkg 包|apk 包|级别|探测方式
+#
+#   级别  req = 缺了后端起不来
+#         luc = LuCI 网页界面要用；App 走 API，不受影响
+#         opt = 缺了只少一块功能（这里是硬件页的 PCI 列表）
+#   探测  py      = Python 3.9 以上
+#         ipjson  = 支持 -j 的完整 iproute2（busybox 自带的 ip 没有 -j，
+#                   而流量与接口列表都靠 ip -j）
+#         cmd:X   = 命令 X 存在
+#         dir:P   = 目录 P 存在
+#
+# 两个包名列大部分时候一样，但分开写：opkg 和 apk 的包名库不是同一份，
+# 以后哪个改名只改一列就行。
+DEPS='
+Python 3|python3|python3|req|py
+UCI|uci|uci|req|cmd:uci
+ubus|ubus|ubus|req|cmd:ubus
+iproute2|ip-full|ip-full|req|ipjson
+LuCI 框架|luci-base|luci-base|luc|dir:/usr/lib/lua/luci/controller
+LuCI Lua 兼容层|luci-compat|luci-compat|luc|dir:/usr/lib/lua/luci/model/cbi
+LuCI Lua 运行时|luci-lua-runtime|luci-lua-runtime|luc|cmd:lua
+PCI 工具|pciutils|pciutils|opt|cmd:lspci
+'
+
+dep_have() {
+	case "$1" in
+		py)
+			find_python || return 1
+			"$PY" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)' \
+				>/dev/null 2>&1
+			;;
+		ipjson)
+			ip -j addr >/dev/null 2>&1
+			;;
+		cmd:*)
+			command -v "${1#cmd:}" >/dev/null 2>&1
+			;;
+		dir:*)
+			[ -d "$ROOT_DIR${1#dir:}" ]
+			;;
+		*)
+			return 1
+			;;
+	esac
+}
+
+# 扫一遍依赖。缺的按级别存进全局变量（ash 没有数组，只能这样传）。
+# 返回 0 = 全齐，1 = 有缺。
+scan_deps() {
+	MISS_REQ=""; MISS_LUC=""; MISS_OPT=""
+	MISS_OPKG=""; MISS_APK=""; MISS_OPT_OPKG=""
+	local name op ap lvl probe miss=0
+	while IFS='|' read -r name op ap lvl probe; do
+		[ -n "$name" ] || continue
+		dep_have "$probe" && continue
+		miss=1
+		case "$lvl" in
+			req)
+				MISS_REQ="$MISS_REQ $name"
+				MISS_OPKG="$MISS_OPKG $op"; MISS_APK="$MISS_APK $ap" ;;
+			luc)
+				MISS_LUC="$MISS_LUC $name"
+				MISS_OPKG="$MISS_OPKG $op"; MISS_APK="$MISS_APK $ap" ;;
+			*)
+				MISS_OPT="$MISS_OPT $name"; MISS_OPT_OPKG="$MISS_OPT_OPKG $op" ;;
+		esac
+	done <<DEPS_EOF
+$DEPS
+DEPS_EOF
+	return $miss
+}
+
+pm_update() {
+	[ -n "$PM" ] || return 1
+	if [ "$PM" = "apk" ]; then
+		apk update >/dev/null 2>&1
+	else
+		opkg update >/dev/null 2>&1
+	fi
+}
+
+pm_add() {
+	[ -n "$PM" ] || return 1
+	if [ "$PM" = "apk" ]; then
+		apk add "$1" >/dev/null 2>&1
+	else
+		opkg install "$1" >/dev/null 2>&1
+	fi
+}
+
+# 真正装包。缺的包名按当前包管理器挑（opkg 名 / apk 名可能不同）。
+install_deps() {
+	local pkgs p failed=""
+	if [ "$PM" = "apk" ]; then
+		pkgs="$MISS_APK"
+	else
+		pkgs="$MISS_OPKG"
+	fi
+	[ -n "$pkgs" ] || return 0
+
+	info "更新软件包索引（$PM update）…"
+	pm_update || warn "索引更新失败，直接尝试安装（离线或软件源没配时会这样）"
+
+	for p in $pkgs; do
+		printf '    · 安装 %-22s ' "$p"
+		if pm_add "$p"; then
+			printf '完成\n'
+		else
+			printf '失败\n'
+			failed="$failed $p"
+		fi
+	done
+	FAILED_PKGS="$failed"
+	[ -z "$failed" ]
+}
+
+# 依赖总闸：缺了就装，装不上按级别决定「继续」还是「中止」
+ensure_deps() {
+	if scan_deps; then
+		ok "依赖齐全"
+		return 0
+	fi
+
+	[ -n "$MISS_LUC" ] && info "LuCI 界面依赖缺失：$(echo $MISS_LUC)（App 走 API，不受影响）"
+	[ -n "$MISS_OPT" ] && info "可选依赖缺失：$(echo $MISS_OPT)（跳过，只影响对应的一小块功能）"
+
+	if [ -z "$MISS_OPKG" ]; then
+		return 0
+	fi
+
+	info "缺少依赖：$(echo $MISS_OPKG)"
+
+	if [ "$NO_DEPS" = "1" ]; then
+		warn "按 --no-deps 跳过自动安装"
+		[ -n "$MISS_REQ" ] && die "必需依赖没装：$(echo $MISS_REQ)
+     去掉 --no-deps 重跑，或手动装。
+     手动命令：$(pkg_hint $MISS_OPKG)"
+		return 0
+	fi
+
+	if [ -z "$PM" ]; then
+		die "缺少依赖，而这台机器既没有 opkg 也没有 apk，没法自动装：
+       $(echo $MISS_OPKG)
+     请手动准备好后重跑本安装包。"
+	fi
+
+	if install_deps; then
+		ok "依赖已安装"
+	else
+		warn "以下包没装上：$(echo $FAILED_PKGS)"
+		if [ -n "$MISS_REQ" ]; then
+			die "必需依赖没装齐，装上也跑不起来。
+     手动重试：$(pkg_hint $FAILED_PKGS)
+     离线环境：在一台能上网的机器上下载对应的 $(pkg_ext) 包，
+     传到路由器后 $(pkg_hint_local) 安装，再重跑本安装器。"
+		fi
+	fi
+
+	# 重新确认一次：装失败但漏报的情况（比如包名对不上）在这里拦住
+	if scan_deps; then
+		ok "依赖齐全"
+	elif [ -n "$MISS_REQ" ]; then
+		die "必需依赖仍然缺失：$(echo $MISS_REQ)
+     手动装：$(pkg_hint $MISS_OPKG)"
+	else
+		warn "仍有界面/可选依赖缺失：$(echo $MISS_LUC $MISS_OPT)"
+	fi
+
+	if [ -z "$PY" ]; then
+		find_python || die "找不到 python3，本插件的后端跑不起来。
+     手动装：$(pkg_hint python3)"
+	fi
+	return 0
+}
+
+# 给用户的手动命令提示（按当前包管理器）
+pkg_hint() {
+	if [ "$PM" = "apk" ]; then
+		printf 'apk add%s' "$*"
+	else
+		printf 'opkg install%s' "$*"
+	fi
+}
+
+pkg_hint_local() {
+	if [ "$PM" = "apk" ]; then
+		printf 'apk add --allow-untrusted'
+	else
+		printf 'opkg install'
+	fi
+}
+
+pkg_ext() {
+	[ "$PM" = "apk" ] && printf 'apk' || printf 'ipk'
+}
+
+# 移除包管理器里那份同名记录（.run 与 opkg/apk 安装互斥）
+pkg_remove_self() {
+	if command -v opkg >/dev/null 2>&1; then
+		opkg remove luci-app-istore-agent >/dev/null 2>&1
+	elif command -v apk >/dev/null 2>&1; then
+		apk del luci-app-istore-agent >/dev/null 2>&1
+	fi
+}
+
+# 当前包管理器的名字，只用于文案。顺序与 detect_pm 一致：apk 优先
+pkg_mgr_name() {
+	if command -v apk >/dev/null 2>&1; then
+		printf 'apk'
+	elif command -v opkg >/dev/null 2>&1; then
+		printf 'opkg'
+	else
+		printf '无'
+	fi
 }
 
 # ---------------------------------------------------------------- 解包
@@ -260,9 +532,15 @@ verify_payload() {
 
 do_check() {
 	printf '\n  %s %s-%s 环境检查\n\n' "$APP_NAME" "$PKG_VERSION" "$PKG_REVISION"
+	detect_pm
 	check_env
 	ok "sh / gzip / tar 可用"
-	ok "python3 在 $PY（$("$PY" -V 2>&1)）"
+	ok "$(distro_line) · $(pkg_mgr_name) · $(norm_arch)"
+	if [ -n "$PY" ]; then
+		ok "python3 在 $PY（$("$PY" -V 2>&1)）"
+	else
+		warn "没有 python3 —— 安装时会尝试自动装"
+	fi
 	arch_note
 
 	local size expect
@@ -270,11 +548,31 @@ do_check() {
 	expect=$((PAYLOAD_OFFSET + PAYLOAD_LEN))
 	ok "安装包完整（$size 字节）"
 
-	if opkg_has_pkg; then
-		warn "opkg 中有同名包：$(opkg list-installed 2>/dev/null | grep '^luci-app-istore-agent ')"
-		info "安装时需加 --force 改由本包接管，或先 opkg remove"
+	# 依赖矩阵：缺什么、装什么、会不会自动装，一次说清
+	printf '\n'
+	if scan_deps; then
+		ok "依赖齐全"
 	else
-		ok "opkg 中没有同名包，互不冲突"
+		[ -n "$MISS_REQ" ] && warn "必需缺失：$(echo $MISS_REQ)" || ok "必需依赖齐全"
+		[ -n "$MISS_LUC" ] && warn "界面缺失：$(echo $MISS_LUC)（只影响 LuCI 网页版，App 不受影响）"
+		[ -n "$MISS_OPT" ] && info "可选缺失：$(echo $MISS_OPT)（对应功能降级，不装也能用）"
+		if [ -n "$MISS_OPKG" ]; then
+			if [ "$NO_DEPS" = "1" ]; then
+				info "本次带 --no-deps，安装时不会自动装"
+			elif [ -z "$PM" ]; then
+				warn "没有 opkg / apk，无法自动安装，需要手动准备"
+			else
+				info "安装时会自动装：$(echo $MISS_OPKG)"
+			fi
+		fi
+	fi
+	printf '\n'
+
+	if pkg_has_self; then
+		warn "$(pkg_mgr_name) 里有同名包（luci-app-istore-agent）"
+		info "安装时需加 --force 改由本包接管，或先 $(pkg_mgr_name) 卸掉它"
+	else
+		ok "包管理器里没有同名包，互不冲突"
 	fi
 
 	if [ -f "$ROOT_DIR/etc/config/istore-agent" ]; then
@@ -297,9 +595,11 @@ do_check() {
 
 do_install() {
 	need_root
+	detect_pm
 	check_env
 
 	printf '\n  %s %s-%s 安装（%s）\n\n' "$APP_NAME" "$PKG_VERSION" "$PKG_REVISION" "$PKG_ARCH"
+	ok "$(distro_line) · $(pkg_mgr_name) · $(norm_arch)"
 	arch_note
 
 	# 0) 先只往 /tmp 解一遍验货。损坏的包必须在这一步就被拦住，
@@ -308,38 +608,40 @@ do_install() {
      没有改动任何系统文件，当前服务保持原样，请重新下载后再试。"
 	ok "载荷校验通过"
 
+	# 0.5) 依赖：缺了先装（这一步会动软件包，所以放在验包之后）
+	ensure_deps
+
 	local cfg="$ROOT_DIR/etc/config/istore-agent"
 	local svc="$ROOT_DIR/etc/init.d/istore-agent"
 
 	# 1) 先把现有 uci 配置备份到 /tmp。
-	#    顺序很重要：opkg remove 有可能把 conffile 一起删掉，先备份才安全。
+	#    顺序很重要：卸载时有可能把 conffile 一起删掉，先备份才安全。
 	if [ -f "$cfg" ]; then
 		CFG_BAK="${TMPDIR:-/tmp}/.istore-agent.cfg.$$"
 		cp -p "$cfg" "$CFG_BAK" 2>/dev/null || CFG_BAK=""
 	fi
 
-	# 2) 与 opkg 安装互斥。两者并存会导致 opkg 卸载时把程序文件删掉，
-	#    而 opkg 记录里还写着「已安装」，后续升级彻底错乱。
-	if [ -z "$ROOT_DIR" ] && opkg_has_pkg; then
-		warn "检测到已用 opkg 安装：$(opkg list-installed 2>/dev/null | grep '^luci-app-istore-agent ')"
-		info "两者不能并存——否则 opkg 卸载会删掉本包的文件。"
+	# 2) 与 opkg / apk 安装互斥。两者并存会导致卸载时把程序文件删掉，
+	#    而包记录里还写着「已安装」，后续升级彻底错乱。
+	if [ -z "$ROOT_DIR" ] && pkg_has_self; then
+		warn "检测到已用 $(pkg_mgr_name) 安装过 luci-app-istore-agent"
+		info "两者不能并存——否则卸载会删掉本包的文件。"
 		if [ "$FORCE" = "1" ]; then
-			info "按 --force 处理，移除 opkg 包记录…"
-			opkg remove luci-app-istore-agent >/dev/null 2>&1 \
-				|| warn "opkg remove 返回非零，继续安装"
-			ok "opkg 包记录已清除"
+			info "按 --force 处理，移除包记录…"
+			pkg_remove_self || warn "移除返回非零，继续安装"
+			ok "包记录已清除"
 		elif [ -t 0 ]; then
 			printf '    改为由本安装包接管？[y/N] '
 			read -r ans
 			case "$ans" in
 				y|Y|yes|YES)
-					opkg remove luci-app-istore-agent >/dev/null 2>&1
-					ok "opkg 包记录已清除" ;;
+					pkg_remove_self
+					ok "包记录已清除" ;;
 				*) die "已取消，未改动任何文件。" ;;
 			esac
 		else
-			die "检测到 opkg 安装的 luci-app-istore-agent。
-     加 --force 让本包接管，或先执行：opkg remove luci-app-istore-agent"
+			die "检测到 $(pkg_mgr_name) 安装的 luci-app-istore-agent。
+     加 --force 让本包接管，或先卸掉它。"
 		fi
 	fi
 
@@ -355,7 +657,7 @@ do_install() {
 		"$ROOT_DIR/www" 2>/dev/null
 	extract_payload "${ROOT_DIR:-/}" \
 		|| die "解包失败（写入目标目录时出错）。设备空间可能不足。
-     手动救急：opkg install --force-reinstall <同名 ipk>"
+     可以先腾点空间（rm -rf /tmp/*），或改用同版本的 ipk 装。"
 	ok "文件已解包到 /usr/lib/istore-agent"
 
 	# 5) 配置：已有就保留，备份还在就恢复，都没有才用默认
@@ -431,8 +733,8 @@ do_uninstall() {
 		ok "服务已停止并取消自启"
 	fi
 
-	if [ -z "$ROOT_DIR" ] && opkg_has_pkg; then
-		warn "opkg 中仍有同名包，建议改用：opkg remove luci-app-istore-agent"
+	if [ -z "$ROOT_DIR" ] && pkg_has_self; then
+		warn "包管理器里仍有同名包，建议改用 $(pkg_mgr_name) 卸载"
 	fi
 
 	local man="$ROOT_DIR/usr/lib/istore-agent/MANIFEST"

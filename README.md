@@ -28,8 +28,8 @@
 
 | 文件 | 装在哪 | 说明 |
 |---|---|---|
-| `istore-pilot_0.1.3-1.run` | 路由器 | **推荐**。单文件，`sh` 一下就装完，不用 opkg、不用联网 |
-| `luci-app-istore-agent_0.1.3-1_all.ipk` | 路由器 | 传统方式，走 opkg（软件包页面上传安装） |
+| `istore-pilot_0.1.3-1.run` | 路由器 | **推荐**。单文件，`sh` 一下就装完，24.10 与 25.12 都能用 |
+| `luci-app-istore-agent_0.1.3-1_all.ipk` | 路由器 | 传统方式，走 opkg（**仅 24.10 及更早**） |
 | `istoreos-0.1.3.apk` | Android 手机 | 连路由器用 |
 | iOS / 鸿蒙 | — | 暂未提供安装包，按 [六、构建](#六构建与打包) 自行编译 |
 
@@ -43,7 +43,7 @@
 sh istore-pilot_0.1.3-1_x86_64.run --check    # 先只检查环境与架构，不改任何文件
 sh istore-pilot_0.1.3-1_x86_64.run            # 安装或升级，保留现有配置
 
-# 方式 B：ipk
+# 方式 B：ipk（仅 iStoreOS 24.10 及更早，25.12 换 apk 后装不了 ipk）
 opkg update && opkg install python3
 opkg install luci-app-istore-agent_0.1.3-1_all.ipk
 ```
@@ -53,8 +53,31 @@ opkg install luci-app-istore-agent_0.1.3-1_all.ipk
 ```sh
 sh istore-pilot_0.1.3-1.run --uninstall   # 卸载程序，保留密码与配置
 sh istore-pilot_0.1.3-1.run --purge       # 卸载并清除全部配置
-sh istore-pilot_0.1.3-1.run --force       # 已用 opkg 装过时，改由本包接管
+sh istore-pilot_0.1.3-1.run --force       # 已用 opkg/apk 装过时，改由本包接管
+sh istore-pilot_0.1.3-1.run --no-deps     # 不自动装依赖（离线或已手工备齐）
 ```
+
+### 依赖与系统版本
+
+`.run` 会**先探测系统、再看缺什么、缺了就自动装**，x86 与 ARM 走同一套逻辑
+（装哪个架构的包由系统自己的软件源决定，不需要你选）。
+
+| 依赖 | 级别 | 缺了会怎样 |
+|---|---|---|
+| `python3` (≥3.9) | 必需 | 后端起不来，安装器自动装 |
+| `uci` / `ubus` | 必需 | OpenWrt 基础组件，正常都自带 |
+| `ip-full` | 必需 | `ip -j` 不可用 → 设备与接口列表是空的，安装器自动装 |
+| `luci-base` / `luci-compat` / `luci-lua-runtime` | 界面 | 只影响 LuCI 网页版，App 走 API 不受影响 |
+| `pciutils`（`lspci`） | 可选 | 硬件页少一块 PCI 设备列表 |
+
+系统版本差异：
+
+- **24.10 及更早**：包管理器是 `opkg`，`.run` 与 ipk 都能用。
+- **25.12 及以后**：包管理器换成 `apk`（基于 OpenWrt 25.12.5），
+  **ipk 装不上**，只能用 `.run`。安装器会自动改用 `apk update` / `apk add`。
+- 两边的软件包名基本一致，少数改动在 `deploy/build_run.py` 的 `DEPS` 表里
+  分别写了 `opkg 包名|apk 包名` 两列，改一个只动一列。
+
 
 装完打开 `http://<路由器IP>:8443`。首次安装的随机密码在路由器上查看：
 
@@ -267,7 +290,8 @@ python scripts/release.py --update-notes   # 只改已发布 Release 的正文
 
 ## 七、部署 Agent
 
-Agent 是一组 Python 文件，只依赖标准库，路由器自带 Python 3.11 就能跑。
+Agent 是一组 Python 文件，**只依赖标准库**（没有 pip 包），系统自带 python3 就能跑。
+24.10 是 3.11、25.12 是 3.13，都验证过；代码里对 3.13 移除 `crypt` 模块做了降级处理。
 
 ```bash
 export ROUTER_PW='<路由器 SSH 口令>'
@@ -300,9 +324,9 @@ ROUTER_PW='...' python deploy/install_ipk.py
 > 装完还会把手工上传的新文件覆盖回去。
 > **正确顺序：改代码 → build_ipk / build_run → install。**
 >
-> **3. `.run` 与 ipk 互斥**：两种装法不能并存，否则 `opkg remove` 会把 `.run`
-> 装进去的程序文件一起删掉，而 opkg 记录里还写着「已安装」，后续升级彻底错乱。
-> `.run` 检测到 opkg 包时会拒绝执行，需要显式 `--force` 才接管。
+> **3. `.run` 与包管理器互斥**：两种装法不能并存，否则 `opkg remove` / `apk del`
+> 会把 `.run` 装进去的程序文件一起删掉，而包记录里还写着「已安装」，后续升级彻底错乱。
+> `.run` 检测到同名包时会拒绝执行，需要显式 `--force` 才接管。
 
 ## 八、配置与口令
 

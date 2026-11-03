@@ -4,10 +4,11 @@
 
 1. **上传要用裸流**。路由器内存小，multipart 解析器要么吃内存要么依赖
    python-multipart，所以走「X-Filename 头 + 原始字节流」，边收边写盘。
-2. **安装必须按类型分流**。.ipk 走 opkg；Alpine 的 .apk 这台机器上没有 apk
-   命令，只能放进下载目录；Android 的 .apk（其实是个 zip）也放进下载目录，
+2. **安装必须按类型分流**。.ipk 给 opkg（24.10 及更早）、.apk 给 apk
+   （25.12 及以后）；两者互相装不了，所以在哪台机器上都只放行对应的那种，
+   另一种直接给出明确提示。Android 的 .apk（其实是个 zip）放进下载目录，
    正好可以让「下载 App」弹窗直接用。
-3. **升级不能同步等**。opkg upgrade 动辄几分钟，HTTP 早就超时了，
+3. **升级不能同步等**。包升级动辄几分钟，HTTP 早就超时了，
    所以改成后台任务 + 日志文件，客户端轮询状态。
 """
 
@@ -41,6 +42,47 @@ def _run(args: list[str], timeout: float = 60.0, stdin: bytes | None = None) -> 
         return p.returncode, (p.stdout + p.stderr).decode("utf-8", "replace")
     except (OSError, subprocess.SubprocessError) as exc:
         return 1, str(exc)
+
+
+# ---------------------------------------------------------------- 包管理器
+#
+# OpenWrt 24.10 及更早用 opkg，25.12 起换成 apk（Alpine Package Keeper）。
+# 两边的命令名和输出格式都不一样，所以把「装 / 升 / 数 / 查」四件事统一收口
+# 到这里，别处不要再直接调 opkg —— 25.12 上根本没有这个命令。
+
+
+def pkg_mgr() -> str:
+    """当前系统的包管理器：'apk' / 'opkg' / ''。
+
+    apk 优先：25.12 上只剩它；24.10 上不会有 apk。
+    """
+    if shutil.which("apk"):
+        return "apk"
+    if shutil.which("opkg"):
+        return "opkg"
+    return ""
+
+
+def _pm_install(path: str, timeout: float = 180.0) -> tuple[int, str, str]:
+    """装一个本地包文件，返回 (返回码, 输出, 包格式)。"""
+    pm = pkg_mgr()
+    if pm == "apk":
+        # --allow-untrusted：自己打/传的包没有 apk 签名，不加会被直接拒
+        code, out = _run(["apk", "add", "--allow-untrusted", path], timeout=timeout)
+        return code, out, "apk"
+    if pm == "opkg":
+        # --force-reinstall：同版本重装时 opkg 会跳过，force 才覆盖得上去
+        code, out = _run(["opkg", "install", "--force-reinstall", path], timeout=timeout)
+        return code, out, "ipk"
+    return 1, "这台机器既没有 opkg 也没有 apk，装不了软件包", "?"
+
+
+def _pm_self_install_cmd(path: str) -> str:
+    """把「装自己」的命令拼成一行，给后台脚本用。"""
+    q = shlex.quote(path)
+    if pkg_mgr() == "apk":
+        return "apk add --allow-untrusted %s" % q
+    return "opkg install --force-reinstall %s" % q
 
 
 def _safe_name(raw: str) -> str:
@@ -172,11 +214,11 @@ def _install_self(path: str) -> dict:
     body = (
         "#!/bin/sh\n"
         "sleep 1\n"
-        "opkg install --force-reinstall %s >%s 2>&1\n"
+        "%s >%s 2>&1\n"
         "echo \"rc=$?\" >>%s\n"
         "/etc/init.d/istore-agent enable >/dev/null 2>&1\n"
         "/etc/init.d/istore-agent restart >/dev/null 2>&1\n"
-    ) % (shlex.quote(path), OPKG_LOG, OPKG_LOG)
+    ) % (_pm_self_install_cmd(path), OPKG_LOG, OPKG_LOG)
     try:
         with open(script, "w", encoding="utf-8") as fh:
             fh.write(body)
@@ -228,20 +270,24 @@ def install(name: str, confirm: str = "") -> dict:
     if kind == "ipk":
         if _ipk_package(path) == SELF_PKG:
             return _install_self(path)
-        # --force-reinstall：同一个版本号重装时 opkg 会直接跳过，
-        # 用 force 才能让「我自己重新打了一次包」正常覆盖上去
-        code, out = _run(["opkg", "install", "--force-reinstall", path], timeout=180)
+        if pkg_mgr() == "apk":
+            # 25.12 起没有 opkg，.ipk 解都解不开
+            return {"ok": False, "kind": "ipk", "name": name,
+                    "error": "这台机器用的是 apk 包管理器（iStoreOS 25.12 及以后），"
+                             "装不了 .ipk。请改用 .run 安装包，"
+                             "或上传 .apk 格式的包。"}
+        code, out, _ = _pm_install(path)
         return {"ok": code == 0, "kind": "ipk", "name": name,
                 "output": _tail(out), "error": None if code == 0 else "opkg 安装失败"}
 
     if kind == "alpine-apk":
-        if shutil.which("apk"):
-            code, out = _run(["apk", "add", "--allow-untrusted", path], timeout=180)
-            return {"ok": code == 0, "kind": "apk", "name": name,
-                    "output": _tail(out), "error": None if code == 0 else "apk 安装失败"}
-        return {"ok": False, "kind": "apk", "name": name,
-                "error": "这台机器用 opkg 管理软件包，没有 apk 命令，"
-                         "Alpine 格式的 .apk 装不了"}
+        if pkg_mgr() != "apk":
+            return {"ok": False, "kind": "apk", "name": name,
+                    "error": "这台机器用的是 opkg 包管理器（OpenWrt 24.10 及更早），"
+                             "没有 apk 命令，装不了 .apk。请用 .run 或 .ipk。"}
+        code, out, _ = _pm_install(path)
+        return {"ok": code == 0, "kind": "apk", "name": name,
+                "output": _tail(out), "error": None if code == 0 else "apk 安装失败"}
 
     if kind == "android-apk":
         os.makedirs(PUBLISH_DIR, exist_ok=True)
@@ -384,7 +430,16 @@ def _kernel() -> str:
     return out.strip() if code == 0 else ""
 
 
+# 包名 + 版本的分界：版本必定以数字开头。贪婪匹配包名，正好能吃下
+# `python3-2to3-1.0-r1` 这种名字里带数字的。
+_PKG_VER = re.compile(r"^(?P<name>.+)-(?P<ver>\d[^\s]*)$")
+
+
 def _parse_upgradable() -> list[dict]:
+    """当前可升级的包。opkg 与 apk 的输出格式完全不同，分开解析。"""
+    if pkg_mgr() == "apk":
+        return _parse_upgradable_apk()
+
     code, out = _run(["opkg", "list-upgradable"], timeout=90)
     items = []
     for line in out.splitlines():
@@ -399,8 +454,40 @@ def _parse_upgradable() -> list[dict]:
     return items
 
 
+def _parse_upgradable_apk() -> list[dict]:
+    """apk 的可升级列表。
+
+    `apk list -u` 每行形如：
+        luci-base-26.304.26398~e969939 x86_64 {luci} (Apache-2.0) [upgradable from: luci-base-26.286.75782~0e65379]
+    解析不出来的一律跳过 —— 宁可少列几个，也不要拿错包名去升级。
+    """
+    code, out = _run(["apk", "list", "-u"], timeout=90)
+    items = []
+    for line in out.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        head = re.match(r"^(\S+)\s+\S+\s+\{", line)
+        if not head:
+            continue
+        pv = _PKG_VER.match(head.group(1))
+        if not pv:
+            continue
+        cur = ""
+        fm = re.search(r"upgradable from:\s*(\S+?)\]", line)
+        if fm:
+            ov = _PKG_VER.match(fm.group(1))
+            cur = ov.group("ver") if ov else fm.group(1)
+        items.append({"name": pv.group("name"),
+                      "current": cur, "latest": pv.group("ver")})
+    return items
+
+
 def _running() -> bool:
-    code, _ = _run(["pgrep", "-f", "opkg (update|upgrade)"], timeout=5)
+    # 只在跑包管理任务时才算「忙」。apk 的 add/del 也会锁库，一并算进去。
+    pat = ("apk (update|upgrade|add|del|fix|world)"
+           if pkg_mgr() == "apk" else "opkg (update|upgrade)")
+    code, _ = _run(["pgrep", "-f", pat], timeout=5)
     return code == 0
 
 
@@ -424,9 +511,14 @@ def update_status() -> dict:
 
 
 def _count_installed() -> int:
+    """已安装包数量。opkg 数 status 里的 Package:，apk 数 installed 里的 P:。"""
+    if pkg_mgr() == "apk":
+        path, prefix = "/lib/apk/db/installed", "P:"
+    else:
+        path, prefix = "/usr/lib/opkg/status", "Package:"
     try:
-        with open("/usr/lib/opkg/status", "r", encoding="utf-8", errors="replace") as fh:
-            return sum(1 for line in fh if line.startswith("Package:"))
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            return sum(1 for line in fh if line.startswith(prefix))
     except OSError:
         return 0
 
@@ -435,10 +527,11 @@ def check_updates(refresh: bool = False) -> dict:
     """检查可升级的软件包。refresh=True 会先 opkg update 拉一次索引。"""
     log = ""
     if refresh:
-        code, out = _run(["opkg", "update"], timeout=180)
+        pm = pkg_mgr() or "opkg"
+        code, out = _run([pm, "update"], timeout=180)
         log = _tail(out, 1200)
         if code != 0 and not log:
-            return {"ok": False, "error": "opkg update 失败，检查网络或软件源"}
+            return {"ok": False, "error": "%s update 失败，检查网络或软件源" % pm}
 
     items = _parse_upgradable()
     rel = _release()
@@ -449,7 +542,7 @@ def check_updates(refresh: bool = False) -> dict:
         "packages": items,
         "count": len(items),
         "log": log,
-        "note": "软件包升级只动 opkg 包，不改固件本体。",
+        "note": "软件包升级只动系统包，不改固件本体。",
     }
 
 
@@ -571,7 +664,13 @@ def upgrade(names: list[str] | None = None) -> dict:
             return {"ok": False, "error": "参数不合法"}
         pkgs = " " + " ".join(safe)
 
-    cmd = f"opkg update && opkg upgrade{pkgs}"
+    if pkg_mgr() == "apk":
+        # apk 没有 upgrade <包名> 这种写法：整体升级用 apk upgrade，
+        # 指定若干包要用 add --upgrade
+        cmd = ("apk update && apk add --upgrade" + pkgs) if pkgs \
+            else "apk update && apk upgrade"
+    else:
+        cmd = f"opkg update && opkg upgrade{pkgs}"
     try:
         with open(OPKG_LOG, "wb") as fh:
             subprocess.Popen(["/bin/sh", "-c", cmd], stdout=fh, stderr=fh,

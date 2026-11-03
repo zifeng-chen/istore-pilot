@@ -1522,12 +1522,24 @@ def _configure_rules(user: str, password: str) -> str:
 
 def _install_worker():
     try:
+        # 25.12 起 OpenWrt 换成 apk，opkg 不存在了。这里只是顺手装个 LuCI
+        # 插件（AGH 本体是下面直接下二进制的），所以装不上也不影响主流程。
+        from .system import pkg_mgr
+
+        pm = pkg_mgr()
+
         _step(4, "检查软件源")
-        _run(["opkg", "update"], timeout=150)
+        if pm:
+            _run([pm, "update"], timeout=150)
 
         _step(12, "安装 LuCI 插件（可选）")
-        code, out = _run(["opkg", "install", "luci-app-adguardhome"], timeout=300)
-        pkg_warn = "" if code == 0 else out.strip()[-120:]
+        pkg_warn = ""
+        if pm:
+            code, out = _run([pm, "add" if pm == "apk" else "install",
+                              "luci-app-adguardhome"], timeout=300)
+            pkg_warn = "" if code == 0 else out.strip()[-120:]
+        else:
+            pkg_warn = "没有 opkg / apk，跳过 LuCI 插件"
 
         _step(28, "下载 AdGuard Home 本体")
         arch = _arch()
