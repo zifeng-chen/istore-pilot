@@ -31,7 +31,10 @@ SKIP_DIRS = {
     ".git", "node_modules", "oh_modules", ".hvigor", "build", ".gradle",
     "DerivedData", ".idea", ".dart_tool", "Pods", "__pycache__", ".vs",
 }
-SKIP_FILES = {".DS_Store", "Thumbs.db"}
+# build-profile.json5 里有 DevEco 写入的 signingConfigs（含 keystore 口令），
+# 属于「这台机器上的登录态」而不是仓库内容。同步过去会把签名配置冲掉，
+# 下次构建就变成 unsigned、装不进真机 —— 所以整份不传，要改构建配置去 Mac 上改。
+SKIP_FILES = {".DS_Store", "Thumbs.db", "build-profile.json5"}
 
 BASE_PATH = (
     "export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:"
