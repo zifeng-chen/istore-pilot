@@ -379,6 +379,14 @@ struct Bar: View {
     var color: Color = C.primary
     var height: CGFloat = 6
 
+    /// 夹到 0…1，并挡掉 NaN / inf —— 调用方常写 `used / total`，
+    /// total 为 0 时是 NaN，直接进 frame(width:) 会刷
+    /// "Invalid frame dimension (negative or non-finite)"
+    private var safeRatio: CGFloat {
+        guard ratio.isFinite else { return 0 }
+        return CGFloat(min(1, max(0, ratio)))
+    }
+
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
@@ -386,7 +394,7 @@ struct Bar: View {
                 Capsule()
                     .fill(LinearGradient(colors: [color.opacity(0.75), color],
                                          startPoint: .leading, endPoint: .trailing))
-                    .frame(width: max(0, min(1, ratio)) * geo.size.width)
+                    .frame(width: safeRatio * geo.size.width)
             }
         }
         .frame(height: height)

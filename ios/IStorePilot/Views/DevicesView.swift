@@ -19,7 +19,9 @@ struct DevicesView: View {
     /// 页签容器在 RootView 里用 contentColumn 收过口（rail 980 / 其它 820），
     /// 这里必须把那层上限也算进去，否则 1400pt 的外接屏算出来是四列。
     private var contentW: CGFloat {
-        min(winW, axis == .rail ? 980 : 820) - 32
+        // 首次布局 winW 还是 0，直接减留白会得到 -32；负宽度进 frame 会被
+        // SwiftUI 判为非法尺寸（日志刷 "Invalid frame dimension"）
+        max(0, min(winW, axis == .rail ? 980 : 820) - 32)
     }
 
     /// 1 列 = 手机竖屏，保持原来的分组列表；2 列以上才换卡片。

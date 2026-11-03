@@ -36,7 +36,7 @@ struct WebScreen: View {
                     Color.clear
                     Rectangle()
                         .fill(C.primary)
-                        .frame(width: g.size.width * ctl.progress)
+                        .frame(width: g.size.width * ctl.safeProgress)
                 }
             }
             .frame(height: 2)
@@ -113,6 +113,13 @@ struct WebScreen: View {
 /// 反过来会先按未登录渲染一次，页面闪一下登录页再跳回来。
 final class WebController: NSObject, ObservableObject, WKNavigationDelegate {
     @Published var progress: Double = 0
+
+    /// 进度条宽度直接吃这个值：KVO 首帧、重定向瞬间可能给到 NaN/负数，
+    /// 未收敛时会刷 "Invalid frame dimension (negative or non-finite)"
+    var safeProgress: CGFloat {
+        guard progress.isFinite else { return 0 }
+        return CGFloat(min(1, max(0, progress)))
+    }
     @Published var host = ""
     @Published var blocked: String?
 

@@ -53,6 +53,11 @@ struct RootView: View {
             } else {
                 VStack(spacing: 0) {
                     tabs
+                        // 底栏收放要让页面重排，但不能让这次重排也吃动画：
+                        // 页面各层的 bounds/position 一边跟 spring 走、一边被
+                        // 重排改，Xcode 就会刷 "Decomposition of 'bounds' ...
+                        // while a composite animation is already running"
+                        .transaction { $0.animation = nil }
                     // 二级页推进后整页覆盖，底下不该还压着四个页签（安卓就是这样）。
                     // 淡出而不是直接删，避免内容高度突变
                     if !chrome.pushed[tab] {
