@@ -29,6 +29,8 @@ import re
 import subprocess
 import urllib.parse
 
+from . import sysinfo
+
 PKG = {"openclash": "openclash", "passwall": "passwall"}
 STYPE = {"openclash": "config_subscribe", "passwall": "subscribe_list"}
 LABEL = {"openclash": "OpenClash", "passwall": "Passwall"}
@@ -64,11 +66,8 @@ def _url_ok(url: str) -> bool:
 
 
 def _run(args: list[str], timeout: float = 10.0) -> tuple[int, str]:
-    try:
-        p = subprocess.run(args, capture_output=True, timeout=timeout, check=False)
-        return p.returncode, (p.stdout + p.stderr).decode("utf-8", "replace")
-    except (OSError, subprocess.SubprocessError) as exc:
-        return 1, str(exc)
+    # 实现只有一份（sysinfo.run_code），超时默认值各模块自己定
+    return sysinfo.run_code(args, timeout=timeout)
 
 
 def _spawn(cmd: str, log: str) -> None:

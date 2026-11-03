@@ -59,21 +59,11 @@ LEASE_CHOICES = [
 ]
 
 
-def _uci(*args: str, timeout: float = 10.0) -> str:
-    return sysinfo._run(["uci", *args], timeout=timeout).strip()
-
-
-def _now(key: str) -> str:
-    out = sysinfo._run(["uci", "-q", "get", key], timeout=4).strip()
-    return "" if out.startswith("uci:") else out
-
-
-def _is_ipv4(s: str) -> bool:
-    try:
-        ipaddress.IPv4Address(str(s or ""))
-        return True
-    except ValueError:
-        return False
+# uci 读写助手与 netedit 共用一份：两处各写一份的时候，`uci: xxx` 的
+# 容错、超时值、stripping 迟早会分叉。名字保留本地写法，调用点不用动。
+_uci = netedit.uci
+_now = netedit.uci_get
+_is_ipv4 = netedit.is_ipv4
 
 
 def _prefix_of(mask: str) -> int:

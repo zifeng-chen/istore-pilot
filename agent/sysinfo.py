@@ -37,6 +37,19 @@ def _read(path: str, default: str = "") -> str:
         return default
 
 
+def run_code(cmd: list[str], timeout: float = 8.0) -> tuple[int, str]:
+    """跑命令，返回 (退出码, stdout+stderr)。
+
+    与 `_run` 的区别：`_run` 只回 stdout，命令跑挂了和「本来就没输出」
+    长得一模一样。要看失败原因（uci get 不存在的键、pgrep 没匹配）用它。
+    """
+    try:
+        p = subprocess.run(cmd, capture_output=True, timeout=timeout, check=False)
+        return p.returncode, (p.stdout + p.stderr).decode("utf-8", "replace")
+    except (OSError, subprocess.SubprocessError) as exc:
+        return 1, str(exc)
+
+
 def _run(cmd: list[str], timeout: float = 5.0) -> str:
     try:
         out = subprocess.run(

@@ -14,11 +14,9 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import time
 
-from . import clash
-from . import config
+from . import clash, config, sysinfo
 
 INIT = {
     "openclash": "/etc/init.d/openclash",
@@ -34,11 +32,8 @@ _socks_port = {"openclash": 7891, "passwall": 1070}
 
 
 def _run(args: list[str], timeout: float = 8.0) -> tuple[int, str]:
-    try:
-        p = subprocess.run(args, capture_output=True, timeout=timeout, check=False)
-        return p.returncode, (p.stdout + p.stderr).decode("utf-8", "replace")
-    except (OSError, subprocess.SubprocessError) as exc:
-        return 1, str(exc)
+    # 实现只有一份（sysinfo.run_code），超时默认值各模块自己定
+    return sysinfo.run_code(args, timeout=timeout)
 
 
 def _uci_get(key: str) -> str:

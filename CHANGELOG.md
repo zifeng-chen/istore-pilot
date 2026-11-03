@@ -33,6 +33,16 @@
   getter、6 条未用 import
 - **新增 `scripts/dead_code.py`**：五语言一把跑，排除 `@Watch` 字符串引用、
   `@Override` 框架回调、OpenWrt init 钩子三类误报；Python 侧走 vulture
+- **去重**（jscpd 8 行/60 token 口径，1.52% → **1.21%**）：
+  - `check_sniffer.py` ~ `check_sniffer5.py` 五个探针合成 `scripts/sniffer_stat.py`
+    （`rate` / `split` / `tcp443` / `device` / `watch` 五个子命令），代码量从
+    5 份变 1 份
+  - uci 读写助手收拢到 `netedit`（`uci` / `uci_get` / `is_ipv4`），`lanedit`
+    不再自带一份；`sysinfo.run_code` 统一「命令 + 退出码 + stderr」，
+    `proxy` / `subscriptions` 各自的 `_run` 改为委托
+  - `release.py` 把 `api()` / `upload()` 里重复的 GitHub 错误归一抽成 `_send()`
+- **不合并的地方**：Activity / ArkUI 页面的骨架（工具栏 + 滚动容器 + 分组卡片）。
+  每个屏的头部、内边距、空态都不同，抽成多参数 helper 比重复更难读
 
 验证：`lint_style.py` 210 文件 0 error/0 warn、`dead_code.py` 0 候选、ruff F 通过；
 Android `assembleDebug`、iOS `BUILD SUCCEEDED`、鸿蒙 `BUILD SUCCESSFUL` 各跑一遍。

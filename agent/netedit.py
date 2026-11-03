@@ -22,11 +22,11 @@ import re
 from . import sysinfo
 
 
-def _uci(*args: str, timeout: float = 8.0) -> str:
+def uci(*args: str, timeout: float = 8.0) -> str:
     return sysinfo._run(["uci", *args], timeout=timeout).strip()
 
 
-def _now(key: str) -> str:
+def uci_get(key: str) -> str:
     out = sysinfo._run(["uci", "-q", "get", key], timeout=4).strip()
     return "" if out.startswith("uci:") else out
 
@@ -38,14 +38,14 @@ def sections(pkg: str) -> dict[str, str]:
     因为 LuCI 新建的段是具名的，而系统自带的匿名段是带下标的。
     """
     out: dict[str, str] = {}
-    for line in _uci("show", pkg, timeout=6).splitlines():
+    for line in uci("show", pkg, timeout=6).splitlines():
         m = re.match(rf"^{pkg}\.(\S+)=(\S+)$", line.strip())
         if m:
             out[m.group(1)] = m.group(2)
     return out
 
 
-def _is_ipv4(s: str) -> bool:
+def is_ipv4(s: str) -> bool:
     try:
         ipaddress.IPv4Address(s)
         return True
@@ -59,11 +59,11 @@ def client_on_lan(client_ip: str) -> bool:
     用来在界面上区分「局域网内操作」和「外网远程操作」：改 LAN 网段这类
     动作在外网做等于当场把自己断掉，必须先劝回去。
     """
-    if not client_ip or not _is_ipv4(client_ip):
+    if not client_ip or not is_ipv4(client_ip):
         return False
-    ip = _now("network.lan.ipaddr")
-    mask = _now("network.lan.netmask") or "255.255.255.0"
-    if not _is_ipv4(ip):
+    ip = uci_get("network.lan.ipaddr")
+    mask = uci_get("network.lan.netmask") or "255.255.255.0"
+    if not is_ipv4(ip):
         return False
     try:
         net = ipaddress.ip_network(f"{ip}/{mask}", strict=False)

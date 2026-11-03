@@ -87,6 +87,23 @@ def token() -> str:
     return ""
 
 
+def _send(req, timeout: int) -> tuple[int, dict]:
+    """发请求，把 HTTPError 也归一成 (status, dict)。
+
+    api() / upload() 原来各抄了 10 行同样的错误处理：GitHub 的 4xx
+    有时返回 JSON，有时返回纯文本，两处都得兜住。
+    """
+    try:
+        with _open(req, timeout) as r:
+            return r.status, json.load(r)
+    except urllib.error.HTTPError as exc:
+        payload = exc.read()
+        try:
+            return exc.code, json.loads(payload)
+        except ValueError:
+            return exc.code, {"message": payload.decode("utf-8", "replace")}
+
+
 def api(method: str, path: str, tok: str, body: dict | None = None):
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(
@@ -95,15 +112,7 @@ def api(method: str, path: str, tok: str, body: dict | None = None):
                  "Accept": "application/vnd.github+json",
                  "Content-Type": "application/json",
                  "User-Agent": "istore-pilot-release"})
-    try:
-        with _open(req, 60) as r:
-            return r.status, json.load(r)
-    except urllib.error.HTTPError as exc:
-        payload = exc.read()
-        try:
-            return exc.code, json.loads(payload)
-        except ValueError:
-            return exc.code, {"message": payload.decode("utf-8", "replace")}
+    return _send(req, 60)
 
 
 def patch_body(release_id: int, body: str, tok: str) -> int:
@@ -123,15 +132,7 @@ def upload(release_id: int, path: str, tok: str) -> tuple[int, dict]:
         "Content-Type": "application/octet-stream",
         "Content-Length": str(size),
         "User-Agent": "istore-pilot-release"})
-    try:
-        with _open(req, 300) as r:
-            return r.status, json.load(r)
-    except urllib.error.HTTPError as exc:
-        payload = exc.read()
-        try:
-            return exc.code, json.loads(payload)
-        except ValueError:
-            return exc.code, {"message": payload.decode("utf-8", "replace")}
+    return _send(req, 300)
 
 
 # ---------------------------------------------------------------- 构建

@@ -130,9 +130,23 @@ python scripts/lint_style.py
 # 全语言：声明了但没人调的函数/方法（候选清单，需人工确认）
 python scripts/dead_code.py
 
+# 重复代码率（jscpd，阈值 8 行 / 60 token）
+npx --yes jscpd@4 . --format python,java,swift --min-lines 8 --min-tokens 60 \
+  --ignore "**/build/**,**/dist/**,**/.git/**,**/node_modules/**,**/.workbuddy/**"
+
+# 鸿蒙的 .ets 要单独跑一次：--formats-exts 会顶掉 --format 列表
+npx --yes jscpd@4 . --format typescript --formats-exts typescript:ets \
+  --min-lines 8 --min-tokens 60 --ignore "**/build/**,**/.git/**"
+
 # Android 编译期 lint
 cd android && ./gradlew :app:lintDebug
 ```
+
+重复率基线（2026-11-03）：总体 **1.21%**，Python 0.12% / Java 2.30% /
+Swift 0.71% / ArkTS 2.45% / Shell 0%。剩下的是页面骨架（工具栏 + 滚动容器 +
+`setContentView`、ArkUI 的分组卡片），**故意不合并**：每个屏的头部、内边距、
+空态都不同，抽成一个六参数 helper 比重复本身更难读。逻辑重复（uci 读写、
+命令执行、HTTP 错误归一）已经收干净了。
 
 前三条必须零 error 才算过；warning 分类见报告。
 
