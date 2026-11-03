@@ -15,6 +15,24 @@
 
 ## 未发布
 
+### 0.1.4 · 安装器自动装依赖 + iStoreOS 25.12（apk）支持
+
+`.run` 装之前先探环境，缺依赖自动补装，x86 与 ARM 共用一套逻辑。
+
+- **包管理器探测**：apk 优先、opkg 次之（25.12 起 OpenWrt 把 opkg 换成 apk，
+  ipk 在 25.12 上完全装不了，`.run` 不受影响）
+- **依赖清单**：必需 `python3`(≥3.9) / `uci` / `ubus` / `ip-full`
+  （busybox 的 `ip` 没有 `-j`，流量与接口列表全靠它）；
+  界面 `luci-base` / `luci-compat` / `luci-lua-runtime`；可选 `pciutils`
+- **分级处理**：必需装不上中止并给手工命令；界面/可选装不上只警告继续
+- 新增 `--no-deps`；`--check` 输出「系统 · 包管理器 · 架构」与依赖缺口
+- Agent 侧收口 `pkg_mgr()` / `_pm_install()`，软件包升级、可升级列表、
+  已装包数量、后台升级任务全部按 opkg / apk 分流；`.ipk` 与 `.apk` 互相拒绝
+- 已知降级：Python 3.13 移除 `crypt` 模块，25.12 上「改 root 密码」会提示去后台改
+
+验证：24.10.8 真机 `--check` 通过；造假 opkg / 造假 apk 各跑一遍确认命令分流；
+`--no-deps` 正确跳过；真实安装后服务正常。**未在真 25.12 设备上验证。**
+
 ### 补齐 · Android 代理节点分组卡片 + 弹窗
 
 安卓 `ProxyFragment` 原来用 `expanded` 集合就地展开节点，展开两三个组就把整页撑没。
