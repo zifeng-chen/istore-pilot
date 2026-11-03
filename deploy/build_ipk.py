@@ -56,19 +56,18 @@ def revision() -> int:
     return 1
 
 
-def newest_apk() -> str:
-    if not os.path.isdir(APK_DIR):
-        return ""
-    best = ""
-    best_mtime = 0
-    for name in os.listdir(APK_DIR):
-        if not name.endswith(".apk"):
-            continue
-        path = os.path.join(APK_DIR, name)
-        mt = os.path.getmtime(path)
-        if mt > best_mtime:
-            best, best_mtime = path, mt
-    return best
+def apk_for(ver: str) -> str:
+    """**只认与当前版本同名的** dist/istoreos-<ver>.apk。
+
+    以前是按 mtime 挑「最新的那个」：dist 里留着 0.1.2 / 0.1.3 / 0.1.4 时，
+    只要某个旧文件的 mtime 被碰过（复制、解压、同步都会），就会被装进包 ——
+    用户装完网页端下的还是旧 App，而且看不出来。
+
+    版本号对不上就返回空串，由调用方明确报错。宁可打包失败，
+    也不要发一个「说是 0.1.4、里面是 0.1.2」的包。
+    """
+    path = os.path.join(APK_DIR, "istoreos-%s.apk" % ver)
+    return path if os.path.isfile(path) else ""
 
 
 # ---------------------------------------------------------------- 打包工具
@@ -209,7 +208,7 @@ def uci_config(src: str) -> bytes:
     return ("\n" + "\n".join(lines) + "\n\n").encode("utf-8")
 
 
-def stage_data(stage: str, with_apk: bool) -> None:
+def stage_data(stage: str, with_apk: bool) -> str:
     def put(rel: str, content: bytes, mode: int = 0o644) -> None:
         dest = os.path.join(stage, rel)
         os.makedirs(os.path.dirname(dest), exist_ok=True)
@@ -265,12 +264,17 @@ def stage_data(stage: str, with_apk: bool) -> None:
             open(os.path.join(luci, "view", "istore_agent", name), "rb").read())
 
     # --- APK（可选）
-    if with_apk:
-        apk = newest_apk()
-        if apk:
-            put(f"www/istore-agent/{os.path.basename(apk)}", open(apk, "rb").read())
-            print(f"  已附带 APK：{os.path.basename(apk)} "
-                  f"({os.path.getsize(apk) / 1048576:.1f} MB)")
+    # 只放当前版本这一个：包里的 App 版本必须和包本身的版本号一致。
+    apk = apk_for(version()) if with_apk else ""
+    if apk:
+        put(f"www/istore-agent/{os.path.basename(apk)}", open(apk, "rb").read())
+        print(f"  已附带 APK：{os.path.basename(apk)} "
+              f"({os.path.getsize(apk) / 1048576:.1f} MB)")
+    elif with_apk:
+        print(f"  ! dist 里没有 istoreos-{version()}.apk —— 本次不带 APK")
+        print("    先编译 App（gradle :app:assembleRelease），"
+              "再跑 scripts/release.py 同步")
+    return apk
 
 
 # ---------------------------------------------------------------- control
@@ -362,7 +366,12 @@ def main() -> int:
         os.makedirs(ctrl_dir)
 
         print(f"打包 {PKG_NAME} {ver}")
-        stage_data(data_dir, with_apk)
+        apk = stage_data(data_dir, with_apk)
+        if with_apk and not apk:
+            print(f"! 找不到 dist/istoreos-{version()}.apk，不出包。")
+            print("  包里的 App 版本必须与包版本一致；先编译 App，"
+                  "或用 --with-apk 之外的方式打包。")
+            return 3
         data_size = size_of(data_dir)
         stage_control(ctrl_dir, data_size)
 

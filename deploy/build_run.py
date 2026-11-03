@@ -849,7 +849,15 @@ def build(archs: tuple[str, ...], with_apk: bool) -> int:
     try:
         stage = os.path.join(work, "rootfs")
         os.makedirs(stage)
-        bipk.stage_data(stage, with_apk)
+        apk = bipk.stage_data(stage, with_apk)
+        if with_apk and not apk:
+            print("\n  ! dist 里没有 istoreos-%s.apk，拒绝出包。" % bipk.version())
+            print("    包里的 App 版本必须和包本身的版本号一致，"
+                  "不然用户装完下载到的还是旧 App。")
+            print("    先编译：gradle :app:assembleRelease，"
+                  "再跑 scripts/release.py（它会同步 APK），")
+            print("    或显式加 --no-apk 打一个不带 App 的包。")
+            return 3
 
         # ipk 里配置直接落 /etc/config/istore-agent；.run 里必须改成 .example，
         # 否则解压就会覆盖用户当前的 bind/端口（曾把 8443 暴露到公网）。

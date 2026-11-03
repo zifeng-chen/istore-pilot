@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """一条命令走完「APK 更新 → 重打 .run → 提交推送 → 发 Release」。
 
-为什么要有这个脚本：这四步以前是手动的，而 .run 的 APK 是**按文件时间**挑的
-（`build_ipk.newest_apk()`），最容易出的错就是「编译了新 APK 但忘了复制进 dist」，
+为什么要有这个脚本：这四步以前是手动的，而 .run 要带**对应版本**的 APK
+（`build_ipk.apk_for()` 按版本名取），最容易出的错就是「编译了新 APK 但忘了复制进 dist」，
 于是打出来的包里还是旧 App —— 用户从网页端点下载，拿到的是旧版本。
 
 步骤：
@@ -137,20 +137,41 @@ def upload(release_id: int, path: str, tok: str) -> tuple[int, dict]:
 # ---------------------------------------------------------------- 构建
 
 def sync_apk(ver: str, dry: bool) -> str:
-    """把最新编译的 APK 放进 dist/ —— .run 只认 dist 里 mtime 最新的那个。"""
+    """把编译出来的 APK 同步进 dist/，并清掉其它版本的旧 APK。
+
+    打包时按「版本名」取 APK（`build_ipk.apk_for`），所以 dist 里留着旧版本
+    只会制造混乱：既看不出哪个是真的，又容易在手工操作时被打进包。
+    """
     target = os.path.join(DIST, "istoreos-%s.apk" % ver)
     if not os.path.exists(APK_BUILD):
         print("  ! 没找到编译产物 %s" % APK_BUILD)
         print("    先跑：cd android && gradle assembleRelease")
         return target if os.path.exists(target) else ""
+
     src_mt = os.path.getmtime(APK_BUILD)
     dst_mt = os.path.getmtime(target) if os.path.exists(target) else 0
     if src_mt > dst_mt:
-        print("  APK 已更新 → dist/%s" % os.path.basename(target))
-        if not dry:
+        if dry:
+            print("  [dry] APK %s → dist/%s" % (ver, os.path.basename(target)))
+        else:
             shutil.copy2(APK_BUILD, target)
+            print("  APK 已更新 → dist/%s" % os.path.basename(target))
     else:
         print("  APK 已是最新（dist 不比编译产物旧）")
+
+    # 只留当前版本这一个
+    if not dry and os.path.isdir(DIST):
+        keep = os.path.basename(target)
+        for name in sorted(os.listdir(DIST)):
+            if not (name.startswith("istoreos-") and name.endswith(".apk")):
+                continue
+            if name == keep:
+                continue
+            try:
+                os.remove(os.path.join(DIST, name))
+                print("  清理旧 APK：%s" % name)
+            except OSError:
+                pass
     return target
 
 
