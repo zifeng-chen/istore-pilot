@@ -31,6 +31,16 @@
 
 外网被挡时的说明页也从「去改 config.json」改成指向这个开关。
 
+### 概览页「WAN 地址」显示 [object Object]
+
+`overview.network.wan.ipv4` 是数组（PPPoE 可能给多个地址），但鸿蒙和 iOS
+都当成字符串读：鸿蒙 `String(数组)` 得到 `[object Object]`，iOS 的类型兜底
+返回空串。安卓读的是另一支接口（`network/wan` 的 `status.ipv4`，本来就是
+字符串），所以只有两个端出问题。
+
+服务端在 `wan` / `lan` 上补 `ipv4_text` / `ipv6_text`（第一个非 fe80 地址
+拼成 `地址/前缀`），两个客户端改读这两个字段 —— 三端从此同一份口径。
+
 ### 鸿蒙：卡片头部图标贴边
 
 `RowCard` 只给上下留白（15/5），而 `CardTitle` 自己不带左右 padding，

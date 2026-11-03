@@ -388,7 +388,8 @@ struct OverviewView: View {
                 }
 
                 VStack(spacing: 9) {
-                    KV("WAN 地址", wan.str("ipv4"))
+                    // ipv4 是数组（PPPoE 可能多个地址），服务端另给了拼好的文本
+                    KV("WAN 地址", wan.str("ipv4_text", "—"))
                     KV("网关", wan.str("gateway"))
                     KV("DNS", dns.isEmpty ? "自动" : dns.joined(separator: "  "))
                     KV("拨号时长", secs > 0 ? F.uptime(secs) : "—")

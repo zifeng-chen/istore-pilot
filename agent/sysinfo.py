@@ -433,6 +433,22 @@ def _interfaces_sample() -> dict:
             if isinstance(it, dict)
         ]
 
+    def first_text(items: list[dict]) -> str:
+        """列表里第一个地址的展示形式：`100.*.*.34/32`。
+
+        界面只需要一行字，但 wan.ipv4 是数组（PPPoE 可能给多个地址）。
+        让三端各自拼数组的后果是三种结果：安卓取到字符串、iOS 显示空、
+        鸿蒙直接显示 [object Object]。文本统一由服务端给。
+        """
+        for it in items:
+            addr = it.get("address") or ""
+            # 链路本地地址（fe80::）对用户没有意义，跳过
+            if not addr or addr.lower().startswith("fe80"):
+                continue
+            plen = it.get("prefixlen")
+            return "%s/%s" % (addr, plen) if plen else str(addr)
+        return ""
+
     def shape(status: dict, label: str) -> dict:
         dev = status.get("l3_device") or status.get("device") or ""
         rate = rates.get(dev, {})
@@ -449,6 +465,7 @@ def _interfaces_sample() -> dict:
                 if not any(x["address"] == addr["address"] for x in ipv6):
                     ipv6.append({"address": mask.ip(addr["address"]),
                                  "prefixlen": addr["prefixlen"], "ptp": None})
+        ipv4 = pick(status, "ipv4-address")
         return {
             "label": label,
             "up": bool(status.get("up")),
@@ -456,8 +473,11 @@ def _interfaces_sample() -> dict:
             "device": status.get("device", ""),
             "l3_device": dev,
             "uptime": status.get("uptime", 0),
-            "ipv4": pick(status, "ipv4-address"),
+            "ipv4": ipv4,
+            # 展示用文本，省得客户端各自拼数组（见 first_text 的注释）
+            "ipv4_text": first_text(ipv4),
             "ipv6": ipv6,
+            "ipv6_text": first_text(ipv6),
             "prefixes": [
                 dict(x, address=mask.ip(str(x.get("address") or "")))
                 for x in pick(status, "ipv6-prefix")

@@ -368,7 +368,8 @@ export struct OverviewPage {
 
     this.wanUp = wan.bool('up', false);
     this.wanProto = wan.str('proto', '').toUpperCase();
-    this.wanIp = wan.str('ipv4', '—');
+    // wan.ipv4 是数组，直接 str() 会得到 [object Object]；用服务端拼好的文本
+    this.wanIp = wan.str('ipv4_text', '—');
     this.wanGw = wan.str('gateway', '—');
     const dnsList: string[] = wan.strs('dns');
     this.wanDns = dnsList.length === 0 ? '自动' : dnsList.join('  ');
