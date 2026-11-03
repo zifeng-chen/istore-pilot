@@ -41,9 +41,9 @@ SERVICE_NAMES = ("network", "firewall", "dnsmasq")
 
 # 事务期间可能被改动的「旁路状态」文件。它们不在 /etc/config 里，
 # 但同样是配置的一部分 —— 回滚时必须一起还原，否则会留下脏标记。
-# 真实踩过：harden 删掉 wan→lan 转发时把这条记在 fw_saved.json 里，
-# 事务超时回滚把 config 铺回去了，标记却留着，用户点「放宽」时
-# 又照着标记补了一条，于是同一份配置里出现两条 wan→lan 转发。
+# `fw_saved.json` 的写方（防火墙收紧）已在 2026-11 下线，但老版本装过的
+# 机器上这个文件还躺在 data 目录里；留着这一项，是为了回滚时能正确还原，
+# 不至于把用户当初的 wan→lan 转发记录弄丢。
 SIDE_FILES = ("fw_saved.json",)
 
 
