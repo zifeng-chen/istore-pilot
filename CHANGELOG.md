@@ -15,6 +15,28 @@
 
 ## 未发布
 
+### 清理 · 未引用代码与残留资源
+
+三端加 Agent 全量过了一遍「声明了没人调」的代码，删掉 30 处：
+
+- **Python**：`config.reload`、`netapply.SERVICE_NAMES`、`apps.snapshot` 的 `period`
+  参数（早就被忽略，接口不再返回 today 口径）、`make_icons.squircle`
+- **防火墙写入口彻底下线**：`netedit` 只剩 `sections` / `client_on_lan` 两个只读
+  助手，`harden` / `unrestrict` 的实现删除（接口本来就没路由）。理由见 README
+  的「已知风险」——收紧 wan 入口会连带断掉远程管理和 IPv6 直连 NAS
+- **Android**：16 个没人调的方法（`Ui.big`/`Ui.stat`/`Ui.kvClick`/`Ui.infoValue`、
+  `Fmt.pct`/`Fmt.clock`、`WebActivity.hostOnly`、`SettingsFragment.editBase` 等）、
+  21 条未用 import、7 个未用 `<style>`、`SplashActivity.OUTRO_MS`
+- **iOS**：`Fmt.ago`、`Appearance.apply` / `Appearance.get`（主题走 `@AppStorage`）
+- **鸿蒙**：`J.raw`、`Session.defaultHost`（硬编码 192.168.100.1:8443）、
+  `Bp.ring`、`Comp.opaque`、`Fmt.pct`、`Snap.ageSeconds`、5 个没人取的颜色
+  getter、6 条未用 import
+- **新增 `scripts/dead_code.py`**：五语言一把跑，排除 `@Watch` 字符串引用、
+  `@Override` 框架回调、OpenWrt init 钩子三类误报；Python 侧走 vulture
+
+验证：`lint_style.py` 210 文件 0 error/0 warn、`dead_code.py` 0 候选、ruff F 通过；
+Android `assembleDebug`、iOS `BUILD SUCCEEDED`、鸿蒙 `BUILD SUCCESSFUL` 各跑一遍。
+
 ### 0.1.4 · 安装器自动装依赖 + iStoreOS 25.12（apk）支持
 
 `.run` 装之前先探环境，缺依赖自动补装，x86 与 ARM 共用一套逻辑。

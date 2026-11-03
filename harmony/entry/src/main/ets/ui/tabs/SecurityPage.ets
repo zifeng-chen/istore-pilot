@@ -6,7 +6,7 @@ import { Shell } from '../../core/Shell';
 import { Fmt } from '../../util/Fmt';
 import { Pal, T } from '../Theme';
 import { Bp } from '../Breakpoint';
-import { Card, CardHeader, CardTitle, Comp, GlyphIcon, Hairline, HeroStat, LineIcon, Pill } from '../Comp';
+import { Card, CardTitle, Comp, GlyphIcon, Hairline, HeroStat, LineIcon, Pill } from '../Comp';
 import { Glyph, Ico } from '../comp/Icons';
 import { AppIcon } from '../comp/AppIcon';
 import { DevicesPage } from './DevicesPage';

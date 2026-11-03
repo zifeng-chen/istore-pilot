@@ -353,23 +353,6 @@ public class OverviewFragment extends BaseFragment {
         return row;
     }
 
-    private LinearLayout legendItem(Context c, String name, int colorRes) {
-        LinearLayout box = Ui.row(c);
-        View d = new View(c);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setShape(GradientDrawable.OVAL);
-        bg.setColor(Ui.color(c, colorRes));
-        d.setBackground(bg);
-        box.addView(d, new LinearLayout.LayoutParams(Ui.dp(c, 6), Ui.dp(c, 6)));
-        TextView t = Ui.text(c, name, 11.5f, R.color.text_secondary);
-        LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        tlp.leftMargin = Ui.dp(c, 5);
-        tlp.rightMargin = Ui.dp(c, 12);
-        box.addView(t, tlp);
-        return box;
-    }
-
     @Override
     protected void load(boolean quiet) {
         Api.get(ctx(), "/api/v1/overview", new Cb() {

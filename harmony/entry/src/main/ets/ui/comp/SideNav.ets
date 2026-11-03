@@ -1,5 +1,5 @@
 import { Ico } from './Icons';
-import { Pal, T } from '../Theme';
+import { Pal } from '../Theme';
 import { LineIcon } from '../Comp';
 
 interface RailItem {

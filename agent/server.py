@@ -84,16 +84,16 @@ def cache_drop_prefix(prefix: str) -> None:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "istore-agent/0.1"
-    protocol_version = "HTTP/1.1"
+    server_version = "istore-agent/0.1"  # noqa 由 BaseHTTPRequestHandler 读
+    protocol_version = "HTTP/1.1"  # noqa 同上
     # 关掉 Nagle：下面 _send 已经把响应头和正文合成一次写，
     # 但 keep-alive 下零散的小包（比如 OPTIONS 预检）还会走 Nagle，
     # 和客户端的延迟 ACK 凑一起就是每请求固定 40ms
-    disable_nagle_algorithm = True
+    disable_nagle_algorithm = True  # noqa 同上
 
     # ------------------------------------------------------------ 基础工具
 
-    def log_message(self, fmt, *args):  # 静音，避免刷屏 procd 日志
+    def log_message(self, fmt, *args):  # noqa 静音，避免刷屏 procd 日志
         return
 
     def _cors_origin(self) -> str:
@@ -350,10 +350,10 @@ class Handler(BaseHTTPRequestHandler):
 
     # ------------------------------------------------------------ 路由分发
 
-    def do_OPTIONS(self):
+    def do_OPTIONS(self):  # noqa HTTP 钩子
         self._send(204, b"")
 
-    def do_HEAD(self):
+    def do_HEAD(self):  # noqa HTTP 钩子
         self.do_GET()
 
     def do_GET(self):
@@ -597,10 +597,10 @@ class Handler(BaseHTTPRequestHandler):
             _log("POST %s 失败: %r" % (path, exc))
             self._json({"ok": False, "error": "操作失败，详情见路由器系统日志"}, 500)
 
-    def do_PUT(self):
+    def do_PUT(self):  # noqa HTTP 钩子
         self.do_POST()
 
-    def do_PATCH(self):
+    def do_PATCH(self):  # noqa HTTP 钩子
         self.do_POST()
 
     # ------------------------------------------------------------ GET 接口
@@ -632,8 +632,7 @@ class Handler(BaseHTTPRequestHandler):
                 })
             elif path == "/api/v1/apps":
                 # 自带 3 秒采样的后台线程，不走 cached()，否则速率会被冻住
-                # 只给累计口径，period 参数保留但忽略（老客户端还在传）
-                self._json(apps.snapshot(query.get("period", ["all"])[0]))
+                self._json(apps.snapshot())
             elif path == "/api/v1/network":
                 self._json(cached("network", 1.0, sysinfo.interfaces))
             elif path == "/api/v1/network/wan":
@@ -870,7 +869,7 @@ def serve():
         host = _bind_host(want, wait=10 if first else 0)
         first = False
         httpd = ThreadingHTTPServer((host, port), Handler)
-        httpd.daemon_threads = True
+        httpd.daemon_threads = True  # noqa ThreadingHTTPServer 的开关
         print(f"[istore-agent] listening on {host}:{port}", flush=True)
         threading.Thread(target=_watch_bind, args=(httpd, host), daemon=True).start()
         try:

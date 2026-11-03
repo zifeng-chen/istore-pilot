@@ -48,16 +48,6 @@ export class Snap {
     return v as string;
   }
 
-  /** 快照距今多少秒，没有快照返回 -1 */
-  static async ageSeconds(ctx: common.Context, path: string): Promise<number> {
-    const p = await Snap.ready(ctx);
-    const ts = (await p.get(Snap.key(path) + SUFFIX_TS, 0)) as number;
-    if (ts <= 0) {
-      return -1;
-    }
-    return Math.floor((Date.now() - ts) / 1000);
-  }
-
   static async clear(ctx: common.Context): Promise<void> {
     const p = await Snap.ready(ctx);
     await p.clear();

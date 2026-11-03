@@ -54,10 +54,6 @@ public final class Fmt {
         return String.format(Locale.US, "%,d", v);
     }
 
-    public static String pct(double v) {
-        return String.format(Locale.US, "%.1f%%", v);
-    }
-
     public static String temp(double c) {
         return String.format(Locale.US, "%.0f°C", c);
     }
@@ -127,9 +123,4 @@ public final class Fmt {
         return v == null || v.isEmpty() ? "—" : v;
     }
 
-    /** 时:分:秒，用于「快照时间」这类提示 */
-    public static String clock(long millis) {
-        java.text.SimpleDateFormat f = new java.text.SimpleDateFormat("HH:mm:ss", Locale.US);
-        return f.format(new java.util.Date(millis));
-    }
 }

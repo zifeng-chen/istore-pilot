@@ -49,8 +49,6 @@ public class SplashActivity extends Activity {
     private static final long MIN_STAY_MS = 1400L;
     /** 等路由器响应的上限：超了先放人进界面，不把人卡在启动页 */
     private static final long NET_TIMEOUT_MS = 2600L;
-    /** 收尾动画时长 */
-    private static final long OUTRO_MS = 420L;
     /** 拿到结果后走完剩下距离的时长：短一点，"满格 + 准备就绪"才看得清楚 */
     private static final long FINISH_MS = 240L;
 

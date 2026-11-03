@@ -4,7 +4,7 @@ import { Api, ApiResult } from '../api/Api';
 import { J } from '../core/Json';
 import { Fmt } from '../util/Fmt';
 import { Pal, T } from '../ui/Theme';
-import { Card, GroupBox, Hairline, Kv } from '../ui/Comp';
+import { Card, Hairline, Kv } from '../ui/Comp';
 
 /**
  * 设备详情（二级页）。

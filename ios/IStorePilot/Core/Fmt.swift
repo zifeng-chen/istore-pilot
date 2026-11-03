@@ -176,14 +176,4 @@ extension F {
         }
         return String(format: "%.1fG", bps / (1024 * 1024 * 1024))
     }
-
-    /// 相对时间 → "3 分钟前"
-    static func ago(_ ts: Double) -> String {
-        guard ts > 0 else { return "—" }
-        let d = Date().timeIntervalSince1970 - ts
-        if d < 60 { return "刚刚" }
-        if d < 3600 { return "\(Int(d / 60)) 分钟前" }
-        if d < 86400 { return "\(Int(d / 3600)) 小时前" }
-        return "\(Int(d / 86400)) 天前"
-    }
 }

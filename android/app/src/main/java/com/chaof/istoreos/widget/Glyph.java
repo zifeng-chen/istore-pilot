@@ -62,13 +62,6 @@ public final class Glyph extends View {
         setColor(Ui.color(c, com.chaof.istoreos.R.color.text_secondary));
     }
 
-    public static Glyph of(Context c, int kind, int colorRes) {
-        Glyph g = new Glyph(c);
-        g.setKind(kind);
-        g.setColor(Ui.color(c, colorRes));
-        return g;
-    }
-
     public void setKind(int kind) {
         this.kind = kind;
         invalidate();
@@ -77,12 +70,6 @@ public final class Glyph extends View {
     public void setColor(int color) {
         pen.setColor(color);
         fill.setColor(color);
-        invalidate();
-    }
-
-    /** 线宽按控件尺寸等比缩放，24dp 的图标看起来才不会「太细」 */
-    public void setStrokeDp(float dp) {
-        this.stroke = dp;
         invalidate();
     }
 

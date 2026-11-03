@@ -4,8 +4,8 @@ import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
 import { Bp } from '../Breakpoint';
 import { Pal, T } from '../Theme';
-import { Card, CardHeader, CardTitle, Comp, GlyphIcon, GroupBox, Hairline, LineIcon, Pill } from '../Comp';
-import { Glyph, Ico } from '../comp/Icons';
+import { Card, CardTitle, Comp, GlyphIcon, GroupBox, Hairline, Pill } from '../Comp';
+import { Glyph } from '../comp/Icons';
 
 interface Backend {
   id: string;

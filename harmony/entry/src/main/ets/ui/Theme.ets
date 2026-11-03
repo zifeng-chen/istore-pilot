@@ -89,19 +89,9 @@ export class Pal {
     const s: string = v.toString(16);
     return s.length === 1 ? '0' + s : s;
   }
-
-  static appBg(): string {
-    return Pal.of($r('app.color.app_bg'), '#EDF3F0');
-  }
-
   static surface(): string {
     return Pal.of($r('app.color.surface'), '#FFFFFF');
   }
-
-  static surfaceSunken(): string {
-    return Pal.of($r('app.color.surface_sunken'), '#F4F9F6');
-  }
-
   static track(): string {
     return Pal.of($r('app.color.track'), '#E1E7E4');
   }
@@ -153,11 +143,6 @@ export class Pal {
   static heroTo(): string {
     return Pal.of($r('app.color.hero_to'), '#00553E');
   }
-
-  static heroFg(): string {
-    return Pal.of($r('app.color.hero_fg'), '#FFFFFF');
-  }
-
   static heroStroke(): string {
     return Pal.of($r('app.color.hero_stroke'), '#24FFFFFF');
   }
@@ -169,15 +154,6 @@ export class Pal {
   static accentSoft(): string {
     return Pal.of($r('app.color.accent_soft'), '#1700A87E');
   }
-
-  static skeletonBase(): string {
-    return Pal.of($r('app.color.skeleton_base'), '#D8E3DE');
-  }
-
-  static skeletonHi(): string {
-    return Pal.of($r('app.color.skeleton_highlight'), '#F7FBF9');
-  }
-
   /**
    * 给实体色加透明度，返回 '#AARRGGBB'（ArkUI 把 alpha 写在最前面）。
    * 传进来的如果是 8 位色，先砍掉原来的 alpha —— 否则会拼出 10 位，界面直接变透明

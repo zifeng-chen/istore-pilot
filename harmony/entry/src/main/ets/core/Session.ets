@@ -62,11 +62,6 @@ export class Session {
     return v;
   }
 
-  /** 不含协议的展示用地址（输入框占位符） */
-  static defaultHost(): string {
-    return '192.168.100.1:8443';
-  }
-
   static token(): string {
     return Session.authToken;
   }

@@ -127,11 +127,33 @@ python -m ruff check agent deploy scripts
 # 全语言：行宽 / 缩进 / 尾随空格 / 死代码标记 / 敏感信息
 python scripts/lint_style.py
 
+# 全语言：声明了但没人调的函数/方法（候选清单，需人工确认）
+python scripts/dead_code.py
+
 # Android 编译期 lint
 cd android && ./gradlew :app:lintDebug
 ```
 
-前两条必须零 error 才算过；warning 分类见报告。
+前三条必须零 error 才算过；warning 分类见报告。
+
+### 死代码怎么判
+
+`dead_code.py` 输出的是**候选**，不是判决书。三类合法的"看起来没人调"已经
+在脚本里排除，改规则时别删：
+
+| 形态 | 例子 | 为什么算活的 |
+|---|---|---|
+| 字符串引用 | ArkTS `@Watch('onSubChanged')` | 回调名是字符串，运行时才绑 |
+| 框架回调 | `@Override`/`override`、`onCreate`、`makeUIView` | 调用点在系统里 |
+| init 钩子 | `start_service`、`service_triggers` | 由 `/etc/rc.common` 调 |
+
+Python 侧交给 `vulture`（`pip install vulture`，未装则跳过）；协议钩子
+（`do_GET`、`log_message`、`server_version`）用行尾 `# noqa: 原因` 标注。
+
+**设计令牌是例外**：`res/values/colors.xml`、`harmony/.../color.json` 这类
+颜色/尺寸表即使暂时没人用也保留 —— 它们是配色方案的唯一真源，删了以后
+下一屏要用就得凭记忆重编一个色值。函数和样式（`styles.xml` 的 `<style>`）
+不留，没人用就删。
 
 ## 五、已知的、决定不改的地方
 

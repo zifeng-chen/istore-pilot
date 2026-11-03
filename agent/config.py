@@ -119,13 +119,6 @@ def get(section: str, default=None):
     return load().get(section, default)
 
 
-def reload() -> dict:
-    global _cache
-    with _lock:
-        _cache = None
-    return load()
-
-
 def save(data: dict) -> bool:
     global _cache
     with _lock:

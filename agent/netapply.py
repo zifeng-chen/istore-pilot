@@ -36,9 +36,6 @@ CONF_DIR = "/etc/config"
 # 默认等待客户端确认的秒数。太短来不及重连，太长用户已经走了还在「待确认」
 DEFAULT_WAIT = 60
 
-# 服务名 → 重载命令。reload 不存在时守护会退化成 restart
-SERVICE_NAMES = ("network", "firewall", "dnsmasq")
-
 # 事务期间可能被改动的「旁路状态」文件。它们不在 /etc/config 里，
 # 但同样是配置的一部分 —— 回滚时必须一起还原，否则会留下脏标记。
 # `fw_saved.json` 的写方（防火墙收紧）已在 2026-11 下线，但老版本装过的

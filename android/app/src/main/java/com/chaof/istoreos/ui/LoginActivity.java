@@ -6,7 +6,6 @@ import android.view.KeyEvent;
 import android.view.inputmethod.EditorInfo;
 
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.chaof.istoreos.MainActivity;
 import com.chaof.istoreos.R;

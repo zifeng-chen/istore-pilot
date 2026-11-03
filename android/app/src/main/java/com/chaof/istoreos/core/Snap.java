@@ -46,15 +46,6 @@ public final class Snap {
         }
     }
 
-    /** 快照距今多少秒，没有快照返回 -1 */
-    public static long ageSeconds(Context c, String key) {
-        long ts = sp(c).getLong(key + "#ts", 0L);
-        if (ts <= 0L) {
-            return -1L;
-        }
-        return (System.currentTimeMillis() - ts) / 1000L;
-    }
-
     public static void clear(Context c) {
         sp(c).edit().clear().apply();
     }

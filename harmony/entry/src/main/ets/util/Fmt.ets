@@ -62,14 +62,6 @@ export class Fmt {
     }
     return out;
   }
-
-  static pct(v: number): string {
-    if (!Number.isFinite(v)) {
-      return '—';
-    }
-    return v.toFixed(1) + '%';
-  }
-
   static temp(c: number): string {
     if (!Number.isFinite(c) || c <= 0) {
       return '—';

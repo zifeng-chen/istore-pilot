@@ -36,11 +36,6 @@ export class J {
     return j;
   }
 
-  /** 原始文本，仅调试用 */
-  raw(): string {
-    return JSON.stringify(this.d);
-  }
-
   has(key: string): boolean {
     const v: Object = this.d[key];
     return v !== undefined && v !== null;

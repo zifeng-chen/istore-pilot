@@ -3,7 +3,6 @@ package com.chaof.istoreos;
 import android.os.Bundle;
 
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.chaof.istoreos.core.BaseActivity;
 import com.chaof.istoreos.ui.DevicesFragment;

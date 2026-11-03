@@ -611,12 +611,4 @@ export class Comp {
     const s: string = v.toString(16);
     return '#' + (s.length === 1 ? '0' + s : s) + rgb;
   }
-
-  /** 从 '#AARRGGBB' 里去掉 alpha，用于不能让底色透出来的场景 */
-  static opaque(hex: string): string {
-    if (hex.length === 9) {
-      return '#' + hex.substring(3);
-    }
-    return hex;
-  }
 }

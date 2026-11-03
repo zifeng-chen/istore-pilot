@@ -90,16 +90,4 @@ export class Bp {
     }
     return compactH;
   }
-
-  /** 环图直径 */
-  static ring(w: number, compactD: number): number {
-    const f: Form = Bp.form(w);
-    if (f === Form.Expanded) {
-      return compactD + 24;
-    }
-    if (f === Form.Medium) {
-      return compactD + 10;
-    }
-    return compactD;
-  }
 }

@@ -37,9 +37,6 @@ MASTER_CANDIDATES = [
 # Android 传统图标各密度边长
 DENSITIES = {"mdpi": 48, "hdpi": 72, "xhdpi": 96, "xxhdpi": 144, "xxxhdpi": 192}
 
-# 圆角半径比例（相对边长）。母版自己的圆角约 22.5%
-RADIUS_RATIO = 0.225
-
 
 def load_master(path: str) -> Image.Image:
     """读母版。只做方图化（非正方形时取中心正方），绝不裁边距。"""
@@ -110,16 +107,6 @@ def fill_outside(im: Image.Image, alpha_thr: int = 240) -> Image.Image:
     bg.putalpha(255)
     # 原图（带 alpha）叠在填充层上：四角保留填充色，半透明边缘按 alpha 正常混合
     return Image.alpha_composite(bg, orig).convert("RGB")
-
-
-def squircle(size: int) -> Image.Image:
-    big = 4
-    px = size * big
-    mask = Image.new("L", (px, px), 0)
-    ImageDraw.Draw(mask).rounded_rectangle(
-        (0, 0, px - 1, px - 1), radius=int(px * RADIUS_RATIO), fill=255
-    )
-    return mask.resize((size, size), Image.LANCZOS)
 
 
 def circle(size: int) -> Image.Image:

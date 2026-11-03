@@ -902,12 +902,11 @@ def _domains_for(conns: list[dict]) -> dict[str, dict[str, int]]:
     return out
 
 
-def snapshot(period: str = "all") -> dict:
+def snapshot() -> dict:
     """对外接口：应用流量排行（只给累计口径）。
 
     用户只关心「这个应用一共用了多少」，今日口径在界面上只会让人反复
-    对比两套数字，所以接口不再返回 today 系列字段；``period`` 参数保留
-    但被忽略，仅为兼容老版本客户端。
+    对比两套数字，所以接口不返回 today 系列字段，也不再接受 period 参数。
     """
     _ensure()
     with _lock:

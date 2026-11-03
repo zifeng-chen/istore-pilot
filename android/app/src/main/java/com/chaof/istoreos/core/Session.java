@@ -45,11 +45,6 @@ public final class Session {
         return sp(c).getLong(K_EXP, 0L);
     }
 
-    public static String lastUser(Context c) {
-        String v = sp(c).getString(K_USER, "");
-        return v == null ? "" : v;
-    }
-
     public static void saveToken(Context c, String token, long expiresAt, String user) {
         sp(c).edit()
                 .putString(K_TOKEN, token)

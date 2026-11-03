@@ -172,13 +172,6 @@ public final class Ui {
         return text(c, s, 13f, R.color.text_secondary);
     }
 
-    public static TextView big(Context c, CharSequence s) {
-        TextView t = text(c, s, 28f, R.color.text_primary);
-        t.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        t.setIncludeFontPadding(false);
-        return t;
-    }
-
     /** iOS 大标题：34sp 半粗，页面顶部随内容滚走 */
     public static TextView largeTitle(Context c, CharSequence s) {
         TextView t = text(c, s, 33f, R.color.text_primary);
@@ -301,21 +294,6 @@ public final class Ui {
             // 个别 ROM 的字体不认这个特性，退回默认比例字宽即可
         }
         return t;
-    }
-
-    /** 统计块：上面小灰字，下面大数字 */
-    public static TextView stat(Context c, LinearLayout parent, String label, String value) {
-        LinearLayout box = column(c);
-        TextView l = text(c, label, 12f, R.color.text_secondary);
-        l.setIncludeFontPadding(false);
-        box.addView(l);
-        TextView v = text(c, value, 20f, R.color.text_primary);
-        v.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        v.setIncludeFontPadding(false);
-        v.setPadding(0, dp(c, 5), 0, 0);
-        box.addView(v);
-        parent.addView(box);
-        return v;
     }
 
     /**
@@ -653,37 +631,6 @@ public final class Ui {
         return v;
     }
 
-    /**
-     * 可点击的键值行，尾部带一个 › 箭头，用于「点进去选」的项。
-     * 返回右侧的值 TextView，方便调用方自己刷新显示。
-     */
-    public static TextView kvClick(LinearLayout card, String key, String val,
-                                   Runnable onClick) {
-        Context c = card.getContext();
-        card.addView(hairline(c));
-        LinearLayout line = row(c);
-        int pad = dp(c, 12);
-        line.setPadding(0, pad, 0, pad);
-        line.setClickable(true);
-        line.setFocusable(true);
-        line.setOnClickListener(v -> onClick.run());
-
-        TextView k = text(c, key, 15f, R.color.text_primary);
-        line.addView(k, new LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
-        TextView v = value(c, val);
-        v.setPadding(dp(c, 12), 0, 0, 0);
-        line.addView(v, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        TextView arrow = text(c, "\u203A", 17f, R.color.text_tertiary);
-        arrow.setPadding(dp(c, 8), 0, 0, 0);
-        line.addView(arrow);
-        card.addView(line);
-        return v;
-    }
-
     /** 卡片顶部的标题行，返回右侧容器方便塞状态标签 */
     public static LinearLayout header(LinearLayout card, String title, String sub) {
         Context c = card.getContext();
@@ -759,13 +706,6 @@ public final class Ui {
 
         card.addView(line);
         return e;
-    }
-
-    /** 只读行，但值用强调色（比如「当前 IP」），用于状态卡 */
-    public static TextView kvAccent(LinearLayout card, String key, String val, int colorRes) {
-        TextView v = kv(card, key, val);
-        v.setTextColor(color(card.getContext(), colorRes));
-        return v;
     }
 
     // ---------------------------------------------------------------- 图标行
@@ -1000,23 +940,6 @@ public final class Ui {
 
         card.addView(row);
         return slot;
-    }
-
-    /** 往 infoRow 的插槽里放一个值：等宽数字、右对齐、最多两行 */
-    public static TextView infoValue(LinearLayout slot, CharSequence s, int colorRes) {
-        Context c = slot.getContext();
-        TextView v = num(c, s, 13.5f, colorRes);
-        v.setGravity(Gravity.END);
-        v.setPadding(dp(c, 10), 0, 0, 0);
-        v.setMaxLines(2);
-        v.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        if (Build.VERSION.SDK_INT >= 23) {
-            v.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE);
-            v.setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE);
-        }
-        slot.addView(v, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        return v;
     }
 
     /**

@@ -203,8 +203,4 @@ public class NavBar extends LinearLayout {
         selected = index;
         apply(animate);
     }
-
-    public int selected() {
-        return selected;
-    }
 }

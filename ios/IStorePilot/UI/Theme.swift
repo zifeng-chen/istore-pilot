@@ -107,17 +107,6 @@ enum Appearance {
     static let names = ["跟随系统", "浅色", "深色"]
     static let modes = [0, 1, 2]
 
-    private static let key = "istore.theme"
-
-    static func get() -> Int {
-        let v = UserDefaults.standard.integer(forKey: key)
-        return modes.contains(v) ? v : 0
-    }
-
-    static func apply(_ mode: Int) {
-        UserDefaults.standard.set(mode, forKey: key)
-    }
-
     static func name(_ mode: Int) -> String {
         let i = modes.firstIndex(of: mode) ?? 0
         return names[i]

@@ -1,7 +1,6 @@
 package com.chaof.istoreos;
 
 import android.annotation.SuppressLint;
-import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.MenuItem;
@@ -310,16 +309,6 @@ public class WebActivity extends BaseActivity {
             rest = rest.substring(0, slash);
         }
         return scheme + "://" + rest;
-    }
-
-    /** 只取 host（不含端口、统一小写），用来核对票据地址 */
-    private static String hostOnly(String url) {
-        try {
-            String h = android.net.Uri.parse(url == null ? "" : url).getHost();
-            return h == null ? "" : h.toLowerCase();
-        } catch (Exception e) {
-            return "";
-        }
     }
 
     private static String hostOf(String url) {

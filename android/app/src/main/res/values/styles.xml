@@ -72,46 +72,4 @@
         <item name="cardElevation">0dp</item>
         <item name="cardPreventCornerOverlap">true</item>
     </style>
-
-    <style name="CardInsist" parent="Card">
-        <item name="android:clickable">true</item>
-        <item name="android:focusable">true</item>
-        <item name="rippleColor">@color/ripple</item>
-    </style>
-
-    <!-- 分组标题：iOS 用小号大写灰字，不抢注意力 -->
-    <style name="SectionTitle">
-        <item name="android:textSize">12sp</item>
-        <item name="android:textColor">@color/text_secondary</item>
-        <item name="android:letterSpacing">0.06</item>
-        <item name="android:textAllCaps">true</item>
-        <item name="android:fontFamily">sans-serif-medium</item>
-    </style>
-
-    <style name="ValueText">
-        <item name="android:textSize">15sp</item>
-        <item name="android:textColor">@color/text_primary</item>
-        <item name="android:fontFamily">sans-serif-medium</item>
-    </style>
-
-    <style name="LabelText">
-        <item name="android:textSize">13sp</item>
-        <item name="android:textColor">@color/text_secondary</item>
-    </style>
-
-    <style name="BigNumber">
-        <item name="android:textSize">28sp</item>
-        <item name="android:textColor">@color/text_primary</item>
-        <item name="android:fontFamily">sans-serif-medium</item>
-        <item name="android:includeFontPadding">false</item>
-    </style>
-
-    <!-- 底部标签栏文字：iOS 用 10pt 左右，比 Material 默认的 12sp 小一档，
-         字号小一点图标和文字才不会挤在一起 -->
-    <style name="NavLabel" parent="TextAppearance.Material3.LabelMedium">
-        <item name="android:textSize">10.5sp</item>
-        <item name="android:letterSpacing">0.02</item>
-        <item name="android:fontFamily">sans-serif-medium</item>
-    </style>
-
 </resources>

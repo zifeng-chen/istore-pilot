@@ -350,13 +350,6 @@ public abstract class BaseFragment extends Fragment implements Refreshable {
         }
     }
 
-    /** 把视野拉回顶部。切换列表口径后要调，否则重建完看到的是一堆无关条目 */
-    protected void scrollTop() {
-        if (scroller != null) {
-            scroller.scrollTo(0, 0);
-        }
-    }
-
     protected void notice(String text) {
         notice(text, false);
     }

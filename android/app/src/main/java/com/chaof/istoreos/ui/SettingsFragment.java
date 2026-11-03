@@ -5,11 +5,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
-import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -639,24 +637,6 @@ public class SettingsFragment extends BaseFragment {
         }
         String pick = global.isEmpty() ? any : global;
         return pick.isEmpty() ? "—" : pick;
-    }
-
-    // ---------------------------------------------------------------- 地址
-
-    private void editBase() {
-        Context c = ctx();
-        Sheet.input(c, "服务器地址", "内网填路由器 IP，外网填 DDNS 域名。端口默认 8443。",
-                new String[]{"地址:192.168.100.1:8443:" + Session.base(c)},
-                "保存", values -> {
-                    if (values[0].isEmpty()) {
-                        return false;
-                    }
-                    Session.setBase(ctx(), values[0]);
-                    renderHeroMeta();
-                    Toast.makeText(ctx(), "地址已更新", Toast.LENGTH_SHORT).show();
-                    requireActivity().recreate();
-                    return true;
-                });
     }
 
     private void relogin() {
