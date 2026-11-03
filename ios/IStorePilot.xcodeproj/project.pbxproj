@@ -323,7 +323,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = "0.1.5";
-				PRODUCT_BUNDLE_IDENTIFIER = com.chaof.istoreos;
+				PRODUCT_BUNDLE_IDENTIFIER = com.izifeng.www.istorepilot;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				TARGETED_DEVICE_FAMILY = 1;
@@ -346,7 +346,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = "0.1.5";
-				PRODUCT_BUNDLE_IDENTIFIER = com.chaof.istoreos;
+				PRODUCT_BUNDLE_IDENTIFIER = com.izifeng.www.istorepilot;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				TARGETED_DEVICE_FAMILY = 1;

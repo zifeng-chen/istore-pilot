@@ -18,7 +18,7 @@ import os
 ROOT = os.path.dirname(os.path.abspath(__file__))
 APP = "IStorePilot"
 PROJ = "IStorePilot.xcodeproj"
-BUNDLE_ID = "com.chaof.istoreos"
+BUNDLE_ID = "com.izifeng.www.istorepilot"
 NAME = "iStore Pilot"
 VERSION = "0.1.5"
 BUILD = "28"

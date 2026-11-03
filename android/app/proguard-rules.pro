@@ -10,7 +10,7 @@
 
 # 自绘控件（Ui / MeterBar / TrendChart / AppIcon 里都是 new 出来的，
 # 但 Fragment 里偶尔会用全限定名反射式创建，保守留着）
--keep public class com.chaof.istoreos.widget.** { *; }
+-keep public class com.izifeng.www.istorepilot.widget.** { *; }
 
 # MPAndroidChart：内部有些回调走弱引用/泛型，混淆后偶发 ClassCastException，
 # 官方 issue 里也建议整包保留（体积不大）

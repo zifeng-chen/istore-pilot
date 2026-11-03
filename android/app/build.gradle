@@ -1,11 +1,11 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace 'com.chaof.istoreos'
+    namespace 'com.izifeng.www.istorepilot'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.chaof.istoreos"
+        applicationId "com.izifeng.www.istorepilot"
         minSdk 24
         targetSdk 34
         versionCode 28

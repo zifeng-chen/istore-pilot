@@ -377,7 +377,7 @@ App 设置页有「接管全网 / 退出接管」按钮，一键切换。
 
 | 项 | 值 |
 |---|---|
-| 包名 / 应用名 | `com.chaof.istoreos` / iStore Pilot |
+| 包名 / 应用名 | `com.izifeng.www.istorepilot` / iStore Pilot |
 | 版本 | 1.0.0（versionCode 1） |
 | 系统 | minSdk 24（7.0）· targetSdk 34（14） |
 | 体积 | 57 KB |

@@ -28,7 +28,7 @@
 3. 填：
    - Product Name：`iStoreOS`
    - Team：先选 **None**，一会儿再配
-   - Organization Identifier：`com.chaof`
+   - Organization Identifier：`com.izifeng`
    - Interface：**Storyboard** ← 必须是这个，不要选 SwiftUI
    - Language：**Swift**
    - 三个勾（Core Data / Tests）全部取消
@@ -66,8 +66,8 @@
 1. 左侧点蓝色工程图标 → **TARGETS → iStoreOS** → **Signing & Capabilities**
 2. 勾 **Automatically manage signing**
 3. **Team** → 选 `Add an Account...` → 用你的 Apple ID 登录 → 回来后选这个 Personal Team
-4. **Bundle Identifier** 改成唯一的，例如 `com.chaof.istoreos`
-   - 如果报「identifier is not available」，后面加几个字，如 `com.chaof.istoreos1`
+4. **Bundle Identifier** 改成唯一的，例如 `com.izifeng.www.istorepilot`
+   - 如果报「identifier is not available」，后面加几个字，如 `com.izifeng.www.istorepilot1`
 
 ---
 

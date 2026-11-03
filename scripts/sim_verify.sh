@@ -47,10 +47,10 @@ xcrun simctl install "$UDID" "$APP"
 cp /tmp/DuoLayout.bak "$DUO"
 
 # 预置登录态：plutil -insert 会把 istore.base 的点当 keypath 分隔符，用 plistlib
-DATA=$(xcrun simctl get_app_container "$UDID" com.chaof.istoreos data)
+DATA=$(xcrun simctl get_app_container "$UDID" com.izifeng.www.istorepilot data)
 PREFS="$DATA/Library/Preferences"
 mkdir -p "$PREFS"
-PL="$PREFS/com.chaof.istoreos.plist"
+PL="$PREFS/com.izifeng.www.istorepilot.plist"
 TOKEN="$TOKEN" PL="$PL" python3 -c "
 import os, plistlib, time
 d = {
@@ -63,8 +63,8 @@ plistlib.dump(d, open(os.environ['PL'], 'wb'))
 "
 echo "预置: $(ls -la "$PL" | awk '{print $5" bytes"}')"
 
-xcrun simctl terminate "$UDID" com.chaof.istoreos 2>/dev/null || true
-xcrun simctl launch "$UDID" com.chaof.istoreos >/dev/null
+xcrun simctl terminate "$UDID" com.izifeng.www.istorepilot 2>/dev/null || true
+xcrun simctl launch "$UDID" com.izifeng.www.istorepilot >/dev/null
 sleep 9
 xcrun simctl io "$UDID" screenshot "/tmp/shot_${NAME}.png" 2>/dev/null
 echo "SHOT=/tmp/shot_${NAME}.png"

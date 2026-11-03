@@ -21,7 +21,7 @@ mkdir -p "$DIR"
 sleep 1
 "$ADB" shell input swipe 540 2000 540 600 250 >/dev/null 2>&1
 sleep 1
-"$ADB" shell am start -n com.chaof.istoreos/.MainActivity >/dev/null 2>&1
+"$ADB" shell am start -n com.izifeng.www.istorepilot/.MainActivity >/dev/null 2>&1
 sleep 3
 
 focus=$("$ADB" shell dumpsys window 2>/dev/null | grep -m1 mCurrentFocus)

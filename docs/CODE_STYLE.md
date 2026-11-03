@@ -50,7 +50,7 @@
 ### Java（`android/`）
 
 - 4 空格缩进，行宽 **100**。
-- 命名：包 `com.chaof.istoreos.*` 全小写、类 `UpperCamelCase`、方法/字段 `lowerCamelCase`、
+- 命名：包 `com.izifeng.www.istorepilot.*` 全小写、类 `UpperCamelCase`、方法/字段 `lowerCamelCase`、
   常量 `UPPER_SNAKE_CASE`。
 - 一个文件一个 public 类；文件名与类名一致。
 - 成员变量 `private`，需要暴露用方法。

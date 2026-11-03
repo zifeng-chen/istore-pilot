@@ -146,7 +146,7 @@ hvigorw --mode module -p product=default -p buildMode=release assembleHap --no-d
 
 `build-profile.json5` 的 `signingConfigs` 是空数组。要装真机必须：
 
-1. 在 AppGallery Connect 上建应用，`bundleName` 用 `com.chaof.istoreos`
+1. 在 AppGallery Connect 上建应用，`bundleName` 用 `com.izifeng.www.istorepilot`
 2. 生成 `p12`（密钥库）+ `cer`（证书）+ `p7b`（Profile）
 3. 在 `build-profile.json5` 里填 `signingConfigs`，或在 DevEco 的
    File → Project Structure → Signing Configs 勾「Automatically generate signature」
@@ -234,7 +234,7 @@ xcodebuild -exportArchive -archivePath build/IStorePilot.xcarchive \
 <key>method</key><string>development</string>
 <key>teamID</key><string>你的 Team ID</string>
 <key>provisioningProfiles</key>
-<dict><key>com.chaof.istoreos</key><string>描述文件名</string></dict>
+<dict><key>com.izifeng.www.istorepilot</key><string>描述文件名</string></dict>
 <key>signingStyle</key><string>manual</string>
 ```
 

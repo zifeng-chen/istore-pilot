@@ -221,8 +221,8 @@ def main() -> int:
         else:
             missing.append(f"{name}（缺 ic_app_{slug}.png，先跑 scripts/make_brand_icons.py）")
 
-    lines = ["package com.chaof.istoreos.util;", "",
-             "import com.chaof.istoreos.R;", "",
+    lines = ["package com.izifeng.www.istorepilot.util;", "",
+             "import com.izifeng.www.istorepilot.R;", "",
              "import java.util.HashMap;", "import java.util.Map;", "",
              "/** 自动生成：scripts/fetch_app_icons.py。应用名 → 官方图标资源。 */",
              "public final class AppIcons {", "",
