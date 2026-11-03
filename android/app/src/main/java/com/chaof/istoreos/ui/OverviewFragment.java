@@ -322,6 +322,7 @@ public class OverviewFragment extends BaseFragment {
         try {
             v.setFontFeatureSettings("'tnum'");
         } catch (Throwable ignored) {
+            // 老系统没有这个 API，退回默认字距，数字宽度不齐但不影响读数
         }
         col.addView(v);
 

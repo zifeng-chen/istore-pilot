@@ -263,7 +263,6 @@ _dirty = False
 _last_save = 0.0
 
 
-
 # --------------------------------------------------------------- 用量账本
 
 
@@ -516,7 +515,6 @@ def by_device(mac: str) -> list[dict]:
     # 到底是谁在用。速率作为每一项的附加信息交给界面显示
     out.sort(key=lambda x: -x["total"])
     return out[:MAX_DEV_APPS]
-
 
 
 def _is_fake_ip(host: str) -> bool:

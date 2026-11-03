@@ -187,7 +187,9 @@ struct AppIconView: View {
         let n = name.trimmingCharacters(in: .whitespaces)
         guard let first = n.first else { return "?" }
         if first.isNumber { return String(n.prefix(2)) }
-        if first.unicodeScalars.first!.value > 0x2E80 { return String(first) }
+        if let scalar = first.unicodeScalars.first, scalar.value > 0x2E80 {
+            return String(first)
+        }
         let parts = n.split(separator: " ")
         if parts.count >= 2, let a = parts[0].first, let b = parts[1].first {
             return "\(Character(a.uppercased()))\(Character(b.uppercased()))"

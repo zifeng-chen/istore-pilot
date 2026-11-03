@@ -675,7 +675,7 @@ struct SettingsView: View {
                         popup = Popup(title: "检查失败", body: j.str("error", "没能拿到固件信息"))
                     } else if j.bool("has_update") {
                         popup = Popup(title: "发现新固件",
-                                      body: "当前：\(j.str("current"))\n最新：\(j.str("latest"))\n\n\(j.str("note", ""))")
+                                      body: "当前：\(j.str("current"))\n最新：\(j.str("latest"))\n\n\(j.str("note", ""))")  // style-ok
                     } else {
                         popup = Popup(title: "已是最新固件",
                                       body: "当前版本 \(j.str("current")) 就是官方最新版。")

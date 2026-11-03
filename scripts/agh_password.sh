@@ -48,8 +48,14 @@ ss -lntp 2>/dev/null | grep -E ":5353 " | head -2
 
 echo
 echo "=== 4. 认证验证 ==="
-printf "新密码 -> "; curl -s -o /dev/null -w "%{http_code}\n" -u "admin:${AGH_PW:?请先设置 AGH_PW}" http://127.0.0.1:3000/control/status
-printf "旧密码 -> "; curl -s -o /dev/null -w "%{http_code}\n" -u "admin:${AGH_OLD_PW:-unset}" http://127.0.0.1:3000/control/status
+printf "新密码 -> "
+curl -s -o /dev/null -w "%{http_code}\n" \
+  -u "admin:${AGH_PW:?请先设置 AGH_PW}" \
+  http://127.0.0.1:3000/control/status
+printf "旧密码 -> "
+curl -s -o /dev/null -w "%{http_code}\n" \
+  -u "admin:${AGH_OLD_PW:-unset}" \
+  http://127.0.0.1:3000/control/status
 
 echo
 echo "=== 5. 拦截仍生效吗 ==="

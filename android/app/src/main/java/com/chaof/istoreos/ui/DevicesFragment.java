@@ -445,10 +445,7 @@ public class DevicesFragment extends BaseFragment {
         line.addView(com.chaof.istoreos.util.Access.badge(c, d.optJSONObject("access"), online));
 
         LinearLayout mid = Ui.column(c);
-        String name = d.optString("label");
-        if (name.isEmpty()) {
-            name = !alias.isEmpty() ? alias : (!host.isEmpty() ? host : (!vendor.isEmpty() ? vendor : (ip.isEmpty() ? mac : ip)));
-        }
+        String name = pickName(alias, host, vendor, ip, mac);
         TextView title = Ui.text(c, name, 15f, online ? R.color.text_primary : R.color.text_secondary);
         title.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         title.setSingleLine(true);
@@ -533,5 +530,15 @@ public class DevicesFragment extends BaseFragment {
             startActivity(it);
         });
         return card;
+    }
+
+    /** 设备显示名：依次取 备注 → 主机名 → 厂商 → IP → MAC，第一个非空的。 */
+    private static String pickName(String... candidates) {
+        for (String v : candidates) {
+            if (v != null && !v.isEmpty()) {
+                return v;
+            }
+        }
+        return "";
     }
 }

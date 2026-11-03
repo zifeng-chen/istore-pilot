@@ -315,10 +315,7 @@ public class DeviceDetailActivity extends BaseActivity {
         String ip = d.optString("ip");
         boolean online = d.optBoolean("online");
 
-        String name = d.optString("label");
-        if (name.isEmpty()) {
-            name = !alias.isEmpty() ? alias : (!hostname.isEmpty() ? hostname : (!vendor.isEmpty() ? vendor : ip));
-        }
+        String name = pickName(alias, hostname, vendor, ip);
         currentName = name;
         toolbar.setTitle(name.isEmpty() ? "设备" : name);
 
@@ -465,7 +462,9 @@ public class DeviceDetailActivity extends BaseActivity {
 
         long last = d.optLong("last_seen", -1);
         if (!online && last >= 0) {
-            TextView seen = Ui.text(this, last == 0 ? "刚离线" : Fmt.dur(last) + "前", 11f, R.color.text_secondary);
+            TextView seen = Ui.text(this,
+                    last == 0 ? "刚离线" : Fmt.dur(last) + "前",
+                    11f, R.color.text_secondary);
             seen.setGravity(Gravity.END);
             seen.setPadding(0, Ui.dp(this, 4), 0, 0);
             right.addView(seen);
@@ -622,7 +621,9 @@ public class DeviceDetailActivity extends BaseActivity {
 
         long down = o.optLong("down", 0);
         long up = o.optLong("up", 0);
-        TextView bytes = Ui.text(this, "↓" + Fmt.bytes(down) + " ↑" + Fmt.bytes(up), 11f, R.color.text_secondary);
+        TextView bytes = Ui.text(this,
+                "↓" + Fmt.bytes(down) + " ↑" + Fmt.bytes(up),
+                11f, R.color.text_secondary);
         bytes.setGravity(Gravity.END);
         line.addView(bytes);
 
@@ -651,7 +652,8 @@ public class DeviceDetailActivity extends BaseActivity {
             line.setLayoutParams(lp);
 
             String arrow = o.optBoolean("outbound") ? "↑" : "↓";
-            TextView dir = Ui.text(this, arrow, 12f, o.optBoolean("outbound") ? R.color.warn : R.color.primary);
+            TextView dir = Ui.text(this, arrow, 12f,
+                    o.optBoolean("outbound") ? R.color.warn : R.color.primary);
             dir.setPadding(0, 0, Ui.dp(this, 6), 0);
             line.addView(dir);
 
@@ -810,5 +812,16 @@ public class DeviceDetailActivity extends BaseActivity {
         } catch (Exception e) {
             return new JSONObject();
         }
+    }
+
+    /** 设备显示名：依次取 备注 → 主机名 → 厂商 → IP，第一个非空的。
+     *  以前这里是一行四层嵌套三元，改一个字段要看半天括号。 */
+    private static String pickName(String... candidates) {
+        for (String v : candidates) {
+            if (v != null && !v.isEmpty()) {
+                return v;
+            }
+        }
+        return "";
     }
 }

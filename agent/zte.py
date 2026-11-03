@@ -210,6 +210,7 @@ def _fetch_one(host: str, user: str, password: str,
         # 会把对方踢回登录页，所以调用方要克制（见 _refresh）
         if not (allow_preempt and holder.get("sid")):
             return {}, err, holder
+        # 记下被我们踢下线的会话主人，返回给调用方提示「抢了谁的登录」
         kicked = holder.get("ip", "")
         fields = {"preempt_sessid": holder["sid"], "action": "preempt",
                   "_sessionTOKEN": sess}
@@ -245,7 +246,7 @@ def _fetch_one(host: str, user: str, password: str,
     rows = _parse(xml)
     for rec in rows.values():
         rec["ap"] = host
-    return rows, "", {}
+    return rows, "", ({"kicked": kicked} if kicked else {})
 
 
 # ---------------------------------------------------------------- 轮询

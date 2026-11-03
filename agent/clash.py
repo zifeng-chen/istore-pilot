@@ -11,6 +11,18 @@ import urllib.request
 from .config import get as cfg
 
 
+def _last_delay(node: dict) -> int | None:
+    """取节点最近一次测速的延迟。
+
+    Clash 的 history 是一个数组，每项形如 {"time": ..., "delay": 120}；
+    空数组或没有 delay 字段都返回 None（= 没测过），不要当成 0（= 超时）。
+    """
+    hist = node.get("history") or []
+    if not hist:
+        return None
+    return hist[-1].get("delay")
+
+
 def _base() -> str:
     c = cfg("clash", {})
     host = c.get("controller_host", "127.0.0.1")
@@ -45,7 +57,8 @@ def _req(path: str, method: str = "GET", body: dict | None = None, timeout: floa
 
 def _uci(section: str) -> str:
     try:
-        out = subprocess.run(["uci", "get", f"openclash.{section}"], capture_output=True, timeout=4, check=False)
+        out = subprocess.run(["uci", "get", f"openclash.{section}"],
+                             capture_output=True, timeout=4, check=False)
         return out.stdout.decode("utf-8", "replace").strip()
     except (OSError, subprocess.SubprocessError):
         return ""
@@ -130,7 +143,7 @@ def proxies() -> dict:
                     "name": m,
                     "type": child.get("type", ""),
                     "is_group": is_group(child),
-                    "delay": (child.get("history") or [{}])[-1].get("delay") if child.get("history") else None,
+                    "delay": _last_delay(child),
                     "udp": child.get("udp"),
                 }
             )
@@ -153,7 +166,7 @@ def proxies() -> dict:
                 "now": now,
                 "now_valid": bool(now),
                 "now_info": now_info,
-                "now_delay": (raw.get(now, {}).get("history") or [{}])[-1].get("delay") if now in raw and raw.get(now, {}).get("history") else None,
+                "now_delay": _last_delay(raw.get(now, {})),
                 "members": members,
             }
         )

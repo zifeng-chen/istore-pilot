@@ -89,7 +89,6 @@ def config() -> dict:
 
 def status() -> dict:
     """运行态：链路是否 up、拿到什么 IP、网关 DNS、拨号时长。"""
-    data = sysinfo._ubus("network", "interface", timeout=5)
     # ubus 用 interface 名查询要带参数，这里直接查 wan
     raw = {}
     try:

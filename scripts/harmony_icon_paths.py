@@ -362,7 +362,9 @@ def main() -> int:
     if "--sheet" in sys.argv:
         out = sys.argv[sys.argv.index("--sheet") + 1]
         # 收集原/新路径做对照
-        names = re.findall(r"static readonly (\w+): string =\s*('(?:[^'\\]|\\.)*'(?:\s*\+\s*'(?:[^'\\]|\\.)*')*)", src)
+        names = re.findall(
+            r"static readonly (\w+): string =\s*"
+            r"('(?:[^'\\]|\\.)*'(?:\s*\+\s*'(?:[^'\\]|\\.)*')*)", src)
         pairs = []
         for name, expr in names:
             old = "".join(re.findall(r"'((?:[^'\\]|\\.)*)'", expr))

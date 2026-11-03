@@ -107,8 +107,11 @@ public abstract class BaseFragment extends Fragment implements Refreshable {
         build(body);
         installSkeleton(c);
 
-        scroller.addView(content);        scroller.setOnScrollChangeListener((NestedScrollView.OnScrollChangeListener)
-                (v, x, y, oldX, oldY) -> syncNavTitle(y));
+        scroller.addView(content);
+        // 强转不能省：NestedScrollView 与 View 各有一个同名重载，lambda 推断不出是哪一个
+        scroller.setOnScrollChangeListener(
+                (NestedScrollView.OnScrollChangeListener)
+                        (v, x, y, oldX, oldY) -> syncNavTitle(y));
 
         // 固定区：不放进滚动容器。设备清单这类页面要把 hero、筛选、搜索框
         // 钉在顶上，只让下面的列表滚 —— 否则翻到第 30 台想换筛选，还得先滚回去

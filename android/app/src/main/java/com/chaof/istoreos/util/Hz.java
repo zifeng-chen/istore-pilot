@@ -63,6 +63,7 @@ public final class Hz {
             lp.preferredDisplayModeId = bestMode;
             w.setAttributes(lp);
         } catch (Throwable ignored) {
+            // 系统可能拒绝改窗口属性（如分屏 / 息屏），保持原刷新率即可
         }
         return best;
     }

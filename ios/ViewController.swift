@@ -83,7 +83,9 @@ final class ViewController: UIViewController {
             progressBar.heightAnchor.constraint(equalToConstant: 2),
         ])
 
-        progressObservation = webView.observe(\.estimatedProgress, options: [.new]) { [weak self] webView, _ in
+        progressObservation = webView.observe(
+            \.estimatedProgress, options: [.new]
+        ) { [weak self] webView, _ in
             guard let self else { return }
             let p = Float(webView.estimatedProgress)
             self.progressBar.setProgress(p, animated: true)

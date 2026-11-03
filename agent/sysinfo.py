@@ -275,7 +275,11 @@ def ip_addrs() -> list[dict]:
     for dev in data:
         addrs = []
         for a in dev.get("addr_info", []):
-            addrs.append({"family": a.get("family"), "address": a.get("local"), "prefixlen": a.get("prefixlen")})
+            addrs.append({
+                "family": a.get("family"),
+                "address": a.get("local"),
+                "prefixlen": a.get("prefixlen"),
+            })
         out.append(
             {
                 "name": dev.get("ifname"),

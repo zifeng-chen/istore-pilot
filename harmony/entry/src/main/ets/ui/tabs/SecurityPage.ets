@@ -503,8 +503,22 @@ export struct SecurityPage {
       CardTitle({ glyph: Glyph.LINK, title: '设备', sub: '点数字进清单，点行看详情' });
 
       Row() {
-        StatCell({ label: '在线', value: this.online, unknown: this.neverLoaded(), tone: Pal.primary(), filter: 1, onTap: () => { this.openSub(1, 1); } }).layoutWeight(1);
-        StatCell({ label: '离线', value: this.offline(), unknown: this.neverLoaded(), tone: Pal.textPrimary(), filter: 2, onTap: () => { this.openSub(1, 2); } }).layoutWeight(1);
+        StatCell({
+          label: '在线',
+          value: this.online,
+          unknown: this.neverLoaded(),
+          tone: Pal.primary(),
+          filter: 1,
+          onTap: () => { this.openSub(1, 1); }
+        }).layoutWeight(1);
+        StatCell({
+          label: '离线',
+          value: this.offline(),
+          unknown: this.neverLoaded(),
+          tone: Pal.textPrimary(),
+          filter: 2,
+          onTap: () => { this.openSub(1, 2); }
+        }).layoutWeight(1);
         // 0 台禁网时标红只会让人以为出事了；有数才用危险色
         StatCell({ label: '已禁网', value: this.blocked, unknown: this.neverLoaded(),
           tone: this.blocked > 0 ? Pal.danger() : Pal.textTertiary(),

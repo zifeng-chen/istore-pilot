@@ -651,7 +651,6 @@ def firmware_check() -> dict:
     }
 
 
-
 def upgrade(names: list[str] | None = None) -> dict:
     """后台跑 opkg upgrade，立刻返回。进度看 update_status()。"""
     if _running():

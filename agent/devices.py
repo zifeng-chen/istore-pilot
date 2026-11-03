@@ -86,7 +86,6 @@ PROBE_SEC = 60.0
 ALIVE_GRACE = 180.0
 
 
-
 # ---------------------------------------------------------------- 基础工具
 
 
@@ -255,7 +254,6 @@ def ip_mac_map() -> dict[str, str]:
     return _ip_mac_cache
 
 
-
 # ---------------------------------------------------------------- 厂商识别
 
 # 手工覆盖层：优先于 IEEE 大库，只为把虚拟机这类容易混淆的条目写清楚。
@@ -273,11 +271,11 @@ _PORT_HINT = {
     123: "NTP", 1900: "SSDP", 5353: "mDNS", 5355: "LLMNR", 137: "NetBIOS",
     139: "NetBIOS", 445: "SMB 文件共享", 548: "AFP 文件共享", 631: "打印",
     3389: "远程桌面", 5900: "VNC", 8080: "HTTP 代理", 8443: "HTTPS 备用",
-    3478: "STUN", 3479: "STUN", 5228: "Google 推送", 5223: "Apple 推送",
+    3478: "STUN / PSN", 3479: "STUN", 5228: "Google 推送", 5223: "Apple 推送",
     5222: "XMPP", 8883: "MQTT TLS", 1883: "MQTT", 5060: "SIP", 554: "RTSP 视频流",
     8009: "Chromecast", 7000: "AirPlay", 5000: "HTTP 备用", 9000: "HTTP 备用",
     32400: "Plex", 8096: "Jellyfin", 9091: "Transmission", 51413: "BT 下载",
-    19132: "Minecraft", 27015: "游戏联机", 3074: "Xbox Live", 3478: "PSN",
+    19132: "Minecraft", 27015: "游戏联机", 3074: "Xbox Live",
     6881: "BT 下载", 16881: "BT 下载", 1194: "OpenVPN", 500: "IPSec",
     4500: "IPSec", 51820: "WireGuard", 8554: "RTSP", 1935: "RTMP 推流",
 }
@@ -566,7 +564,6 @@ def _guess_access(mac: str, dev_type: str, hostname: str) -> dict:
       3. 电脑/NAS/网络设备 —— 两种都可能，给个低置信度的"有线"
     接入方式在 UI 上是个**参考**，不能拿去当计费或限速的依据。
     """
-    reason = ""
     try:
         first = int((mac or "00").split(":")[0], 16)
     except (ValueError, IndexError):
@@ -631,11 +628,9 @@ def _display(host: str, who: dict) -> str:
     return f"{brand} {kind}".strip() if kind and kind != "其他" else (brand or name)
 
 
-
 def _vendor(mac: str) -> str:
     """兼容旧调用：只给品牌名。"""
     return identify(mac, "")["brand"]
-
 
 
 # ---------------------------------------------------------------- 数据源

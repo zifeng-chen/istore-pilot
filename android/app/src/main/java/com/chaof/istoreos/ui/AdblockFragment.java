@@ -1001,6 +1001,7 @@ public class AdblockFragment extends BaseFragment {
         try {
             body.put("confirm", "install");
         } catch (Exception ignored) {
+            // key / value 都是非空字符串，put 不会抛；声明式 catch 而已
         }
         Api.post(c, "/api/v1/adblock/install", body, new Cb() {
             @Override

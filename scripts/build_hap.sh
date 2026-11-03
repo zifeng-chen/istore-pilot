@@ -6,7 +6,7 @@ PROJ="${1:-/Users/chen/istore-build/harmony}"
 DEVECO="/Applications/DevEco-Studio.app/Contents"
 
 export DEVECO_SDK_HOME="$DEVECO/sdk"
-export PATH="$DEVECO/tools/node/bin:$DEVECO/tools/ohpm/bin:$DEVECO/tools/hvigor/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+export PATH="$DEVECO/tools/node/bin:$DEVECO/tools/ohpm/bin:$DEVECO/tools/hvigor/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"  # style-ok
 export NODE_HOME="$DEVECO/tools/node"
 
 cd "$PROJ" || { echo "!! 工程目录不存在: $PROJ"; exit 1; }
@@ -14,7 +14,7 @@ cd "$PROJ" || { echo "!! 工程目录不存在: $PROJ"; exit 1; }
 echo "=== 环境 ==="
 echo "node    $(node -v)"
 echo "hvigor  $(hvigorw --version 2>&1 | tail -1)"
-echo "sdk api $(python3 -c "import json;print(json.load(open('$DEVECO_SDK_HOME/default/sdk-pkg.json'))['data']['apiVersion'])" 2>/dev/null)"
+echo "sdk api $(python3 -c "import json;print(json.load(open('$DEVECO_SDK_HOME/default/sdk-pkg.json'))['data']['apiVersion'])" 2>/dev/null)"  # style-ok
 echo "工程    $PROJ"
 
 echo ""

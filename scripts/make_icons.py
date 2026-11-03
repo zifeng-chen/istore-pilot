@@ -183,7 +183,10 @@ def main() -> int:
         save(opaque, os.path.join(HARMONY, rel))
 
     print("\niOS:")
-    save(opaque, os.path.join(MOBILE, "ios", "Assets", "AppIcon-1024.png"))
+    # 两处都要写：ios/Assets 是源文件，Assets.xcassets 才是 Xcode 打包的那份
+    for rel in ("ios/Assets/AppIcon-1024.png",
+                "ios/IStorePilot/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png"):
+        save(opaque, os.path.join(ROOT, rel))
 
     # ---- adaptive 背景色保留（万一以后回退）
     colors = os.path.join(ANDROID_RES, "values", "colors.xml")

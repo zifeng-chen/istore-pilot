@@ -1269,7 +1269,6 @@ def _dns_chain() -> dict:
 
 def preflight() -> dict:
     mem = _meminfo()
-    chain = _dns_chain()
     st = status()
     up, up_note = _pick_upstream()
 
