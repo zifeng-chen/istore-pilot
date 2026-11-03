@@ -655,6 +655,12 @@ do_install() {
 	mkdir -p "$ROOT_DIR/usr/lib/istore-agent" "$ROOT_DIR/etc/init.d" \
 		"$ROOT_DIR/etc/config" "$ROOT_DIR/usr/lib/lua/luci" \
 		"$ROOT_DIR/www" 2>/dev/null
+
+	# 解包只会覆盖同名文件，上一版的 istoreos-x.y.z.apk 会一直留在 www 里。
+	# 既白占空间，又会让下面「Android 安装」按文件名取到最旧的那个
+	# （0.1.2 < 0.1.3 < 0.1.4，ls 默认就是按名字排）。所以先清掉。
+	rm -f "$ROOT_DIR/www/istore-agent/"*.apk 2>/dev/null
+
 	extract_payload "${ROOT_DIR:-/}" \
 		|| die "解包失败（写入目标目录时出错）。设备空间可能不足。
      可以先腾点空间（rm -rf /tmp/*），或改用同版本的 ipk 装。"
@@ -713,7 +719,8 @@ do_install() {
 	printf '   安装完成  %s %s-%s\n\n' "$APP_NAME" "$PKG_VERSION" "$PKG_REVISION"
 	printf '   网页控制台   http://%s:%s\n' "$ip" "$port"
 	printf '   LuCI 管理    http://%s/cgi-bin/luci/admin/services/istore_agent\n' "$ip"
-	apk=$(ls "$ROOT_DIR/www/istore-agent/"*.apk 2>/dev/null | head -1)
+	# 按时间取，不按文件名取：目录里理论上只剩一个，但万一有残留也别提示错版本
+	apk=$(ls -t "$ROOT_DIR/www/istore-agent/"*.apk 2>/dev/null | head -1)
 	[ -n "$apk" ] && printf '   Android 安装 http://%s/istore-agent/%s\n' "$ip" "$(basename "$apk")"
 	printf '   卸载         sh %s --uninstall\n' "$(basename "$SELF")"
 	printf '  ────────────────────────────────────────────────────────\n\n'
