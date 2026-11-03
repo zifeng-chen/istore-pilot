@@ -3,6 +3,7 @@ import { router } from '@kit.ArkUI';
 import { webview } from '@kit.ArkWeb';
 import { Api, ApiResult } from '../api/Api';
 import { Session } from '../core/Session';
+import { J } from '../core/Json';
 import { Pal, T } from '../ui/Theme';
 import { GlyphIcon } from '../ui/Comp';
 import { Glyph } from '../ui/comp/Icons';
@@ -72,24 +73,23 @@ struct WebPage {
     return (colon > 0 ? s.substring(0, colon) : s).toLowerCase();
   }
 
-  private guessUrl(): string {
-    let host: string = Session.base().replace('https://', '').replace('http://', '');
-    const slash: number = host.indexOf('/');
-    if (slash > 0) {
-      host = host.substring(0, slash);
+  /**
+   * App 当前连的 origin（协议 + 主机 + 端口），原样保留。
+   *
+   * 网页端必须和 API 同源 —— 同源才能共用 cookie，也才能走 Agent 上那条
+   * /cgi-bin/luci 的透传。以前这里把协议和端口都剥掉了：域名访问时
+   * 打开的是 http://域名/（80 口），必然白屏。
+   */
+  private origin(): string {
+    const b: string = Session.base();
+    const sep: number = b.indexOf('://');
+    const scheme: string = sep > 0 ? b.substring(0, sep) : 'http';
+    let rest: string = sep > 0 ? b.substring(sep + 3) : b;
+    const slash: number = rest.indexOf('/');
+    if (slash >= 0) {
+      rest = rest.substring(0, slash);
     }
-    if (host.startsWith('[')) {
-      const end: number = host.indexOf(']');
-      if (end > 0) {
-        host = host.substring(0, end + 1);
-      }
-    } else {
-      const colon: number = host.lastIndexOf(':');
-      if (colon > 0) {
-        host = host.substring(0, colon);
-      }
-    }
-    return 'http://' + host + '/cgi-bin/luci/';
+    return scheme + '://' + rest;
   }
 
   /**
@@ -109,35 +109,38 @@ struct WebPage {
   }
 
   private async open(): Promise<void> {
-    const fallback: string = this.guessUrl();
-    this.host = fallback.replace('http://', '').replace('/cgi-bin/luci/', '');
+    // 先按 origin + 默认路径兜底，拿到票据后再用服务端给的相对路径
+    let target: string = this.origin() + '/cgi-bin/luci/';
 
     const r: ApiResult = await Api.getFresh(this.ctx(), '/api/v1/luci/session');
-    let target: string = fallback;
+    if (r.ok) {
+      const p: string = r.data.str('path', '/cgi-bin/luci/');
+      target = this.origin() + (p.startsWith('/') ? p : '/' + p);
+    }
+    this.host = this.hostOf(target);
+
     let ok: boolean = false;
     if (r.ok && r.data.bool('ok', false)) {
       const name: string = r.data.str('cookie_name', '');
       const value: string = r.data.str('cookie_value', '');
-      // 票据里的地址必须是「我们连的这台路由器」：否则这张 root 会话
-      // cookie 会被种到别的域上（篡改响应 / Host 头带偏都能做到）
-      let u: string = r.data.str('url', fallback);
-      if (this.hostOf(u) !== this.hostOf(fallback)) {
-        u = fallback;
-      }
       if (name.length > 0 && value.length > 0) {
         try {
           // 先清空：LuCI 自己下发的 cookie 路径是 /cgi-bin/luci/，我们这张是 /，
           // 两个同名 cookie 同时存在时服务端取哪一条没保证
           webview.WebCookieManager.clearAllCookiesSync();
-          webview.WebCookieManager.configCookieSync(u, name + '=' + value + '; path=/');
-          target = u;
+          // 网页端通行证：Agent 的透传只放行带这张 cookie 的请求，
+          // 没换过票的浏览器打不开
+          const pass: J = r.data.obj('web_cookie');
+          const pn: string = pass.str('name', '');
+          const pv: string = pass.str('value', '');
+          if (pn.length > 0 && pv.length > 0) {
+            webview.WebCookieManager.configCookieSync(target, pn + '=' + pv + '; path=/');
+          }
+          webview.WebCookieManager.configCookieSync(target, name + '=' + value + '; path=/');
           ok = true;
         } catch (e) {
           ok = false;
         }
-      }
-      if (ok) {
-        this.host = r.data.str('host', this.host);
       }
     }
 

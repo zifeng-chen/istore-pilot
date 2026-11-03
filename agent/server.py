@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import http.client
+import ipaddress
 import json
 import os
 import sys
@@ -21,6 +23,23 @@ VERSION = "0.1.3"
 
 _cache_lock = threading.Lock()
 _cache: dict[str, tuple[float, object]] = {}
+
+# 网页端走同源代理：这两个前缀转发给路由器自己的 LuCI（127.0.0.1:80）。
+# LuCI 的页面只用这两个绝对路径（静态资源在 /luci-static），够用。
+LUCI_PREFIXES = ("/cgi-bin/luci", "/luci-static")
+
+
+def _is_lan(ip: str) -> bool:
+    """来源是不是内网。
+
+    只用来判断「网页端要不要放行」，不参与鉴权 —— 公网来源还能靠
+    换票通行证（cookie）进来，前提是你把 proxy_lan_only 关掉。
+    """
+    try:
+        a = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    return a.is_loopback or a.is_private or a.is_link_local
 
 
 def _log(msg: str) -> None:
@@ -169,6 +188,16 @@ class Handler(BaseHTTPRequestHandler):
     def _client_ip(self) -> str:
         return self.client_address[0] if self.client_address else "?"
 
+    def _origin_ip(self) -> str:
+        """真实来源 IP。
+
+        前面挂了反向代理（群晖那类）时，TCP 对端是代理自己 —— 它也在局域网里，
+        直接看 client_address 会把「从外网进来的」也当成内网。
+        代理会带 X-Forwarded-For，取第一段（最靠近用户的那一跳）。
+        """
+        xff = (self.headers.get("X-Forwarded-For", "") or "").split(",")[0].strip()
+        return xff or self._client_ip()
+
     def _host_only(self) -> str:
         """客户端访问我们时用的主机名/IP（去掉端口），用来拼 LuCI 的地址。
 
@@ -182,6 +211,140 @@ class Handler(BaseHTTPRequestHandler):
             end = raw.find("]")
             return raw[1:end] if end > 0 else raw
         return raw.rsplit(":", 1)[0] if raw.count(":") == 1 else raw
+
+    # ------------------------------------------------------------ 网页端代理
+
+    def _cookie(self, name: str) -> str:
+        raw = self.headers.get("Cookie", "") or ""
+        for part in raw.split(";"):
+            k, _, v = part.strip().partition("=")
+            if k == name:
+                return v
+        return ""
+
+    def _raw_body(self, limit: int = 8 << 20) -> bytes:
+        """原样读请求体：LuCI 的 ubus 调用是 json/urlencoded，不能按 JSON 解析。"""
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            return b""
+        if length <= 0:
+            return b""
+        return self.rfile.read(min(length, limit))
+
+    def _web_block(self, title: str, detail: str) -> None:
+        """给浏览器看的一页说明：不转发，也不透任何 LuCI 内容。"""
+        html = (
+            '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">'
+            '<meta name="viewport" content="width=device-width,initial-scale=1">'
+            "<title>%s</title><style>"
+            "body{margin:0;background:#0f1c18;color:#e8f2ee;"
+            "font:15px/1.7 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;"
+            "display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px}"
+            ".b{max-width:430px}h1{font-size:17px;margin:0 0 10px}"
+            "p{margin:0;color:#9fb3ab;font-size:13.5px}"
+            "</style></head><body><div class=\"b\"><h1>%s</h1><p>%s</p></div></body></html>"
+            % (title, title, detail)
+        )
+        self._send(403, html.encode("utf-8"), "text/html; charset=utf-8")
+
+    def _send_pairs(self, code: int, body: bytes, pairs: list[tuple[str, str]]) -> None:
+        """带重复头的发送：Set-Cookie 会来好几条，dict 装不下。"""
+        self.send_response(code)
+        for k, v in pairs:
+            self.send_header(k, v)
+        self.send_header("Content-Length", str(len(body)))
+        self._headers_buffer.append(b"\r\n")
+        head = b"".join(self._headers_buffer)
+        self._headers_buffer = []
+        if self.command == "HEAD":
+            self.wfile.write(head)
+        else:
+            self.wfile.write(head + body)
+
+    @staticmethod
+    def _relocate(value: str, port: int) -> str:
+        """LuCI 有时回绝对跳转（http://127.0.0.1/cgi-bin/luci/...），改回相对路径。"""
+        try:
+            u = urllib.parse.urlsplit(value)
+        except ValueError:
+            return value
+        if not u.scheme or not u.netloc:
+            return value
+        if (u.hostname or "") in ("127.0.0.1", "localhost", "::1"):
+            return urllib.parse.urlunsplit(("", "", u.path or "/", u.query, u.fragment))
+        return value
+
+    def _relay_luci(self) -> None:
+        """把 /cgi-bin/luci、/luci-static 透传给路由器自己的 LuCI。
+
+        为什么不让客户端直接连 LuCI 的 80 口：
+          - 外面（域名 + 端口）那条反代只到 Agent，80 口根本不可达；
+          - 局域网时又会把协议/端口猜错 —— App 连的是 https://域名:18443，
+            网页端却被拼成 http://域名/ 。
+        统一从这里转发后，App 用哪个 origin 进来，网页端就落在同一个 origin。
+        """
+        if luci.proxy_lan_only() and not _is_lan(self._origin_ip()):
+            self._web_block(
+                "网页端只在家里的局域网可用",
+                "当前是从外网连进来的。App 的功能不受影响；要用网页端请连回家里的 Wi-Fi。"
+                "想在公网也能用，把 /etc/istore-agent/config.json 里的 "
+                "luci.proxy_lan_only 改成 false（那样 LuCI 会暴露在这个端口上）。",
+            )
+            return
+
+        if not luci.web_pass_ok(self._cookie(luci.WEB_COOKIE)):
+            self._web_block(
+                "请从 App 的「网页端」入口打开",
+                "这个地址不对浏览器单独开放。回 App 里点任意一个网页端入口，"
+                "会自动带上通行凭证再跳过来。",
+            )
+            return
+
+        port, secure = luci.upstream()
+        body = None
+        if self.command in ("POST", "PUT", "PATCH", "DELETE"):
+            body = self._raw_body()
+
+        hdrs = {
+            "Host": "127.0.0.1:%d" % port,
+            "Connection": "close",
+            "User-Agent": self.headers.get("User-Agent", "istore-agent"),
+            "Accept": self.headers.get("Accept", "*/*"),
+            "Accept-Language": self.headers.get("Accept-Language", "zh-CN,zh;q=0.9"),
+            "Cookie": self.headers.get("Cookie", ""),
+        }
+        for name in ("Content-Type", "Referer", "Origin", "X-Requested-With"):
+            v = self.headers.get(name)
+            if v:
+                hdrs[name] = v
+        if body is not None:
+            hdrs["Content-Length"] = str(len(body))
+
+        cls = http.client.HTTPSConnection if secure else http.client.HTTPConnection
+        conn = cls("127.0.0.1", port, timeout=25)
+        try:
+            conn.request(self.command, self.path, body=body, headers=hdrs)
+            resp = conn.getresponse()
+            data = resp.read()
+            status = resp.status
+            pairs: list[tuple[str, str]] = []
+            for k, v in resp.getheaders():
+                lk = k.lower()
+                if lk in ("connection", "keep-alive", "transfer-encoding", "content-length"):
+                    continue
+                if lk == "location":
+                    v = self._relocate(v, port)
+                pairs.append((k, v))
+        except (OSError, http.client.HTTPException) as exc:
+            _log("luci proxy failed: %s" % exc)
+            self._web_block("网页端打不开",
+                            "Agent 连不上路由器自己的 LuCI（127.0.0.1:%d）。" % port)
+            return
+        finally:
+            conn.close()
+
+        self._send_pairs(status, data, pairs)
 
     # ------------------------------------------------------------ 路由分发
 
@@ -212,6 +375,11 @@ class Handler(BaseHTTPRequestHandler):
             self._api_get(path, query)
             return
 
+        # 网页端：同源代理到路由器自己的 LuCI
+        if path.startswith(LUCI_PREFIXES):
+            self._relay_luci()
+            return
+
         # 不再服务内置 Web 面板（已从项目里分离），非 API 的 GET 一律 404
         self._error(404, "not found")
 
@@ -226,6 +394,11 @@ class Handler(BaseHTTPRequestHandler):
                 self._error(403, "密码错误或尝试过于频繁")
                 return
             self._json({"ok": True, **auth.issue_token()})
+            return
+
+        # 网页端表单/ubus 调用也走同源代理
+        if path.startswith(LUCI_PREFIXES):
+            self._relay_luci()
             return
 
         if not path.startswith("/api/"):

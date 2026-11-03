@@ -20,6 +20,8 @@ from __future__ import annotations
 import http.client
 import threading
 import time
+import hashlib
+import hmac
 import urllib.parse
 
 from . import sysinfo
@@ -214,6 +216,58 @@ def _lan_host() -> str:
     return "192.168.100.1"
 
 
+# --------------------------------------------------------------- 网页端通行证
+#
+# 网页端现在走 Agent 自己的同源代理（/cgi-bin/luci → 127.0.0.1:80），
+# 好处是外面只开一个端口、域名/局域网都走同一条路。
+# 但代理不能对所有人敞开 —— 那等于把 LuCI 的登录页挂到公网上让人撞密码。
+# 所以 App 换票时一起发一张签名通行证，浏览器带着它才放行；
+# 签发用的是和登录令牌同一把 signing_key。
+
+WEB_COOKIE = "istore_web"
+
+
+def upstream() -> tuple[int, bool]:
+    """LuCI 在哪个端口、是不是 https。"""
+    return _uhttpd()
+
+
+def proxy_lan_only() -> bool:
+    """网页端是否只对内网开放（默认是）。
+
+    开着的效果：从公网进来（域名+端口）只得到一句提示，
+    LuCI 的登录页永远不会暴露到外网；App 自己的接口不受影响。
+    """
+    sec = cfg("luci", {}) or {}
+    return bool(sec.get("proxy_lan_only", True))
+
+
+def _web_key() -> bytes:
+    return str(cfg("auth", {}).get("signing_key", "")).encode()
+
+
+def web_pass(ttl: int = 7 * 24 * 3600) -> str:
+    """签一张网页端通行证：`过期时间.签名`。"""
+    exp = int(time.time()) + ttl
+    payload = "web:%d" % exp
+    sig = hmac.new(_web_key(), payload.encode(), hashlib.sha256).hexdigest()[:32]
+    return "%d.%s" % (exp, sig)
+
+
+def web_pass_ok(token: str) -> bool:
+    if not token or "." not in token:
+        return False
+    exp_s, sig = token.split(".", 1)
+    try:
+        exp = int(exp_s)
+    except ValueError:
+        return False
+    if exp < time.time():
+        return False
+    want = hmac.new(_web_key(), ("web:%d" % exp).encode(), hashlib.sha256).hexdigest()[:32]
+    return hmac.compare_digest(sig, want)
+
+
 def ticket(host: str) -> dict:
     """给客户端一张可以直接塞进 WebView 的 cookie。
 
@@ -257,6 +311,11 @@ def ticket(host: str) -> dict:
         # 直接给 /cgi-bin/luci/：这是后台首页。打开 `http://host/` 也行，
         # 但那多一跳 meta refresh，WebView 会闪一下白屏
         "url": "%s://%s/cgi-bin/luci/" % (scheme, host),
+        # 新客户端只用下面这两个：路径是相对的，由客户端拿自己配的
+        # origin（协议 + 主机 + 端口）拼绝对地址 —— 域名访问时也能落在
+        # 同一个源上，不用再猜 LuCI 在哪个端口
+        "path": "/cgi-bin/luci/",
+        "web_cookie": {"name": WEB_COOKIE, "value": web_pass(), "path": "/"},
         "host": host,
         "scheme": scheme,
         "cookie_name": cached["name"],

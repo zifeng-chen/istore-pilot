@@ -51,6 +51,11 @@ def defaults() -> dict:
             # 留空 = 用下面 auth.password（全站同一个口令的部署什么都不用填）；
             # 只有「路由器 root 口令 ≠ App 登录口令」时才需要在这里写。
             "password": os.environ.get("AGENT_LUCI_PASSWORD", ""),
+            # 网页端（/cgi-bin/luci）走 Agent 的同源代理，外面不用再开端口。
+            # true = 只对内网放行：从公网（域名+端口）进来只看得到一句提示，
+            #        LuCI 的登录页不会暴露出去；
+            # false = 公网也能用，靠换票通行证挡（只有 App 换过票才进得来）。
+            "proxy_lan_only": True,
         },
         "ap": {
             # 中兴 AP 的接入设备表 —— 「有线还是无线」只有 AP 自己知道，

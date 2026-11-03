@@ -57,7 +57,13 @@ public class WebActivity extends BaseActivity {
     private TextView errorBox;
     private String wantPath = "";
 
-    /** 拿不到票据时的兜底地址：Agent 在 8443，LuCI 在 80，端口必须剥掉 */
+    /**
+     * 拿不到票据时的兜底地址。
+     *
+     * 现在网页端走 Agent 的同源代理（/cgi-bin/luci 转发到路由器 80 口），
+     * 所以地址就是「App 连的那个 origin + 路径」—— 局域网、域名、
+     * https 反代都用同一个 origin，不用再猜 LuCI 在哪个端口。
+     */
     private String fallbackUrl = "";
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -73,7 +79,7 @@ public class WebActivity extends BaseActivity {
         String p = getIntent().getStringExtra(EXTRA_PATH);
         wantPath = p == null ? "" : p;
 
-        fallbackUrl = guessLuciUrl();
+        fallbackUrl = origin() + "/cgi-bin/luci/";
 
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
@@ -169,7 +175,7 @@ public class WebActivity extends BaseActivity {
             @Override
             public void onReceivedError(WebView view, int code, String desc, String url) {
                 if (Build.VERSION.SDK_INT < 23) {
-                    showError("打不开 " + hostOf(url) + "，确认手机还连着这个路由器的 Wi-Fi。");
+                    showError("打不开 " + hostOf(url) + "，检查网络是否可达这个地址。");
                 }
             }
         });
@@ -201,26 +207,37 @@ public class WebActivity extends BaseActivity {
                 if (isFinishing() || web == null) {
                     return;
                 }
-                String rawUrl = body.optString("url", fallbackUrl);
-                // 票据里的地址必须是「我们连的这台路由器」。否则（被篡改、
-                // 或被 Host 头带偏）这张 root 会话 cookie 就会被种到别的域上。
-                // 用 final 局部变量：下面两层 lambda 要捕获它
-                final String url = hostOnly(rawUrl).equals(hostOnly(Session.base(WebActivity.this)))
-                        ? rawUrl : fallbackUrl;
+                // 地址一律由客户端自己拼：origin 是我们配的那个服务器，
+                // 路径是 Agent 给的相对路径（/cgi-bin/luci/）。
+                // 不再用服务端返回的绝对 url —— 它只可能是局域网地址，
+                // 走域名进来时对不上（而且会把 root cookie 种到别的域上）。
+                String path = body.optString("path", "/cgi-bin/luci/");
+                final String url = origin() + (path.startsWith("/") ? path : "/" + path);
                 String name = body.optString("cookie_name", "");
                 String value = body.optString("cookie_value", "");
+
+                // 网页端通行证：Agent 的代理只放行带这张 cookie 的请求，
+                // 所以「能不能开网页端」= App 有没有换过票，浏览器直接访问进不来
+                JSONObject pass = body.optJSONObject("web_cookie");
+                final String passName = pass == null ? "" : pass.optString("name", "");
+                final String passValue = pass == null ? "" : pass.optString("value", "");
+
                 if (body.optBoolean("ok", false) && !name.isEmpty() && !value.isEmpty()) {
                     CookieManager cm = CookieManager.getInstance();
                     // 先清空 WebView 的 cookie 罐：LuCI 自己下发的 cookie 路径是
                     // /cgi-bin/luci/，我们这张是 /，两个同名 cookie 同时存在时
                     // 服务端取哪一条是没保证的 —— 上一轮残留的旧会话因此让人
                     // 反复掉回登录页。罐子是空的才开始，就只有一个 sysauth_http
-                    cm.removeAllCookies(cleared -> runOnUiThread(() ->
-                            cm.setCookie(url, name + "=" + value + "; path=/", ok -> runOnUiThread(() -> {
-                                if (!isFinishing() && web != null) {
-                                    web.loadUrl(withPath(url));
-                                }
-                            }))));
+                    cm.removeAllCookies(cleared -> runOnUiThread(() -> {
+                        if (!passName.isEmpty() && !passValue.isEmpty()) {
+                            cm.setCookie(url, passName + "=" + passValue + "; path=/", null);
+                        }
+                        cm.setCookie(url, name + "=" + value + "; path=/", ok -> runOnUiThread(() -> {
+                            if (!isFinishing() && web != null) {
+                                web.loadUrl(withPath(url));
+                            }
+                        }));
+                    }));
                     return;
                 }
                 // 票据拿不到：不是错误，退回「打开网页端，自己登」
@@ -276,25 +293,23 @@ public class WebActivity extends BaseActivity {
         errorBox.setVisibility(View.VISIBLE);
     }
 
-    /** Agent 在 8443、LuCI 在 80：直接拿 Session.base 会把 API 端口当网页打开 */
-    private String guessLuciUrl() {
-        String host = Session.base(this).replaceFirst("^https?://", "");
-        int slash = host.indexOf('/');
-        if (slash > 0) {
-            host = host.substring(0, slash);
+    /**
+     * App 当前连的 origin：协议 + 主机 + 端口，原样保留。
+     *
+     * 网页端和 API 必须同源 —— 同源才能共用 cookie、也才能走 Agent 的
+     * 代理路径。以前这里把端口和协议都剥掉了，域名访问时打开的是
+     * `http://域名/`（80 口），必然白屏。
+     */
+    private String origin() {
+        String b = Session.base(this);
+        int sep = b.indexOf("://");
+        String scheme = sep > 0 ? b.substring(0, sep) : "http";
+        String rest = sep > 0 ? b.substring(sep + 3) : b;
+        int slash = rest.indexOf('/');
+        if (slash >= 0) {
+            rest = rest.substring(0, slash);
         }
-        if (host.startsWith("[")) {
-            int end = host.indexOf(']');
-            if (end > 0) {
-                host = host.substring(0, end + 1);
-            }
-        } else {
-            int colon = host.lastIndexOf(':');
-            if (colon > 0) {
-                host = host.substring(0, colon);
-            }
-        }
-        return "http://" + host + "/cgi-bin/luci/";
+        return scheme + "://" + rest;
     }
 
     /** 只取 host（不含端口、统一小写），用来核对票据地址 */

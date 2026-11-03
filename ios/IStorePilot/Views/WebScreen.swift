@@ -162,28 +162,34 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate {
         guard !loaded else { return }
         loaded = true
 
-        let fallback = Self.guessLuciURL()
         let res = try? await Api.get("/api/v1/luci/session")
 
-        await MainActor.run { host = URL(string: fallback)?.host ?? "" }
+        // 地址一律由客户端拼：origin 用 App 里配的那个服务器，
+        // 路径用 Agent 给的相对路径。这样局域网 / 域名 / https 反代
+        // 都落在同一个源上（Agent 在 8443 上把 /cgi-bin/luci 透传给 80 口）。
+        let path = res?.str("path") ?? "/cgi-bin/luci/"
+        let urlStr = Self.origin() + (path.hasPrefix("/") ? path : "/" + path)
+        await MainActor.run { host = URL(string: urlStr)?.host ?? "" }
 
-        let name = res?.str("cookie_name") ?? ""
-        let value = res?.str("cookie_value") ?? ""
-        let urlStr = res?.str("url") ?? ""
-
-        // 票据里的地址必须是「我们连的这台路由器」。否则（响应被篡改、
-        // 或 Host 头被带偏）这张 root 会话 cookie 就会被种到别的域上。
-        let baseHost = (URL(string: Session.base)?.host ?? "").lowercased()
-
-        guard let res, res.bool("ok"), !name.isEmpty, !value.isEmpty,
-              let url = URL(string: urlStr), let urlHost = url.host,
-              baseHost.isEmpty || urlHost.lowercased() == baseHost else {
-            // 拿不到票据：不是错误，退回「打开网页端，自己登」
-            await load(withPath(fallback), cookie: nil)
-            return
+        var cookies: [(String, String)] = []
+        if let res, res.bool("ok") {
+            let name = res.str("cookie_name")
+            let value = res.str("cookie_value")
+            if !name.isEmpty, !value.isEmpty {
+                cookies.append((name, value))
+            }
+            // 网页端通行证：Agent 的代理只放行带这张 cookie 的请求，
+            // 没换过票的浏览器直接被挡在门外
+            if let pass = res.obj("web_cookie") {
+                let pn = pass.str("name")
+                let pv = pass.str("value")
+                if !pn.isEmpty, !pv.isEmpty {
+                    cookies.append((pn, pv))
+                }
+            }
         }
-        await load(withPath(urlStr), cookie: (name, value, urlHost))
-        await MainActor.run { host = urlHost }
+        // 拿不到票据也不挡：照样打开，让用户自己登一次
+        await load(withPath(urlStr), cookies: cookies)
     }
 
     /// 票据给的 url 是后台首页，深链要自己换上路径；query 必须清掉，
@@ -196,8 +202,9 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate {
         return comp.url?.absoluteString ?? s
     }
 
-    private func load(_ urlStr: String, cookie: (String, String, String)?) async {
+    private func load(_ urlStr: String, cookies jar: [(String, String)]) async {
         guard let url = URL(string: urlStr) else { return }
+        let domain = url.host ?? ""
         let store = WKWebsiteDataStore.default().httpCookieStore
 
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
@@ -211,16 +218,25 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate {
                     store.delete(c) { group.leave() }
                 }
                 group.notify(queue: .main) {
-                    guard let (name, value, domain) = cookie,
-                          let c = HTTPCookie(properties: [
-                              .name: name, .value: value, .domain: domain,
-                              .path: "/", .version: 0,
-                          ]) else {
+                    // 注意别写成 cookies：外层 getAllCookies 的回调参数就叫 cookies（[HTTPCookie]），
+                    // 会把它盖掉，编译器会去 HTTPCookie 上找 .0/.1
+                    let ready = jar.compactMap { pair -> HTTPCookie? in
+                        HTTPCookie(properties: [
+                            .name: pair.0, .value: pair.1, .domain: domain,
+                            .path: "/", .version: 0,
+                        ])
+                    }
+                    guard !ready.isEmpty else {
                         cont.resume()
                         self.web.load(URLRequest(url: url))
                         return
                     }
-                    store.setCookie(c) {
+                    let put = DispatchGroup()
+                    for c in ready {
+                        put.enter()
+                        store.setCookie(c) { put.leave() }
+                    }
+                    put.notify(queue: .main) {
                         cont.resume()
                         self.web.load(URLRequest(url: url))
                     }
@@ -229,18 +245,18 @@ final class WebController: NSObject, ObservableObject, WKNavigationDelegate {
         }
     }
 
-    /// Agent 在 8443、LuCI 在 80：直接拿 Session.base 会把 API 端口当网页打开
-    static func guessLuciURL() -> String {
-        var host = Session.base
-            .replacingOccurrences(of: "https://", with: "")
-            .replacingOccurrences(of: "http://", with: "")
-        if let slash = host.firstIndex(of: "/") { host = String(host[..<slash]) }
-        if host.hasPrefix("[") {
-            if let end = host.firstIndex(of: "]") { host = String(host[...end]) }
-        } else if let colon = host.lastIndex(of: ":") {
-            host = String(host[..<colon])
+    /// App 当前连的 origin（协议 + 主机 + 端口），原样保留。
+    ///
+    /// 网页端必须和 API 同源：同源才能共用 cookie，也才能走 Agent 的代理路径。
+    /// 以前这里把协议和端口都剥掉了，域名访问时打开的是 http://域名/，
+    /// 打到 80 口上，必然白屏。
+    static func origin() -> String {
+        if let u = URL(string: Session.base), let scheme = u.scheme, let h = u.host {
+            var out = "\(scheme)://\(h)"
+            if let port = u.port { out += ":\(port)" }
+            return out
         }
-        return "http://\(host)/cgi-bin/luci/"
+        return Session.base.hasSuffix("/") ? String(Session.base.dropLast()) : Session.base
     }
 
     // MARK: - WKNavigationDelegate
