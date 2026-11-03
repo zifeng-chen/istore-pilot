@@ -782,34 +782,61 @@ def _local_v4() -> set[str]:
     return out
 
 
-def _bind_host(want: str) -> str:
+def _bind_host(want: str, wait: float = 0.0) -> str:
     """绑定地址已经不在本机时，退到通配地址。
 
     LAN 管理地址可以从 App 里改，改完那个 IP 就不存在了。agent 如果还死绑
     在上面，socket 就成了孤儿：客户端连不上，也就永远回不来点「确认」，
     结果每次改地址都超时回滚，看起来像功能坏了。
+
+    但**不能一探不到就退**：服务重启经常撞上 network reload，那一瞬间
+    `ip addr` 还没配上地址，退到 0.0.0.0 就等于把管理面摊到 WAN 上
+    （实测重启后确实出现过）。所以启动时先等 wait 秒，等不到才降级，
+    并且把降级这件事明确打出来。
     """
     want = (want or "").strip()
     if want in ("", "0.0.0.0", "*"):
         return "0.0.0.0"
     if want in ("localhost", "127.0.0.1"):
         return "127.0.0.1"
-    return want if want in _local_v4() else "0.0.0.0"
+
+    deadline = time.time() + max(0.0, wait)
+    while True:
+        if want in _local_v4():
+            return want
+        if time.time() >= deadline:
+            break
+        time.sleep(0.5)
+
+    print("!!! [istore-agent] 绑定地址 %s 不在本机，已退到 0.0.0.0"
+          " —— 管理面可能暴露到外网，请检查 LAN 地址" % want, flush=True)
+    return "0.0.0.0"
 
 
 def _watch_bind(httpd, host: str) -> None:
-    """盯住绑定地址：它是具体 IP 且消失时，让主循环重新绑一次。"""
+    """盯住绑定地址：它是具体 IP 且**连续几次**都消失时，让主循环重绑。
+
+    连续判定是必须的：network reload 期间 `ip addr` 会短暂缺地址，
+    单次失败就重绑会把管理面闪到 0.0.0.0 上。
+    """
     if host in ("0.0.0.0", "127.0.0.1", ""):
         return
+    miss = 0
     while True:
         time.sleep(2)
-        if host not in _local_v4():
-            print(f"[istore-agent] {host} 已不在本机，改绑 0.0.0.0", flush=True)
-            try:
-                httpd.shutdown()
-            except Exception:
-                pass
-            return
+        if host in _local_v4():
+            miss = 0
+            continue
+        miss += 1
+        if miss < 3:
+            continue
+        print("!!! [istore-agent] %s 连续 %d 次不在本机，改绑 0.0.0.0" % (host, miss),
+              flush=True)
+        try:
+            httpd.shutdown()
+        except Exception:
+            pass
+        return
 
 
 def serve():
@@ -836,9 +863,12 @@ def serve():
     except Exception:
         pass
 
-    # 主循环：正常只跑一圈；只有当绑定地址失效（改了 LAN）时才会重绑
+    # 主循环：正常只跑一圈；只有当绑定地址失效（改了 LAN）时才会重绑。
+    # 首圈等 10 秒：开机/重启时网卡可能还没配好地址。
+    first = True
     while True:
-        host = _bind_host(want)
+        host = _bind_host(want, wait=10 if first else 0)
+        first = False
         httpd = ThreadingHTTPServer((host, port), Handler)
         httpd.daemon_threads = True
         print(f"[istore-agent] listening on {host}:{port}", flush=True)

@@ -51,15 +51,6 @@ def remember(password: str) -> None:
     with _lock:
         _override = pwd
         _cache["at"] = 0.0
-
-
-def forget() -> None:
-    global _override
-    with _lock:
-        _override = ""
-        _cache["at"] = 0.0
-
-
 def _password() -> str:
     if _override:
         return _override

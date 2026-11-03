@@ -22,7 +22,6 @@ import shutil
 import subprocess
 import tarfile
 import time
-import zipfile
 
 UPLOAD_DIR = "/tmp/istore-upload"
 PUBLISH_DIR = "/www/istore-agent"

@@ -11,7 +11,6 @@ geosite.dat 是 protobuf 格式:
 """
 from __future__ import annotations
 
-import io
 import json
 import os
 import struct

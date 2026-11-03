@@ -15,8 +15,6 @@ from __future__ import annotations
 import io
 import json
 import os
-import posixpath
-import sys
 import tarfile
 import time
 
@@ -86,8 +84,13 @@ def main() -> int:
         fh.write(blob)
     print(f"上传完成 {len(blob)/1024:.0f} KB")
 
+    # init 脚本只留一个来源：deploy/ipk/init.d/istore-agent（打包用的也是它）。
+    # 以前这里读的是 deploy/istore-agent.init 那份旧拷贝 —— 每部署一次就把路由器上的
+    # init 降级一次：它不读 uci 的 bind/port，服务于是退回 config.json 里的
+    # 0.0.0.0:8443，管理面直接摊到 WAN 上，而 LuCI 里改端口也不生效。
     with sftp.open("/tmp/istore-agent.init", "w") as fh:
-        with open(os.path.join(ROOT, "deploy", "istore-agent.init"), "r", encoding="utf-8") as src:
+        src_path = os.path.join(ROOT, "deploy", "ipk", "init.d", "istore-agent")
+        with open(src_path, "r", encoding="utf-8") as src:
             fh.write(src.read())
 
     steps = [
@@ -162,10 +165,15 @@ def main() -> int:
         print("--- log ---")
         print(log.strip())
 
+    # 真实监听地址以 netstat 为准：环境变量里的 AGENT_BIND 只是"想绑哪"，
+    # 实际可能因为地址不存在退到 0.0.0.0（或者反过来，bind 由 uci 决定）
+    code, listening = run(client, f"netstat -lnt 2>/dev/null | awk '/:{port} /{{print $4; exit}}'")
+    addr = listening.strip() or f"{bind}:{port}"
+
     sftp.close()
     client.close()
     # 不打印口令：CI 日志、终端回滚区、共享屏幕都会把它带走
-    print(f"\n访问地址: http://{bind}:{port}  (管理密码与 SSH / 后台 / AdGuard 一致)")
+    print(f"\n访问地址: http://{addr}  (管理密码与 SSH / 后台 / AdGuard 一致)")
     return 0
 
 

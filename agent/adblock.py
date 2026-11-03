@@ -375,19 +375,6 @@ def _dnsmasq_upstream() -> str:
             continue
         return val + ":53"
     return ""
-
-
-def _clash_alive() -> bool:
-    up = _dnsmasq_upstream()
-    if not up:
-        return False
-    host, _, port = up.partition(":")
-    try:
-        return _port_open(host or "127.0.0.1", int(port or 53))
-    except ValueError:
-        return False
-
-
 def _pick_upstream() -> tuple[list[str], str]:
     """返回 (上游列表, 说明)。优先沿用 dnsmasq 指向的 OpenClash。"""
     up = _dnsmasq_upstream()
@@ -1251,22 +1238,6 @@ def _meminfo() -> dict:
     total, avail = info.get("MemTotal", 0), info.get("MemAvailable", 0)
     return {"total_mb": total, "available_mb": avail,
             "used_percent": round((1 - avail / total) * 100, 1) if total else 0.0}
-
-
-def _dns_chain() -> dict:
-    servers: list[str] = []
-    code, out = _run(["uci", "show", "dhcp"], timeout=6)
-    if code == 0:
-        for line in out.splitlines():
-            if ".server=" in line:
-                servers.append(line.split("=", 1)[1].strip().strip("'"))
-    hijack = False
-    code, out = _run(["nft", "list", "table", "inet", "fw4"], timeout=8)
-    if code == 0:
-        hijack = "OpenClash DNS Hijack" in out
-    return {"openclash_hijack": hijack, "upstream": servers[0] if servers else "未知"}
-
-
 def preflight() -> dict:
     mem = _meminfo()
     st = status()

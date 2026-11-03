@@ -5,9 +5,7 @@
 无论中间出什么错都会把端口还原，避免把 App 的连接地址搞丢。
 """
 import os
-import re
 import sys
-import time
 
 import paramiko
 

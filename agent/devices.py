@@ -626,13 +626,6 @@ def _display(host: str, who: dict) -> str:
     if usable:
         return model
     return f"{brand} {kind}".strip() if kind and kind != "其他" else (brand or name)
-
-
-def _vendor(mac: str) -> str:
-    """兼容旧调用：只给品牌名。"""
-    return identify(mac, "")["brand"]
-
-
 # ---------------------------------------------------------------- 数据源
 
 

@@ -2,7 +2,6 @@
 """检查 Mihomo sniffer 效果：还有多少外网连接拿不到域名。"""
 import json
 import subprocess
-import sys
 from collections import Counter
 
 CLASH_SECRET = ""

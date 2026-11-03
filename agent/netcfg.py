@@ -53,15 +53,6 @@ def _present(pwd: str) -> str:
     if len(pwd) <= 2:
         return "*" * len(pwd)
     return pwd[0] + "*" * (len(pwd) - 2) + pwd[-1]
-
-
-# ---------------------------------------------------------------- 读
-
-def wan_id() -> str:
-    """WAN 段名不一定是 wan（有人改成 wan2），按 device+proto 猜一次更稳"""
-    return "wan"
-
-
 def config() -> dict:
     """当前 WAN 配置。密码掩码，客户端提交时留空表示「不修改」。"""
     proto = _uci_get("network.wan.proto") or "pppoe"

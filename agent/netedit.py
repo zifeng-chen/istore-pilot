@@ -149,6 +149,13 @@ def client_on_lan(client_ip: str) -> bool:
 # ---------------------------------------------------------------- 收紧
 
 def harden(payload: dict, client_ip: str = "") -> dict:
+    """收紧 wan 区入站 + 给管理口开白名单。
+
+    **当前没有接 HTTP 接口**（server.py 里没有路由，客户端也没有入口），
+    所以线上环境不会执行到这里。实现是完整的（含事务与回滚），
+    要启用只需要在 server.py 加一对 POST /api/v1/security/harden|unrestrict。
+    `_restore_forwarding()` 就是给回滚用的，一并留着。
+    """
     """收紧 wan 区入口。
 
     三件事可以分开做，但一次事务里全部应用：
@@ -294,45 +301,3 @@ def _restore_forwarding() -> bool:
     except OSError:
         pass
     return True
-
-
-def unrestrict() -> dict:
-    """撤销收紧：wan input 回到 ACCEPT，并清掉 App 加的管理口规则。
-
-    这是「我确认自己不需要这么严」的出口，同样要走事务——
-    放宽之后如果发现哪里不对，还得能一键回来。
-    """
-    st = state()
-    if not st["zone"]:
-        return {"ok": False, "error": "找不到 wan 区"}
-
-    todo: list[str] = []
-    if st["input"] != "ACCEPT":
-        todo.append(f"wan 区 input: {st['input'] or '?'} → ACCEPT")
-    if st["mgmt_rules"]:
-        todo.append("移除 App 添加的管理端口放行规则")
-    if os.path.exists(SAVED):
-        todo.append("恢复 wan → lan 转发")
-    if not todo:
-        return {"ok": True, "changed": [], "message": "当前已经是放行状态", "state": state()}
-
-    txn = netapply.begin("firewall-open", services=("firewall",), note="放宽 wan 入口")
-    if not txn.get("ok"):
-        return txn
-    token = txn["token"]
-    try:
-        _uci("set", f"{PKG}.{st['zone']}.input=ACCEPT")
-        for p in st["mgmt_rules"]:
-            _uci("delete", f"{PKG}.istore_mgmt_{p}")
-        _restore_forwarding()
-        out = _uci("commit", PKG)
-        if "error" in out.lower():
-            raise RuntimeError(out)
-    except Exception as exc:
-        netapply.rollback(token, quiet=True)
-        return {"ok": False, "error": f"写入防火墙配置失败（{exc}），已还原"}
-
-    sysinfo._run(["/etc/init.d/firewall", "reload"], timeout=20)
-    return {"ok": True, "token": token, "wait": txn["wait"], "deadline": txn["deadline"],
-            "changed": todo, "state": state(), "message": "已放宽",
-            "detail": f"如果 {txn['wait']} 秒内没有确认，会自动还原。"}
