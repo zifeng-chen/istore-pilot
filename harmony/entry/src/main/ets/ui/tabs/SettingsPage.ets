@@ -394,7 +394,7 @@ export struct SettingsPage {
   @Builder
   actionCard() {
     RowCard({ gapBottom: T.GAP }) {
-      CardTitle({ glyph: Glyph.LIST, title: '操作', sub: '登录、缓存与主题' });
+      CardTitle({ pad: 16, glyph: Glyph.LIST, title: '操作', sub: '登录、缓存与主题' });
       SettingRow({
         glyph: Glyph.LOGOUT,
         title: '退出登录',
@@ -435,7 +435,7 @@ export struct SettingsPage {
   @Builder
   connCard() {
     RowCard({ gapBottom: this.rail() ? 0 : T.GAP }) {
-      CardTitle({ glyph: Glyph.LINK, title: '连接', sub: '凭证与服务器' });
+      CardTitle({ pad: 16, glyph: Glyph.LINK, title: '连接', sub: '凭证与服务器' });
       SettingRow({
         glyph: Glyph.GLOBE,
         title: '服务器地址',
@@ -467,7 +467,7 @@ export struct SettingsPage {
   @Builder
   netCard() {
     RowCard({ gapBottom: this.rail() ? 0 : T.GAP }) {
-      CardTitle({
+      CardTitle({ pad: 16,
         glyph: Glyph.GLOBE,
         title: '网络',
         sub: this.protoText.length > 0 ? (this.protoText + ' · 外网与内网网关') : '外网与内网网关'
@@ -666,7 +666,7 @@ export struct SettingsPage {
   @Builder
   systemCard() {
     RowCard({ gapBottom: T.GAP }) {
-      CardTitle({ glyph: Glyph.BOX, title: '系统维护', sub: '备份、固件与软件包' });
+      CardTitle({ pad: 16, glyph: Glyph.BOX, title: '系统维护', sub: '备份、固件与软件包' });
       // 备份排第一：它是后面所有危险操作的前提，放最下面用户往往是「改坏了」才想起来找它
       SettingRow({
         glyph: Glyph.BOX,
@@ -727,7 +727,7 @@ export struct SettingsPage {
   @Builder
   securityCard() {
     RowCard({ gapBottom: T.GAP }) {
-      CardTitle({ glyph: Glyph.SHIELD, title: '安全', sub: '两个密码，别记混' });
+      CardTitle({ pad: 16, glyph: Glyph.SHIELD, title: '安全', sub: '两个密码，别记混' });
       SettingRow({
         glyph: Glyph.KEY,
         title: '修改 App 登录密码',

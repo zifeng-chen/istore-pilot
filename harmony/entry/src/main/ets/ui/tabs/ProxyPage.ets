@@ -449,7 +449,7 @@ export struct ProxyPage {
   @Builder
   backendCard() {
     Card() {
-      CardTitle({
+      CardTitle({ pad: 16,
         glyph: Glyph.POWER,
         title: '代理后端',
         sub: this.active === 'none' ? '当前没有代理在运行' : '当前生效：' + this.activeLabel()

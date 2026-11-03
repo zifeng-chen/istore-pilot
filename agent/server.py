@@ -19,7 +19,7 @@ from .config import get as cfg, load as load_cfg, save as save_cfg
 START_TS = time.time()
 
 # Agent 自身版本：随 ipk 一起发版，硬件详情页与「关于」都会显示
-VERSION = "0.1.5"
+VERSION = "0.1.6"
 
 _cache_lock = threading.Lock()
 _cache: dict[str, tuple[float, object]] = {}
@@ -290,8 +290,9 @@ class Handler(BaseHTTPRequestHandler):
             self._web_block(
                 "网页端只在家里的局域网可用",
                 "当前是从外网连进来的。App 的功能不受影响；要用网页端请连回家里的 Wi-Fi。"
-                "想在公网也能用，把 /etc/istore-agent/config.json 里的 "
-                "luci.proxy_lan_only 改成 false（那样 LuCI 会暴露在这个端口上）。",
+                "确实需要在外面用：打开路由器网页端的「服务 → iStore Pilot → 网页端访问范围」，"
+                "勾选「允许从公网打开网页端」，再输入「确认开启」并保存。"
+                "注意那会把 LuCI 后台暴露在这个端口上，用完记得关掉。",
             )
             return
 

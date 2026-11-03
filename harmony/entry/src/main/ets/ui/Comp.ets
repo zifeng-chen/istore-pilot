@@ -406,6 +406,9 @@ export struct CardTitle {
   @Prop title: string;
   @Prop sub: string;
   tone: string = '';
+  /** 左右留白。RowCard 只给上下，放进 RowCard 时必须传 16，
+   *  否则图标直接贴到卡片边框上；Card 自身已有 16 内边距，保持默认 0 */
+  pad: number = 0;
   /** 右侧插槽：在线数、状态胶囊之类 */
   @BuilderParam trailing: () => void = this.emptyTrailing;
 
@@ -450,7 +453,7 @@ export struct CardTitle {
     }
     .width('100%')
     .alignItems(VerticalAlign.Center)
-    .padding({ bottom: 2 });
+    .padding({ left: this.pad, right: this.pad, bottom: 2 });
   }
 }
 

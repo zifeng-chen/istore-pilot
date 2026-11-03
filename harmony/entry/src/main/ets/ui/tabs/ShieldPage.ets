@@ -660,7 +660,7 @@ export struct ShieldPage {
   @Builder
   dnsCard() {
     RowCard({ gapBottom: this.rail() ? 0 : T.GAP }) {
-      CardTitle({ glyph: Glyph.GLOBE, title: 'DNS 链路', sub: '请求从设备到解析的完整路径' });
+      CardTitle({ pad: 16, glyph: Glyph.GLOBE, title: 'DNS 链路', sub: '请求从设备到解析的完整路径' });
       Column() {
         ForEach(this.hops, (h: DnsHop, i: number) => {
           Column() {
@@ -725,7 +725,7 @@ export struct ShieldPage {
   @Builder
   rankCard() {
     RowCard({ gapBottom: T.GAP }) {
-      CardTitle({
+      CardTitle({ pad: 16,
         glyph: Glyph.LIST,
         title: '拦截排行',
         sub: this.window.length > 0 ? this.window : '前 5 名'
