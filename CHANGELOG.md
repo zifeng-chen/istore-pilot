@@ -31,6 +31,22 @@
 
 外网被挡时的说明页也从「去改 config.json」改成指向这个开关。
 
+### 一进设备页就弹「要不要接管 DNS」
+
+`Toggle` 的 `onChange` 在 ArkUI 里**被程序化改 `isOn` 时也会回调**。
+设备页那个开关的 `isOn` 绑在 `adTakeover` 上，数据加载完从 false 变成 true，
+回调就带着 `true` 把确认弹窗弹了出来 —— 用户根本没点过，而且问的方向还是反的。
+
+改成「开关只显示、点击走整行」：`Toggle` 挂 `hitTestBehavior(Transparent)`，
+确认弹窗由外层 `Row.onClick` 触发。这样数据回填不会误弹，点「取消」也不会
+留下一个自己弹上去的开关。
+
+顺带修了同一类问题：代理页「隐藏超时」开关没做同值判断，每次进页面数据回填
+都会白发一次设置请求。`ShieldPage` 早就写了 `if (v !== item.enabled)` 的守卫，
+这次两处对齐；iOS 的接管开关也加了 `guard newValue != takeover`（SwiftUI
+本来不会误触发，属于防御）；Android 的 `Toggle.performClick()` 只在真点击时
+回调，本来就没这个问题。
+
 ### 概览页「WAN 地址」显示 [object Object]
 
 `overview.network.wan.ipv4` 是数组（PPPoE 可能给多个地址），但鸿蒙和 iOS

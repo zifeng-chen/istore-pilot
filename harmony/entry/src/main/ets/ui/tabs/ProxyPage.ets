@@ -643,7 +643,11 @@ export struct ProxyPage {
           .selectedColor($r('app.color.primary'))
           .margin({ left: 6 })
           .onChange((on: boolean) => {
-            this.setHideTimeout(on);
+            // 程序化改 isOn（数据回填 / 其他端改过）也会回调，
+            // 状态没变就别打接口 —— 否则每次进代理页都白发一次请求
+            if (on !== this.hideTimeout) {
+              this.setHideTimeout(on);
+            }
           });
       }
       .width('100%')

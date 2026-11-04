@@ -904,17 +904,25 @@ export struct SecurityPage {
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1);
 
+        // 开关只负责显示，点击交给整行。挂在 Toggle.onChange 上有两个坑：
+        //  1. ArkUI 在 isOn 被数据回填时也会回调 onChange —— 一进页面
+        //     数据加载完就把「要不要接管」弹出来，用户根本没点过；
+        //  2. 点完取消后开关不会自己弹回去，看着像已经接管了。
         Toggle({ type: ToggleType.Switch, isOn: this.adTakeover })
           .selectedColor(Pal.primary())
           .enabled(this.adInstalled && !this.busy)
-          .onChange((on: boolean) => {
-            // 先确认再改：它动的是全网的 DNS 走向
-            this.confirmTakeover(on);
-          });
+          .hitTestBehavior(HitTestMode.Transparent);
       }
       .width('100%')
       .alignItems(VerticalAlign.Center)
-      .margin({ top: 14 });
+      .margin({ top: 14 })
+      .onClick(() => {
+        if (!this.adInstalled || this.busy) {
+          return;
+        }
+        // 先确认再改：它动的是全网的 DNS 走向
+        this.confirmTakeover(!this.adTakeover);
+      });
 
       if (this.adGuardCount > 0) {
         Text('DNS 巡检触发过 ' + this.adGuardCount.toString() + ' 次自愈'

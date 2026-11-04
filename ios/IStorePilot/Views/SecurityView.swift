@@ -442,7 +442,12 @@ struct SecurityView: View {
                     Spacer(minLength: 6)
                     Toggle("", isOn: Binding(
                         get: { takeover },
-                        set: { askTakeover = $0 }
+                        set: { newValue in
+                            // 数据刷新会让 get 的值变，SwiftUI 偶尔会带着新值回调
+                            // set（那不是用户点的）；值没变就直接忽略，别弹确认
+                            guard newValue != takeover else { return }
+                            askTakeover = newValue
+                        }
                     ))
                     .labelsHidden()
                     .tint(C.primary)
