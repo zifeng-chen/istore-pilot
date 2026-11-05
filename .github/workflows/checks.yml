@@ -1,0 +1,33 @@
+name: checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 安装 ruff
+        run: pip install ruff
+
+      - name: 代码规范（lint_style）
+        run: python scripts/lint_style.py
+
+      - name: 死代码（dead_code）
+        run: python scripts/dead_code.py
+
+      - name: ArkTS 编译期坑（arkts_scan）
+        run: python scripts/arkts_scan.py
+
+      - name: Python 静态检查（ruff F）
+        run: python -m ruff check agent scripts deploy --select F
+
+      - name: 版本一致性（check_version）
+        run: python scripts/check_version.py

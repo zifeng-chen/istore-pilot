@@ -62,6 +62,36 @@ def sh(args: list[str], check: bool = True) -> subprocess.CompletedProcess:
     return subprocess.run(args, cwd=ROOT, text=True, capture_output=True, check=check)
 
 
+def preflight() -> int:
+    """发版前体检：任一项不过就不发。--skip-checks 可跳过（救急用）。
+
+    这里只跑「纯 Python / 不需要 SDK」的检查：lint_style、dead_code、
+    arkts_scan、ruff(F)、版本一致性。三端编译不在这里跑——需要 Android SDK
+    / Mac / DevEco，放到真正出包前各自验证。
+    """
+    checks = [
+        ("lint_style", [sys.executable, "scripts/lint_style.py"]),
+        ("dead_code", [sys.executable, "scripts/dead_code.py"]),
+        ("arkts_scan", [sys.executable, "scripts/arkts_scan.py"]),
+        ("ruff", [sys.executable, "-m", "ruff", "check", "agent", "scripts",
+                  "deploy", "--select", "F"]),
+        ("version", [sys.executable, "scripts/check_version.py"]),
+    ]
+    failed: list[str] = []
+    for name, cmd in checks:
+        r = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True)
+        if r.returncode != 0:
+            failed.append(name)
+            print("  ✗ %s 未通过：" % name)
+            print((r.stdout + r.stderr).strip()[-1200:])
+    if failed:
+        print("! 体检不过：%s。修复后再发，或用 --skip-checks 强制（不建议）。"
+              % ", ".join(failed))
+        return 1
+    print("  体检通过：%s" % ", ".join(c[0] for c in checks))
+    return 0
+
+
 def version() -> tuple[str, int]:
     """从 agent/server.py 的 VERSION 与 build_ipk.revision() 取，和包名一致。"""
     import importlib.util
@@ -260,6 +290,7 @@ def main() -> int:
     args = sys.argv[1:]
     dry = "--dry-run" in args
     skip_build = "--skip-build" in args
+    skip_checks = "--skip-checks" in args
 
     notes_file = ""
     for i, a in enumerate(args):
@@ -272,6 +303,9 @@ def main() -> int:
     tag = "v" + ver
     full = "%s-%d" % (ver, rev)
     print("\n=== 发布 %s（revision %d）===" % (tag, rev))
+
+    if not skip_checks and preflight() != 0:
+        return 2
 
     tok = token()
     if not tok:
