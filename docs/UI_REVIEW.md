@@ -118,6 +118,7 @@
 | 坑 | 表现 | 正确做法 |
 |---|---|---|
 | 鸿蒙 `RowCard` 无左右留白 | 卡片头图标贴边框 | `CardTitle` 放 RowCard 里必须 `pad:16` |
+| 鸿蒙 `Card()` 自带 16 内边距 | 头部被双重留白 32pt | `CardTitle` 放 `Card()` 里**不要** `pad` |
 | `Toggle` 程序化回调 | 一进页面就弹确认 | 见「鸿蒙专项」第 3 条 |
 | fake-ip 下 `GEOIP,cn` 不命中 | 国内无规则站点走代理 | 用 `GEOSITE,cn,DIRECT` 兜底，别信 GEOIP |
 | iOS `ZStack{背景.ignoresSafeArea();内容}` | 内容也被拉满 | 背景单独 `.ignoresSafeArea()`，内容不套 |

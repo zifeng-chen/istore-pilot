@@ -500,7 +500,7 @@ export struct SecurityPage {
   @Builder
   deviceCard() {
     Card() {
-      CardTitle({ pad: 16, glyph: Glyph.LINK, title: '设备', sub: '点数字进清单，点行看详情' });
+      CardTitle({ glyph: Glyph.LINK, title: '设备', sub: '点数字进清单，点行看详情' });
 
       Row() {
         StatCell({
