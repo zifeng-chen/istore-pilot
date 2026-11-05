@@ -158,21 +158,21 @@ export struct SettingsPage {
 
   /** ubus 返回的第一条常是 fe80 链路本地地址，优先显示能用的全局地址 */
   private pickV6(list: J[]): string {
-    let global: string = '';
-    let any: string = '';
+    let preferred: string = '';
+    let first: string = '';
     for (let i = 0; i < list.length; i++) {
       const a: string = list[i].str('address', '');
       if (a.length === 0) {
         continue;
       }
-      if (any.length === 0) {
-        any = a;
+      if (first.length === 0) {
+        first = a;
       }
-      if (global.length === 0 && a.indexOf('fe80') !== 0) {
-        global = a;
+      if (preferred.length === 0 && a.indexOf('fe80') !== 0) {
+        preferred = a;
       }
     }
-    const pick: string = global.length > 0 ? global : any;
+    const pick: string = preferred.length > 0 ? preferred : first;
     return pick.length > 0 ? pick : '—';
   }
 

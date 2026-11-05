@@ -133,6 +133,9 @@ python scripts/lint_style.py
 # 全语言：声明了但没人调的函数/方法（候选清单，需人工确认）
 python scripts/dead_code.py
 
+# 鸿蒙：ArkTS 编译期坑扫描（any/解构/for..in/受限 stdlib…，配合 docs/ARKTS_PITFALLS.md）
+python scripts/arkts_scan.py
+
 # 重复代码率（jscpd，阈值 8 行 / 60 token）
 npx --yes jscpd@4 . --format python,java,swift --min-lines 8 --min-tokens 60 \
   --ignore "**/build/**,**/dist/**,**/.git/**,**/node_modules/**,**/.workbuddy/**"
