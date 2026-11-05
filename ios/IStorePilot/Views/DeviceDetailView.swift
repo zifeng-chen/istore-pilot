@@ -63,16 +63,16 @@ struct DeviceDetailView: View {
         Hero {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 9) {
-                    Circle().fill(online ? Color(hex: 0x5FE7C4) : Color(hex: 0xFF7A6B))
+                    Circle().fill(online ? C.heroOn : C.heroOff)
                         .frame(width: 8, height: 8)
                     Text(online ? "在线" : "离线")
                         .font(F.tiny).foregroundStyle(C.heroFgSoft)
                     if blocked {
                         Text("已禁网")
                             .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Color(hex: 0xFF9F8F))
+                            .foregroundStyle(C.heroOffFg)
                             .padding(.horizontal, 7).padding(.vertical, 2)
-                            .background(Color(hex: 0xFF7A6B).opacity(0.22))
+                            .background(C.heroOff.opacity(0.22))
                             .clipShape(Capsule())
                     }
                     Spacer()

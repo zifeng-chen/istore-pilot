@@ -107,7 +107,7 @@ struct WanView: View {
         return Hero {
             VStack(alignment: .leading, spacing: 9) {
                 HStack(spacing: 7) {
-                    Circle().fill(up ? Color(hex: 0x5FE7C4) : Color(hex: 0xFF7A6B))
+                    Circle().fill(up ? C.heroOn : C.heroOff)
                         .frame(width: 7, height: 7)
                     Text(state)
                         .font(.system(size: 12.5, weight: .medium))

@@ -449,7 +449,7 @@ public class OverviewFragment extends BaseFragment {
         GradientDrawable chip = new GradientDrawable();
         chip.setCornerRadius(Ui.dp(c, 100));
         int base = Ui.color(c, badgeColor);
-        chip.setColor((base & 0x00FFFFFF) | 0x22000000);
+        chip.setColor(Ui.alpha(base, 0.13f));
         tvWanBadge.setBackground(chip);
 
         tvWanIp.setText(ip.isEmpty() ? "—" : ip);

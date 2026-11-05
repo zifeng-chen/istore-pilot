@@ -139,7 +139,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 8) {
                     Circle()
-                        .fill(ok ? Color(hex: 0x5FE7C4) : C.heroFgSoft)
+                        .fill(ok ? C.heroOn : C.heroFgSoft)
                         .frame(width: 7, height: 7)
                     Text(ok ? "已连接" : "连不上")
                         .font(.system(size: 12.5, weight: .medium))

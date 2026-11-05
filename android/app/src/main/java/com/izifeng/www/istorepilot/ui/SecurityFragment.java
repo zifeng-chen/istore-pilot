@@ -267,7 +267,7 @@ public class SecurityFragment extends BaseFragment {
         GradientDrawable tile = new GradientDrawable();
         tile.setCornerRadius(Ui.dp(c, 9));
         int base = Ui.color(c, R.color.primary);
-        tile.setColor((base & 0x00FFFFFF) | 0x1F000000);
+        tile.setColor(Ui.alpha(base, 0.12f));
         wrap.setBackground(tile);
         Glyph g = new Glyph(c);
         g.setKind(glyph);
@@ -629,7 +629,7 @@ public class SecurityFragment extends BaseFragment {
         GradientDrawable bg = new GradientDrawable();
         bg.setCornerRadius(Ui.dp(ctx(), 100));
         int base = t.getCurrentTextColor();
-        bg.setColor((base & 0x00FFFFFF) | 0x1F000000);
+        bg.setColor(Ui.alpha(base, 0.12f));
         t.setBackground(bg);
     }
 

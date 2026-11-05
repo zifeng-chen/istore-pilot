@@ -660,7 +660,7 @@ export struct NetworkPage {
               .width('100%')
               .padding({ left: 12, right: 12, top: 9, bottom: 9 })
               .borderRadius(T.R_INNER)
-              .backgroundColor(Comp.alpha('#FF9500', 0.12))
+              .backgroundColor(Comp.alpha(Pal.warn(), 0.12))
               .margin({ top: 6 });
           }, (r: string) => r);
         }

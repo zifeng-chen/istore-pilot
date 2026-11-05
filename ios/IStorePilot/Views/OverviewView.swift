@@ -101,7 +101,7 @@ struct OverviewView: View {
                         .font(.system(size: 21, weight: .bold))
                         .foregroundStyle(C.heroFg)
                     Circle()
-                        .fill(wan.bool("up") ? Color(hex: 0x5FE7C4) : Color(hex: 0xFF7A6B))
+                        .fill(wan.bool("up") ? C.heroOn : C.heroOff)
                         .frame(width: 7, height: 7)
                     Spacer()
                     Text(F.uptime(uptimeNow))

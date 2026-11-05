@@ -195,7 +195,7 @@ public final class Ui {
         GradientDrawable bg = new GradientDrawable();
         bg.setCornerRadius(dp(c, 100));
         int base = color(c, colorRes);
-        bg.setColor((base & 0x00FFFFFF) | 0x30000000);
+        bg.setColor(alpha(base, 0.19f));
         t.setBackground(bg);
         t.setGravity(Gravity.CENTER);
         return t;
@@ -879,7 +879,7 @@ public final class Ui {
         GradientDrawable tile = new GradientDrawable();
         tile.setCornerRadius(dp(c, boxDp * 0.31f));
         int base = color(c, tintRes);
-        tile.setColor((base & 0x00FFFFFF) | 0x1F000000);
+        tile.setColor(alpha(base, 0.12f));
         box.setBackground(tile);
         int inner = Math.round(boxDp * 0.59f);
         box.addView(g, new LinearLayout.LayoutParams(dp(c, inner), dp(c, inner)));

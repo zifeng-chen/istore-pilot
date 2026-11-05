@@ -61,7 +61,7 @@ public class NavBar extends LinearLayout {
         // 深色下它又是 6.22:1，和选中项的 6.46:1 几乎一样，反而分不出谁被选中。
         // icon_off 是专门给导航算过的一组色：看得清，但明显弱于彩色的选中项。
         colorOff = ContextCompat.getColor(c, R.color.icon_off);
-        pillColor = (colorOn & 0x00FFFFFF) | 0x2E000000;
+        pillColor = Ui.alpha(colorOn, 0.18f);
 
         setOrientation(HORIZONTAL);
         setGravity(Gravity.CENTER_VERTICAL);

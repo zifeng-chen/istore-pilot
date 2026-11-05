@@ -209,7 +209,7 @@ struct ShieldView: View {
                     Text("AdGuard Home")
                         .font(.system(size: 21, weight: .bold))
                         .foregroundStyle(C.heroFg)
-                    Circle().fill(Color(hex: 0xFFB020)).frame(width: 7, height: 7)
+                    Circle().fill(C.heroWarn).frame(width: 7, height: 7)
                     Spacer()
                     Text("未安装").font(F.tiny).foregroundStyle(C.heroFgSoft)
                 }
@@ -230,7 +230,7 @@ struct ShieldView: View {
                     Text("AdGuard Home")
                         .font(.system(size: 21, weight: .bold))
                         .foregroundStyle(C.heroFg)
-                    Circle().fill(running ? Color(hex: 0x5FE7C4) : Color(hex: 0xFF7A6B))
+                    Circle().fill(running ? C.heroOn : C.heroOff)
                         .frame(width: 7, height: 7)
                     Spacer()
                     Text(d.str("mode_label", running ? "运行中" : "已停止"))

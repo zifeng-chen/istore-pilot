@@ -125,7 +125,7 @@ struct ProxyView: View {
         return Hero {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 8) {
-                    Circle().fill(running ? Color(hex: 0x5FE7C4) : Color(hex: 0xFF7A6B))
+                    Circle().fill(running ? C.heroOn : C.heroOff)
                         .frame(width: 7, height: 7)
                     Text(running ? "运行中" : "都没在运行")
                         .font(.system(size: 12.5, weight: .medium))
@@ -180,11 +180,11 @@ struct ProxyView: View {
     private func heroPill(_ text: String, on: Bool) -> some View {
         Text(text)
             .font(.system(size: 11, weight: on ? .semibold : .medium))
-            .foregroundStyle(on ? Color(hex: 0x073128) : C.heroFg.opacity(0.72))
+            .foregroundStyle(on ? C.heroInk : C.heroFg.opacity(0.72))
             .padding(.horizontal, 10).padding(.vertical, 3.5)
             .background {
                 if on {
-                    Capsule().fill(Color(hex: 0x5FE7C4))
+                    Capsule().fill(C.heroOn)
                 } else {
                     Capsule().strokeBorder(C.heroFg.opacity(0.28), lineWidth: 0.9)
                 }
@@ -206,12 +206,12 @@ struct ProxyView: View {
             HStack(spacing: 12) {
                 Image(systemName: "power")
                     .font(.system(size: 13, weight: on ? .semibold : .medium))
-                    .foregroundStyle(on ? Color(hex: 0x073128) : C.heroFg.opacity(0.55))
+                    .foregroundStyle(on ? C.heroInk : C.heroFg.opacity(0.55))
                     .frame(width: 30, height: 30)
                     .background {
                         if on {
                             RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                .fill(Color(hex: 0x5FE7C4))
+                                .fill(C.heroOn)
                         } else {
                             RoundedRectangle(cornerRadius: 9, style: .continuous)
                                 .fill(C.heroFg.opacity(0.09))

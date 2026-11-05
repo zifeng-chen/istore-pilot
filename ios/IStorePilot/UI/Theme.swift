@@ -25,6 +25,14 @@ enum C {
     static let heroFg        = dyn(0xFFFFFF, 0xFFFFFF)
     static let heroFgSoft    = dyn(0xD9FFFFFF, 0xD9FFFFFF)
 
+    // hero 卡片上的状态强调色：压深绿渐变上，对比度需求和普通 ok/danger 不同，
+    // 所以单列，别混进 C.ok/C.danger（浅色主题下两者都发灰）
+    static let heroOn    = Color(hex: 0x5FE7C4)   // 在线 / 运行中
+    static let heroOff   = Color(hex: 0xFF7A6B)   // 离线 / 停止
+    static let heroOffFg = Color(hex: 0xFF9F8F)   // 「已禁网」角标文字
+    static let heroWarn  = Color(hex: 0xFFB020)   // 未安装 / 警告
+    static let heroInk   = Color(hex: 0x073128)   // 选中胶囊上的深墨文字
+
     // 导航未选中图标：不能复用 textSecondary，尺寸小、对比度要更高一档
     static let iconOff       = dyn(0x59635F, 0x87968F)
 

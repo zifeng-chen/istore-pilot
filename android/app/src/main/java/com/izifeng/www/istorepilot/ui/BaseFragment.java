@@ -76,7 +76,7 @@ public abstract class BaseFragment extends Fragment implements Refreshable {
         banner.setLineSpacing(Ui.dp(c, 2), 1f);
         GradientDrawable bg = new GradientDrawable();
         bg.setCornerRadius(Ui.dp(c, 14));
-        bg.setColor(0x1AFFB454);
+        bg.setColor(Ui.alpha(Ui.color(c, R.color.warn), 0.10f));
         banner.setBackground(bg);
         LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -366,7 +366,7 @@ public abstract class BaseFragment extends Fragment implements Refreshable {
         Context c = banner.getContext();
         GradientDrawable bg = new GradientDrawable();
         bg.setCornerRadius(Ui.dp(c, 14));
-        bg.setColor(ok ? 0x1A34C759 : 0x1AFFB454);
+        bg.setColor(Ui.alpha(Ui.color(c, ok ? R.color.ok : R.color.warn), 0.10f));
         banner.setBackground(bg);
         banner.setTextColor(c.getColor(ok ? R.color.ok : R.color.warn));
         banner.setText(text);

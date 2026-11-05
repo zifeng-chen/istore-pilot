@@ -285,15 +285,15 @@ export struct ProxyPage {
   /** 延迟三档配色：绿 <150 / 琥珀 <350 / 红 */
   private delayHex(ms: number): string {
     if (ms <= 0) {
-      return '#8E8E93';
+      return Pal.textSecondary();
     }
     if (ms < 150) {
-      return '#34C759';
+      return Pal.ok();
     }
     if (ms < 350) {
-      return '#FF9500';
+      return Pal.warn();
     }
-    return '#FF3B30';
+    return Pal.danger();
   }
 
   /** 整组测速：OpenClash 由内核并发打完，Passwall 走并发 TCP 探测 */

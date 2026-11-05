@@ -5,6 +5,7 @@
 > 运行时表现一律标「待真机验证」，不凭静态猜。
 >
 > 生成时间：2026-11-06。方法：grep 硬编码颜色/尺寸 + 组件契约比对 + 三端同语义对照。
+> 状态：§1 的 P2 项已在第二轮收口，见文末「收口结果」。
 
 ## 结论速览
 
@@ -47,9 +48,9 @@
 **结论**：违反 `UI_REVIEW.md` §三「三端同口径」。iOS 应该和其它两端一样用 `primary`
 （或三端一起改成同一个「在线」专用 Token），而不是一个既不随主题、也不等于其它两端的硬编码。
 
-### 1.3 鸿蒙 `ProxyPage.statusColor()` 重复实现调色板
+### 1.3 鸿蒙 `ProxyPage.delayHex()` 重复实现调色板
 
-`ProxyPage.ets:288-296` 的 `statusColor()` 返回 `'#8E8E93' / '#34C759' / '#FF9500' / '#FF3B30'`，
+`ProxyPage.ets:288-296` 的 `delayHex()` 返回 `'#8E8E93' / '#34C759' / '#FF9500' / '#FF3B30'`，
 正好是 `Pal.textSecondary() / Pal.ok() / Pal.warn() / Pal.danger()` 的浅色值。
 这是**把调色板抄了一份**——深浅色切换时这四个会固定在浅色值上。收口到 `Pal.*`。
 
@@ -119,9 +120,27 @@
 
 ---
 
+## 收口结果（第二轮，2026-11-06）
+
+已按 §1 逐项处理，三端均编译通过（Android assembleDebug / iOS BUILD SUCCEEDED / 鸿蒙 BUILD SUCCESSFUL）：
+
+- **iOS**：新增 `C.heroOn / heroOff / heroOffFg / heroWarn / heroInk` 五个 hero 状态色
+  Token，替换 6 个文件里的 8 处 `0x5FE7C4`、5 处 `0xFF7A6B` 及 `0xFF9F8F`/`0xFFB020`/`0x073128`。
+  视觉值不变，只是从「散落硬编码」变成「单点可改」。
+- **鸿蒙**：`ProxyPage.delayHex()` 收口到 `Pal.textSecondary/ok/warn/danger`；
+  `NetworkPage` 的字面量 `'#FF9500'` 改 `Pal.warn()`。
+- **Android**：5 处内联 alpha 位运算改 `Ui.alpha(base, 0.xxf)`，
+  `BaseFragment` 两处琥珀/绿 10% 底色改 `Ui.alpha(Ui.color(...), 0.10f)`，
+  `NavBar` 的 `0x2E000000` 改 `Ui.alpha(colorOn, 0.18f)`。
+
+**仍未做（等设计拍板）**：§1.2「三端『在线』颜色值不一致」——
+iOS 现在是 `heroOn`(#5FE7C4)，Android/鸿蒙是 `primary`。这属于「在线」到底是
+用主色还是用亮绿的语义选择，收口成 Token 后改一处即可，但改哪个值请你定。
+§2.1 卡片圆角 20 vs 22 同理，未动。
+
 ## 5. 建议的收口顺序
 
 1. 先定「在线/离线/警告」三个状态色的三端统一 Token（影响面最大、最容易被下一个人改歪）。
-2. 鸿蒙 `statusColor()` 收口到 `Pal.*`，Android 内联 alpha 收口到 `Ui.alpha()`。
+2. 鸿蒙 `delayHex()` 收口到 `Pal.*`，Android 内联 alpha 收口到 `Ui.alpha()`。
 3. 卡片圆角统一成 22（或 20，一次性三端改）。
 4. 剩余零散硬编码（GraphView、SettingsPage scrim）按需收口，不强求。
