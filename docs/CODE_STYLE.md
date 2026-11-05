@@ -120,6 +120,9 @@
 
 ## 四、评审怎么跑
 
+代码层检查用下面的命令；**界面/交互层**按 `docs/UI_REVIEW.md` 自查（三端单位、
+空间责任、组件契约、状态清单、鸿蒙专项、真机验收）。
+
 ```bash
 # Python：静态检查（配置见 ruff.toml）
 python -m ruff check agent deploy scripts
