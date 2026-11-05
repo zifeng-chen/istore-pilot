@@ -91,6 +91,10 @@
 7. **`if` 块不能插在组件闭括号和它的 `.width()` 链式调用之间**。
 8. **图标别用 `Path` 组件**：实测只画出第一个 `M` 点，统一走 `LineIcon`/`GlyphIcon`。
 
+**编译期易犯**（`any`、对象字面量、解构、`for..in`、`catch (e:T)` 等 —— 标准模式下
+全是编译错误，`@ts-ignore` 关不掉）：完整规则表见 **`docs/ARKTS_PITFALLS.md`**，
+写 `.ets` 前自查 §1，报错按 rule-id 查 §2。
+
 ## 五、审查流程（改 UI 前后各跑一遍）
 
 1. **先找真源**：颜色 `Theme.ets`/`Appearance`/`res/values/colors.xml`，组件

@@ -92,11 +92,15 @@
 3. **暂不碰**：ECC 整套、spellbook、DevEcoCli——它们面向"从零生成项目/CI 全托管"，
    我们这个成型项目用不上，还容易和现有脚本打架（违背原文"别混装同职责 skill"）。
 
-**下一步可选动作**（等你定）：
-- 我去核实 `hmos-arkts-syntax-checker` 和 `linhay/harmony-next.skills` 的实际内容，
-  把对得上我们 API 版本（现网 API 12 兼容 SDK 20）的部分翻译进 `docs/`；
-- 或者先把文章里"AI 易犯的 ArkTS 语法错误清单"整理进 `docs/UI_REVIEW.md` 的鸿蒙专项，
-  作为我们自己 skill 的一部分——这最贴合你之前定的"只借鉴、不安装"路线。
+**落地情况（2026-11-06 已完成，见相关文档）**：
+- `linhay/harmony-next.skills` 与 `JohnnnyTang/harmonyos-dev-skills` 均已克隆核实，
+  装法/用法/取走了什么 → `docs/HARMONY_SKILLS_SETUP.md`
+- 「AI 易犯的 ArkTS 语法错误清单」已按本项目 API 20 改写 → `docs/ARKTS_PITFALLS.md`
+  （规则 id + 错误码 + 惯用改写 + 并发 + 导入规则）
+- `docs/UI_REVIEW.md` 鸿蒙专项已加「编译期易犯」指针
+
+两条路线都落地了：既核实了两个知识包、翻译了对得上 API 版本的部分，
+也把语法错误清单沉淀成了项目自己的文档。
 
 ---
 
