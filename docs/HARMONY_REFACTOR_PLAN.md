@@ -90,6 +90,30 @@
 2. **目标 C**：已清零，保持（发版门禁 + CI 会盯）。
 3. **目标 A**：V2 迁移，等痛点或生态成熟再做。
 
+## 阶段性结论（2026-11-06 已开工 A）
+
+按「先迁叶子组件」的官方建议，第一批量已落地在 `refactor/arkui-v2` 分支：
+
+**已迁 V2（编译通过，与 V1 页面共存）**：`Comp.ets`（Card/RowCard/GroupBox/
+CardTitle/SettingRow/Kv/GlyphIcon/LineIcon/HeroStat/Pill/Note/Chip…15 个共享组件）、
+`Ring`、`AppIcon`、`PortTile`、`TrendChart`。
+
+**迁移中确认的两个硬事实**：
+
+1. **V1 父组件可以容纳 V2 子组件**（实测编译通过），所以能自底向上渐进迁，
+   不必大爆炸。
+2. **`@StorageProp`/`@StorageLink` 是 V1 专属装饰器**，在 `@ComponentV2` 里直接
+   编译报错。V2 的等价物是 **`AppStorageV2.connect()` + `@ObservedV2`/`@Trace`**
+   —— 要把 `tab`/`winW`/`safeTop`/`forceLogin`/`shellBackTick` 这些跨页 AppStorage
+   键值改成 `@ObservedV2` 类。这是**架构级改动**，不是装饰器替换。
+
+**因此**：页面（Index、7 个 tab、Login 等）和 NavBar/SideNav（依赖双向绑定 @Link）
+**暂留 V1**，等 AppStorageV2 改造单独立项后再迁。这不是没做完，而是 V1/V2 共存的
+官方推荐边界 —— 强行迁页面会把跨页状态机制一起推翻，风险反而变大。
+
+**剩余工作**：把 AppStorage 键值封装成 `@ObservedV2` 状态类 + `AppStorageV2.connect`，
+再逐页迁 V2。建议单独一期，配真机全量回归。
+
 ## 回滚总原则（通用）
 
 - 一切重构在**独立分支**上做，主线保持可发版状态。
