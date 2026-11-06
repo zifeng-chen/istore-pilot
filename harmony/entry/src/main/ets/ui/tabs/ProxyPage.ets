@@ -5,7 +5,7 @@ import { J } from '../../core/Json';
 import { UI, UIState } from '../../core/UIState';
 import { Bp } from '../Breakpoint';
 import { Pal, T } from '../Theme';
-import { Card, CardTitle, Comp, GlyphIcon, GroupBox, Hairline, Pill } from '../Comp';
+import { Card, CardTitle, Comp, GlyphIcon, GroupBox, Hairline, Note, Pill } from '../Comp';
 import { Glyph } from '../comp/Icons';
 
 interface Backend {
@@ -15,6 +15,43 @@ interface Backend {
   running: boolean;
   nodes: number;
   engine: string;
+  /** 包名（luci-app-xxx），安装时显示用 */
+  pkg: string;
+  /** 内核是否已下载：installed=true 而这里是 false，就是「装了却启不来」 */
+  coreReady: boolean;
+}
+
+/** 安装环境：决定空态那屏能不能一键装、按钮给什么文案 */
+interface SysInfo {
+  pkgManager: string;
+  distro: string;
+  release: string;
+  arch: string;
+  freeMb: number;
+  /** yes | no | unknown —— no 表示源里没有，点了也装不上 */
+  repoOc: string;
+  repoPw: string;
+}
+
+interface InstallErr {
+  code: string;
+  title: string;
+  detail: string;
+  suggest: string[];
+}
+
+interface InstallState {
+  running: boolean;
+  done: boolean;
+  ok: boolean;
+  pct: number;
+  step: string;
+  index: number;
+  total: number;
+  installed: string[];
+  failed: string[];
+  partial: boolean;
+  err: InstallErr;
 }
 
 interface NodeItem {
@@ -77,11 +114,34 @@ export struct ProxyPage {
   @Local currentPath: string = '';
   @Local configBusy: boolean = false;
 
+  // ---- 插件安装（只在「两个都没装」时用得上）
+  @Local sys: SysInfo = {
+    pkgManager: '', distro: '', release: '', arch: '', freeMb: 0,
+    repoOc: '', repoPw: ''
+  };
+  @Local inst: InstallState = {
+    running: false, done: false, ok: false, pct: 0, step: '',
+    index: 0, total: 0, installed: [], failed: [], partial: false,
+    err: { code: '', title: '', detail: '', suggest: [] }
+  };
+  /** 安装相关的弹窗（确认 / 失败共用一个 sheet，靠 sheetMode 分辨内容） */
+  @Local showSheet: boolean = false;
+  @Local sheetMode: string = '';
+  @Local askTarget: string = '';
+  @Local showFail: boolean = false;
+  @Local failTitle: string = '';
+  @Local failCode: string = '';
+  @Local failDetail: string = '';
+  @Local failSuggest: string[] = [];
+
   private timer: number = -1;
+  private installTimer: number = -1;
 
   aboutToAppear(): void {
     this.winW = this.ui.winW;
     this.load(true);
+    // 任务在 Agent 侧跑，切走再回来要能接上进度
+    this.resumeInstall();
     if (this.tab === 2) {
       this.startPoll();
     }
@@ -89,6 +149,7 @@ export struct ProxyPage {
 
   aboutToDisappear(): void {
     this.stopPoll();
+    this.stopInstallPoll();
   }
 
   @Monitor('ui.winW')
@@ -130,6 +191,193 @@ export struct ProxyPage {
     return this.getUIContext().getHostContext() as common.UIAbilityContext;
   }
 
+  // ------------------------------------------------------- 插件安装
+  //
+  // 空态（两个都没装）时这一页要回答一个问题：「我该装哪个」。
+  // 所以不摆两行「未安装」的空卡片，改成解释 + 一键装 + 单独装。
+
+  private noneInstalled(): boolean {
+    if (this.backends.length === 0) {
+      return false;
+    }
+    for (let i = 0; i < this.backends.length; i++) {
+      if (this.backends[i].installed) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private repoOf(id: string): string {
+    return id === 'openclash' ? this.sys.repoOc : this.sys.repoPw;
+  }
+
+  private labelOf(id: string): string {
+    return id === 'openclash' ? 'OpenClash' : 'Passwall';
+  }
+
+  private descOf(id: string): string {
+    return id === 'openclash'
+      ? '按域名规则分流，支持 fake-ip'
+      : '轻量，Xray 内核，依赖少';
+  }
+
+  private pkgOf(id: string): string {
+    return id === 'openclash' ? 'luci-app-openclash' : 'luci-app-passwall';
+  }
+
+  /** 源里有就走源；没有就得从官方发布页下（国内常失败，文案要说明） */
+  private repoHint(id: string): string {
+    const r: string = this.repoOf(id);
+    if (r === 'yes') {
+      return '软件源里有 · 可直接安装';
+    }
+    if (r === 'no') {
+      return '软件源里没有 · 从官方发布页下载';
+    }
+    return '还没刷新软件源 · 可以试试';
+  }
+
+  private sysLine(): string {
+    const bits: string[] = [];
+    const dr: string = this.sys.distro;
+    if (dr.length > 0) {
+      bits.push(this.sys.release.length > 0 ? dr + ' ' + this.sys.release : dr);
+    }
+    if (this.sys.pkgManager.length > 0) {
+      bits.push(this.sys.pkgManager);
+    }
+    if (this.sys.arch.length > 0) {
+      bits.push(this.sys.arch);
+    }
+    return bits.join(' · ');
+  }
+
+  /** @Local 只追踪整体赋值 —— 改 this.inst.xxx 不会刷新，必须造新对象 */
+  private freshInst(step: string, total: number, running: boolean): InstallState {
+    return {
+      running: running, done: false, ok: false, pct: 0, step: step,
+      index: 0, total: total, installed: [], failed: [], partial: false,
+      err: { code: '', title: '', detail: '', suggest: [] }
+    };
+  }
+
+  private applyInstall(j: J): void {
+    const e: J = j.obj('error');
+    this.inst = {
+      running: j.bool('running', false),
+      done: j.bool('done', false),
+      ok: j.bool('ok', false),
+      pct: j.num('pct', 0),
+      step: j.str('step', ''),
+      index: j.num('index', 0),
+      total: j.num('total', 0),
+      installed: j.strs('installed'),
+      failed: j.strs('failed'),
+      partial: j.bool('partial', false),
+      err: {
+        code: e.str('error_code', ''),
+        title: e.str('error_title', ''),
+        detail: e.str('detail', ''),
+        suggest: e.strs('suggest')
+      }
+    };
+  }
+
+  private applyFailRaw(code: string, title: string, detail: string,
+    suggest: string[]): void {
+    this.failCode = code;
+    this.failTitle = title;
+    this.failDetail = detail;
+    this.failSuggest = suggest;
+    this.sheetMode = 'fail';
+    this.showSheet = true;
+  }
+
+  /** 服务端的失败结构是平的（error_code / error_title / detail / suggest） */
+  private applyFailOf(j: J): void {
+    this.applyFailRaw(j.str('error_code', 'unknown'),
+      j.str('error_title', '安装失败'), j.str('detail', ''), j.strs('suggest'));
+  }
+
+  private askInstall(target: string): void {
+    this.askTarget = target;
+    this.sheetMode = 'ask';
+    this.showSheet = true;
+  }
+
+  private async doInstall(force: boolean): Promise<void> {
+    const target: string = this.askTarget;
+    this.showSheet = false;
+    const total: number = target === 'all' ? 2 : 1;
+    this.inst = this.freshInst('准备中', total, true);
+
+    const body: Record<string, Object> = {
+      'target': target, 'confirm': 'install', 'force': force
+    };
+    const r: ApiResult = await Api.post(this.ctx(), '/api/v1/proxy/install', body);
+    if (!r.ok) {
+      this.inst = this.freshInst('', total, false);
+      this.applyFailRaw('net_unreachable', '连不上 Agent', r.error, ['retry']);
+      return;
+    }
+    if (!r.data.bool('ok', true)) {
+      this.inst = this.freshInst('', total, false);
+      this.applyFailOf(r.data);
+      return;
+    }
+    this.startInstallPoll();
+  }
+
+  private startInstallPoll(): void {
+    this.stopInstallPoll();
+    this.installTimer = setInterval(() => {
+      this.pollInstall();
+    }, 1000);
+  }
+
+  private stopInstallPoll(): void {
+    if (this.installTimer >= 0) {
+      clearInterval(this.installTimer);
+      this.installTimer = -1;
+    }
+  }
+
+  private async pollInstall(): Promise<void> {
+    const r: ApiResult = await Api.get(this.ctx(), '/api/v1/proxy/install');
+    if (!r.ok) {
+      return;
+    }
+    this.applyInstall(r.data);
+    if (this.inst.err.code.length > 0 && !this.showSheet) {
+      this.failCode = this.inst.err.code;
+      this.failTitle = this.inst.err.title;
+      this.failDetail = this.inst.err.detail;
+      this.failSuggest = this.inst.err.suggest;
+      this.sheetMode = 'fail';
+      this.showSheet = true;
+    }
+    if (!this.inst.running && this.inst.done) {
+      this.stopInstallPoll();
+      this.load(true);
+      if (this.inst.ok) {
+        this.toast = '装好了 · 导入订阅后再启动';
+      }
+    }
+  }
+
+  /** 重进页面时接上还在跑的任务（任务在 Agent 侧，杀 App 也不中断） */
+  private async resumeInstall(): Promise<void> {
+    const r: ApiResult = await Api.get(this.ctx(), '/api/v1/proxy/install');
+    if (!r.ok) {
+      return;
+    }
+    this.applyInstall(r.data);
+    if (this.inst.running) {
+      this.startInstallPoll();
+    }
+  }
+
   private async load(withCache: boolean): Promise<void> {
     const ctx = this.ctx();
     if (withCache) {
@@ -160,10 +408,24 @@ export struct ProxyPage {
         installed: b.bool('installed', false),
         running: b.bool('running', false),
         nodes: b.num('node_count', 0),
-        engine: b.str('engine', '')
+        engine: b.str('engine', ''),
+        pkg: b.str('pkg', ''),
+        coreReady: b.bool('core_ready', false)
       });
     }
     this.backends = out;
+
+    const sys: J = j.obj('system');
+    const repo: J = sys.obj('repo');
+    this.sys = {
+      pkgManager: sys.str('pkg_manager', ''),
+      distro: sys.str('distro', ''),
+      release: sys.str('release', ''),
+      arch: sys.str('arch', ''),
+      freeMb: sys.num('free_mb', 0),
+      repoOc: repo.str('openclash', 'unknown'),
+      repoPw: repo.str('passwall', 'unknown')
+    };
   }
 
   private async loadGroups(): Promise<void> {
@@ -393,7 +655,11 @@ export struct ProxyPage {
         .alignItems(VerticalAlign.Bottom)
         .padding({ bottom: 12 });
 
-        if (this.rail()) {
+        if (this.noneInstalled()) {
+          // 两个都没装：整页换成「教你装」。摆两行未安装的空卡片对用户没信息量，
+          // 下面的运行模式、节点分组更是死的
+          this.installGuide();
+        } else if (this.rail()) {
           // 平板：左边「走哪条线」（后端 + 模式），右边「能选哪些线」（节点分组）
           Row({ space: Bp.gap(this.winW) }) {
             Column() {
@@ -448,6 +714,296 @@ export struct ProxyPage {
         this.showGroup = false;
       }
     });
+  }
+
+  // ------------------------------------------------- 空态：装插件
+  //
+  // 两个都没装时，这一页的价值不是「报告没装」，而是「教你怎么装」。
+  // 所以不摆两行未安装的空卡片，改成：解释 → 一键装 → 单独装。
+
+  @Builder
+  installGuide() {
+    Column() {
+      Card() {
+        Row() {
+          GlyphIcon({ kind: Glyph.POWER, color: Pal.primary(), side: 22 });
+          Column() {
+            Text('还没有代理插件')
+              .fontSize(T.F_H2)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.text_primary'));
+            Text('装一个才能在这里选节点、切模式')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_secondary'))
+              .margin({ top: 3 });
+          }
+          .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1)
+          .margin({ left: 12 });
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Center);
+      }
+
+      if (this.inst.running) {
+        this.installProgress();
+      } else {
+        this.installChoices();
+      }
+    }
+    .width('100%')
+    .bindSheet($$this.showSheet, this.installSheet(), {
+      height: this.sheetMode === 'ask' ? 360 : 440,
+      dragBar: true,
+      backgroundColor: $r('app.color.app_bg'),
+      onDisappear: () => {
+        this.showSheet = false;
+      }
+    });
+  }
+
+  @Builder
+  installChoices() {
+    Column() {
+      // 一键：省掉「选哪个」这一步决策
+      Column() {
+        Text('一键全部安装')
+          .fontSize(T.F_H2)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.on_primary'));
+        Text('两个都装 · 之后选一个启动')
+          .fontSize(T.F_TINY)
+          .fontColor($r('app.color.on_primary'))
+          .opacity(0.82)
+          .margin({ top: 3 });
+      }
+      .width('100%')
+      .padding({ top: 15, bottom: 15 })
+      .backgroundColor($r('app.color.primary'))
+      .borderRadius(T.R_CARD)
+      .margin({ top: T.GAP })
+      .onClick(() => {
+        this.askInstall('all');
+      });
+
+      Text('或者只装一个')
+        .fontSize(T.F_TINY)
+        .fontColor($r('app.color.text_tertiary'))
+        .width('100%')
+        .textAlign(TextAlign.Center)
+        .margin({ top: T.GAP, bottom: 2 });
+
+      this.oneCard('openclash');
+      this.oneCard('passwall');
+
+      Note({ text: this.sysLine() + (this.sysLine().length > 0 ? '\n' : '')
+        + '装完不会自动启动：先导入订阅，再回这里启动' });
+    }
+    .width('100%');
+  }
+
+  @Builder
+  oneCard(id: string) {
+    Card({ gapTop: T.GAP }) {
+      Row() {
+        Column() {
+          Text(this.labelOf(id))
+            .fontSize(T.F_H2)
+            .fontColor($r('app.color.text_primary'));
+          Text(this.descOf(id))
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_secondary'))
+            .margin({ top: 2 });
+          Text(this.repoHint(id))
+            .fontSize(T.F_TINY)
+            .fontColor(this.repoOf(id) === 'no'
+              ? $r('app.color.warn')
+              : $r('app.color.text_tertiary'))
+            .margin({ top: 4 });
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1);
+
+        Text(this.repoOf(id) === 'yes' ? '安装' : '下载安装')
+          .fontSize(T.F_SUB)
+          .fontColor($r('app.color.primary'))
+          .padding({ left: 12, right: 12, top: 5, bottom: 5 })
+          .borderRadius(99)
+          .backgroundColor($r('app.color.accent_soft'))
+          .margin({ left: 8 })
+          .onClick(() => {
+            this.askInstall(id);
+          });
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center);
+    }
+  }
+
+  @Builder
+  installProgress() {
+    Card({ gapTop: T.GAP }) {
+      CardTitle({
+        glyph: Glyph.BOLT,
+        title: this.inst.index > 0 && this.inst.total > 0
+          ? '正在安装 ' + this.inst.index + ' / ' + this.inst.total
+          : '正在安装',
+        sub: this.inst.step
+      });
+      // 进度条自己画：复用组件里没有细长条，为一个地方加一个不划算
+      Stack({ alignContent: Alignment.Start }) {
+        Row()
+          .width('100%')
+          .height(6)
+          .borderRadius(3)
+          .backgroundColor($r('app.color.track'));
+        Row()
+          .width(Math.max(0, Math.min(100, this.inst.pct)) + '%')
+          .height(6)
+          .borderRadius(3)
+          .backgroundColor($r('app.color.primary'));
+      }
+      .width('100%')
+      .height(6)
+      .margin({ top: 14, bottom: 10 });
+
+      Text('装第二个之前会等 opkg 锁释放，别退出')
+        .fontSize(T.F_TINY)
+        .fontColor($r('app.color.text_tertiary'))
+        .width('100%');
+    }
+  }
+
+  /** 确认与失败共用一个 sheet：同一个组件上挂两个 bindSheet 会打架 */
+  @Builder
+  installSheet() {
+    Column() {
+      Row() {
+        Text(this.sheetMode === 'ask'
+          ? (this.askTarget === 'all' ? '安装两个插件' : '安装 ' + this.labelOf(this.askTarget))
+          : this.failTitle)
+          .fontSize(T.F_H1)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'))
+          .layoutWeight(1)
+          .maxLines(2);
+        Text('关闭')
+          .fontSize(T.F_SUB)
+          .fontColor($r('app.color.text_secondary'))
+          .padding({ left: 8, top: 4, bottom: 4 })
+          .onClick(() => {
+            this.showSheet = false;
+          });
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Top)
+      .padding({ bottom: 14 });
+
+      if (this.sheetMode === 'ask') {
+        this.askBody();
+      } else {
+        this.failBody();
+      }
+    }
+    .width('100%')
+    .padding({ left: 20, right: 20, top: 18, bottom: 20 });
+  }
+
+  @Builder
+  askBody() {
+    Column() {
+      Text(this.askTarget === 'all'
+        ? '会把 OpenClash 和 Passwall 都装上（约 20 MB），装完选一个启动。'
+        : '安装 ' + this.pkgOf(this.askTarget) + '，装完不会自动启动。')
+        .fontSize(T.F_SUB)
+        .fontColor($r('app.color.text_primary'))
+        .lineHeight(20)
+        .width('100%');
+
+      Text('安装包会以 root 权限执行安装脚本，过程中请不要关闭 App 或重启路由器。')
+        .fontSize(T.F_TINY)
+        .fontColor($r('app.color.text_secondary'))
+        .lineHeight(18)
+        .width('100%')
+        .margin({ top: 10 });
+
+      Row({ space: 10 }) {
+        Text('取消')
+          .fontSize(T.F_SUB)
+          .fontColor($r('app.color.text_primary'))
+          .layoutWeight(1)
+          .textAlign(TextAlign.Center)
+          .padding({ top: 11, bottom: 11 })
+          .borderRadius(99)
+          .backgroundColor($r('app.color.surface_sunken'))
+          .onClick(() => {
+            this.showSheet = false;
+          });
+        Text('开始安装')
+          .fontSize(T.F_SUB)
+          .fontColor($r('app.color.on_primary'))
+          .layoutWeight(1)
+          .textAlign(TextAlign.Center)
+          .padding({ top: 11, bottom: 11 })
+          .borderRadius(99)
+          .backgroundColor($r('app.color.primary'))
+          .onClick(() => {
+            this.doInstall(false);
+          });
+      }
+      .width('100%')
+      .margin({ top: 18 });
+    }
+    .width('100%');
+  }
+
+  @Builder
+  failBody() {
+    Column() {
+      if (this.failDetail.length > 0) {
+        Text(this.failDetail)
+          .fontSize(T.F_SUB)
+          .fontColor($r('app.color.text_primary'))
+          .lineHeight(20)
+          .width('100%');
+      }
+      Text(this.failCode === 'net_unreachable' || this.failCode === 'dns_failed'
+        ? '路由器当前可能上不了外网，或软件源/官方发布页不可达。'
+        : '可以重试一次；反复失败就先更新软件源，或手动下载 ipk 上传安装。')
+        .fontSize(T.F_TINY)
+        .fontColor($r('app.color.text_secondary'))
+        .lineHeight(18)
+        .width('100%')
+        .margin({ top: 10 });
+
+      Row({ space: 10 }) {
+        Text('仍然尝试')
+          .fontSize(T.F_SUB)
+          .fontColor($r('app.color.text_primary'))
+          .layoutWeight(1)
+          .textAlign(TextAlign.Center)
+          .padding({ top: 11, bottom: 11 })
+          .borderRadius(99)
+          .backgroundColor($r('app.color.surface_sunken'))
+          .onClick(() => {
+            this.doInstall(true);
+          });
+        Text('重试')
+          .fontSize(T.F_SUB)
+          .fontColor($r('app.color.on_primary'))
+          .layoutWeight(1)
+          .textAlign(TextAlign.Center)
+          .padding({ top: 11, bottom: 11 })
+          .borderRadius(99)
+          .backgroundColor($r('app.color.primary'))
+          .onClick(() => {
+            this.doInstall(false);
+          });
+      }
+      .width('100%')
+      .margin({ top: 18 });
+    }
+    .width('100%');
   }
 
   @Builder
