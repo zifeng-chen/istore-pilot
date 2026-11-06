@@ -366,6 +366,43 @@ opkg update → opkg install luci-app-adguardhome（失败不致命）
 另外接管状态下 `POST /adblock/service {"action":"stop"}` 会被拒绝并返回
 `need_release: true` —— 停掉 AGH 等于把全家的 DNS 打死。
 
+### DNS 上游跟着代理开关自动切
+
+AGH 的上游**不能写死**代理的 DNS 端口。OpenClash 停止后它监听的 7874 就没了，
+AGH 所有查询会变成 `SERVFAIL` —— 整个网络的 DNS 一起挂掉，只有不查 DNS 的
+IoT 设备看起来正常（2026-11-06 踩过一次）。
+
+所以接管后每轮巡检（12 秒）都会看一次上游：
+
+| 状态 | AGH 上游 | 效果 |
+|---|---|---|
+| OpenClash(7874) / Passwall(15353/7913) 在跑 | `127.0.0.1:7874` | fake-ip 分流生效 |
+| 都没跑 | `223.5.5.5` + `119.29.29.29` | DNS 永远可用 |
+
+- 只在模式变化时改 yaml + 重启 AGH，不会频繁中断
+- `proxy.service` / `proxy.config` 起停或切换配置后会主动调一次
+  `adblock.sync_upstream()`，不用等下一轮巡检
+- `/adblock/preflight` 的 `upstream` 检查会实测：指向本机的上游必须真的有人监听
+
+### 接管时必须下发 IPv4 DNS
+
+`dnsmasq` 的 `port` 从 53 挪到 5354 之后，**不会**再自动下发 DHCP 的 option 6
+（IPv4 DNS）。客户端于是只从 RA/DHCPv6 拿到 IPv6 DNS —— 表现就是
+Mac / Apple TV / 打印机「DNS 里只有 v6、没有 v4」、上不了网。
+
+`takeover()` 在重启 dnsmasq 之后会调 `_ensure_dhcp_dns()`：
+
+```
+uci add_list dhcp.lan.dhcp_option=6,<LAN IP>
+uci commit dhcp
+```
+
+已经有 `6,xxx` 就不重复添加（幂等）。客户端拿到 IPv4 DNS 后查 `<LAN>:53`
+就是 AGH，整条链路才闭合。
+
+> 改了 DHCP 配置后，**已连接的设备不会立刻重新请求**（租约 24 小时）。
+> 需要重连 WiFi 或重启设备才会拿到新的 DNS。
+
 ## 配置备份
 
 | 方法 | 路径 | 说明 |

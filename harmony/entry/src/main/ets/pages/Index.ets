@@ -3,6 +3,7 @@ import { router, window } from '@kit.ArkUI';
 import { Api, ApiResult } from '../api/Api';
 import { Session } from '../core/Session';
 import { Shell } from '../core/Shell';
+import { UI, UIState } from '../core/UIState';
 import { Pal, T } from '../ui/Theme';
 import { Appearance } from '../ui/Appearance';
 import { Bp } from '../ui/Breakpoint';
@@ -20,35 +21,34 @@ import { SettingsPage } from '../ui/tabs/SettingsPage';
  * 折叠屏展开/折叠、手机横屏、分屏，本质上都是「宽度变了」，
  * 按设备型号判断反而会在这些场景里翻车。
  *
- * 宽度写进 AppStorage('winW')，各页面自己读：
+ * 宽度写进 UIState.winW，各页面自己读：
  * 只有真正需要改布局的组件会重建，比把宽度当参数一层层往下传省事得多。
  */
 @Entry
-@Component
+@ComponentV2
 struct Index {
-  @State current: number = 0;
-  @State booted: boolean = false;
+  @Local current: number = 0;
+  @Local booted: boolean = false;
   /** 启动页覆盖层：三端同一套（对齐安卓 SplashActivity） */
-  @State splash: boolean = true;
-  @State prog: number = 0;
-  @State splashTip: string = '正在启动…';
-  @State logoIn: boolean = false;
-  @State nameIn: boolean = false;
-  @State tagIn: boolean = false;
-  @State safeBottom: number = 0;
-  /** 状态栏高度。窗口是全屏的（EntryAbility 里 setWindowLayoutFullScreen），
-      不主动让出来，页面大标题就会被时钟、电量压住 */
-  @StorageLink('safeTop') safeTop: number = 0;
-  @State winW: number = 360;
-  @State hostname: string = '';
-  @StorageProp('forceLogin') @Watch('onForceLogin') forceLogin: number = 0;
+  @Local splash: boolean = true;
+  @Local prog: number = 0;
+  @Local splashTip: string = '正在启动…';
+  @Local logoIn: boolean = false;
+  @Local nameIn: boolean = false;
+  @Local tagIn: boolean = false;
+  @Local safeBottom: number = 0;
+  @Local winW: number = 360;
+  @Local hostname: string = '';
   /**
-   * 页内二级页的标题（空串 = 停在一级页）。
-   *
-   * 设备清单 / 应用流量 / 拦截这些二级页是 SecurityPage 里换内容，不是路由页；
-   * 底部导航是这一层画的浮层，不读这个状态就永远压在二级页上面。
+   * 跨页共享的壳状态（V2 AppStorageV2 单例 UI，见 core/UIState.ets）：
+   *   - safeTop    状态栏高度，Index 测出后写，页面/侧栏读着让出顶部
+   *   - subTitle   页内二级页标题（空串 = 停在一级页）。设备清单/应用流量/拦截
+   *                是 SecurityPage 里换内容不是路由页，底部导航是这层画的浮层，
+   *                不读它就永远压在二级页上面
+   *   - forceLogin 令牌失效信号（EntryAbility 置时间戳），收到跳登录页
+   *   - tab/winW   当前页签与窗口宽度，各 tab 页 @Monitor 跟随
    */
-  @StorageProp('shellSubTitle') subTitle: string = '';
+  @Local ui: UIState = UI;
 
   aboutToAppear(): void {
     // 冷启动 / 重新登录后一定是停在一级页：把上一条会话可能残留的
@@ -104,7 +104,7 @@ struct Index {
 
     await this.measureSafeArea(ctx);
     // 各页签靠这个值决定自己要不要轮询：切走的页面立刻停定时器
-    AppStorage.setOrCreate('tab', 0);
+    UI.tab = 0;
     this.booted = true;
     this.fetchHost();
   }
@@ -164,33 +164,32 @@ struct Index {
       const name: string = r.data.obj('board').str('hostname', '');
       if (name.length > 0) {
         this.hostname = name;
-        AppStorage.setOrCreate('hostname', name);
+        UI.hostname = name;
       }
       const ver: string = r.data.obj('board').str('agent', '');
       if (ver.length > 0) {
-        AppStorage.setOrCreate('agentVer', ver);
+        UI.agentVer = ver;
       }
     }
   }
 
-  /** 记下状态栏与导航条高度，子页面靠 AppStorage 里的值自己留白 */
+  /** 记下状态栏与导航条高度，子页面靠 UIState 里的值自己留白 */
   private async measureSafeArea(ctx: common.UIAbilityContext): Promise<void> {
     try {
       const win = await window.getLastWindow(ctx);
       const sys = win.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM);
       const indicator = win.getWindowAvoidArea(window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR);
-      AppStorage.setOrCreate('safeTop', px2vp(sys.topRect.height));
+      UI.safeTop = px2vp(sys.topRect.height);
       this.safeBottom = px2vp(indicator.bottomRect.height);
-      AppStorage.setOrCreate('safeBottom', this.safeBottom);
     } catch (e) {
-      AppStorage.setOrCreate('safeTop', 0);
+      UI.safeTop = 0;
       this.safeBottom = 0;
-      AppStorage.setOrCreate('safeBottom', 0);
     }
   }
 
-  private onForceLogin(): void {
-    if (this.forceLogin > 0) {
+  @Monitor('ui.forceLogin')
+  onForceLogin(): void {
+    if (this.ui.forceLogin > 0) {
       router.replaceUrl({ url: 'pages/LoginPage' });
     }
   }
@@ -206,11 +205,18 @@ struct Index {
           Row() {
             // 侧栏
             Column() {
-              SideNav({ current: $current, hostname: this.hostname })
+              SideNav({
+                current: this.current,
+                hostname: this.hostname,
+                onChange: (i: number): void => {
+                  this.current = i;
+                  UI.tab = i;
+                }
+              })
             }
             .width(Bp.RAIL_W)
             .height('100%')
-            .padding({ top: this.safeTop });
+            .padding({ top: this.ui.safeTop });
 
             // 内容区
             Column() {
@@ -231,8 +237,14 @@ struct Index {
 
             // 二级页推进来的时候把底部导航收起来（安卓那边整页覆盖、没有横条）。
             // 淡出 + 下沉，和 iOS 的 transition 同一个节奏
-            if (this.subTitle.length === 0) {
-              NavBar({ current: $current })
+            if (this.ui.subTitle.length === 0) {
+              NavBar({
+                current: this.current,
+                onChange: (i: number): void => {
+                  this.current = i;
+                  UI.tab = i;
+                }
+              })
                 .width('100%')
                 .padding({ left: 14, right: 14 })
                 .margin({ top: 4, bottom: this.safeBottom + 12 })
@@ -260,7 +272,7 @@ struct Index {
       const w: number = Number(newArea.width);
       if (w > 0 && Math.abs(w - this.winW) > 1) {
         this.winW = w;
-        AppStorage.setOrCreate('winW', w);
+        UI.winW = w;
       }
     });
   }
@@ -335,7 +347,7 @@ struct Index {
       // 侧栏模式没有底部浮层，原来就是 0，别顺手改掉平板的手势条留白
       return 0;
     }
-    if (this.subTitle.length > 0) {
+    if (this.ui.subTitle.length > 0) {
       return this.safeBottom;
     }
     return T.NAV_H + 16 + this.safeBottom;
@@ -365,13 +377,13 @@ struct Index {
     .animationDuration(0)
     .onChange((i: number) => {
       this.current = i;
-      AppStorage.setOrCreate('tab', i);
+      UI.tab = i;
     })
     .width('100%')
     .height('100%')
     // 顶上让出状态栏，底下让出导航条：这个 App 是全屏窗口
     // （EntryAbility 里 setWindowLayoutFullScreen），不让出来内容会钻到系统栏底下。
-    .padding({ top: this.safeTop, bottom: this.bottomPad() });
+    .padding({ top: this.ui.safeTop, bottom: this.bottomPad() });
   }
 
   /**
@@ -382,13 +394,13 @@ struct Index {
    * 这里接管：二级页先退回一级页，页签不在首页时退回首页；都在最外层才交还给系统。
    */
   onBackPress(): boolean {
-    if (this.subTitle.length > 0) {
+    if (this.ui.subTitle.length > 0) {
       Shell.requestBack();
       return true;
     }
     if (this.current !== 0) {
       this.current = 0;
-      AppStorage.setOrCreate('tab', 0);
+      UI.tab = 0;
       return true;
     }
     return false;

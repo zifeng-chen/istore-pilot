@@ -2,6 +2,7 @@ import { common } from '@kit.AbilityKit';
 import { router } from '@kit.ArkUI';
 import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
+import { UI, UIState } from '../../core/UIState';
 import { Fmt } from '../../util/Fmt';
 import { Bp } from '../Breakpoint';
 import { Pal, T } from '../Theme';
@@ -72,27 +73,27 @@ interface DevRow {
  * 分组容器（一组一层圆角 + 行间细线），不是一个设备一张卡：
  * 家里 55 台设备，逐张卡会出现 55 层圆角和 55 层投影，列表又碎又卡。
  */
-@Component
+@ComponentV2
 export struct DevicesPage {
-  @State online: DevRow[] = [];
-  @State offline: DevRow[] = [];
-  @State totalCount: number = 0;
-  @State blockedCount: number = 0;
-  @State loaded: boolean = false;
-  @State err: string = '';
+  @Local online: DevRow[] = [];
+  @Local offline: DevRow[] = [];
+  @Local totalCount: number = 0;
+  @Local blockedCount: number = 0;
+  @Local loaded: boolean = false;
+  @Local err: string = '';
 
   /** 从「设备」一级页进来时预设的筛选：0 全部 / 1 在线 / 2 离线 */
-  @Prop presetFilter: number = 0;
-  @State filter: number = 0;
+  @Param presetFilter: number = 0;
+  @Local filter: number = 0;
 
-  @StorageProp('tab') @Watch('onTab') tab: number = 2;
-  @State winW: number = 360;
-  @StorageProp('winW') @Watch('onWidth') winWStore: number = 360;
+  @Local ui: UIState = UI;
+  @Local tab: number = UI.tab;
+  @Local winW: number = 360;
 
   private timer: number = -1;
 
   aboutToAppear(): void {
-    this.winW = this.winWStore;
+    this.winW = this.ui.winW;
     this.filter = this.presetFilter;
     this.load(true);
     if (this.tab === 2) {
@@ -104,15 +105,18 @@ export struct DevicesPage {
     this.stopPoll();
   }
 
-  private onWidth(): void {
-    this.winW = this.winWStore;
+  @Monitor('ui.winW')
+  onWidth(): void {
+    this.winW = this.ui.winW;
   }
 
   private rail(): boolean {
     return Bp.rail(this.winW);
   }
 
-  private onTab(): void {
+  @Monitor('ui.tab')
+  onTab(): void {
+    this.tab = this.ui.tab;
     if (this.tab === 2) {
       this.startPoll();
       this.load(false);

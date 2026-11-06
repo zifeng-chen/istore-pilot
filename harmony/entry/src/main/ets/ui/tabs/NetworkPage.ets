@@ -2,6 +2,7 @@ import { common } from '@kit.AbilityKit';
 import { router } from '@kit.ArkUI';
 import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
+import { UI, UIState } from '../../core/UIState';
 import { Fmt } from '../../util/Fmt';
 import { Pal, T } from '../Theme';
 import { Bp } from '../Breakpoint';
@@ -20,76 +21,75 @@ import { Glyph } from '../comp/Icons';
  * 只读不是偷懒：LAN 一改，手机到路由器的连接立刻失效，
  * 用户看到的是「App 崩了」而不是「配置生效了请注意重连」。
  */
-@Component
+@ComponentV2
 export struct NetworkPage {
   /** 作为二级页打开时显示返回箭头（底部四个页签里没有它了） */
-  @Prop showBack: boolean = false;
+  @Param showBack: boolean = false;
   /** 独立成页（网络设置）时窗口是全屏的，标题行要让出状态栏 */
-  @StorageProp('safeTop') safeTop: number = 0;
 
-  @State loaded: boolean = false;
-  @State err: string = '';
+  @Local loaded: boolean = false;
+  @Local err: string = '';
 
   // WAN
-  @State wanUp: boolean = false;
-  @State wanNote: string = '';
-  @State wanIp: string = '';
-  @State proto: string = '';
-  @State gateway: string = '';
-  @State uptime: number = 0;
-  @State dns: string = '';
-  @State account: string = '';
+  @Local wanUp: boolean = false;
+  @Local wanNote: string = '';
+  @Local wanIp: string = '';
+  @Local proto: string = '';
+  @Local gateway: string = '';
+  @Local uptime: number = 0;
+  @Local dns: string = '';
+  @Local account: string = '';
 
   // LAN
-  @State lanCidr: string = '';
-  @State lanHosts: number = 0;
-  @State lanDhcp: boolean = true;
-  @State lanPool: string = '';
-  @State lanLeases: number = 0;
-  @State lanLease: string = '';
-  @State lanV6: string = '';
+  @Local lanCidr: string = '';
+  @Local lanHosts: number = 0;
+  @Local lanDhcp: boolean = true;
+  @Local lanPool: string = '';
+  @Local lanLeases: number = 0;
+  @Local lanLease: string = '';
+  @Local lanV6: string = '';
 
   // 防火墙
-  @State fwDefault: string = '';
-  @State fwWanIn: string = '';
-  @State fwLanIn: string = '';
-  @State fwRules: number = 0;
-  @State fwRedirects: number = 0;
-  @State fwRisks: string[] = [];
-  @State fwOld: boolean = false;
+  @Local fwDefault: string = '';
+  @Local fwWanIn: string = '';
+  @Local fwLanIn: string = '';
+  @Local fwRules: number = 0;
+  @Local fwRedirects: number = 0;
+  @Local fwRisks: string[] = [];
+  @Local fwOld: boolean = false;
 
   /** 待确认事务：改完配置后不回来点确认，服务端 60 秒自动回滚 */
-  @State pendOn: boolean = false;
-  @State pendNote: string = '';
-  @State pendLeft: number = 0;
-  @State pendToken: string = '';
-  @State pendExpired: boolean = false;
+  @Local pendOn: boolean = false;
+  @Local pendNote: string = '';
+  @Local pendLeft: number = 0;
+  @Local pendToken: string = '';
+  @Local pendExpired: boolean = false;
 
   // 宽带参数（编辑用）：只在第一次拿到配置时灌一次，之后以用户输入为准
-  @State protoKey: string = 'pppoe';
-  @State protoKeys: string[] = [];
-  @State protoLabels: string[] = [];
-  @State inUser: string = '';
-  @State inPass: string = '';
-  @State inIp: string = '';
-  @State inMask: string = '255.255.255.0';
-  @State inGw: string = '';
-  @State inDns: string = '';
-  @State inMtu: string = '';
-  @State savingWan: boolean = false;
+  @Local protoKey: string = 'pppoe';
+  @Local protoKeys: string[] = [];
+  @Local protoLabels: string[] = [];
+  @Local inUser: string = '';
+  @Local inPass: string = '';
+  @Local inIp: string = '';
+  @Local inMask: string = '255.255.255.0';
+  @Local inGw: string = '';
+  @Local inDns: string = '';
+  @Local inMtu: string = '';
+  @Local savingWan: boolean = false;
   private cfgFilled: boolean = false;
 
-  @State acting: boolean = false;
-  @State actNote: string = '重拨只重建链路，不改配置；断开后点「连接」即可恢复。';
+  @Local acting: boolean = false;
+  @Local actNote: string = '重拨只重建链路，不改配置；断开后点「连接」即可恢复。';
 
-  @State winW: number = 360;
-  @StorageProp('winW') @Watch('onWidth') winWStore: number = 360;
-  @StorageProp('tab') @Watch('onTab') tab: number = 1;
+  @Local winW: number = 360;
+  @Local ui: UIState = UI;
+  @Local tab: number = UI.tab;
 
   private timer: number = -1;
 
   aboutToAppear(): void {
-    this.winW = this.winWStore;
+    this.winW = this.ui.winW;
     this.load(true);
     // 作为二级页时它是当前页面，直接开始轮询；不再看 tab 是谁
     this.startPoll();
@@ -99,11 +99,14 @@ export struct NetworkPage {
     this.stopPoll();
   }
 
-  private onWidth(): void {
-    this.winW = this.winWStore;
+  @Monitor('ui.winW')
+  onWidth(): void {
+    this.winW = this.ui.winW;
   }
 
-  private onTab(): void {
+  @Monitor('ui.tab')
+  onTab(): void {
+    this.tab = this.ui.tab;
     if (this.tab === 1) {
       this.startPoll();
       this.load(false);
@@ -918,7 +921,7 @@ export struct NetworkPage {
         Row().width('100%').height(24);
       }
       .width('100%')
-      .padding({ left: T.PAD, right: T.PAD, top: 8 + (this.showBack ? this.safeTop : 0) });
+      .padding({ left: T.PAD, right: T.PAD, top: 8 + (this.showBack ? this.ui.safeTop : 0) });
     }
     .width('100%')
     .height('100%')

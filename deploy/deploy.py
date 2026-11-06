@@ -93,11 +93,25 @@ def main() -> int:
         with open(src_path, "r", encoding="utf-8") as src:
             fh.write(src.read())
 
+    # DNS 上游守护：AGH 的上游必须跟着 OpenClash/Passwall 的开关自动切。
+    # 否则关掉代理，AGH 的上游（127.0.0.1:7874）就没人监听，整个网络 DNS 全挂
+    # （除了不查 DNS 的 IoT）。细节见 scripts/agh_upstream_guard.py 的注释。
+    with sftp.open("/tmp/agh_upstream_guard.py", "w") as fh:
+        src_path = os.path.join(ROOT, "scripts", "agh_upstream_guard.py")
+        with open(src_path, "r", encoding="utf-8") as src:
+            fh.write(src.read())
+
     steps = [
         f"mkdir -p {REMOTE_DIR} {CONF_DIR}",
         f"tar xzf /tmp/istore-agent.tar.gz -C {REMOTE_DIR}",
         f"cp /tmp/istore-agent.init {INITD} && chmod 755 {INITD}",
         f"chmod 700 {CONF_DIR}",
+        # DNS 上游守护：装到 /usr/bin，并保证 cron 每分钟巡检一次（幂等）
+        "cp /tmp/agh_upstream_guard.py /usr/bin/agh_upstream_guard.py"
+        " && chmod 755 /usr/bin/agh_upstream_guard.py",
+        "grep -q agh_upstream_guard /etc/crontabs/root 2>/dev/null"
+        " || echo '* * * * * /usr/bin/agh_upstream_guard.py' >> /etc/crontabs/root",
+        "/etc/init.d/cron restart >/dev/null 2>&1 || true",
         # LuCI 状态页读这个文件显示版本号；不打 ipk 直接 deploy 时没人写它，
         # 页面就会一直显示装机时的旧版本
         f"echo '{agent_version()}' > {REMOTE_DIR}/VERSION",

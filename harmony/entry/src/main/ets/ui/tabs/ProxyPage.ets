@@ -2,6 +2,7 @@ import { common } from '@kit.AbilityKit';
 import { promptAction, router } from '@kit.ArkUI';
 import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
+import { UI, UIState } from '../../core/UIState';
 import { Bp } from '../Breakpoint';
 import { Pal, T } from '../Theme';
 import { Card, CardTitle, Comp, GlyphIcon, GroupBox, Hairline, Pill } from '../Comp';
@@ -45,41 +46,41 @@ interface ConfigItem {
  * 界面上把「谁是当前生效」放在最前面，而不是列出两个各自的状态 ——
  * 用户关心的是现在走哪条线，不是两个服务各自的开关。
  */
-@Component
+@ComponentV2
 export struct ProxyPage {
-  @State backends: Backend[] = [];
-  @State active: string = '';
-  @State groups: NodeGroup[] = [];
-  @State nodeCount: number = 0;
-  @State backend: string = '';
-  @State mode: string = '';
+  @Local backends: Backend[] = [];
+  @Local active: string = '';
+  @Local groups: NodeGroup[] = [];
+  @Local nodeCount: number = 0;
+  @Local backend: string = '';
+  @Local mode: string = '';
   /** 弹窗里正在看的分组下标，-1 表示没打开 */
-  @State openIdx: number = -1;
-  @State showGroup: boolean = false;
-  @State busy: string = '';
+  @Local openIdx: number = -1;
+  @Local showGroup: boolean = false;
+  @Local busy: string = '';
   /** 正在测速的分组名，空串表示空闲 */
-  @State testingGroup: string = '';
-  @State toast: string = '';
-  @State loaded: boolean = false;
+  @Local testingGroup: string = '';
+  @Local toast: string = '';
+  @Local loaded: boolean = false;
   /** 「隐藏超时节点」：偏好存在路由器上，不是本机设置，几台设备看到的是同一份列表 */
-  @State hideTimeout: boolean = false;
+  @Local hideTimeout: boolean = false;
   /** 服务端按偏好裁掉了几个，显示在标题右边 */
-  @State hiddenCount: number = 0;
+  @Local hiddenCount: number = 0;
 
-  @StorageProp('tab') @Watch('onTab') tab: number = 2;
-  @State winW: number = 360;
+  @Local ui: UIState = UI;
+  @Local tab: number = UI.tab;
+  @Local winW: number = 360;
   /** 后端启停中，占位防止连点 */
-  @State busyBackend: string = '';
+  @Local busyBackend: string = '';
   /** 配置文件列表与当前生效的那个 */
-  @State configs: ConfigItem[] = [];
-  @State currentPath: string = '';
-  @State configBusy: boolean = false;
-  @StorageProp('winW') @Watch('onWidth') winWStore: number = 360;
+  @Local configs: ConfigItem[] = [];
+  @Local currentPath: string = '';
+  @Local configBusy: boolean = false;
 
   private timer: number = -1;
 
   aboutToAppear(): void {
-    this.winW = this.winWStore;
+    this.winW = this.ui.winW;
     this.load(true);
     if (this.tab === 2) {
       this.startPoll();
@@ -90,15 +91,18 @@ export struct ProxyPage {
     this.stopPoll();
   }
 
-  private onWidth(): void {
-    this.winW = this.winWStore;
+  @Monitor('ui.winW')
+  onWidth(): void {
+    this.winW = this.ui.winW;
   }
 
   private rail(): boolean {
     return Bp.rail(this.winW);
   }
 
-  private onTab(): void {
+  @Monitor('ui.tab')
+  onTab(): void {
+    this.tab = this.ui.tab;
     if (this.tab === 2) {
       this.startPoll();
       this.load(false);

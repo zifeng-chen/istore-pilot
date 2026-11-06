@@ -15,9 +15,11 @@ interface NavItem {
  * 图标是 22 的细线条，比正文更需要对比度补偿，
  * 用正文色会在浅色下淡到几乎看不见（Android 端踩过这个坑）。
  */
-@Component
+@ComponentV2
 export struct NavBar {
-  @Link current: number;
+  @Param current: number = 0;
+  /** 点击页签回调：V2 里没有 @Link 双向，选中改由父组件收事件后写回全局 */
+  @Event onChange: (i: number) => void = () => {};
 
   // 和 Android / iOS 一致：四个页签。「网络」并进了概览 →「网络设置」二级页
   private items: NavItem[] = [
@@ -77,7 +79,7 @@ export struct NavBar {
     .layoutWeight(1)
     .justifyContent(FlexAlign.Center)
     .onClick(() => {
-      this.current = i;
+      this.onChange(i);
     });
   }
 }

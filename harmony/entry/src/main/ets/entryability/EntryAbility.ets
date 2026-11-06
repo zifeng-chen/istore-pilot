@@ -2,6 +2,7 @@ import { AbilityConstant, Configuration, UIAbility, Want } from '@kit.AbilityKit
 import { window } from '@kit.ArkUI';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { Api } from '../api/Api';
+import { UI } from '../core/UIState';
 import { Pal } from '../ui/Theme';
 
 const DOMAIN: number = 0x0001;
@@ -14,7 +15,7 @@ export default class EntryAbility extends UIAbility {
     // 令牌失效统一走这里：置一个时间戳，Index 页监听后跳登录页。
     // 不在每个页面各自判断 401 —— 那会漏，而且会把跳转逻辑散在各处。
     Api.setAuthFailHandler(() => {
-      AppStorage.setOrCreate('forceLogin', Date.now());
+      UI.forceLogin = Date.now();
     });
   }
 

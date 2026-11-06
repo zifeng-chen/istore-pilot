@@ -13,6 +13,28 @@
 
 ---
 
+## 0.1.7 · 鸿蒙状态管理 V1→V2 全量迁移
+
+### 鸿蒙端架构升级：状态管理 V2（`refactor/arkui-v2`）
+
+把鸿蒙从 V1 状态管理（`@State`/`@Prop`/`@Watch`/`@StorageProp`/`@StorageLink`）
+整体迁到 V2（`@ComponentV2`/`@Local`/`@Param`/`@Event`/`@Monitor`/`@ObservedV2`/`@Trace`）。
+这是纯内部重构，对外功能与界面不变。
+
+- 新增 `core/UIState.ets`：`@ObservedV2 class UIState` + `AppStorageV2.connect` 全局单例，
+  把 `tab`/`winW`/`safeTop`/`forceLogin`/`subTitle`/`backTick` 等跨页状态收进 `@Trace` 字段
+- 迁移范围：Index + 7 个 tab 页 + BackupsPage + NavBar/SideNav + 共享组件
+  （Comp.ets 15 个）+ 叶子组件（Ring/AppIcon/PortTile/TrendChart）+ 内部子组件
+- `@Link` 双向绑定改为 `@Param` + `@Event onChange`
+- 5 个路由页（登录/内置浏览器/设备详情/订阅/网络设置）刻意保留 V1：
+  不参与跨页状态，`safeTop` 改为一次性读 `UI.safeTop`
+
+### 顺带修掉的迁移中发现的问题
+
+- 概览页「WAN 地址」显示 `[object Object]`：`wan.ipv4` 是数组，服务端补
+  `ipv4_text`/`ipv6_text`，三端统一读文本字段
+- 三端状态色与 alpha 收口到 Token（iOS `C.hero*`、鸿蒙 `Pal.*`、Android `Ui.alpha`）
+
 ## 0.1.6 · 公网网页端开关 + 鸿蒙卡片头对齐
 
 ### 网页端访问范围可配（不再只能改配置文件）

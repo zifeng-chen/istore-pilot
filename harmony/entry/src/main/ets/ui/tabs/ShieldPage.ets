@@ -1,6 +1,7 @@
 import { common } from '@kit.AbilityKit';
 import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
+import { UI, UIState } from '../../core/UIState';
 import { Fmt } from '../../util/Fmt';
 import { Bp } from '../Breakpoint';
 import { Pal, T } from '../Theme';
@@ -75,43 +76,43 @@ function shortClient(c: string): string {
   return seg.length === 4 ? (seg[2] + '.' + seg[3]) : c;
 }
 
-@Component
+@ComponentV2
 export struct ShieldPage {
-  @State blocked: number = 0;
-  @State queries: number = 0;
-  @State percent: number = 0;
-  @State modeLabel: string = '';
-  @State running: boolean = false;
-  @State rules: number = 0;
-  @State window: string = '';
-  @State top: RankItem[] = [];
-  @State hops: DnsHop[] = [];
-  @State loaded: boolean = false;
+  @Local blocked: number = 0;
+  @Local queries: number = 0;
+  @Local percent: number = 0;
+  @Local modeLabel: string = '';
+  @Local running: boolean = false;
+  @Local rules: number = 0;
+  @Local window: string = '';
+  @Local top: RankItem[] = [];
+  @Local hops: DnsHop[] = [];
+  @Local loaded: boolean = false;
   /** 拦截体检：原来只有安卓有，鸿蒙/iOS 都没有入口 */
-  @State checks: CheckItem[] = [];
-  @State preflightReady: boolean = false;
-  @State preflightMode: string = '';
+  @Local checks: CheckItem[] = [];
+  @Local preflightReady: boolean = false;
+  @Local preflightMode: string = '';
   /** 查询日志（最近几十条），默认只看被拦的 */
-  @State logItems: LogItem[] = [];
-  @State logOnlyBlocked: boolean = true;
-  @State logTotal: number = 0;
+  @Local logItems: LogItem[] = [];
+  @Local logOnlyBlocked: boolean = true;
+  @Local logTotal: number = 0;
 
   // ---- 规则更新
-  @State ruleAuto: boolean = false;
-  @State ruleInterval: number = 0;
-  @State ruleNext: string = '';
-  @State ruleMsg: string = '';
-  @State ruleBusy: boolean = false;
-  @State ruleLists: RuleItem[] = [];
+  @Local ruleAuto: boolean = false;
+  @Local ruleInterval: number = 0;
+  @Local ruleNext: string = '';
+  @Local ruleMsg: string = '';
+  @Local ruleBusy: boolean = false;
+  @Local ruleLists: RuleItem[] = [];
 
-  @State winW: number = 360;
-  @StorageProp('winW') @Watch('onWidth') winWStore: number = 360;
-  @StorageProp('tab') @Watch('onTab') tab: number = 2;
+  @Local winW: number = 360;
+  @Local ui: UIState = UI;
+  @Local tab: number = UI.tab;
 
   private timer: number = -1;
 
   aboutToAppear(): void {
-    this.winW = this.winWStore;
+    this.winW = this.ui.winW;
     this.load(true);
     if (this.tab === 2) {
       this.startPoll();
@@ -122,11 +123,14 @@ export struct ShieldPage {
     this.stopPoll();
   }
 
-  private onWidth(): void {
-    this.winW = this.winWStore;
+  @Monitor('ui.winW')
+  onWidth(): void {
+    this.winW = this.ui.winW;
   }
 
-  private onTab(): void {
+  @Monitor('ui.tab')
+  onTab(): void {
+    this.tab = this.ui.tab;
     if (this.tab === 2) {
       this.startPoll();
       this.load(false);
@@ -974,11 +978,11 @@ export struct ShieldPage {
 
 }
 
-/** 拦截卡的三格。@Builder 按值传参不会刷新，必须用 @Prop 组件 */
-@Component
+/** 拦截卡的三格。@Builder 按值传参不会刷新，必须用 @Param 组件 */
+@ComponentV2
 struct ShieldStat {
-  @Prop value: string = '';
-  @Prop label: string = '';
+  @Param value: string = '';
+  @Param label: string = '';
 
   build() {
     Column() {

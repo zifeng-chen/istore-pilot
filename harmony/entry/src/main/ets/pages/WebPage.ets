@@ -4,6 +4,7 @@ import { webview } from '@kit.ArkWeb';
 import { Api, ApiResult } from '../api/Api';
 import { Session } from '../core/Session';
 import { J } from '../core/Json';
+import { UI } from '../core/UIState';
 import { Pal, T } from '../ui/Theme';
 import { GlyphIcon } from '../ui/Comp';
 import { Glyph } from '../ui/comp/Icons';
@@ -30,7 +31,7 @@ struct WebPage {
   @State host: string = '';
   @State ready: boolean = false;
   /** 全屏窗口：标题行要让出状态栏，否则返回键被时钟压住 */
-  @StorageProp('safeTop') safeTop: number = 0;
+  @State safeTop: number = 0;
   @State progress: number = 0;
   @State err: string = '';
 
@@ -38,6 +39,7 @@ struct WebPage {
   private wantPath: string = '';
 
   aboutToAppear(): void {
+    this.safeTop = UI.safeTop;
     const raw: Object | undefined = router.getParams();
     if (raw) {
       const p: Record<string, Object> = raw as Record<string, Object>;

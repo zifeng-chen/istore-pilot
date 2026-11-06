@@ -24,14 +24,14 @@ interface BakItem {
  * 恢复走服务端同一条事务：铺完 60 秒内不确认就自动退回。因为备份里的
  * network 会把 LAN 地址一起改掉，手机拿的还是旧地址，连不回来就是个死局。
  */
-@Component
+@ComponentV2
 export struct BackupsPage {
-  @State items: BakItem[] = [];
-  @State count: number = 0;
-  @State total: number = 0;
-  @State loaded: boolean = false;
-  @State err: string = '';
-  @State busy: string = '';
+  @Local items: BakItem[] = [];
+  @Local count: number = 0;
+  @Local total: number = 0;
+  @Local loaded: boolean = false;
+  @Local err: string = '';
+  @Local busy: string = '';
 
   aboutToAppear(): void {
     this.load();

@@ -7,14 +7,14 @@ import { Pal } from '../Theme';
  * 另外 onReady 有可能在第一次 @Watch 之后才触发，用一个 ready 标记挡住，
  * 否则会往还没初始化的 context 里画东西（表现为空白环）。
  */
-@Component
+@ComponentV2
 export struct Ring {
-  @Prop @Watch('onValueChange') ratio: number;
-  @Prop label: string;
-  @Prop caption: string;
+  @Param ratio: number = 0;
+  @Param label: string = '';
+  @Param caption: string = '';
   /** 主色，默认走品牌绿；温度这类告警场景由外部传 danger/warn */
-  @Prop accent: string;
-  @Prop diameter: number;
+  @Param accent: string = '';
+  @Param diameter: number = 0;
 
   private settings: RenderingContextSettings = new RenderingContextSettings(true);
   private ctx: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.settings);
@@ -23,6 +23,7 @@ export struct Ring {
   private static readonly START: number = 135 * Math.PI / 180;
   private static readonly SWEEP: number = 270 * Math.PI / 180;
 
+  @Monitor('ratio')
   onValueChange(): void {
     if (this.ready) {
       this.draw();

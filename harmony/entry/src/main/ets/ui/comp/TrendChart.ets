@@ -12,11 +12,11 @@ import { Fmt } from '../../util/Fmt';
  * 一行挤三个标签在窄屏上必然互相叠（Android 端的「12.4 MB/s」叠字就是这么来的），
  * 所以标签走 Fmt.bpsAxis 的短格式，并只留两个。
  */
-@Component
+@ComponentV2
 export struct TrendChart {
-  @Prop @Watch('redraw') down: number[];
-  @Prop @Watch('redraw') up: number[];
-  @Prop chartHeight: number;
+  @Param down: number[] = [];
+  @Param up: number[] = [];
+  @Param chartHeight: number = 0;
 
   private settings: RenderingContextSettings = new RenderingContextSettings(true);
   private ctx: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.settings);
@@ -27,6 +27,7 @@ export struct TrendChart {
   private static readonly PAD_T: number = 12;
   private static readonly PAD_B: number = 16;
 
+  @Monitor('down','up')
   redraw(): void {
     if (this.ready) {
       this.draw();

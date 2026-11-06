@@ -2,6 +2,7 @@ import { common } from '@kit.AbilityKit';
 import { router } from '@kit.ArkUI';
 import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
+import { UI, UIState } from '../../core/UIState';
 import { Fmt } from '../../util/Fmt';
 import { Bp } from '../Breakpoint';
 import { Pal, T } from '../Theme';
@@ -37,51 +38,51 @@ interface PortVM {
  * 所有卡片都抽成 @Builder，两种布局共用同一份实现 ——
  * 否则改一个数字要改两处，迟早两边长得不一样。
  */
-@Component
+@ComponentV2
 export struct OverviewPage {
-  @State hostname: string = '';
-  @State model: string = '';
-  @State kernel: string = '';
-  @State osVersion: string = '';
-  @State uptime: string = '';
-  @State cpuPct: number = 0;
-  @State memPct: number = 0;
-  @State diskPct: number = 0;
-  @State cpuText: string = '—';
-  @State memText: string = '—';
-  @State diskText: string = '—';
-  @State temp: string = '';
-  @State tempWarm: boolean = false;
-  @State load1: string = '—';
-  @State threads: string = '—';
-  @State rxNow: string = '—';
-  @State txNow: string = '—';
-  @State rxTotal: string = '—';
+  @Local hostname: string = '';
+  @Local model: string = '';
+  @Local kernel: string = '';
+  @Local osVersion: string = '';
+  @Local uptime: string = '';
+  @Local cpuPct: number = 0;
+  @Local memPct: number = 0;
+  @Local diskPct: number = 0;
+  @Local cpuText: string = '—';
+  @Local memText: string = '—';
+  @Local diskText: string = '—';
+  @Local temp: string = '';
+  @Local tempWarm: boolean = false;
+  @Local load1: string = '—';
+  @Local threads: string = '—';
+  @Local rxNow: string = '—';
+  @Local txNow: string = '—';
+  @Local rxTotal: string = '—';
   /** 峰值：图表右上角那个数，和安卓一样按窗口内最大速率算 */
-  @State peakText: string = '—';
-  @State txTotal: string = '—';
-  @State wanUp: boolean = false;
-  @State wanProto: string = '';
-  @State onlineCount: number = 0;
+  @Local peakText: string = '—';
+  @Local txTotal: string = '—';
+  @Local wanUp: boolean = false;
+  @Local wanProto: string = '';
+  @Local onlineCount: number = 0;
   /** 设备数至少成功取到过一次；false 时才显示「—」，而不是把 0 台当成未知 */
-  @State devicesKnown: boolean = false;
-  @State wanIp: string = '—';
-  @State wanGw: string = '—';
-  @State wanDns: string = '—';
-  @State wanUpSec: number = 0;
-  @State memDetail: string = '';
-  @State diskDetail: string = '';
-  @State ports: PortVM[] = [];
-  @State downHist: number[] = [];
-  @State upHist: number[] = [];
-  @State loaded: boolean = false;
-  @State verdict: string = '';
+  @Local devicesKnown: boolean = false;
+  @Local wanIp: string = '—';
+  @Local wanGw: string = '—';
+  @Local wanDns: string = '—';
+  @Local wanUpSec: number = 0;
+  @Local memDetail: string = '';
+  @Local diskDetail: string = '';
+  @Local ports: PortVM[] = [];
+  @Local downHist: number[] = [];
+  @Local upHist: number[] = [];
+  @Local loaded: boolean = false;
+  @Local verdict: string = '';
   /** 最近一次 overview 取数失败：界面上的数字是缓存，要如实告诉用户 */
-  @State stale: boolean = false;
-  @State winW: number = 360;
+  @Local stale: boolean = false;
+  @Local winW: number = 360;
 
-  @StorageProp('tab') @Watch('onTab') tab: number = 0;
-  @StorageProp('winW') @Watch('onWidth') winWStore: number = 360;
+  @Local ui: UIState = UI;
+  @Local tab: number = UI.tab;
 
   private timer: number = -1;
   private liveTimer: number = -1;
@@ -91,7 +92,7 @@ export struct OverviewPage {
   private upAt: number = 0;
 
   aboutToAppear(): void {
-    this.winW = this.winWStore;
+    this.winW = this.ui.winW;
     this.refreshAll(true);
     if (this.tab === 0) {
       this.startPoll();
@@ -102,11 +103,14 @@ export struct OverviewPage {
     this.stopPoll();
   }
 
-  private onWidth(): void {
-    this.winW = this.winWStore;
+  @Monitor('ui.winW')
+  onWidth(): void {
+    this.winW = this.ui.winW;
   }
 
-  private onTab(): void {
+  @Monitor('ui.tab')
+  onTab(): void {
+    this.tab = this.ui.tab;
     if (this.tab === 0) {
       this.startPoll();
       this.refreshAll(false);
@@ -788,12 +792,12 @@ export struct OverviewPage {
 }
 
 /** 系统负载的一行：标签 + 说明 + 百分比 + 进度条。同上是 @Component，不是 @Builder。 */
-@Component
+@ComponentV2
 struct MeterRow {
-  @Prop label: string = '';
-  @Prop ratio: number = 0;
-  @Prop value: string = '';
-  @Prop detail: string = '';
+  @Param label: string = '';
+  @Param ratio: number = 0;
+  @Param value: string = '';
+  @Param detail: string = '';
 
   private pctWidth(): string {
     const v: number = Math.max(0, Math.min(1, this.ratio));
