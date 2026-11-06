@@ -2,6 +2,7 @@ import { common } from '@kit.AbilityKit';
 import { router } from '@kit.ArkUI';
 import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
+import { UI, UIState } from '../../core/UIState';
 import { Session } from '../../core/Session';
 import { Snap } from '../../core/Snap';
 import { Fmt } from '../../util/Fmt';
@@ -31,48 +32,48 @@ const SHEET_INFO: string = 'info';
  * 弹层用页面内的浮层而不是 CustomDialog：CustomDialog 拿不到主题色变量，
  * 深浅色下会白底配白字，而且底部安全区还得自己补。
  */
-@Component
+@ComponentV2
 export struct SettingsPage {
-  @State server: string = '';
-  @State hostname: string = '';
-  @State agentVersion: string = '';
-  @State latency: string = '';
-  @State online: boolean = false;
-  @State userName: string = '';
-  @State tokenOk: boolean = false;
+  @Local server: string = '';
+  @Local hostname: string = '';
+  @Local agentVersion: string = '';
+  @Local latency: string = '';
+  @Local online: boolean = false;
+  @Local userName: string = '';
+  @Local tokenOk: boolean = false;
   /** 是否正在看「配置备份」子页。设置页的子页用状态切换，不另开路由 */
-  @State subBackup: boolean = false;
+  @Local subBackup: boolean = false;
 
-  @State protoText: string = '';
-  @State wanUp: boolean = false;
-  @State ipv4: string = '—';
-  @State ipv6: string = '—';
-  @State wanUptime: string = '—';
-  @State lanV4: string = '—';
+  @Local protoText: string = '';
+  @Local wanUp: boolean = false;
+  @Local ipv4: string = '—';
+  @Local ipv6: string = '—';
+  @Local wanUptime: string = '—';
+  @Local lanV4: string = '—';
   /** 主题名，操作卡片里显示 */
-  @State themeName: string = '跟随系统';
+  @Local themeName: string = '跟随系统';
 
-  @State sheet: string = '';
-  @State sheetTitle: string = '';
-  @State infoTitle: string = '';
-  @State infoBody: string = '';
-  @State f1: string = '';
-  @State f2: string = '';
-  @State busy: boolean = false;
-  @State toast: string = '';
+  @Local sheet: string = '';
+  @Local sheetTitle: string = '';
+  @Local infoTitle: string = '';
+  @Local infoBody: string = '';
+  @Local f1: string = '';
+  @Local f2: string = '';
+  @Local busy: boolean = false;
+  @Local toast: string = '';
 
-  @State winW: number = 360;
+  @Local winW: number = 360;
   /** 电源：先点一次变「再点一次确认」，避免误触 */
-  @State pendingPower: string = '';
-  @State powerBusy: boolean = false;
+  @Local pendingPower: string = '';
+  @Local powerBusy: boolean = false;
   /** 硬件信息（system/hardware 只读） */
-  @State hw: J = J.empty();
-  @State hwLoaded: boolean = false;
-  @StorageProp('winW') @Watch('onWidth') winWStore: number = 360;
-  @StorageProp('tab') @Watch('onTab') tab: number = 4;
+  @Local hw: J = J.empty();
+  @Local hwLoaded: boolean = false;
+  @Local ui: UIState = UI;
+  @Local tab: number = UI.tab;
 
   aboutToAppear(): void {
-    this.winW = this.winWStore;
+    this.winW = this.ui.winW;
     this.server = Session.base();
     this.userName = Session.user();
     this.themeName = Appearance.label();
@@ -80,8 +81,9 @@ export struct SettingsPage {
     this.load();
   }
 
-  private onWidth(): void {
-    this.winW = this.winWStore;
+  @Monitor('ui.winW')
+  onWidth(): void {
+    this.winW = this.ui.winW;
   }
 
   private onTab(): void {
@@ -1261,10 +1263,10 @@ export struct SettingsPage {
  * hero 底部的一格读数。用 @Component 而不是 @Builder —— ArkUI 里 @Builder
  * 按值传参时状态变化不会刷新，页面上会一直停在初始值。
  */
-@Component
+@ComponentV2
 struct HeroStat {
-  @Prop label: string = '';
-  @Prop value: string = '';
+  @Param label: string = '';
+  @Param value: string = '';
 
   build() {
     Column() {

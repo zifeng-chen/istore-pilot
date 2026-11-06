@@ -2,6 +2,7 @@ import { common } from '@kit.AbilityKit';
 import { promptAction, router } from '@kit.ArkUI';
 import { Api, ApiResult } from '../api/Api';
 import { J } from '../core/Json';
+import { UI } from '../core/UIState';
 import { T } from '../ui/Theme';
 import { Card, Hairline } from '../ui/Comp';
 
@@ -37,8 +38,7 @@ struct SubscriptionPage {
   @State urlDraft: string = '';
 
   aboutToAppear(): void {
-    const top = AppStorage.get<number>('safeTop');
-    this.safeTop = top !== undefined ? top : 0;
+    this.safeTop = UI.safeTop;
     this.load();
   }
 

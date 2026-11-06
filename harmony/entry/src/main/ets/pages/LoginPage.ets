@@ -3,6 +3,7 @@ import { router } from '@kit.ArkUI';
 import { Api, ApiResult } from '../api/Api';
 import { Session } from '../core/Session';
 import { Snap } from '../core/Snap';
+import { UI } from '../core/UIState';
 import { Pal, T } from '../ui/Theme';
 import { LineIcon } from '../ui/Comp';
 import { Ico } from '../ui/comp/Icons';
@@ -27,8 +28,7 @@ struct LoginPage {
         this.host = Session.base();
       }
     });
-    const top = AppStorage.get<number>('safeTop');
-    this.safeTop = top !== undefined ? top : 0;
+    this.safeTop = UI.safeTop;
   }
 
   private async doLogin(): Promise<void> {

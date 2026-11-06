@@ -1,4 +1,5 @@
 import { Ico } from './Icons';
+import { UI } from '../../core/UIState';
 import { Pal } from '../Theme';
 import { LineIcon } from '../Comp';
 
@@ -18,11 +19,13 @@ interface RailItem {
  *
  * 每项带一句说明：Pad 上空间够，一句 hint 能省掉「代理到底是干什么的」这类误点。
  */
-@Component
+@ComponentV2
 export struct SideNav {
-  @Link current: number;
+  @Param current: number = 0;
+  /** 点击页签回调：V2 里没有 @Link 双向，选中改由父组件收事件后写回全局 */
+  @Event onChange: (i: number) => void = () => {};
   /** 顶部品牌区的机型名，让侧栏不是一条空白的图标列 */
-  @Prop hostname: string;
+  @Param hostname: string = '';
 
   // 四个页签，和手机端、Android、iOS 保持一致
   private items: RailItem[] = [
@@ -81,7 +84,7 @@ export struct SideNav {
 
       Blank();
 
-      Text('v' + (AppStorage.get<string>('agentVer') ?? '2.14.0'))
+      Text('v' + (UI.agentVer.length > 0 ? UI.agentVer : '2.14.0'))
         .fontSize(10.5)
         .fontColor($r('app.color.text_tertiary'))
         .padding({ left: 20, bottom: 16 });
@@ -135,7 +138,7 @@ export struct SideNav {
     .backgroundColor(this.current === i ? $r('app.color.accent_soft') : Color.Transparent)
     .margin({ left: 8, right: 8, bottom: 2 })
     .onClick(() => {
-      this.current = i;
+      this.onChange(i);
     });
   }
 }

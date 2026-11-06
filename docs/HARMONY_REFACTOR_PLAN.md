@@ -114,6 +114,38 @@ CardTitle/SettingRow/Kv/GlyphIcon/LineIcon/HeroStat/Pill/Note/Chip…15 个共�
 **剩余工作**：把 AppStorage 键值封装成 `@ObservedV2` 状态类 + `AppStorageV2.connect`，
 再逐页迁 V2。建议单独一期，配真机全量回归。
 
+## AppStorageV2 改造 + 页面全量迁 V2（2026-11-06 完成）
+
+上一节「剩余工作」已做完，`refactor/arkui-v2` 分支上**页面全部迁到 V2**，编译通过：
+
+**新增 `core/UIState.ets`**：`@ObservedV2 class UIState` 把 `tab`/`winW`/`safeTop`/
+`forceLogin`/`subTitle`/`backTick`/`hostname`/`agentVer` 收成 `@Trace` 字段，
+`export const UI = AppStorageV2.connect(UIState, 'iStoreUI', ...)!` 拿全局单例。
+
+**写入方**：`Index`（tab/winW/safeTop/hostname/agentVer）、`Shell`（subTitle/backTick）、
+`EntryAbility`（forceLogin）—— 全部从 `AppStorage.setOrCreate` 改成 `UI.xxx = ...`。
+
+**读方**（各页面的标准接法，也是官方的 `@StorageProp` 迁移姿势）：
+```typescript
+@Local ui: UIState = UI;
+@Local tab: number = UI.tab;          // @StorageProp('tab') 的替代
+@Monitor('ui.tab') onTab() {          // @Watch('onTab') 的替代
+  this.tab = this.ui.tab;             // 先同步本地副本，再跑原逻辑
+  ...
+}
+```
+
+**双向绑定**：NavBar/SideNav 的 `@Link current` 改成 `@Param current` + `@Event onChange`，
+Index 在 `onChange` 里 `this.current = i; UI.tab = i`（两条路径——点导航、滑 Tabs——都汇
+到 `UI.tab`，`@Trace` 严格相等去重，重复写无害）。
+
+**边界（刻意保留 V1）**：`LoginPage`/`WebPage`/`DeviceDetailPage`/`SubscriptionPage`/
+`NetSettingsPage` 五个路由页仍是 `@Entry @Component + @State`。它们不参与跨页状态，
+`safeTop` 改成一次性读 `UI.safeTop`（静态值），没有迁 V2 的必要——强行迁只会增加回归面。
+
+**尚未做**：真机回归（USB 掉线，编译通过但运行时未验）。重点看：切页签时轮询启停、
+二级页返回、折叠屏宽度联动、canvas 组件（Ring/TrendChart）的 `@Monitor` 重绘。
+
 ## 回滚总原则（通用）
 
 - 一切重构在**独立分支**上做，主线保持可发版状态。

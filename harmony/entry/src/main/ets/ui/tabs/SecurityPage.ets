@@ -2,6 +2,7 @@ import { common } from '@kit.AbilityKit';
 import { router } from '@kit.ArkUI';
 import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
+import { UI, UIState } from '../../core/UIState';
 import { Shell } from '../../core/Shell';
 import { Fmt } from '../../util/Fmt';
 import { Pal, T } from '../Theme';
@@ -46,57 +47,56 @@ interface DevRow {
  * 其余全部下沉到二级页，用 sub 状态切换 —— 手机上没有侧栏，
  * 一个「返回」顶栏比多一层 Tabs 更省纵向空间。
  */
-@Component
+@ComponentV2
 export struct SecurityPage {
-  @State loaded: boolean = false;
-  @State err: string = '';
+  @Local loaded: boolean = false;
+  @Local err: string = '';
 
   /** 0 一级页 / 1 设备清单 / 2 拦截配置 / 3 应用流量 */
-  @State @Watch('onSubChanged') sub: number = 0;
+  @Local sub: number = 0;
   /** 进二级页时的预设筛选：0 全部 / 1 在线 / 2 离线 */
-  @State subFilter: number = 0;
+  @Local subFilter: number = 0;
   /** 壳发来的「返回一级页」请求计数，见 core/Shell.ets */
-  @StorageProp('shellBackTick') @Watch('onBackAsked') backTick: number = 0;
 
-  @State online: number = 0;
-  @State total: number = 0;
-  @State blocked: number = 0;
+  @Local online: number = 0;
+  @Local total: number = 0;
+  @Local blocked: number = 0;
   /** 全网实时速率（上下行相加），hero 第三格用 */
-  @State liveBps: number = 0;
-  @State recent: DevRow[] = [];
+  @Local liveBps: number = 0;
+  @Local recent: DevRow[] = [];
   /** 应用流量排行：一级页只看前几名，全部在 sub=3 */
-  @State appRows: AppRow[] = [];
-  @State appTotalBytes: number = 0;
-  @State appDownBytes: number = 0;
-  @State appUpBytes: number = 0;
-  @State appDays: number = 0;
+  @Local appRows: AppRow[] = [];
+  @Local appTotalBytes: number = 0;
+  @Local appDownBytes: number = 0;
+  @Local appUpBytes: number = 0;
+  @Local appDays: number = 0;
 
-  @State adInstalled: boolean = true;
-  @State adRunning: boolean = false;
-  @State adTakeover: boolean = false;
+  @Local adInstalled: boolean = true;
+  @Local adRunning: boolean = false;
+  @Local adTakeover: boolean = false;
   /** 未安装时「去安装」要落的 LuCI 页面，由 Agent 下发 */
-  @State adInstallPath: string = '';
+  @Local adInstallPath: string = '';
   /** 一键安装：Agent 在路由器上跑，这里只显示进度 */
-  @State adInstalling: boolean = false;
-  @State adInstallStep: string = '';
-  @State adInstallPct: number = 0;
-  @State adInstallErr: string = '';
+  @Local adInstalling: boolean = false;
+  @Local adInstallStep: string = '';
+  @Local adInstallPct: number = 0;
+  @Local adInstallErr: string = '';
   /** DNS 兜底巡检的自愈记录，只在触发过时显示一行 */
-  @State adGuardCount: number = 0;
-  @State adGuardReason: string = '';
-  @State adBlocked: number = 0;
-  @State adQueries: number = 0;
-  @State adPct: number = 0;
-  @State busy: boolean = false;
+  @Local adGuardCount: number = 0;
+  @Local adGuardReason: string = '';
+  @Local adBlocked: number = 0;
+  @Local adQueries: number = 0;
+  @Local adPct: number = 0;
+  @Local busy: boolean = false;
 
-  @State winW: number = 360;
-  @StorageProp('winW') @Watch('onWidth') winWStore: number = 360;
-  @StorageProp('tab') @Watch('onTab') tab: number = 2;
+  @Local winW: number = 360;
+  @Local ui: UIState = UI;
+  @Local tab: number = UI.tab;
 
   private timer: number = -1;
 
   aboutToAppear(): void {
-    this.winW = this.winWStore;
+    this.winW = this.ui.winW;
     this.load(true);
     if (this.tab === 2) {
       this.startPoll();
@@ -110,11 +110,14 @@ export struct SecurityPage {
     Shell.leave();
   }
 
-  private onWidth(): void {
-    this.winW = this.winWStore;
+  @Monitor('ui.winW')
+  onWidth(): void {
+    this.winW = this.ui.winW;
   }
 
-  private onTab(): void {
+  @Monitor('ui.tab')
+  onTab(): void {
+    this.tab = this.ui.tab;
     if (this.tab === 2) {
       this.startPoll();
       this.load(false);
@@ -282,7 +285,8 @@ export struct SecurityPage {
     });
   }
 
-  private onSubChanged(prop: string): void {
+  @Monitor('sub')
+  onSubChanged(): void {
     if (this.sub === 0) {
       Shell.leave();
       return;
@@ -291,7 +295,8 @@ export struct SecurityPage {
   }
 
   /** 壳收到系统返回手势：关掉二级页（回到 sub=0，由 onSubChanged 清掉壳状态） */
-  private onBackAsked(prop: string): void {
+  @Monitor('ui.backTick')
+  onBackAsked(): void {
     if (this.sub !== 0) {
       this.getUIContext().animateTo({ duration: 200, curve: Curve.EaseIn }, () => {
         this.sub = 0;
@@ -1197,16 +1202,16 @@ export struct SecurityPage {
   }
 }
 
-/** 设备页顶部的三个统计格。@Builder 按值传参不会刷新，改成 @Prop 组件 */
-@Component
+/** 设备页顶部的三个统计格。@Builder 按值传参不会刷新，改成 @Param 组件 */
+@ComponentV2
 struct StatCell {
-  @Prop label: string = '';
-  @Prop value: number = 0;
-  @Prop tone: string = '';
-  @Prop filter: number = 0;
+  @Param label: string = '';
+  @Param value: number = 0;
+  @Param tone: string = '';
+  @Param filter: number = 0;
   /** 一次都没取到数据时显示「—」，别把「不知道」画成 0 */
-  @Prop unknown: boolean = false;
-  onTap: () => void = () => {};
+  @Param unknown: boolean = false;
+  @Event onTap: () => void = () => {};
 
   build() {
     Column() {
