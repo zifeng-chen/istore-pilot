@@ -196,7 +196,7 @@ $CLI publish submit -a "$APPID" --remark "0.1.7 首个鸿蒙版本"
 
 | 阶段 | 做什么 | 阻塞点 |
 |---|---|---|
-| **P0 材料** | `PRIVACY.md` 已写好，只差托管成网址；写商店文案；补平板/折叠屏截图；录演示视频 | 需要你定演示环境方案（见元数据报告 §4） |
+| **P0 材料** | `PRIVACY.md` 已写好，只差托管成网址；写商店文案；补平板/折叠屏截图；录演示视频 | 演示环境**已定方案 A**（云上只读 demo Agent），实施要点见元数据报告 §4.1，**待办未启动** |
 | **P1 证书** | AGC 服务账号 → `.env` → 发布证书 + Profile（§4） | 需要你登录 AGC 建服务账号 |
 | **P2 构建** | `assembleApp` + `harmony_pkg_verify --expect-type release` 全绿 | 依赖 P1 |
 | **P3 提审** | 上传 `.app` → 填元数据 → `publish submit` | 依赖 P0 + P2 |

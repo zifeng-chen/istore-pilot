@@ -425,6 +425,8 @@ ArkTS 工程 + `Web` 组件加载同一页面，思路与两端一致。动手�
 | P1 | Clash 9090 收敛到 127.0.0.1 | 堵掉直连口子 |
 | P2 | 历史曲线 | Agent 内嵌 SQLite 采样（1 分钟粒度，留 7 天） |
 | P2 | 异常告警 | WAN 掉线、内存/磁盘超阈值、OpenClash 退出 |
+| **P2** | **鸿蒙上架：Agent `--demo` 演示实例** | **已选定方案**（云主机跑只读 demo Agent，给 AGC 填演示地址+口令）。审核员没有用户的路由器，这是过审的前置。设计要点见 `docs/harmony-metadata-audit.md` §4.1 |
+| P2 | 鸿蒙上架：发布证书 + `.app` + 提审 | 流程见 `docs/HARMONY_RELEASE.md`；缺 AGC 服务账号（用户侧） |
 | ✅ | Android 安装包 | 已完成，`dist/istoreos-1.0.0.apk` |
 | P1 | iOS 包 | 你在 Mac 上按 `ios/README.md` 签一次名（约 10 分钟） |
 | P2 | 鸿蒙 NEXT 包 | 先装 DevEco Studio（约 15 GB） |
