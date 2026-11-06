@@ -81,6 +81,26 @@ def _installed(backend: str) -> bool:
     return os.path.exists(INIT[backend])
 
 
+def _preview_hidden() -> set[str]:
+    """界面预览用：/tmp/istore-agent-preview 里写后端名，就当成「没装」显示。
+
+    为什么需要它：这两个包不在任何软件源里，卸了就装不回来（实测
+    `opkg download` 直接报 not available），没法用真卸载来验空态。
+    只影响返回给客户端的 installed 字段，**不影响安装/卸载判断**，
+    也不动系统；/tmp 重启即清空，不会留在生产环境。
+    """
+    try:
+        with open("/tmp/istore-agent-preview", "r", encoding="utf-8") as fh:
+            return {x.strip() for x in fh if x.strip()}
+    except OSError:
+        return set()
+
+
+def _shown_installed(backend: str) -> bool:
+    """给客户端看的 installed：叠一层预览开关。"""
+    return backend not in _preview_hidden() and _installed(backend)
+
+
 # ------------------------------------------------- 安装：系统、软件源、内核
 #
 # 界面要区分「没装 / 装了没内核 / 源里没有」三种情况，光一个 installed 不够。
@@ -486,7 +506,7 @@ def install_status() -> dict:
         snap["failed"] = list(_INST["failed"])
         snap["log"] = list(_INST["log"])
     # 顺带把当前状态回给界面，省得装完还要再问一次有没有装好
-    snap["backends"] = {b: {"installed": _installed(b), "core_ready": core_ready(b)}
+    snap["backends"] = {b: {"installed": _shown_installed(b), "core_ready": core_ready(b)}
                         for b in PKG}
     return snap
 
@@ -572,6 +592,31 @@ def _install_worker(queue: list[str]) -> None:
                      step="完成" if not failed else "安装失败")
 
 
+def _preview_worker(queue: list[str]) -> None:
+    """预览模式下的假任务：只走一遍进度与失败，不碰系统。
+
+    没有它就没法验界面 —— 真实环境里这两个包源里没有、卸了装不回来，
+    但预览时服务端又认为「已经装好」，install() 会直接回 already，
+    客户端连进度条都看不到。
+    """
+    for i, backend in enumerate(queue):
+        with _INST_LOCK:
+            _INST["index"] = i + 1
+            _INST["current"] = backend
+        _istep(int(10 + i * 45), "正在安装 %s（预览）" % PKG[backend])
+        time.sleep(1.2)
+
+    _istep(92, "预览：模拟一次网络失败")
+    time.sleep(0.6)
+    with _INST_LOCK:
+        _INST["failed"] = list(queue)
+        _INST["error"] = _err("net_unreachable",
+                              detail="预览模式：不执行真实安装",
+                              raw="preview", backend=queue[0], pkg=PKG[queue[0]])
+        _INST.update(running=False, done=True, finished=time.time(), pct=100,
+                     ok=False, partial=False, step="安装失败")
+
+
 def install_just_finished() -> bool:
     """装完（无论成败）的 15 秒内返回 True。
 
@@ -597,6 +642,21 @@ def install(target: str = "all", confirm: str = "", force: bool = False) -> dict
         return {"ok": False, "error": "这台设备上没有 opkg / apk，无法安装",
                 "error_code": "no_pkg_manager", "error_title": "没有包管理器",
                 "suggest": []}
+
+    # 预览模式（见 _preview_hidden）：跑假任务，不执行任何安装。
+    # 必须放在「都已装好」判断之前 —— 预览时真实系统里两个包都装着，
+    # queue 会是空的，先返回 already 就永远走不到这里。
+    wanted = [target] if target != "all" else list(PKG)
+    preview = sorted(_preview_hidden() & set(wanted))
+    if preview:
+        with _INST_LOCK:
+            _INST.update(running=True, done=False, ok=False, pct=0, step="准备中（预览）",
+                         queue=list(preview), index=0, total=len(preview), current="",
+                         installed=[], failed=[], partial=False, error={},
+                         started=time.time(), finished=0.0, log=[])
+        threading.Thread(target=_preview_worker, args=(list(preview),),
+                         name="proxy-preview", daemon=True).start()
+        return {"ok": True, "accepted": True, "preview": True, "state": install_status()}
 
     queue = [b for b in PKG if not _installed(b)] if target == "all" else [target]
     queue = [b for b in queue if not _installed(b)]
@@ -787,7 +847,7 @@ def backends() -> list[dict]:
         {
             "id": "openclash",
             "label": LABEL["openclash"],
-            "installed": _installed("openclash"),
+            "installed": _shown_installed("openclash"),
             "pkg": PKG["openclash"],
             "core_ready": core_ready("openclash"),
             "enabled": oc_flat.get("openclash.config.enable", "0") == "1",
@@ -799,7 +859,7 @@ def backends() -> list[dict]:
         {
             "id": "passwall",
             "label": LABEL["passwall"],
-            "installed": _installed("passwall"),
+            "installed": _shown_installed("passwall"),
             "pkg": PKG["passwall"],
             "core_ready": core_ready("passwall"),
             "enabled": pw_state["enabled"],

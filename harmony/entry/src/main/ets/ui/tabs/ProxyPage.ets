@@ -647,7 +647,10 @@ export struct ProxyPage {
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'))
             .layoutWeight(1);
-          Text(this.nodeCount > 0 ? this.nodeCount + ' 个节点' : '')
+          // 空态时后端都没装，nodeCount 还留着上一轮的缓存值，别显示
+          Text(!this.noneInstalled() && this.nodeCount > 0
+            ? this.nodeCount + ' 个节点'
+            : '')
             .fontSize(T.F_SUB)
             .fontColor($r('app.color.text_secondary'));
         }
@@ -753,8 +756,11 @@ export struct ProxyPage {
     }
     .width('100%')
     .bindSheet($$this.showSheet, this.installSheet(), {
-      height: this.sheetMode === 'ask' ? 360 : 440,
-      dragBar: true,
+      height: this.sheetMode === 'ask' ? 320 : 380,
+      dragBar: false,
+      // showClose 默认 true 会在右上角画一个系统关闭图标（圆底 + X），
+      // 正好和我们自己的「关闭」文字叠在一起 —— 看着像被一条横线穿过
+      showClose: false,
       backgroundColor: $r('app.color.app_bg'),
       onDisappear: () => {
         this.showSheet = false;
@@ -906,7 +912,8 @@ export struct ProxyPage {
       }
     }
     .width('100%')
-    .padding({ left: 20, right: 20, top: 18, bottom: 20 });
+    // top 32 是给系统拖拽条让位：18 的时候「关闭」正好被那条横线穿过
+    .padding({ left: 20, right: 20, top: 32, bottom: 20 });
   }
 
   @Builder
