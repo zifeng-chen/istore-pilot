@@ -468,7 +468,13 @@ export struct ProxyPage {
               Text(b.label)
                 .fontSize(T.F_H2)
                 .fontColor($r('app.color.text_primary'));
-              Text(b.engine + ' · ' + b.nodes + ' 节点')
+              // 未安装时只写「未安装」：之前无条件拼 engine+nodes，
+              // Passwall 的 engine 是硬编码 "Xray"，于是胶囊说未安装、
+              // 副标题却写着「Xray · 0 节点」，自相矛盾。
+              // 已安装时 engine 可能为空（uci 没读到），也要避免拼出「 · N 个节点」
+              Text(b.installed
+                ? (b.engine.length > 0 ? b.engine + ' · ' : '') + b.nodes + ' 个节点'
+                : '未安装')
                 .fontSize(T.F_TINY)
                 .fontColor($r('app.color.text_secondary'))
                 .margin({ top: 2 });
@@ -481,7 +487,7 @@ export struct ProxyPage {
             } else if (b.running) {
               Pill({ text: '运行中', tone: Pal.primary() });
             } else {
-              Pill({ text: '已停止', tone: Pal.textSecondary() });
+              Pill({ text: '未运行', tone: Pal.textSecondary() });
             }
 
             if (b.installed) {
