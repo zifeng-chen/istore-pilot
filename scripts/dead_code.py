@@ -144,6 +144,12 @@ def check_decls(exts: tuple[str, ...], lang: str) -> list[dict]:
             head = src[max(0, m.start() - 240):m.start()]
             if re.search(r"@Override\s*$", head) or re.search(r"\boverride\s", src[m.start():m.end()]):
                 continue
+            # ArkUI V2 的 @Monitor / @Computed 装饰的方法由框架按路径调用，
+            # 方法名不会以字符串形式出现，按「名字没被引用」判会全部误报。
+            # 只看紧邻的 2 行，避免把上一个方法的装饰器算到当前方法头上。
+            near = "\n".join(head.rstrip().split("\n")[-2:])
+            if re.search(r"@(Monitor|Computed)\s*\(", near):
+                continue
             # ArkTS 的 @Watch('x')、Swift 的 #selector(x)、JS 的 this.x 都算引用
             if used_in(name, blob, (r"['\"]NAME['\"]", r"::NAME\b")):
                 continue
