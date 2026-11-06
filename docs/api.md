@@ -350,6 +350,21 @@ Mihomo / Xray 内核要另外下载（20~30 MB，来源在 GitHub，国内经常
 > 因此**真正可靠的是第三条路：App 下载 ipk → 上传 → 安装**
 > （`POST /system/upload` + `POST /system/install`），这条链路不依赖任何外部服务。
 
+下载来源可以在 `/etc/istore-agent/config.json` 的 `proxy` 段改，不用动代码：
+
+```json
+"proxy": {
+  "gh_repos": {
+    "openclash": "owner/repo",                 // 换成别的仓库
+    "passwall": "https://example.com/x.ipk"    // 或直接给 ipk 直链，钉死版本
+  },
+  "gh_mirror": "https://gh-proxy.com/"          // 只作用于下载，不作用于 API
+}
+```
+
+改完要重启 Agent（配置只在启动时读一次）。`gh_repos` 里写 `owner/repo`
+就走 `releases/latest` 挑 ipk 附件；写 `http` 开头的完整地址就当固定下载地址。
+
 一键装两个时，第一个成功、第二个失败会带 `partial: true` +
 `installed` / `failed` 两个数组 —— 界面文案要写成「A 已装好，B 没装上」，
 重试只重装失败的那个。

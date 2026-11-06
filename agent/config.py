@@ -44,6 +44,14 @@ def defaults() -> dict:
         # 客户端不用各算各的（也算不齐 —— 只有服务端拿得到 Mihomo 的 history）
         "proxy": {
             "hide_timeout": False,
+            # 装代理插件时的下载来源。留空 = 内置的官方仓库。
+            # 值可以是 "owner/repo"（走 releases/latest 挑 ipk），
+            # 也可以是完整的 ipk 直链（自建镜像/固定版本时用）。
+            # 国内网络到 GitHub 常年不通，换镜像或自建 CDN 时改这里，不用改代码。
+            "gh_repos": {},
+            # 下载前缀，拼在 GitHub 的下载地址前面（如 "https://gh-proxy.com/"）。
+            # 只作用于下载，不作用于 API —— 镜像一般只代理 release 文件。
+            "gh_mirror": "",
         },
         "luci": {
             # App 内置浏览器打开网页端时要免密进后台，Agent 会拿这个口令

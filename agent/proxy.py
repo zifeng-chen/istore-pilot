@@ -383,18 +383,29 @@ _GH_TTL = 3600.0
 _gh_cache: dict = {"ts": 0.0, "data": {}}
 
 
+def _gh_cfg() -> dict:
+    return config.get("proxy") or {}
+
+
 def _gh_asset(backend: str) -> tuple[str, str]:
     """从官方 release 找 ipk 的下载地址，返回 (url, 文件名)。
 
-    结果缓存一小时：GitHub 未认证 API 限 60 次/小时，装一次问一次太浪费，
-    而且 release 也不会分钟级变动。
+    来源可在 config.json 的 proxy.gh_repos 里覆盖：写 "owner/repo" 就按那个
+    仓库查最新 release，写完整 http 直链就当作固定地址（自建镜像/钉版本）。
+    结果缓存一小时：GitHub 未认证 API 限 60 次/小时。
     """
     now = time.time()
     hit = _gh_cache["data"].get(backend)
     if hit and now - _gh_cache["ts"] < _GH_TTL:
         return hit
 
+    override = str((_gh_cfg().get("gh_repos") or {}).get(backend, "") or "")
+    if override.startswith("http"):
+        return override, (override.rsplit("/", 1)[-1] or PKG[backend] + ".ipk")
+
     repo, pattern = GH_REPO[backend]
+    if override:
+        repo = override
     req = urllib.request.Request(
         GH_API % repo,
         headers={"User-Agent": GH_UA, "Accept": "application/vnd.github+json"},
@@ -429,6 +440,9 @@ def _looks_like_ipk(path: str) -> bool:
 def _fetch(backend: str) -> tuple[str, str]:
     """下载 ipk 到 /tmp，返回 (本地路径, 文件名)。失败抛异常，由调用方归因。"""
     url, name = _gh_asset(backend)
+    mirror = str(_gh_cfg().get("gh_mirror", "") or "")
+    if mirror:
+        url = mirror + url
     dest = os.path.join("/tmp", name)
     req = urllib.request.Request(url, headers={"User-Agent": GH_UA})
     with urllib.request.urlopen(req, timeout=120) as resp, open(dest, "wb") as fh:
