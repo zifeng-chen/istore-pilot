@@ -284,9 +284,64 @@ OpenClash 与 Passwall 双后端，`backend` 参数可选，不传则按当前�
 | POST | `/proxy/delays` | `{group, backend}` **整组测速** |
 | POST | `/proxy/config` | `{path}` 切配置文件（改 uci + commit + 重启内核，断网十几秒） |
 | POST | `/proxy/subscriptions` | 增删改订阅 |
+| GET | `/proxy/install` | 安装进度（**不走缓存**，每次都是实时值） |
+| POST | `/proxy/install` | `{target, confirm, force}` 装插件，`target` 只认 `all`/`openclash`/`passwall` |
+| POST | `/proxy/uninstall` | `{target, confirm:"remove"}` 卸插件，配置保留 |
 
 > `POST /proxy/config` 的 `path` 会 `realpath` 后校验是否在 `CONFIG_DIR` 内 ——
 > 不校验就等于开了个任意文件写入口。
+
+### 插件的安装与状态
+
+`GET /proxy` 的 `system` 段告诉客户端「能不能装、装哪个」：
+
+```json
+"system": {
+  "pkg_manager": "opkg",          // opkg | apk | ""（都没有）
+  "distro": "iStoreOS", "release": "24.10.8",
+  "arch": "x86_64",
+  "free_mb": 109971,
+  "repo": {"openclash": "yes", "passwall": "no"}   // yes | no | unknown
+}
+```
+
+`repo` 的含义要说清：**`no` 就是这个包不在任何已配置软件源的索引里**，
+点安装必然失败，界面该显示「手动安装」而不是「安装」。`unknown` 表示索引还没建
+（没跑过 `opkg update`），此时不要断言「没有」。
+
+两个后端各自的 `installed` / `core_ready` 也在 `backends[]` 里。`installed=true`
+但 `core_ready=false` 是最常见的一种「装了却启不来」：`luci-app-*` 只是界面和脚本，
+Mihomo / Xray 内核要另外下载（20~30 MB，来源在 GitHub，国内经常失败）。
+
+安装是**异步任务**：`POST` 立刻返回，客户端轮询 `GET /proxy/install`。
+
+```json
+{"running": true, "pct": 40, "step": "正在安装 luci-app-openclash",
+ "index": 1, "total": 2, "queue": ["openclash", "passwall"],
+ "installed": [], "failed": [], "error": {}}
+```
+
+失败时返回结构化的归因，客户端按 `error_code` 选文案与按钮，不要自己猜：
+
+| `error_code` | 含义 | `suggest` |
+|---|---|---|
+| `net_unreachable` | 连不上软件源 | retry / diagnose / force |
+| `dns_failed` | 域名解析失败 | retry / diagnose / force |
+| `tls_failed` | 源证书问题 | retry / diagnose / force |
+| `repo_missing` | 源里没这个包 | retry / change_feed |
+| `no_space` | 空间不足 | retry |
+| `dep_failed` | 依赖装不上 | retry / change_feed |
+| `locked` | 另一个安装在跑 | retry |
+
+一键装两个时，第一个成功、第二个失败会带 `partial: true` +
+`installed` / `failed` 两个数组 —— 界面文案要写成「A 已装好，B 没装上」，
+重试只重装失败的那个。
+
+`force: true` 跳过装前的 3 秒源连通性预检。预检失败会立刻返回
+`precheck: true` 的同类结构，而不是让用户盯着进度条等 opkg 自己超时。
+
+**`target` 是白名单**，不接受包名。这个接口以 root 跑 opkg，
+放开包名等于「用 root 装任意包」。
 
 ### 兼容接口
 

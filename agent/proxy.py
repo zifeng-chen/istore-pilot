@@ -12,9 +12,14 @@
 
 from __future__ import annotations
 
+import gzip
 import json
 import os
+import platform
+import socket
+import threading
 import time
+from urllib.parse import urlsplit
 
 from . import clash, config, sysinfo
 
@@ -69,9 +74,429 @@ def _uci_show(pkg: str) -> dict[str, str]:
 
 
 def _installed(backend: str) -> bool:
-    import os
-
     return os.path.exists(INIT[backend])
+
+
+# ------------------------------------------------- 安装：系统、软件源、内核
+#
+# 界面要区分「没装 / 装了没内核 / 源里没有」三种情况，光一个 installed 不够。
+# 这三个探测每次 overview 都要跑，所以只读文件与 statvfs；唯一重的
+# `opkg list` 单独加了 2 分钟缓存。
+
+PKG = {"openclash": "luci-app-openclash", "passwall": "luci-app-passwall"}
+
+# 装完 luci-app-* 只是拿到界面和脚本，真正的内核要另外下（OpenClash 20~30 MB，
+# 从 GitHub 拉，国内经常失败）。这是「装了却启不来」最常见的原因，单独探一次。
+CORE = {
+    "openclash": ("/etc/openclash/core/clash_meta", "/etc/openclash/core/clash",
+                  "/etc/openclash/core/clash_tun"),
+    "passwall": ("/usr/bin/xray", "/usr/bin/v2ray", "/usr/bin/sing-box"),
+}
+
+
+def _which(name: str) -> str:
+    dirs = (os.environ.get("PATH") or "/usr/sbin:/usr/bin:/sbin:/bin").split(":")
+    for d in dirs:
+        p = os.path.join(d, name)
+        if os.path.isfile(p) and os.access(p, os.X_OK):
+            return p
+    return ""
+
+
+def pkg_manager() -> str:
+    """24.10 及更早是 opkg，25.12 起换成 apk。
+
+    不按版本号猜 —— 混装过源、刷过固件的机器版本号和实际工具未必对得上，
+    直接看哪个命令在。
+    """
+    if _which("apk"):
+        return "apk"
+    return "opkg" if _which("opkg") else ""
+
+
+def _release() -> dict:
+    """发行版名与版本，读不到就返回空（界面那行直接不显示）。"""
+    out: dict[str, str] = {}
+    try:
+        with open("/etc/openwrt_release", "r", encoding="utf-8") as fh:
+            for line in fh:
+                if "=" not in line:
+                    continue
+                key, _, val = line.partition("=")
+                out[key.strip()] = val.strip().strip("'\"")
+    except OSError:
+        return {}
+    return {"distro": out.get("DISTRIB_ID", ""), "release": out.get("DISTRIB_RELEASE", "")}
+
+
+def _free_mb() -> int:
+    """overlay 剩余空间。两个插件加内核要 100 MB 上下，16 MB NAND 的机器
+    到这一步就该劝退，而不是等 opkg 报 no space。"""
+    try:
+        st = os.statvfs("/")
+        return int(st.f_bavail * st.f_frsize / 1048576)
+    except OSError:
+        return -1
+
+
+def core_ready(backend: str) -> bool:
+    return any(os.path.exists(p) for p in CORE.get(backend, ()))
+
+
+_REPO_TTL = 120.0
+_repo_cache: dict = {"ts": 0.0, "data": {}}
+
+
+def _opkg_cache_ready() -> bool:
+    for d in ("/var/opkg-lists", "/tmp/opkg-lists"):
+        try:
+            if os.path.isdir(d) and os.listdir(d):
+                return True
+        except OSError:
+            continue
+    return False
+
+
+def repo_state() -> dict:
+    """每个后端在软件源里有没有。
+
+    `opkg list <pkg>` 靠 Packages 索引：从没 `opkg update` 过的机器返回空。
+    这时不能断言「源里没有」，标 unknown 让界面提示「先更新源」。
+    """
+    now = time.time()
+    if _repo_cache["data"] and now - _repo_cache["ts"] < _REPO_TTL:
+        return dict(_repo_cache["data"])
+
+    mgr = pkg_manager()
+    data: dict[str, str] = {}
+    for backend, pkg in PKG.items():
+        if mgr == "apk":
+            code, out = _run(["apk", "search", "-e", pkg], timeout=8)
+            data[backend] = "yes" if code == 0 and pkg in out else "no"
+        elif mgr == "opkg":
+            feeds = [name for name, _ in _feed_entries()]
+            if any(_in_feed_index(pkg, f) for f in feeds):
+                data[backend] = "yes"
+            elif not feeds or not _opkg_cache_ready():
+                data[backend] = "unknown"   # 索引还没建，别断言「源里没有」
+            else:
+                data[backend] = "no"
+        else:
+            data[backend] = "unknown"
+    _repo_cache.update(ts=now, data=data)
+    return dict(data)
+
+
+def _feed_entries() -> list[tuple[str, str]]:
+    """当前配置的所有软件源 [(feed 名, URL)]。
+
+    扫 /etc/opkg/*.conf 而不是写死 distfeeds.conf —— iStoreOS 把自家源放在
+    单独的文件里（istore.conf），只读 distfeeds 会漏掉它。
+    """
+    entries: list[tuple[str, str]] = []
+    try:
+        names = sorted(f for f in os.listdir("/etc/opkg") if f.endswith(".conf"))
+    except OSError:
+        return entries
+    for name in names:
+        try:
+            with open(os.path.join("/etc/opkg", name), "r", encoding="utf-8") as fh:
+                for line in fh:
+                    parts = line.split()
+                    # src/gz <feed> <url>
+                    if len(parts) >= 3 and parts[0].startswith("src"):
+                        entries.append((parts[1], parts[2]))
+        except OSError:
+            continue
+    return entries
+
+
+def _in_feed_index(pkg: str, feed: str) -> bool:
+    """包是否出现在某个 feed 的 Packages 索引里。
+
+    不能用 `opkg list <pkg>`：它会把**已安装**的包也列出来，于是「装过的」
+    被当成「源里有」，真去装才发现拿不到（实测 luci-app-passwall 就是：
+    opkg list 有、opkg download 报 not available from any configured src）。
+    """
+    want = "Package: " + pkg
+    for d in ("/var/opkg-lists", "/tmp/opkg-lists"):
+        path = os.path.join(d, feed)
+        if not os.path.isfile(path):
+            continue
+        try:
+            # 索引可能是 gzip（iStoreOS 的 istore_compat 就是），按魔数判断，
+            # 别假设都是纯文本 —— 当成文本读会一行都匹配不到，于是「源里有」
+            # 被误判成「源里没有」。
+            with open(path, "rb") as fh:
+                packed = fh.read(2) == b"\x1f\x8b"
+            opener = gzip.open if packed else open
+            with opener(path, "rt", encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    if line.strip() == want:
+                        return True
+        except (OSError, EOFError):
+            continue
+    return False
+
+
+def precheck() -> dict:
+    """装之前先探一次源。
+
+    opkg 失败要等几十秒才回话，而「连不上」占失败原因的一大半 —— 先花 3 秒
+    试一次 TCP，能立刻说清是网络问题，不用让用户盯着进度条猜。
+    只测第一个源的 host：连得上就说明出网正常，不必逐个试。
+    """
+    entries = _feed_entries()
+    if not entries:
+        return {"ok": False, "code": "repo_missing", "title": "没找到软件源",
+                "detail": "/etc/opkg 下没有 src 配置", "host": ""}
+
+    parts = urlsplit(entries[0][1])
+    host = parts.hostname or ""
+    port = 443 if parts.scheme == "https" else 80
+    if not host:
+        return {"ok": False, "code": "repo_missing", "title": "软件源地址无效",
+                "detail": entries[0][1], "host": ""}
+
+    try:
+        socket.create_connection((host, port), timeout=3).close()
+    except socket.gaierror:
+        return {"ok": False, "code": "dns_failed", "title": "域名解析失败",
+                "detail": "解析不了 %s，可能是 DNS 异常" % host, "host": host}
+    except OSError as exc:
+        return {"ok": False, "code": "net_unreachable", "title": "连不上软件源",
+                "detail": "连接 %s 失败：%s" % (host, exc), "host": host}
+    return {"ok": True, "code": "", "title": "", "detail": "", "host": host}
+
+
+# 归因表：code -> (标题, 建议动作)。动作由客户端渲染成按钮，
+# 顺序即优先级；三端不各自猜，照这个顺序摆就行。
+ERRORS: dict[str, tuple[str, list[str]]] = {
+    "net_unreachable": ("连不上软件源", ["retry", "diagnose", "force"]),
+    "dns_failed": ("域名解析失败", ["retry", "diagnose", "force"]),
+    "tls_failed": ("源的证书有问题", ["retry", "diagnose", "force"]),
+    "repo_missing": ("源里找不到这个包", ["retry", "change_feed"]),
+    "no_space": ("存储空间不足", ["retry"]),
+    "dep_failed": ("依赖装不上", ["retry", "change_feed"]),
+    "locked": ("另一个安装任务正在进行", ["retry"]),
+    "unknown": ("安装失败", ["retry"]),
+}
+
+
+def _classify(raw: str) -> str:
+    """把 opkg/apk 的报错归成上面那几类。
+
+    这里的顺序有意义：先认 DNS 再认超时 —— `wget returned 4` 既可能是解析
+    失败也可能是连不上，但只有带 "could not resolve" 才是 DNS。
+    """
+    low = (raw or "").lower()
+    if ("could not resolve" in low or "bad address" in low
+            or "name or service not known" in low):
+        return "dns_failed"
+    if "wget returned 5" in low or "ssl" in low or "certificate" in low:
+        return "tls_failed"
+    if ("wget returned 4" in low or "timed out" in low or "connection refused" in low
+            or "network is unreachable" in low):
+        return "net_unreachable"
+    if "wget returned 8" in low or " 404" in low:
+        return "repo_missing"
+    if "no space left" in low:
+        return "no_space"
+    if "cannot install package" in low or "dependenc" in low:
+        return "dep_failed"
+    if "lock" in low or "resource temporarily unavailable" in low:
+        return "locked"
+    return "unknown"
+
+
+def _err(code: str, detail: str = "", raw: str = "", **extra) -> dict:
+    title, suggest = ERRORS.get(code, ERRORS["unknown"])
+    return {"ok": False, "error_code": code, "error_title": title,
+            "detail": detail, "suggest": list(suggest), "raw": raw[-600:], **extra}
+
+
+def system_info() -> dict:
+    rel = _release()
+    return {
+        "pkg_manager": pkg_manager(),
+        "distro": rel.get("distro", ""),
+        "release": rel.get("release", ""),
+        "arch": platform.machine() or "",
+        "free_mb": _free_mb(),
+        "repo": repo_state(),
+    }
+
+
+# ------------------------------------------------------------- 安装任务
+#
+# 异步跑：`opkg install` 动辄 30~60 秒，同步等会撞客户端超时。
+# 状态放模块级，进程内唯一 —— 顺带解决「两个手机同时点」的并发
+# （第二个会拿到 already=true，不会真的并发调 opkg）。
+
+_INST: dict = {
+    "running": False, "done": False, "ok": False, "pct": 0, "step": "",
+    "queue": [], "index": 0, "total": 0, "current": "",
+    "installed": [], "failed": [], "partial": False,
+    "error": {}, "started": 0.0, "finished": 0.0, "log": [],
+}
+_INST_LOCK = threading.Lock()
+
+
+def _istep(pct: int, text: str) -> None:
+    with _INST_LOCK:
+        _INST["pct"] = max(0, min(100, pct))
+        _INST["step"] = text
+        _INST["log"] = (_INST["log"] + [time.strftime("%H:%M:%S ") + text])[-12:]
+
+
+def install_status() -> dict:
+    with _INST_LOCK:
+        snap = dict(_INST)
+        snap["queue"] = list(_INST["queue"])
+        snap["installed"] = list(_INST["installed"])
+        snap["failed"] = list(_INST["failed"])
+        snap["log"] = list(_INST["log"])
+    # 顺带把当前状态回给界面，省得装完还要再问一次有没有装好
+    snap["backends"] = {b: {"installed": _installed(b), "core_ready": core_ready(b)}
+                        for b in PKG}
+    return snap
+
+
+def _install_worker(queue: list[str]) -> None:
+    mgr = pkg_manager()
+    total = max(1, len(queue))
+
+    for i, backend in enumerate(queue):
+        pkg = PKG[backend]
+        base = int(i * 100 / total)
+        with _INST_LOCK:
+            _INST["index"] = i + 1
+            _INST["current"] = backend
+        _istep(base + 5, "正在安装 %s" % pkg)
+
+        if mgr == "apk":
+            code, out = _run(["apk", "add", pkg], timeout=600)
+        else:
+            code, out = _run(["opkg", "install", pkg], timeout=600)
+
+        ok = code == 0 and _installed(backend)
+        # 装过时 opkg 会返回非零（"already installed"），但结果是好的
+        if not ok and "already installed" in (out or "").lower() and _installed(backend):
+            ok = True
+
+        if ok:
+            with _INST_LOCK:
+                _INST["installed"].append(backend)
+            _istep(base + int(80 / total), "%s 安装完成" % LABEL[backend])
+            continue
+
+        kind = _classify(out)
+        title = ERRORS.get(kind, ERRORS["unknown"])[0]
+        last = ""
+        for line in reversed((out or "").strip().splitlines()):
+            if line.strip():
+                last = line.strip()
+                break
+        with _INST_LOCK:
+            _INST["failed"].append(backend)
+            _INST["error"] = _err(kind, detail=last, raw=out or "",
+                                  backend=backend, pkg=pkg)
+        # 网络类错误后面必然也失败，别再白等一个 60 秒
+        if kind in ("net_unreachable", "dns_failed", "tls_failed"):
+            with _INST_LOCK:
+                _INST["failed"].extend([q for q in queue[i + 1:]])
+            _istep(base + 50, "%s：%s" % (LABEL[backend], title))
+            break
+
+    forget_active()
+    _repo_cache["ts"] = 0.0          # 装完让源缓存失效，下次重新探
+    with _INST_LOCK:
+        failed = bool(_INST["failed"])
+        _INST.update(running=False, done=True, finished=time.time(), pct=100,
+                     ok=not failed, partial=bool(_INST["installed"]) and failed,
+                     step="完成" if not failed else "安装失败")
+
+
+def install_just_finished() -> bool:
+    """装完（无论成败）的 15 秒内返回 True。
+
+    给外面判断要不要打掉 overview 缓存用 —— 否则会出现「刚装完，卡片上
+    还写着未安装」的几秒窗口，用户会以为没装上又点一遍。
+    """
+    with _INST_LOCK:
+        done, finished = _INST["done"], _INST["finished"]
+    return bool(done and finished and time.time() - finished < 15)
+
+
+def install(target: str = "all", confirm: str = "", force: bool = False) -> dict:
+    """启动安装任务，立刻返回；进度用 install_status() 轮询。
+
+    `target` 只认三个固定值 —— 这个接口最终以 root 跑 opkg，
+    绝不能让客户端把包名传进来，否则等于「用 root 装任意包」。
+    """
+    if target not in ("all", "openclash", "passwall"):
+        return {"ok": False, "error": "target 只能是 all / openclash / passwall"}
+    if confirm != "install":
+        return {"ok": False, "error": "安装需要二次确认：confirm=install"}
+    if not pkg_manager():
+        return {"ok": False, "error": "这台设备上没有 opkg / apk，无法安装",
+                "error_code": "no_pkg_manager", "error_title": "没有包管理器",
+                "suggest": []}
+
+    queue = [b for b in PKG if not _installed(b)] if target == "all" else [target]
+    queue = [b for b in queue if not _installed(b)]
+    if not queue:
+        return {"ok": True, "already": True, "installed": True,
+                "message": "要装的都已经装好了"}
+
+    if not force:
+        check = precheck()
+        if not check.get("ok"):
+            return _err(check["code"], detail=check["detail"],
+                        host=check["host"], precheck=True)
+
+    with _INST_LOCK:
+        if _INST["running"]:
+            return {"ok": True, "accepted": True, "already": True,
+                    "state": install_status()}
+        _INST.update(running=True, done=False, ok=False, pct=0, step="准备中",
+                     queue=list(queue), index=0, total=len(queue), current="",
+                     installed=[], failed=[], partial=False, error={},
+                     started=time.time(), finished=0.0, log=[])
+    threading.Thread(target=_install_worker, args=(list(queue),),
+                     name="proxy-install", daemon=True).start()
+    return {"ok": True, "accepted": True, "queue": queue, "state": install_status()}
+
+
+def uninstall(target: str, confirm: str = "") -> dict:
+    """卸载插件。
+
+    `opkg remove` 默认保留 `/etc/config/<pkg>`，配置和订阅还在 —— 这点要
+    写进返回，别让用户以为清干净了；真要清得用 --force-remove。
+    """
+    if target not in ("openclash", "passwall"):
+        return {"ok": False, "error": "target 只能是 openclash / passwall"}
+    if confirm != "remove":
+        return {"ok": False, "error": "卸载需要二次确认：confirm=remove"}
+    if not _installed(target):
+        return {"ok": True, "already": True, "removed": True, "backend": target}
+
+    mgr = pkg_manager()
+    pkg = PKG[target]
+    if mgr == "apk":
+        code, out = _run(["apk", "del", pkg], timeout=180)
+    else:
+        code, out = _run(["opkg", "remove", pkg], timeout=180)
+
+    forget_active()
+    _repo_cache["ts"] = 0.0
+    return {
+        "ok": code == 0 and not _installed(target),
+        "backend": target,
+        "removed": not _installed(target),
+        "config_kept": True,
+        "output": (out or "").strip()[-600:],
+    }
 
 
 def _service_running(backend: str) -> bool:
@@ -208,6 +633,8 @@ def backends() -> list[dict]:
             "id": "openclash",
             "label": LABEL["openclash"],
             "installed": _installed("openclash"),
+            "pkg": PKG["openclash"],
+            "core_ready": core_ready("openclash"),
             "enabled": oc_flat.get("openclash.config.enable", "0") == "1",
             "running": bool(oc_running),
             "node_count": oc_nodes,
@@ -218,6 +645,8 @@ def backends() -> list[dict]:
             "id": "passwall",
             "label": LABEL["passwall"],
             "installed": _installed("passwall"),
+            "pkg": PKG["passwall"],
+            "core_ready": core_ready("passwall"),
             "enabled": pw_state["enabled"],
             "running": bool(pw_running),
             "node_count": len(pw_state["nodes"]),
@@ -267,6 +696,8 @@ def overview() -> dict:
         "active": current["id"] if current else "none",
         "backends": items,
         "mutual_exclusive": True,
+        # 安装环境：界面靠它决定「一键安装」按钮显不显示、提示什么系统
+        "system": system_info(),
     }
 
 

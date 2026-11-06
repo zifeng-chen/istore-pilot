@@ -463,6 +463,16 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/v1/proxy/config":
                 self._json(proxy.switch_config(str(body.get("path", ""))))
 
+            # ---- 装/卸代理插件：只认固定 target，不接受包名
+            elif path == "/api/v1/proxy/install":
+                self._json(proxy.install(
+                    str(body.get("target", "all")),
+                    str(body.get("confirm", "")),
+                    bool(body.get("force", False))))
+            elif path == "/api/v1/proxy/uninstall":
+                self._json(proxy.uninstall(str(body.get("target", "")),
+                                           str(body.get("confirm", ""))))
+
             # ---- 系统维护：安装包、路由器密码、软件包更新
             elif path == "/api/v1/system/install":
                 # 装包 = 用 root 跑对方的代码，必须二次确认（按文件类型核对）
@@ -690,6 +700,9 @@ class Handler(BaseHTTPRequestHandler):
 
             # ---- 代理后端抽象
             elif path == "/api/v1/proxy":
+                # 刚装完别吃 4 秒缓存：状态从「未安装」变「未运行」要立刻可见
+                if proxy.install_just_finished():
+                    cache_drop("proxy_overview")
                 self._json(cached("proxy_overview", 4.0, proxy.overview))
             elif path == "/api/v1/proxy/groups":
                 backend = query.get("backend", [""])[0]
@@ -700,6 +713,9 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(proxy.connections(query.get("backend", [""])[0]))
             elif path == "/api/v1/proxy/mode":
                 self._json(proxy.mode())
+            # 安装进度：不进 cached —— 它每秒都在变，缓存住就等于进度条卡死
+            elif path == "/api/v1/proxy/install":
+                self._json(proxy.install_status())
 
             # ---- 订阅地址
             elif path == "/api/v1/proxy/subscriptions":
