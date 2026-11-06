@@ -7,12 +7,12 @@ import { appIconOf } from '../../core/AppIcons';
  * 圆角 24% 与安卓 `AppIcon.RoundIconView` 一致 —— 抓来的图都是方图，
  * 圆角是 App Store 客户端加上去的，不裁就是方的。
  */
-@Component
+@ComponentV2
 export struct AppIcon {
-  @Prop name: string;
+  @Param name: string = '';
   /** 边长。不能叫 size —— 与 ArkUI CustomComponent 的同名属性冲突 */
-  side: number = 32;
-  @State private icon: Resource | undefined = undefined;
+  @Param side: number = 32;
+  @Local private icon: Resource | undefined = undefined;
 
   aboutToAppear(): void {
     this.icon = appIconOf(this.name);

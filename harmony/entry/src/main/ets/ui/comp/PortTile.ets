@@ -11,22 +11,23 @@ import { Comp } from '../Comp';
  * 趋势线用 Canvas：ArkTS 的声明式图形画不出一条按数组变化的折线，
  * 而 Canvas 每次 onReady 只挂一次，数据变了在 @Watch 里重画，开销最小。
  */
-@Component
+@ComponentV2
 export struct PortTile {
-  @Prop name: string;
-  @Prop role: string;
-  @Prop up: boolean;
-  @Prop speedText: string;
-  @Prop rxText: string;
-  @Prop txText: string;
-  @Prop totalText: string;
-  @Prop @Watch('redraw') hist: number[];
+  @Param name: string = '';
+  @Param role: string = '';
+  @Param up: boolean = false;
+  @Param speedText: string = '';
+  @Param rxText: string = '';
+  @Param txText: string = '';
+  @Param totalText: string = '';
+  @Param hist: number[] = [];
   /** 平板两列时卡片更高，趋势线跟着长 */
-  @Prop sparkH: number;
+  @Param sparkH: number = 0;
 
   private settings: RenderingContextSettings = new RenderingContextSettings(true);
   private cv: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.settings);
 
+  @Monitor('hist')
   private redraw(): void {
     this.drawSpark();
   }

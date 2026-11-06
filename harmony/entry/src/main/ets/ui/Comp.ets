@@ -6,14 +6,14 @@ import { Glyph } from './comp/Icons';
  * 只有一层圆角 + 一条 0.7 描边 + 极淡投影 —— 投影再重一点，
  * 深色主题下卡片边缘就会糊成一圈脏边（Android 端试过 3dp，退回到 1.2）。
  */
-@Component
+@ComponentV2
 export struct Card {
   @BuilderParam body: () => void = this.emptyBody;
-  pad: number = T.CARD_PAD;
+  @Param pad: number = T.CARD_PAD;
   /** 卡片外间距。ArkTS 不允许在自定义组件后面链式写 .margin()，
    *  所以间距只能当参数传进来，在根容器上生效。 */
-  gapTop: number = 0;
-  gapBottom: number = 0;
+  @Param gapTop: number = 0;
+  @Param gapBottom: number = 0;
 
   @Builder
   emptyBody() {
@@ -35,12 +35,12 @@ export struct Card {
 }
 
 /** 分组容器：一组只有一层圆角，行与行之间用细线分开 */
-@Component
+@ComponentV2
 export struct GroupBox {
   @BuilderParam body: () => void = this.emptyBody;
   /** 同 Card：链式 .margin() 不合法，间距走参数 */
-  gapTop: number = 0;
-  gapBottom: number = 0;
+  @Param gapTop: number = 0;
+  @Param gapBottom: number = 0;
 
   @Builder
   emptyBody() {
@@ -60,9 +60,9 @@ export struct GroupBox {
 }
 
 /** 细分隔线。indent 用来让线从文字左边开始，不顶到卡片边缘 */
-@Component
+@ComponentV2
 export struct Hairline {
-  indent: number = 0;
+  @Param indent: number = 0;
 
   build() {
     Row()
@@ -74,12 +74,12 @@ export struct Hairline {
 }
 
 /** 键值行：左侧标签、右侧值。值用等宽数字，否则一列数字小数点左右跳 */
-@Component
+@ComponentV2
 export struct Kv {
-  @Prop label: string;
-  @Prop value: string;
-  @Prop valueSize: number;
-  @Prop accent: boolean;
+  @Param label: string = '';
+  @Param value: string = '';
+  @Param valueSize: number = 0;
+  @Param accent: boolean = false;
 
   build() {
     Row() {
@@ -187,19 +187,20 @@ export class IconPath {
  *
  * `design` 是路径的坐标系边长：页签那套按 22 格手算，Glyph 那套是 24 格 + 1 的留白。
  */
-@Component
+@ComponentV2
 export struct LineIcon {
-  @Prop @Watch('redraw') path: string = '';
-  @Prop @Watch('redraw') color: string = '';
-  @Prop side: number = 22;
-  @Prop lineWidth: number = 1.7;
-  @Prop spin: number = 0;
-  @Prop design: number = 22;
+  @Param path: string = '';
+  @Param color: string = '';
+  @Param side: number = 22;
+  @Param lineWidth: number = 1.7;
+  @Param spin: number = 0;
+  @Param design: number = 22;
 
   private cfg: RenderingContextSettings = new RenderingContextSettings(true);
   private cv: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.cfg);
   private ready: boolean = false;
 
+  @Monitor('path','color')
   redraw(): void {
     if (this.ready) {
       this.draw();
@@ -233,16 +234,16 @@ export struct LineIcon {
 /**
  * 深绿 hero 卡里的一格：小标签在上、数值在下（和安卓 heroStat 同规格 11 / 20）。
  *
- * 为什么是 @Component 而不是 @Builder：
+ * 为什么是 @ComponentV2 而不是 @Builder：
  * ArkUI 的 @Builder 默认按值传参，**状态变量变化不会刷新 builder 内的 UI**；
  * 传两个以上参数时连"按引用传递"也不生效。这里原来就是 @Builder，结果
  * 数据到了界面不动 —— 三格永远是初始值「—」。换成 @Prop 后父组件状态一变，
  * 子组件就会跟着重绘。
  */
-@Component
+@ComponentV2
 export struct HeroStat {
-  @Prop label: string = '';
-  @Prop value: string = '';
+  @Param label: string = '';
+  @Param value: string = '';
   build() {
     Column() {
       Text(this.label)
@@ -265,10 +266,10 @@ export struct HeroStat {
 }
 
 /** 小号彩色标签，比如「运行中」「已接管」 */
-@Component
+@ComponentV2
 export struct Pill {
-  @Prop text: string;
-  @Prop tone: string;
+  @Param text: string = '';
+  @Param tone: string = '';
 
   build() {
     Text(this.text)
@@ -282,10 +283,10 @@ export struct Pill {
 }
 
 /** 卡片标题 + 可选副标题 */
-@Component
+@ComponentV2
 export struct CardHeader {
-  @Prop title: string;
-  @Prop sub: string;
+  @Param title: string = '';
+  @Param sub: string = '';
 
   build() {
     Column() {
@@ -313,18 +314,19 @@ export struct CardHeader {
  * 观感一致 —— 页签那套 Ico 是按 22 格手算的，尺寸一变粗细就漂。
  * viewPort 往外扩 1 格：描边 2 的话边缘会逃出去半个线宽，被裁掉就变方角了。
  */
-@Component
+@ComponentV2
 export struct GlyphIcon {
-  @Prop @Watch('redraw') kind: string;
-  @Prop @Watch('redraw') color: string;
+  @Param kind: string = '';
+  @Param color: string = '';
   /** 组件边长（vp）。不能叫 size —— 那是 CustomComponent 自带的属性方法 */
-  side: number = 20;
-  lineWidth: number = 2;
+  @Param side: number = 20;
+  @Param lineWidth: number = 2;
 
   private cfg: RenderingContextSettings = new RenderingContextSettings(true);
   private cv: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.cfg);
   private ready: boolean = false;
 
+  @Monitor('kind','color')
   redraw(): void {
     if (this.ready) {
       this.draw();
@@ -373,11 +375,11 @@ export struct GlyphIcon {
  * 不用 Card 是因为它的 pad 是四边同一个值 —— 这里必须「左右 0、上下有」，
  * 否则行内的细线会被再往里推 16，跟卡片边缘差出两截。
  */
-@Component
+@ComponentV2
 export struct RowCard {
   @BuilderParam body: () => void = this.emptyBody;
-  gapTop: number = 0;
-  gapBottom: number = 0;
+  @Param gapTop: number = 0;
+  @Param gapBottom: number = 0;
 
   @Builder
   emptyBody() {
@@ -400,15 +402,15 @@ export struct RowCard {
 }
 
 /** 带图标的卡片标题：一个小图标 + 主标题 + 可选副标题 */
-@Component
+@ComponentV2
 export struct CardTitle {
-  @Prop glyph: string;
-  @Prop title: string;
-  @Prop sub: string;
-  tone: string = '';
+  @Param glyph: string = '';
+  @Param title: string = '';
+  @Param sub: string = '';
+  @Param tone: string = '';
   /** 左右留白。RowCard 只给上下，放进 RowCard 时必须传 16，
    *  否则图标直接贴到卡片边框上；Card 自身已有 16 内边距，保持默认 0 */
-  pad: number = 0;
+  @Param pad: number = 0;
   /** 右侧插槽：在线数、状态胶囊之类 */
   @BuilderParam trailing: () => void = this.emptyTrailing;
 
@@ -463,18 +465,18 @@ export struct CardTitle {
  * 值支持两行（BREAK_ALL）：IPv6 有 39 个字符，单行放不下，
  * 省略号截断会让用户看不到后半段，而那段恰恰是能用的部分。
  */
-@Component
+@ComponentV2
 export struct SettingRow {
-  @Prop glyph: string;
-  @Prop title: string;
-  @Prop subtitle: string;
-  @Prop value: string;
-  @Prop valueSize: number;
+  @Param glyph: string = '';
+  @Param title: string = '';
+  @Param subtitle: string = '';
+  @Param value: string = '';
+  @Param valueSize: number = 0;
   /** 组内第一行不画上分割线 */
-  @Prop first: boolean;
-  @Prop danger: boolean;
-  @Prop arrow: boolean;
-  onTap: () => void = () => {
+  @Param first: boolean = false;
+  @Param danger: boolean = false;
+  @Param arrow: boolean = false;
+  @Event onTap: () => void = () => {
   };
 
   private tone(): string {
@@ -558,9 +560,9 @@ export struct SettingRow {
 }
 
 /** 卡片底部的说明文字 */
-@Component
+@ComponentV2
 export struct Note {
-  @Prop text: string;
+  @Param text: string = '';
 
   build() {
     Text(this.text)
@@ -573,11 +575,11 @@ export struct Note {
 }
 
 /** 可选中的胶囊按钮，用于「6 小时 / 12 小时 / 每天」这类互斥选项 */
-@Component
+@ComponentV2
 export struct Chip {
-  @Prop label: string;
-  @Prop on: boolean;
-  onTap: () => void = () => {
+  @Param label: string = '';
+  @Param on: boolean = false;
+  @Event onTap: () => void = () => {
   };
 
   build() {
