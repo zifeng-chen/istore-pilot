@@ -366,6 +366,8 @@ def _ensure_dhcp_dns() -> bool:
 
     这里把 option 6 显式写成 LAN 地址：客户端查 <lan>:53 就是 AGH。
     用户自己配过 6,xxx 就不动它。
+
+    返回 True 表示这次真的新加了 —— 调用方**必须重启 dnsmasq** 才生效。
     """
     lan = _lan_ip()
     if not lan:
@@ -375,7 +377,7 @@ def _ensure_dhcp_dns() -> bool:
     if code == 0:
         for item in out.split():
             if item.startswith("6,"):
-                return True
+                return False
 
     _run(["uci", "add_list", f"dhcp.lan.dhcp_option=6,{lan}"], timeout=5)
     _run(["uci", "commit", "dhcp"], timeout=5)
@@ -447,6 +449,14 @@ def _proxy_dns() -> tuple[list[str], str]:
     return [], ""
 
 
+def _clash_aaaa() -> bool:
+    """OpenClash 是否在过滤 AAAA（filter_aaaa_dns）。没装/没配就是不过滤。"""
+    code, out = _run(["uci", "get", "openclash.config.filter_aaaa_dns"], timeout=5)
+    if code == 0 and out.strip():
+        return out.strip() in ("1", "true", "yes")
+    return False
+
+
 def _heal_upstream() -> bool:
     """AGH 上游不能写死代理端口：代理一关，7874 没人听，AGH 全部 SERVFAIL，
     整个网络的 DNS 一起挂掉（只有不查 DNS 的 IoT 看起来正常）。
@@ -454,6 +464,8 @@ def _heal_upstream() -> bool:
     每轮巡检调一次：
       - 代理在跑、上游却不是它 → 切过去（fake-ip 分流恢复）
       - 代理没跑、上游还指着它 → 切回公共 DNS（先保住网）
+      - AAAA 过滤跟着 OpenClash 的 filter_aaaa_dns 走（两个方向都要对齐：
+        它过滤我们不过滤会泄漏 IPv6，它不过滤我们过滤则纯 IPv6 站点解析不出来）
     模式没变就什么都不做，避免反复重启 AGH。
     """
     cfg = _dns_settings(_read_yaml())
@@ -464,17 +476,28 @@ def _heal_upstream() -> bool:
     proxy, name = _proxy_dns()
     want = proxy if proxy else list(FALLBACK_UPSTREAM)
 
-    if current == want:
+    aaaa_want = _clash_aaaa()
+    aaaa_cur = cfg.get("aaaa_disabled")
+    aaaa_changed = aaaa_cur is not None and aaaa_cur != aaaa_want
+
+    if current == want and not aaaa_changed:
         _UPSTREAM["mode"] = name or "public"
         return False
 
     upstream = want + [f"[/{z}/]127.0.0.1:{LOCAL_DNS_PORT}" for z in LOCAL_ZONES]
-    if not _patch_yaml(upstream=upstream):
+    if not _patch_yaml(upstream=upstream, aaaa=aaaa_want if aaaa_changed else None):
         return False
     _run(["/etc/init.d/AdGuardHome", "restart"], timeout=90)
     _UPSTREAM["mode"] = name or "public"
     _UPSTREAM["at"] = time.time()
-    _guard_log("上游切换：" + (f"代理 {name} {want[0]}" if proxy else "公共 DNS"))
+    bits = []
+    if proxy:
+        bits.append(f"上游→代理 {name}")
+    else:
+        bits.append("上游→公共 DNS")
+    if aaaa_changed:
+        bits.append("AAAA 过滤" + ("开" if aaaa_want else "关"))
+    _guard_log("；".join(bits))
     return True
 
 
@@ -974,8 +997,12 @@ def _watch_loop():
             if not holder:
                 _heal_dns("53 无人监听（dnsmasq 已挪到 %s）" % _dnsmasq_port())
                 continue
-            # 53 有人应答（正常接管是 AGH），接着看上游还活着没：
-            # 代理一关，写死的 7874 就没人听，AGH 会全部 SERVFAIL
+            # 接管期间：DHCP 的 IPv4 DNS 不能丢（恢复旧备份会把 option 6 带没），
+            # 上游也不能指着已经停掉的代理 —— 两个都要每轮看一眼，都是幂等的
+            if _ensure_dhcp_dns():
+                # 新补的配置要重启 dnsmasq 才生效；只在真补了的时候重启，
+                # 否则每 12 秒断一次 DHCP
+                _run(["/etc/init.d/dnsmasq", "restart"], timeout=60)
             _heal_upstream()
         except Exception as exc:  # noqa: BLE001 —— 巡检自己不能把 Agent 带崩
             _guard_log("巡检异常：" + str(exc))
@@ -1017,8 +1044,9 @@ def takeover() -> dict:
 
     # 1. 一次把 53 端口、监听地址、上游全写好
     #    "::" 会被 yaml 解析成 map，写入时已加引号
-    #    aaaa 不传 = 保持原样，跟随 OpenClash 的 filter_aaaa_dns
-    if not _patch_yaml(port=53, hosts=BIND_ALL, upstream=upstream):
+    #    AAAA 在这里就要对齐 OpenClash 的 filter_aaaa_dns —— 留到巡检补的话，
+    #    刚接管那几秒过滤状态可能是反的，纯 IPv6 站点会先坏一次
+    if not _patch_yaml(port=53, hosts=BIND_ALL, upstream=upstream, aaaa=_clash_aaaa()):
         return {"ok": False, "error": "改写 AGH 配置失败，未做任何变更"}
 
     # 2. dnsmasq 让出 53，挪到 5354 继续做本地解析（DHCP 完全不受影响）
@@ -1027,10 +1055,10 @@ def takeover() -> dict:
         _write_dns_settings(_observe_port(), ["127.0.0.1"])
         return {"ok": False, "error": f"设置 dnsmasq 端口失败: {out.strip()}"}
     _run(["uci", "commit", "dhcp"], timeout=5)
-    _run(["/etc/init.d/dnsmasq", "restart"], timeout=60)
-    # dnsmasq 离开 53 后不会再自动下发 DHCP 的 IPv4 DNS，必须显式补上，
-    # 否则客户端只从 RA 拿到 IPv6 DNS（Mac / Apple TV / 打印机会上不了网）
+    # 先把 option 6 改好，再重启 —— 反过来会出现「配置改了但 dnsmasq 已经
+    # 按旧配置启动」，客户端还是只拿到 IPv6 DNS
     _ensure_dhcp_dns()
+    _run(["/etc/init.d/dnsmasq", "restart"], timeout=60)
 
     # 3. 等 53 真正空出来再启 AGH，否则它 bind 会失败
     time.sleep(2)
