@@ -21,6 +21,16 @@ ios/DerivedData/
 *.p12
 *.mobileprovision
 keystore.properties
+# 鸿蒙上架材料（见 docs/HARMONY_RELEASE.md）
+# .env 存 AGC 凭证与 DEVECO_HOME；.certs/ 是 csr-generate 产出的私钥+证书+Profile
+.env
+harmony/.env
+harmony/.certs/
+# AGC 服务账号私钥（控制台下载，命名通常是 xxx_private.json）
+*_private.json
+# 签名产物：Profile 里有设备白名单与开发者标识，证书链同理
+*.p7b
+*.cer
 
 # ================= Python =================
 __pycache__/

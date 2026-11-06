@@ -436,6 +436,8 @@ python scripts/check_version.py         # 校验六处是否一致（提交前�
 | [`docs/architecture.md`](docs/architecture.md) | 架构与关键设计决策、踩过的硬坑 |
 | [`docs/api.md`](docs/api.md) | Agent 接口参考 |
 | [`docs/clients.md`](docs/clients.md) | 三端打包、签名、安装与真机调试 |
+| [`docs/HARMONY_RELEASE.md`](docs/HARMONY_RELEASE.md) | 鸿蒙上架：发布证书、`.app` 构建、AGC 上传提审 |
+| [`PRIVACY.md`](PRIVACY.md) | 隐私政策（不收集任何个人信息） |
 | [`PLAN.md`](PLAN.md) | 功能规划与早期设计取舍 |
 | `harmony/README.md`、`ios/README.md` | 各端工程内说明（目录结构、平台差异、坑） |
 
