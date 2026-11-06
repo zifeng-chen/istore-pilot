@@ -19,7 +19,7 @@ from .config import get as cfg, load as load_cfg, save as save_cfg
 START_TS = time.time()
 
 # Agent 自身版本：随 ipk 一起发版，硬件详情页与「关于」都会显示
-VERSION = "0.1.7"
+VERSION = "0.1.8"
 
 _cache_lock = threading.Lock()
 _cache: dict[str, tuple[float, object]] = {}
@@ -472,6 +472,15 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/v1/proxy/uninstall":
                 self._json(proxy.uninstall(str(body.get("target", "")),
                                            str(body.get("confirm", ""))))
+            # ---- 整包装：从 Are-u-ok 仓库下，或装本地已上传的文件
+            elif path == "/api/v1/proxy/pkg/install":
+                self._json(proxy.pkg_install(
+                    str(body.get("target", "")),
+                    str(body.get("source", "github")),
+                    str(body.get("name", "")),
+                    str(body.get("confirm", ""))))
+            elif path == "/api/v1/proxy/pkg/probe":
+                self._json(proxy.pkg_probe())
 
             # ---- 系统维护：安装包、路由器密码、软件包更新
             elif path == "/api/v1/system/install":
@@ -716,6 +725,11 @@ class Handler(BaseHTTPRequestHandler):
             # 安装进度：不进 cached —— 它每秒都在变，缓存住就等于进度条卡死
             elif path == "/api/v1/proxy/install":
                 self._json(proxy.install_status())
+
+            # ---- 插件包清单：解析 Are-u-ok 的 x86/README.md，不走 GitHub API
+            elif path == "/api/v1/proxy/pkg/catalog":
+                self._json(proxy.pkg_catalog(
+                    query.get("force", ["0"])[0] in ("1", "true", "yes")))
 
             # ---- 订阅地址
             elif path == "/api/v1/proxy/subscriptions":

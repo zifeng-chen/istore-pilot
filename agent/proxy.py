@@ -25,7 +25,7 @@ import urllib.error
 import urllib.request
 from urllib.parse import urlsplit
 
-from . import clash, config, sysinfo
+from . import clash, config, pkgfeed, sysinfo
 
 INIT = {
     "openclash": "/etc/init.d/openclash",
@@ -339,6 +339,8 @@ ERRORS: dict[str, tuple[str, list[str]]] = {
     "gh_limited": ("GitHub 限流了，过一会儿再试", ["retry"]),
     "bad_payload": ("下载到的文件不对", ["retry"]),
     "no_apk_pkg": ("官方只提供 ipk，你的系统是 apk", ["retry", "change_feed"]),
+    "no_file": ("上传的安装包不见了", ["retry"]),
+    "no_pkg": ("仓库里没有这个插件", ["retry"]),
     "unknown": ("安装失败", ["retry"]),
 }
 
@@ -508,6 +510,9 @@ def install_status() -> dict:
     # 顺带把当前状态回给界面，省得装完还要再问一次有没有装好
     snap["backends"] = {b: {"installed": _shown_installed(b), "core_ready": core_ready(b)}
                         for b in PKG}
+    # 整包安装（远端下载 / 本地上传）是另一条任务线，合并在这里返回，
+    # 客户端轮询一个接口就能同时盯两件事
+    snap["pkg"] = pkg_status()
     return snap
 
 
@@ -625,6 +630,11 @@ def install_just_finished() -> bool:
     """
     with _INST_LOCK:
         done, finished = _INST["done"], _INST["finished"]
+    if done and finished and time.time() - finished < 15:
+        return True
+    # 整包安装同理：装完 15 秒内也要把 overview 的缓存打掉
+    with _PKG_LOCK:
+        done, finished = _PKG["done"], _PKG["finished"]
     return bool(done and finished and time.time() - finished < 15)
 
 
@@ -712,6 +722,186 @@ def uninstall(target: str, confirm: str = "") -> dict:
         "config_kept": True,
         "output": (out or "").strip()[-600:],
     }
+
+
+# ------------------------------------------------------ 插件包安装（整包）
+#
+# 跟上面 install() 的分工：
+#   install()  走「官方 GitHub release 里的单个 ipk」，小、快，但要求有内核配套
+#   pkg_install() 走「一个完整的 .run 安装包」—— 要么从 Are-u-ok 仓库下，
+#                 要么用户自己从手机传上来。包里自带内核，装完就能跑。
+#
+# 为什么必须异步：PassWall 的 .run 有 85 MB，下加装能到几分钟，HTTP 早超时了。
+# 状态单独放一份（_PKG），不复用 _INST —— 两者的字段语义差太多，
+# 混在一起会让老客户端的进度条跳来跳去。
+
+PKG_DIR = "/tmp/istore-upload"
+PKG_TARGETS = ("openclash", "passwall")   # passwall2 与 passwall 冲突，不进白名单
+_PKG_RUN_EXT = (".run", ".ipk", ".apk")
+
+_PKG: dict = {
+    "running": False, "done": False, "ok": False, "pct": 0, "step": "",
+    "target": "", "source": "", "name": "", "channel": "",
+    "got": 0, "total": 0, "log": [], "error": {}, "started": 0.0, "finished": 0.0,
+}
+_PKG_LOCK = threading.Lock()
+
+
+def _pstep(pct: int, text: str) -> None:
+    with _PKG_LOCK:
+        _PKG["pct"] = max(0, min(100, pct))
+        _PKG["step"] = text
+        _PKG["log"] = (_PKG["log"] + [time.strftime("%H:%M:%S ") + text])[-12:]
+
+
+def _hsize(got: int, total: int) -> str:
+    if total > 0:
+        return "%d%%（%.1f/%.1f MB）" % (got * 100 // total, got / 1048576, total / 1048576)
+    return "%.1f MB" % (got / 1048576)
+
+
+def _pfail(kind: str, detail: str, raw: str = "", target: str = "") -> None:
+    err = _err(kind, detail=detail, raw=raw, backend=target, pkg=PKG.get(target, ""))
+    with _PKG_LOCK:
+        _PKG.update(running=False, done=True, ok=False, pct=100,
+                    finished=time.time(), step="安装失败", error=err)
+
+
+def _pkg_worker(target: str, source: str, name: str) -> None:
+    path = ""
+    channel = ""
+    got = total = 0
+
+    if source == "github":
+        _pstep(3, "正在读取插件清单")
+        try:
+            cat = pkgfeed.catalog()
+        except (urllib.error.URLError, OSError, LookupError) as exc:
+            _pfail("net_unreachable", "拿不到插件清单：%s" % exc, "", target)
+            return
+        item = next((x for x in cat.get("items") or [] if x["backend"] == target), None)
+        if not item:
+            _pfail("no_pkg", "仓库里没有 %s 的安装包" % LABEL[target], "", target)
+            return
+        name = item["file"]
+        with _PKG_LOCK:
+            _PKG["name"] = name
+
+        _pstep(6, "正在探测下载通道")
+        dest = os.path.join("/tmp", os.path.basename(name))
+        try:
+            # 传完整地址而不是文件名：24.10/25.12 的包在 release 资产里，
+            # 22.03 的在 raw 目录里，两者的 URL 形状完全不同
+            channel, got = pkgfeed.download_any(
+                item["url"], dest,
+                on_tick=lambda g, t: _pstep(
+                    8 + int(g * 55 / max(1, t or g)), "正在下载 " + _hsize(g, t)),
+            )
+        except LookupError as exc:
+            _pfail("net_unreachable", str(exc), "", target)
+            return
+        total = got
+        with _PKG_LOCK:
+            _PKG.update(channel=channel, got=got, total=total)
+        path = dest
+        if not pkgfeed.looks_like_run(path):
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+            _pfail("bad_payload", "下回来的不是安装包，多半被网关拦了", "", target)
+            return
+    else:
+        path = os.path.join(PKG_DIR, os.path.basename(name or ""))
+        if not os.path.isfile(path):
+            _pfail("no_file", "上传的文件不见了，请重新上传", "", target)
+            return
+        with _PKG_LOCK:
+            _PKG.update(name=os.path.basename(path), total=os.path.getsize(path))
+
+    base = os.path.basename(path)
+    if not base.lower().endswith(_PKG_RUN_EXT):
+        _pfail("bad_payload", "只支持 .run / .ipk / .apk 安装包", "", target)
+        return
+
+    _pstep(68, "正在安装 %s" % base)
+    if base.lower().endswith(".run"):
+        # .run 是 Makeself 自解压脚本，内部 install.sh 会自己调 opkg。
+        # 用 sh 执行：很多包没带可执行位，直接 exec 会 EACCES。
+        code, out = _run(["/bin/sh", path], timeout=900)
+    elif base.lower().endswith(".apk"):
+        code, out = _run(["apk", "add", "--allow-untrusted", path], timeout=900)
+    else:
+        code, out = _run(["opkg", "install", "--force-reinstall", path], timeout=900)
+
+    if _installed(target):
+        _pstep(100, "安装完成")
+        with _PKG_LOCK:
+            _PKG.update(running=False, done=True, ok=True, pct=100,
+                        finished=time.time(), step="安装完成")
+        forget_active()
+        _repo_cache["ts"] = 0.0
+        return
+
+    last = ""
+    for line in reversed((out or "").strip().splitlines()):
+        if line.strip():
+            last = line.strip()
+            break
+    _pfail(_classify(out), last or ("脚本退出码 %d" % code), out or "", target)
+
+
+def pkg_status() -> dict:
+    with _PKG_LOCK:
+        snap = dict(_PKG)
+        snap["log"] = list(_PKG["log"])
+    return snap
+
+
+def pkg_catalog(force: bool = False) -> dict:
+    """远端清单。跑在请求线程里，所以把网络异常收成 ok=False，别抛 500。"""
+    try:
+        return pkgfeed.catalog(force=force)
+    except (urllib.error.URLError, OSError, LookupError) as exc:
+        return {"ok": False, "items": [], "channel": "", "repo": pkgfeed.REPO,
+                "error": str(exc)}
+
+
+def pkg_probe() -> dict:
+    try:
+        return {"ok": True, "channels": pkgfeed.probe_channels()}
+    except (urllib.error.URLError, OSError) as exc:
+        return {"ok": False, "channels": [], "error": str(exc)}
+
+
+def pkg_install(target: str = "", source: str = "github", name: str = "",
+                confirm: str = "") -> dict:
+    """起一个整包安装任务，立刻返回；进度看 install_status()["pkg"]。
+
+    跟 install() 一样，target 只认固定值 —— 这个接口最终以 root 跑
+    ``sh <文件>``，绝不能让客户端把路径传进来。
+    """
+    if target not in PKG_TARGETS:
+        return {"ok": False, "error": "target 只能是 openclash / passwall"}
+    if source not in ("github", "local"):
+        return {"ok": False, "error": "source 只能是 github / local"}
+    if confirm != "install":
+        return {"ok": False, "error": "安装需要二次确认：confirm=install"}
+    if source == "local" and not name:
+        return {"ok": False, "error": "本地上传要先给出文件名"}
+    if not pkg_manager():
+        return _err("unknown", detail="这台设备上没有 opkg / apk，装不了插件包")
+
+    with _PKG_LOCK:
+        if _PKG["running"]:
+            return {"ok": True, "accepted": True, "already": True, "state": pkg_status()}
+        _PKG.update(running=True, done=False, ok=False, pct=0, step="准备中",
+                    target=target, source=source, name=os.path.basename(name or ""),
+                    channel="", got=0, total=0, error={}, started=time.time(),
+                    finished=0.0, log=[])
+    threading.Thread(target=_pkg_worker, args=(target, source, name),
+                     name="proxy-pkg", daemon=True).start()
+    return {"ok": True, "accepted": True, "state": pkg_status()}
 
 
 def _service_running(backend: str) -> bool:

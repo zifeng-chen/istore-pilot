@@ -27,9 +27,11 @@ UPLOAD_DIR = "/tmp/istore-upload"
 PUBLISH_DIR = "/www/istore-agent"
 OPKG_LOG = "/tmp/istore-opkg.log"
 SELF_PKG = "luci-app-istore-agent"
-# 64MB：本项目的安装包最大的 .run 也只有 20MB 上下，固件不走这里。
-# 原来是 256MB，而 /tmp 是 tmpfs —— 连续上传就能把路由器内存吃满。
-MAX_BYTES = 64 * 1024 * 1024
+# 128MB：本项目的安装包 20MB 上下，但第三方插件包大得多 ——
+# AUK9527/Are-u-ok 的 PassWall .run 有 85MB（自带 xray 内核），
+# PassWall2 62MB、OpenClash 21MB。原来卡 64MB 会把这个插件直接挡在门外。
+# 上限不是为了省流量，是为了别让 /tmp（tmpfs）被连续上传吃满内存。
+MAX_BYTES = 128 * 1024 * 1024
 _NAME_RE = re.compile(r"[^A-Za-z0-9._\-+]")
 
 _SAFE_EXT = (".ipk", ".apk", ".run", ".img", ".bin", ".sh", ".tar", ".gz", ".zip")

@@ -101,6 +101,53 @@ export class Http {
     return raw;
   }
 
+  /**
+   * 上传安装包：裸流 + X-Filename 头，跟 Agent 的 `/api/v1/system/upload` 对齐。
+   *
+   * 不能复用 send()：它的 Content-Type 写死 application/json，readTimeout 只有
+   * 12 秒 —— 85MB 的 PassWall 包传不完就被掐了。
+   */
+  static async upload(base: string, token: string, path: string,
+    filename: string, data: ArrayBuffer): Promise<HttpResult> {
+    const url: string = Http.join(base, path);
+    if (url.length === 0) {
+      return { ok: false, code: -1, body: '', error: '服务器地址为空' };
+    }
+
+    const req = http.createHttp();
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/octet-stream',
+        'X-Filename': encodeURIComponent(filename)
+      };
+      if (token.length > 0) {
+        headers['Authorization'] = 'Bearer ' + token;
+      }
+      const options: http.HttpRequestOptions = {
+        method: http.RequestMethod.POST,
+        header: headers,
+        connectTimeout: 15000,
+        // 局域网里 85MB 通常十几秒；给 10 分钟兜住慢速 WiFi
+        readTimeout: 600000,
+        expectDataType: http.HttpDataType.STRING,
+        extraData: data
+      };
+      const res = await req.request(url, options);
+      let text: string = '';
+      if (typeof res.result === 'string') {
+        text = res.result as string;
+      }
+      const code: number = res.responseCode;
+      return { ok: code >= 200 && code < 300, code: code, body: text, error: '' };
+    } catch (e) {
+      const err = e as BusinessError;
+      const raw: string = err.message === undefined ? '' : err.message;
+      return { ok: false, code: -1, body: '', error: Http.zhError(raw) };
+    } finally {
+      req.destroy();
+    }
+  }
+
   /** base 可能带也可能不带尾斜杠，统一收一次 */
   private static join(base: string, path: string): string {
     if (base.length === 0) {

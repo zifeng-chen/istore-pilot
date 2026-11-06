@@ -1,4 +1,5 @@
 import { common } from '@kit.AbilityKit';
+import { fileIo, picker } from '@kit.CoreFileKit';
 import { promptAction, router } from '@kit.ArkUI';
 import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
@@ -51,6 +52,48 @@ interface InstallState {
   installed: string[];
   failed: string[];
   partial: boolean;
+  err: InstallErr;
+}
+
+/** 远端仓库里的一个安装包 */
+interface PkgItem {
+  backend: string;
+  label: string;
+  version: string;
+  /** 本机装着的版本，没装是空串 */
+  local: string;
+  newer: boolean;
+  file: string;
+  /** 与哪个后端互斥，空串表示不冲突 */
+  conflict: string;
+}
+
+/** 下载通道的探测结果：ok=false 表示这条域名不通 */
+interface ChanItem {
+  id: string;
+  label: string;
+  ok: boolean;
+  ms: number;
+}
+
+/**
+ * 整包安装任务。
+ *
+ * 跟 InstallState 是两条独立的线：那个走 opkg 源 / GitHub release 的单个 ipk，
+ * 这个走「一个完整 .run」——要么从仓库下，要么用户从手机里传上来。
+ */
+interface PkgTask {
+  running: boolean;
+  done: boolean;
+  ok: boolean;
+  pct: number;
+  step: string;
+  target: string;
+  source: string;
+  name: string;
+  channel: string;
+  got: number;
+  total: number;
   err: InstallErr;
 }
 
@@ -133,6 +176,27 @@ export struct ProxyPage {
   @Local failCode: string = '';
   @Local failDetail: string = '';
   @Local failSuggest: string[] = [];
+
+  // ---- 整包安装：本地选文件 / 从仓库下载
+  @Local showPkg: boolean = false;
+  @Local pkgItems: PkgItem[] = [];
+  @Local pkgChans: ChanItem[] = [];
+  @Local pkgLoading: boolean = false;
+  @Local pkgMsg: string = '';
+  /** 当前系统画像（如「24.10 · x86_64」），让用户确认按版本选对了包 */
+  @Local pkgSys: string = '';
+  /** 正在等用户二次确认的后端 id，空串表示没有 */
+  @Local pkgConfirm: string = '';
+  @Local uploading: boolean = false;
+  @Local uploadName: string = '';
+  /** 等确认时暂存的来源与文件名（本地包必须带上名字，Agent 才知道装哪个） */
+  @Local pendingSource: string = 'github';
+  @Local pendingName: string = '';
+  @Local pkgTask: PkgTask = {
+    running: false, done: false, ok: false, pct: 0, step: '', target: '',
+    source: '', name: '', channel: '', got: 0, total: 0,
+    err: { code: '', title: '', detail: '', suggest: [] }
+  };
 
   private timer: number = -1;
   private installTimer: number = -1;
@@ -282,6 +346,31 @@ export struct ProxyPage {
         suggest: e.strs('suggest')
       }
     };
+    // 整包安装是另一条任务线，同一个接口顺带返回，接上就行
+    this.applyPkg(j.obj('pkg'));
+  }
+
+  private applyPkg(j: J): void {
+    const e: J = j.obj('error');
+    this.pkgTask = {
+      running: j.bool('running', false),
+      done: j.bool('done', false),
+      ok: j.bool('ok', false),
+      pct: j.num('pct', 0),
+      step: j.str('step', ''),
+      target: j.str('target', ''),
+      source: j.str('source', ''),
+      name: j.str('name', ''),
+      channel: j.str('channel', ''),
+      got: j.num('got', 0),
+      total: j.num('total', 0),
+      err: {
+        code: e.str('error_code', ''),
+        title: e.str('error_title', ''),
+        detail: e.str('detail', ''),
+        suggest: e.strs('suggest')
+      }
+    };
   }
 
   private applyFailRaw(code: string, title: string, detail: string,
@@ -329,6 +418,193 @@ export struct ProxyPage {
     this.startInstallPoll();
   }
 
+  // ------------------------------------------------- 整包安装：本地 / 仓库
+  //
+  // 这是「软件源里根本没有这两个包」的正解，两条路：
+  //   1. 用户自己从手机/电脑传 .run 上来 —— 完全不依赖路由器能不能上外网
+  //   2. 从 Are-u-ok 仓库下 —— 只解析 3.4KB 的 README，不走 GitHub API
+  //     （api.github.com 在这类网络里常 403，jsDelivr 又卡 20MB 单文件上限）
+  // 两条最终都是 `sh <文件>` 跑 Makeself 包，包内自带内核。
+
+  private openPkg(): void {
+    this.showPkg = true;
+    this.pkgMsg = '';
+    this.pkgConfirm = '';
+    this.loadPkg(false);
+  }
+
+  private async loadPkg(force: boolean): Promise<void> {
+    this.pkgLoading = true;
+    const r: ApiResult = await Api.get(this.ctx(),
+      '/api/v1/proxy/pkg/catalog' + (force ? '?force=1' : ''));
+    if (!r.ok) {
+      this.pkgLoading = false;
+      this.pkgMsg = '拿不到插件清单：' + r.error;
+      return;
+    }
+    const list: J[] = r.data.arr('items');
+    const out: PkgItem[] = [];
+    for (let i = 0; i < list.length; i++) {
+      const it: J = list[i];
+      out.push({
+        backend: it.str('backend', ''),
+        label: it.str('label', ''),
+        version: it.str('version', ''),
+        local: it.str('local', ''),
+        newer: it.bool('newer', false),
+        file: it.str('file', ''),
+        conflict: it.str('conflict', '')
+      });
+    }
+    this.pkgItems = out;
+    this.pkgLoading = false;
+    const fam: string = r.data.str('family', '');
+    const arch: string = r.data.str('arch', '');
+    this.pkgSys = fam.length > 0
+      ? (fam + (arch.length > 0 ? ' · ' + arch : ''))
+      : '';
+    if (!r.data.bool('ok', false)) {
+      this.pkgMsg = '仓库里没找到安装包，可以改用本地文件安装';
+    }
+    await this.probePkg();
+  }
+
+  /** 探一遍下载通道，让用户点之前就知道「现在哪条路通」 */
+  private async probePkg(): Promise<void> {
+    const p: ApiResult = await Api.post(this.ctx(), '/api/v1/proxy/pkg/probe',
+      { 'probe': 1 });
+    if (!p.ok) {
+      return;
+    }
+    const list: J[] = p.data.arr('channels');
+    const out: ChanItem[] = [];
+    for (let i = 0; i < list.length; i++) {
+      const c: J = list[i];
+      out.push({
+        id: c.str('id', ''),
+        label: c.str('label', ''),
+        ok: c.bool('ok', false),
+        ms: c.num('ms', -1)
+      });
+    }
+    this.pkgChans = out;
+  }
+
+  /** 文件名推后端：AUK9527 的包名里一定带 OpenClash / PassWall */
+  private targetOfName(name: string): string {
+    const low: string = name.toLowerCase();
+    if (low.indexOf('openclash') >= 0) {
+      return 'openclash';
+    }
+    if (low.indexOf('passwall') >= 0) {
+      return 'passwall';
+    }
+    return '';
+  }
+
+  private fmtMB(n: number): string {
+    if (n <= 0) {
+      return '—';
+    }
+    if (n < 1048576) {
+      return Math.round(n / 1024) + ' KB';
+    }
+    return (n / 1048576).toFixed(1) + ' MB';
+  }
+
+  /** 选文件 → 读进内存 → 传到路由器 → 等二次确认 */
+  private async pickPkg(): Promise<void> {
+    if (this.uploading) {
+      return;
+    }
+    let uri: string = '';
+    try {
+      const opt = new picker.DocumentSelectOptions();
+      opt.maxSelectNumber = 1;
+      opt.fileSuffixFilters = ['.run', '.ipk', '.apk'];
+      const p = new picker.DocumentViewPicker(this.ctx());
+      const uris: string[] = await p.select(opt);
+      if (uris.length === 0) {
+        return;
+      }
+      uri = uris[0];
+    } catch (e) {
+      this.pkgMsg = '打开文件选择器失败';
+      return;
+    }
+
+    const name: string = decodeURIComponent(uri.substring(uri.lastIndexOf('/') + 1));
+    if (this.targetOfName(name).length === 0) {
+      this.pkgMsg = '文件名里要带 OpenClash 或 PassWall，否则分不清装哪个';
+      return;
+    }
+
+    let buf: ArrayBuffer = new ArrayBuffer(0);
+    try {
+      const f = fileIo.openSync(uri, fileIo.OpenMode.READ_ONLY);
+      const st = fileIo.statSync(f.fd);
+      if (st.size <= 0) {
+        fileIo.closeSync(f);
+        this.pkgMsg = '这个文件是空的';
+        return;
+      }
+      if (st.size > 128 * 1024 * 1024) {
+        fileIo.closeSync(f);
+        this.pkgMsg = '文件超过 128 MB，路由器收不下';
+        return;
+      }
+      buf = new ArrayBuffer(st.size);
+      fileIo.readSync(f.fd, buf);
+      fileIo.closeSync(f);
+    } catch (e) {
+      this.pkgMsg = '读文件失败，换个位置再试';
+      return;
+    }
+
+    this.uploading = true;
+    this.uploadName = name;
+    this.pkgMsg = '';
+    const r: ApiResult = await Api.uploadPkg(name, buf);
+    this.uploading = false;
+    if (!r.ok) {
+      this.pkgMsg = '上传失败：' + r.error;
+      return;
+    }
+    this.askPkg(this.targetOfName(name), 'local', r.data.str('name', name));
+  }
+
+  /** 点按钮 → 先弹一个内联确认，确认了才真的调 Agent */
+  private askPkg(target: string, source: string, name: string): void {
+    this.pkgConfirm = target;
+    this.pkgMsg = '';
+    this.pendingSource = source;
+    this.pendingName = name;
+  }
+
+  private async doPkgInstall(): Promise<void> {
+    const target: string = this.pkgConfirm;
+    if (target.length === 0) {
+      return;
+    }
+    this.pkgConfirm = '';
+    this.pkgMsg = '';
+    const body: Record<string, Object> = {
+      'target': target, 'source': this.pendingSource,
+      'name': this.pendingName, 'confirm': 'install'
+    };
+    const r: ApiResult = await Api.post(this.ctx(), '/api/v1/proxy/pkg/install', body);
+    if (!r.ok) {
+      this.pkgMsg = '连不上 Agent：' + r.error;
+      return;
+    }
+    if (!r.data.bool('ok', false)) {
+      this.pkgMsg = r.data.str('error', '启动安装失败');
+      this.applyFailOf(r.data);
+      return;
+    }
+    this.startInstallPoll();
+  }
+
   private startInstallPoll(): void {
     this.stopInstallPoll();
     this.installTimer = setInterval(() => {
@@ -349,18 +625,32 @@ export struct ProxyPage {
       return;
     }
     this.applyInstall(r.data);
-    if (this.inst.err.code.length > 0 && !this.showSheet) {
-      this.failCode = this.inst.err.code;
-      this.failTitle = this.inst.err.title;
-      this.failDetail = this.inst.err.detail;
-      this.failSuggest = this.inst.err.suggest;
-      this.sheetMode = 'fail';
-      this.showSheet = true;
+
+    // 两条任务线的失败共用一个弹窗；同一时刻只弹一次
+    if (!this.showSheet) {
+      if (this.inst.err.code.length > 0) {
+        this.failCode = this.inst.err.code;
+        this.failTitle = this.inst.err.title;
+        this.failDetail = this.inst.err.detail;
+        this.failSuggest = this.inst.err.suggest;
+        this.sheetMode = 'fail';
+        this.showSheet = true;
+      } else if (this.pkgTask.done && !this.pkgTask.ok
+        && this.pkgTask.err.code.length > 0) {
+        this.failCode = this.pkgTask.err.code;
+        this.failTitle = this.pkgTask.err.title;
+        this.failDetail = this.pkgTask.err.detail;
+        this.failSuggest = this.pkgTask.err.suggest;
+        this.sheetMode = 'fail';
+        this.showSheet = true;
+      }
     }
-    if (!this.inst.running && this.inst.done) {
+
+    const busy: boolean = this.inst.running || this.pkgTask.running;
+    if (!busy && (this.inst.done || this.pkgTask.done)) {
       this.stopInstallPoll();
       this.load(true);
-      if (this.inst.ok) {
+      if (this.inst.ok || this.pkgTask.ok) {
         this.toast = '装好了 · 导入订阅后再启动';
       }
     }
@@ -373,8 +663,17 @@ export struct ProxyPage {
       return;
     }
     this.applyInstall(r.data);
-    if (this.inst.running) {
+    if (this.inst.running || this.pkgTask.running) {
       this.startInstallPoll();
+    } else if (this.pkgTask.done && !this.pkgTask.ok
+      && this.pkgTask.err.code.length > 0) {
+      // 不在页面时任务失败了，回来要补上提示，否则用户不知道装没装上
+      this.failCode = this.pkgTask.err.code;
+      this.failTitle = this.pkgTask.err.title;
+      this.failDetail = this.pkgTask.err.detail;
+      this.failSuggest = this.pkgTask.err.suggest;
+      this.sheetMode = 'fail';
+      this.showSheet = true;
     }
   }
 
@@ -692,6 +991,9 @@ export struct ProxyPage {
           }
           .width('100%');
         }
+
+        // 安装包入口放在最后：空态时是「源里没有就自己传」，已装时是「重装/升级」
+        this.pkgEntry();
 
         Row().width('100%').height(24);
       }
@@ -1185,6 +1487,315 @@ export struct ProxyPage {
         router.pushUrl({ url: 'pages/SubscriptionPage' });
       });
     }
+  }
+
+  /** 安装包入口。空态和已装态都要有 —— 装不上时正好用本地上传兜底 */
+  @Builder
+  pkgEntry() {
+    Column() {
+      Card({ gapTop: T.GAP }) {
+        Row() {
+          Row() {
+            GlyphIcon({ kind: Glyph.UPLOAD, color: Pal.primary(), side: 18, lineWidth: 1.9 });
+          }
+          .margin({ right: 10 });
+          Column() {
+            Text('安装包')
+              .fontSize(T.F_BODY)
+              .fontColor($r('app.color.text_primary'));
+            Text(this.pkgSub())
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_secondary'))
+              .margin({ top: 2 });
+          }
+          .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1);
+          Text('›')
+            .fontSize(18)
+            .fontColor($r('app.color.text_tertiary'));
+        }
+        .width('100%')
+        .padding({ top: 4, bottom: 4 })
+        .alignItems(VerticalAlign.Center)
+        .onClick(() => {
+          this.openPkg();
+        });
+      }
+    }
+    .width('100%')
+    .bindSheet($$this.showPkg, this.pkgSheet(), {
+      height: 680,
+      dragBar: true,
+      showClose: false,
+      backgroundColor: $r('app.color.app_bg'),
+      onDisappear: () => {
+        this.showPkg = false;
+      }
+    });
+  }
+
+  private pkgSub(): string {
+    if (this.pkgTask.running) {
+      return '正在安装 · ' + this.pkgTask.step;
+    }
+    if (this.uploading) {
+      return '正在上传 ' + this.uploadName;
+    }
+    return '从本地文件装，或从仓库下载';
+  }
+
+  @Builder
+  pkgSheet() {
+    Column() {
+      Row() {
+        Text('安装包')
+          .fontSize(T.F_H1)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'))
+          .layoutWeight(1);
+        Text('关闭')
+          .fontSize(T.F_SUB)
+          .fontColor($r('app.color.text_secondary'))
+          .padding({ left: 8, top: 4, bottom: 4 })
+          .onClick(() => {
+            this.showPkg = false;
+          });
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Top)
+      .padding({ bottom: 14 });
+
+      Scroll() {
+        Column() {
+          // ---- 1. 本地文件：不依赖路由器能不能上外网
+          Column() {
+            Text(this.uploading ? '正在上传 ' + this.uploadName : '从本地文件安装')
+              .fontSize(T.F_H2)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.on_primary'));
+            Text(this.uploading ? '传完会自动问你要不要装' : '选 .run / .ipk，手机里有包就能装')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.on_primary'))
+              .opacity(0.82)
+              .margin({ top: 3 });
+          }
+          .width('100%')
+          .padding({ top: 15, bottom: 15 })
+          .backgroundColor($r('app.color.primary'))
+          .borderRadius(T.R_CARD)
+          .opacity(this.uploading ? 0.6 : 1)
+          .onClick(() => {
+            if (!this.uploading) {
+              this.pickPkg();
+            }
+          });
+
+          if (this.pkgMsg.length > 0) {
+            Text(this.pkgMsg)
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.warn'))
+              .width('100%')
+              .margin({ top: 8 })
+              .lineHeight(18);
+          }
+
+          // ---- 2. 任务进度
+          if (this.pkgTask.running || (this.pkgTask.done && this.pkgTask.ok)) {
+            this.pkgProgress();
+          }
+
+          // ---- 3. 仓库下载
+          Row() {
+            Text('从仓库下载')
+              .fontSize(T.F_SUB)
+              .fontColor($r('app.color.text_secondary'));
+            Blank();
+            if (this.pkgLoading) {
+              Text('读取中…')
+                .fontSize(T.F_TINY)
+                .fontColor($r('app.color.text_tertiary'));
+            } else {
+              Text('刷新')
+                .fontSize(T.F_TINY)
+                .fontColor($r('app.color.primary'))
+                .onClick(() => {
+                  this.loadPkg(true);
+                });
+            }
+          }
+          .width('100%')
+          .margin({ top: T.GAP, bottom: 2 })
+          .alignItems(VerticalAlign.Center);
+
+          // 仓库是按系统版本 + 架构分开发的：24.10 和 25.12 在另一个仓库的
+          // release 里，同一版本里还分 x86_64 / aarch64_a53 / _a72 / _generic。
+          // 这行是在告诉用户「我选的是哪一套」，装错了要先看见才知道。
+          if (this.pkgSys.length > 0) {
+            Text('已按当前系统匹配：' + this.pkgSys)
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_tertiary'))
+              .width('100%')
+              .margin({ top: 2 });
+          }
+
+          if (this.pkgItems.length === 0) {
+            Text(this.pkgLoading ? '正在读取仓库…' : '没读到仓库清单')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_tertiary'))
+              .width('100%')
+              .margin({ top: 6 });
+          } else {
+            ForEach(this.pkgItems, (it: PkgItem) => {
+              this.pkgRow(it);
+            }, (it: PkgItem) => it.backend + '|' + it.version + '|' + it.local);
+          }
+
+          // ---- 4. 通道状态
+          if (this.pkgChans.length > 0) {
+            Text('下载通道：' + this.chanLine())
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_tertiary'))
+              .width('100%')
+              .margin({ top: 10 })
+              .lineHeight(18);
+          }
+
+          Note({ text: 'PassWall 的包约 80 MB，按现在这条线路可能要十几分钟；'
+            + '着急就直接用上面的本地文件安装。' });
+        }
+        .width('100%');
+      }
+      .layoutWeight(1)
+      .scrollBar(BarState.Off)
+      .align(Alignment.Top);
+    }
+    .width('100%')
+    .padding({ left: 20, right: 20, top: 32, bottom: 16 });
+  }
+
+  @Builder
+  pkgProgress() {
+    Column() {
+      Text(this.pkgTask.step)
+        .fontSize(T.F_TINY)
+        .fontColor($r('app.color.text_secondary'))
+        .width('100%');
+      Stack({ alignContent: Alignment.Start }) {
+        Row()
+          .width('100%')
+          .height(6)
+          .borderRadius(3)
+          .backgroundColor($r('app.color.track'));
+        Row()
+          .width(Math.max(0, Math.min(100, this.pkgTask.pct)) + '%')
+          .height(6)
+          .borderRadius(3)
+          .backgroundColor($r('app.color.primary'));
+      }
+      .width('100%')
+      .height(6)
+      .margin({ top: 8, bottom: 4 });
+
+      if (this.pkgTask.total > 0) {
+        Text(this.fmtMB(this.pkgTask.got) + ' / ' + this.fmtMB(this.pkgTask.total)
+          + (this.pkgTask.channel.length > 0 ? ' · ' + this.pkgTask.channel : ''))
+          .fontSize(T.F_TINY)
+          .fontColor($r('app.color.text_tertiary'))
+          .width('100%');
+      }
+    }
+    .width('100%')
+    .margin({ top: 12 });
+  }
+
+  private chanLine(): string {
+    const parts: string[] = [];
+    for (let i = 0; i < this.pkgChans.length; i++) {
+      const c: ChanItem = this.pkgChans[i];
+      parts.push(c.ok ? (c.label + ' ' + (c.ms / 1000).toFixed(1) + 's') : (c.label + ' 不通'));
+    }
+    return parts.join(' · ');
+  }
+
+  private pkgNote(it: PkgItem): string {
+    let s: string = '';
+    if (it.local.length === 0) {
+      s = '未安装';
+    } else if (it.newer) {
+      s = '本机 ' + it.local + ' · 可升级';
+    } else {
+      s = '本机 ' + it.local + ' · 仓库里的更旧';
+    }
+    if (it.conflict.length > 0) {
+      s = s + ' · 与 ' + (it.conflict === 'passwall' ? 'PassWall' : 'PassWall2') + ' 冲突';
+    }
+    return s;
+  }
+
+  @Builder
+  pkgRow(it: PkgItem) {
+    Column() {
+      Row() {
+        Column() {
+          Row() {
+            Text(it.label)
+              .fontSize(T.F_BODY)
+              .fontColor($r('app.color.text_primary'));
+            Text('  ' + it.version)
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_tertiary'));
+          }
+          Text(this.pkgNote(it))
+            .fontSize(T.F_TINY)
+            .fontColor(it.newer || it.local.length === 0
+              ? $r('app.color.text_secondary')
+              : $r('app.color.text_tertiary'))
+            .margin({ top: 2 });
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1);
+
+        if (this.pkgConfirm === it.backend) {
+          Row({ space: 8 }) {
+            Text('取消')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_secondary'))
+              .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+              .borderRadius(99)
+              .backgroundColor($r('app.color.surface_sunken'))
+              .onClick(() => {
+                this.pkgConfirm = '';
+              });
+            Text('确认安装')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.on_primary'))
+              .padding({ left: 12, right: 12, top: 5, bottom: 5 })
+              .borderRadius(99)
+              .backgroundColor($r('app.color.primary'))
+              .onClick(() => {
+                this.doPkgInstall();
+              });
+          }
+          .margin({ left: 8 });
+        } else {
+          Text('下载安装')
+            .fontSize(T.F_SUB)
+            .fontColor($r('app.color.primary'))
+            .padding({ left: 12, right: 12, top: 5, bottom: 5 })
+            .borderRadius(99)
+            .backgroundColor($r('app.color.accent_soft'))
+            .margin({ left: 8 })
+            .onClick(() => {
+              this.askPkg(it.backend, 'github', it.file);
+            });
+        }
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center);
+      Hairline();
+    }
+    .width('100%')
+    .padding({ top: 10, bottom: 2 });
   }
 
   private fmtSize(n: number): string {

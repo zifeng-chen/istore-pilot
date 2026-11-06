@@ -31,6 +31,23 @@ struct ProxyView: View {
     /// 刚测出来的延迟，优先级高于接口里带的历史值
     @State private var tested: [String: Int] = [:]
 
+    // ---- 安装包：本地传包 / 从仓库下
+    // 这两个插件不在任何软件源里，GitHub 又常常打不开，所以必须有一条
+    // 完全不依赖网络的路径：手机里传包上去。
+    @State private var showPkg = false
+    @State private var pkgItems: [J] = []
+    @State private var pkgChan = ""
+    /// 当前系统画像（如「24.10 · x86_64」）：仓库按版本+架构分开发，装错要先看见
+    @State private var pkgSys = ""
+    @State private var pkgTask: J = [:]
+    @State private var pkgBusy = false
+    @State private var pkgMsg = ""
+    @State private var showImporter = false
+    @State private var askTarget = ""
+    @State private var askName = ""
+    @State private var askSource = "github"
+    @State private var showAsk = false
+
     @Environment(\.tabIndex) private var tabIndex
     @Environment(\.barAxis) private var axis
     @EnvironmentObject private var chrome: TabChrome
@@ -68,6 +85,7 @@ struct ProxyView: View {
                     if !err.isEmpty {
                         Text(err).font(F.tiny).foregroundStyle(C.danger)
                     }
+                    pkgCard
                     Color.clear.barBottomGap()
                 }
                 .padding(.horizontal, 16)
@@ -104,7 +122,150 @@ struct ProxyView: View {
             )) {
                 groupSheet
             }
+            .adaptiveSheet(isPresented: $showPkg) { pkgSheet }
+            .fileImporter(isPresented: $showImporter,
+                          allowedContentTypes: [.data],
+                          allowsMultipleSelection: false) { result in
+                if case let .success(urls) = result, let url = urls.first {
+                    uploadPkg(url)
+                }
+            }
+            .alert("安装 \(askTarget == "openclash" ? "OpenClash" : "PassWall")",
+                   isPresented: $showAsk) {
+                Button("取消", role: .cancel) {}
+                Button("开始安装") { Task { await doPkgInstall() } }
+            } message: {
+                Text(askSource == "local"
+                     ? "会把 \(askName) 装到路由器上，过程中会以管理员权限执行包里的安装脚本。"
+                     : "会从仓库下载 \(askName) 再安装。包大时（PassWall 约 85 MB）"
+                     + "可能要十几分钟，中途别退出。")
+            }
         }
+    }
+
+    // MARK: - 安装包
+
+    private var pkgCard: some View {
+        Card {
+            Button {
+                showPkg = true
+                pkgMsg = ""
+                Task { await loadPkg() }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(C.primary)
+                        .frame(width: 30, height: 30)
+                        .background {
+                            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                .fill(C.accentSoft)
+                        }
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("安装包")
+                            .font(.system(size: 14.5, weight: .medium))
+                            .foregroundStyle(C.textPrimary)
+                        Text(pkgSub)
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(C.textSecondary)
+                    }
+                    Spacer(minLength: 6)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(C.textTertiary)
+                }
+                .padding(.vertical, 4)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var pkgSub: String {
+        if pkgTask.bool("running") {
+            return pkgTask.str("step", "正在安装")
+        }
+        if pkgBusy {
+            return "正在上传…"
+        }
+        return "本地传包，不用路由器联网"
+    }
+
+    private var pkgSheet: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Button {
+                        showImporter = true
+                    } label: {
+                        Label("从本地文件安装", systemImage: "folder")
+                            .font(.system(size: 14.5))
+                    }
+                    if !pkgMsg.isEmpty {
+                        Text(pkgMsg)
+                            .font(F.tiny)
+                            .foregroundStyle(C.danger)
+                    }
+                } header: {
+                    Text("手机里的安装包")
+                } footer: {
+                    Text("选 .run / .ipk。这条路完全不依赖路由器能不能上外网。")
+                }
+
+                Section {
+                    if pkgItems.isEmpty {
+                        Text("仓库清单读不到，只能用本地文件")
+                            .font(F.tiny)
+                            .foregroundStyle(C.textTertiary)
+                    } else {
+                        ForEach(Array(pkgItems.enumerated()), id: \.offset) { _, it in
+                            Button {
+                                ask(it.str("backend"), "github", it.str("file"))
+                            } label: {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(it.str("label") + " " + it.str("version"))
+                                        .font(.system(size: 14.5, weight: .medium))
+                                        .foregroundStyle(C.textPrimary)
+                                    Text(pkgNote(it))
+                                        .font(.system(size: 11.5))
+                                        .foregroundStyle(C.textSecondary)
+                                }
+                            }
+                        }
+                    }
+                } header: {
+                    Text("从仓库下载")
+                } footer: {
+                    Text((pkgSys.isEmpty ? "" : "已按当前系统匹配：\(pkgSys)。\n")
+                         + (pkgChan.isEmpty ? "" : "下载通道 \(pkgChan)。\n")
+                         + "PassWall 约 80 MB，可能要十几分钟。")
+                }
+            }
+            .navigationTitle("安装包")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("关闭") { showPkg = false }
+                }
+            }
+        }
+    }
+
+    private func pkgNote(_ it: J) -> String {
+        let local = it.str("local")
+        var s: String
+        if local.isEmpty {
+            s = "未安装"
+        } else if it.bool("newer") {
+            s = "本机 \(local)，可升级"
+        } else {
+            s = "本机 \(local)，仓库里的更旧"
+        }
+        let conflict = it.str("conflict")
+        if !conflict.isEmpty {
+            s += " · 与 " + (conflict == "passwall" ? "PassWall" : "PassWall2") + " 冲突"
+        }
+        return s
     }
 
     // MARK: - Hero
@@ -676,6 +837,119 @@ struct ProxyView: View {
     }
 
     // MARK: - 动作
+
+    // MARK: - 安装包（逻辑）
+
+    private func loadPkg() async {
+        do {
+            let j = try await Api.get("/api/v1/proxy/pkg/catalog", cache: false)
+            await MainActor.run {
+                pkgItems = j.objs("items")
+                pkgChan = j.str("channel")
+                let fam = j.str("family")
+                let arch = j.str("arch")
+                pkgSys = fam.isEmpty ? "" : (arch.isEmpty ? fam : fam + " · " + arch)
+                if !j.bool("ok") {
+                    pkgMsg = "仓库里没找到安装包，可以改用本地文件"
+                }
+            }
+        } catch {
+            await MainActor.run {
+                pkgMsg = "拿不到清单：\(error.localizedDescription)"
+            }
+        }
+    }
+
+    /// 文件名推后端：AUK9527 的包名里一定带 OpenClash / PassWall
+    private static func targetOf(_ name: String) -> String {
+        let low = name.lowercased()
+        if low.contains("openclash") {
+            return "openclash"
+        }
+        if low.contains("passwall") {
+            return "passwall"
+        }
+        return ""
+    }
+
+    private func uploadPkg(_ url: URL) {
+        pkgBusy = true
+        pkgMsg = ""
+        Task {
+            let got = url.startAccessingSecurityScopedResource()
+            defer { if got { url.stopAccessingSecurityScopedResource() } }
+            do {
+                let data = try Data(contentsOf: url)
+                let j = try await Api.upload(data: data, filename: url.lastPathComponent)
+                await MainActor.run {
+                    pkgBusy = false
+                    let saved = j.str("name", url.lastPathComponent)
+                    let t = Self.targetOf(saved)
+                    if t.isEmpty {
+                        pkgMsg = "文件名里要带 OpenClash 或 PassWall，否则分不清装哪个"
+                        return
+                    }
+                    ask(t, "local", saved)
+                }
+            } catch {
+                await MainActor.run {
+                    pkgBusy = false
+                    pkgMsg = "上传失败：\(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
+    private func ask(_ target: String, _ source: String, _ name: String) {
+        askTarget = target
+        askSource = source
+        askName = name
+        showAsk = true
+    }
+
+    private func doPkgInstall() async {
+        let body: J = [
+            "target": askTarget, "source": askSource,
+            "name": askName, "confirm": "install",
+        ]
+        do {
+            let r = try await Api.post("/api/v1/proxy/pkg/install", body)
+            if !r.bool("ok") {
+                await MainActor.run { pkgMsg = r.str("error", "启动安装失败") }
+                return
+            }
+            await MainActor.run { showPkg = false }
+            await pollPkg()
+        } catch {
+            await MainActor.run { pkgMsg = "启动失败：\(error.localizedDescription)" }
+        }
+    }
+
+    /// 轮询整包安装进度。任务在 Agent 侧跑，App 退后台也不会中断安装。
+    private func pollPkg() async {
+        for _ in 0..<900 {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            guard let j = try? await Api.get("/api/v1/proxy/install", cache: false),
+                  let p = j.obj("pkg") else {
+                continue
+            }
+            await MainActor.run { pkgTask = p }
+            if p.bool("running") {
+                continue
+            }
+            await MainActor.run {
+                if p.bool("ok") {
+                    pkgMsg = ""
+                } else if let e = p.obj("error") {
+                    pkgMsg = e.str("detail", "安装失败")
+                } else {
+                    pkgMsg = "安装失败"
+                }
+            }
+            await load()
+            return
+        }
+    }
 
     private func load() async {
         do {

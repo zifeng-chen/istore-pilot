@@ -90,6 +90,30 @@ public class ProxyFragment extends BaseFragment {
     private TextView tvHideNote;
     private boolean hideTimeout;
 
+    // ---- 安装包：本地传包 / 从仓库下
+    /** 「安装包」那行的状态文字，安装中要实时改 */
+    private TextView tvPkgState;
+    /** 安装进度轮询。任务在 Agent 侧跑，页面销毁不会影响安装本身 */
+    private final android.os.Handler pkgHandler =
+            new android.os.Handler(android.os.Looper.getMainLooper());
+    private Runnable pkgPoll;
+    /** 等二次确认时暂存的来源与文件名（本地包必须带名字，后端才知道装哪个） */
+    private String pkgSource = "github";
+    private String pkgName = "";
+
+    /**
+     * 选安装包。必须在字段初始化时注册 —— 放进 build() 会抛
+     * "attempting to register while current state is RESUMED"。
+     */
+    private final androidx.activity.result.ActivityResultLauncher<String[]> pkgPicker =
+            registerForActivityResult(
+                    new androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+                    uri -> {
+                        if (uri != null) {
+                            uploadPkgFile(uri);
+                        }
+                    });
+
     @Override
     protected String title() {
         return "代理";
@@ -195,6 +219,292 @@ public class ProxyFragment extends BaseFragment {
         combo.addView(nodesBox);
 
         root.addView(combo);
+
+        // ---------------------------------------------------------- 安装包
+        // 这两个插件不在任何软件源里：卸了就装不回来，GitHub 又常常打不开。
+        // 所以给两条不依赖软件源的路 —— 手机里传包 / 从仓库下。
+        Ui.Card pkg = Ui.card(c);
+        Ui.cardTitle(c, pkg, Glyph.UPLOAD, "安装包", "本地传包，不用路由器联网");
+        LinearLayout pkgSlot = Ui.infoRow(c, pkg, Glyph.UPLOAD, "插件安装", true);
+        tvPkgState = Ui.num(c, "", 13.5f, R.color.text_secondary);
+        tvPkgState.setSingleLine(true);
+        tvPkgState.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        pkgSlot.addView(tvPkgState);
+        pkgSlot.addView(Ui.chevron(c));
+        tapRow(pkgSlot, this::openPkgSheet);
+        root.addView(pkg);
+    }
+
+    // ------------------------------------------------------------ 安装包
+    //
+    // Agent 侧有两条安装线：
+    //   /api/v1/proxy/install   —— 走软件源 / GitHub release 的单个 ipk（旧的）
+    //   /api/v1/proxy/pkg/install —— 走一个完整 .run（带内核），本地传或仓库下
+    // 这里用的是后者，因为前者在「源里没有 + GitHub 打不开」时就彻底没辙了。
+
+    private void openPkgSheet() {
+        // 先拿清单再弹窗：弹窗内容是静态的，异步回来再改会闪
+        Api.get(ctx(), "/api/v1/proxy/pkg/catalog", new Cb() {
+            @Override
+            public void onData(JSONObject data, boolean fromCache) {
+                if (!isAdded()) {
+                    return;
+                }
+                showPkgSheet(data);
+            }
+
+            @Override
+            public void onError(String message) {
+                if (!isAdded()) {
+                    return;
+                }
+                // 清单拉不到不等于不能装 —— 本地传包这条路与网络无关
+                showPkgSheet(null);
+            }
+        });
+    }
+
+    private void showPkgSheet(JSONObject data) {
+        Context c = ctx();
+        JSONArray items = data == null ? null : data.optJSONArray("items");
+        String channel = data == null ? "" : data.optString("channel", "");
+        Sheet.Builder box = Sheet.custom(c, "安装包");
+
+        StringBuilder intro = new StringBuilder();
+        intro.append("从手机里装：手机上有 .run / .ipk 就走这条，不需要路由器能上外网。");
+        if (items == null || items.length() == 0) {
+            intro.append("\n仓库清单现在读不到，只能用本地文件。");
+        } else {
+            // 仓库按系统版本 + 架构分开发：24.10/25.12 在另一个仓库的 release 里，
+            // 同一版本还分 x86_64 / aarch64_a53 / _a72 / _generic
+            String fam = data.optString("family", "");
+            String arch = data.optString("arch", "");
+            if (!fam.isEmpty()) {
+                intro.append("\n已按当前系统匹配：").append(fam);
+                if (!arch.isEmpty()) {
+                    intro.append(" · ").append(arch);
+                }
+            }
+            if (!channel.isEmpty()) {
+                intro.append("\n下载通道：").append(channel);
+            }
+        }
+        box.bodyLeft(intro.toString());
+
+        box.row("从本地文件安装", false, false, v -> {
+            box.dismiss();
+            pickPkgFile();
+        });
+
+        if (items != null) {
+            for (int i = 0; i < items.length(); i++) {
+                JSONObject it = items.optJSONObject(i);
+                if (it == null) {
+                    continue;
+                }
+                final String target = it.optString("backend", "");
+                final String file = it.optString("file", "");
+                box.row(it.optString("label", target) + " " + it.optString("version", "")
+                                + " · " + pkgNote(it), false, false, v -> {
+                            box.dismiss();
+                            askPkg(target, "github", file);
+                        });
+            }
+        }
+
+        box.cancel("关闭");
+        box.show();
+    }
+
+    /** 一行说明：本机版本与远端版本的关系，以及和谁冲突 */
+    private static String pkgNote(JSONObject it) {
+        String local = it.optString("local", "");
+        String s;
+        if (local.isEmpty()) {
+            s = "未安装";
+        } else if (it.optBoolean("newer", false)) {
+            s = "本机 " + local + "，可升级";
+        } else {
+            s = "本机 " + local + "，仓库里的更旧";
+        }
+        String conflict = it.optString("conflict", "");
+        if (!conflict.isEmpty()) {
+            s += " · 与 " + ("passwall".equals(conflict) ? "PassWall" : "PassWall2") + " 冲突";
+        }
+        return s;
+    }
+
+    private void pickPkgFile() {
+        try {
+            // */* 而不是限 MIME：.run / .ipk 没有标准 MIME，限死会让文件管理器把目标灰掉
+            pkgPicker.launch(new String[]{"*/*"});
+        } catch (Exception e) {
+            Toast.makeText(ctx(), "打不开文件选择器：" + e.getMessage(),
+                    Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /** 文件名推后端：AUK9527 的包名里一定带 OpenClash / PassWall */
+    private static String targetOfName(String name) {
+        String low = name == null ? "" : name.toLowerCase();
+        if (low.contains("openclash")) {
+            return "openclash";
+        }
+        if (low.contains("passwall")) {
+            return "passwall";
+        }
+        return "";
+    }
+
+    private void uploadPkgFile(android.net.Uri uri) {
+        notice("正在上传安装包…");
+        Api.upload(ctx(), uri, new Cb() {
+            @Override
+            public void onData(JSONObject data, boolean fromCache) {
+                if (!isAdded()) {
+                    return;
+                }
+                String saved = data.optString("name", "");
+                if (!data.optBoolean("ok", false) || saved.isEmpty()) {
+                    notice("");
+                    fail(data.optString("error", "上传失败"));
+                    return;
+                }
+                notice("");
+                String target = targetOfName(saved);
+                if (target.isEmpty()) {
+                    fail("文件名里要带 OpenClash 或 PassWall，否则分不清装哪个");
+                    return;
+                }
+                askPkg(target, "local", saved);
+            }
+
+            @Override
+            public void onError(String message) {
+                if (isAdded()) {
+                    notice("");
+                    fail("上传失败：" + message);
+                }
+            }
+        });
+    }
+
+    /** 装包 = 用 root 执行对方的脚本，先问一句再动手 */
+    private void askPkg(String target, String source, String name) {
+        pkgSource = source;
+        pkgName = name;
+        String label = "openclash".equals(target) ? "OpenClash" : "PassWall";
+        String body = "local".equals(source)
+                ? "会把刚上传的 " + name + " 装到路由器上，过程中会以管理员权限执行包里的安装脚本。"
+                : "会从仓库下载 " + name + " 再安装。包比较大时（PassWall 约 80 MB）"
+                + "可能要十几分钟，中途别退出。";
+        Sheet.confirm(ctx(), "安装 " + label, body, "开始安装", false,
+                () -> doPkgInstall(target));
+    }
+
+    private void doPkgInstall(String target) {
+        JSONObject body = new JSONObject();
+        try {
+            body.put("target", target);
+            body.put("source", pkgSource);
+            body.put("name", pkgName);
+            body.put("confirm", "install");
+        } catch (Exception ignored) {
+            return;
+        }
+        notice("正在启动安装…");
+        Api.post(ctx(), "/api/v1/proxy/pkg/install", body, new Cb() {
+            @Override
+            public void onData(JSONObject data, boolean fromCache) {
+                if (!isAdded()) {
+                    return;
+                }
+                notice("");
+                if (!data.optBoolean("ok", false)) {
+                    fail(data.optString("error", "启动安装失败"));
+                    return;
+                }
+                startPkgPoll();
+            }
+
+            @Override
+            public void onError(String message) {
+                if (isAdded()) {
+                    notice("");
+                    fail("连不上路由器：" + message);
+                }
+            }
+        });
+    }
+
+    private void stopPkgPoll() {
+        if (pkgPoll != null) {
+            pkgHandler.removeCallbacks(pkgPoll);
+            pkgPoll = null;
+        }
+    }
+
+    private void startPkgPoll() {
+        stopPkgPoll();
+        pkgPoll = new Runnable() {
+            @Override
+            public void run() {
+                Api.get(ctx(), "/api/v1/proxy/install", new Cb() {
+                    @Override
+                    public void onData(JSONObject data, boolean fromCache) {
+                        if (!isAdded()) {
+                            return;
+                        }
+                        JSONObject p = data.optJSONObject("pkg");
+                        if (p == null) {
+                            return;
+                        }
+                        applyPkgState(p);
+                        if (p.optBoolean("running", false)) {
+                            pkgHandler.postDelayed(pkgPoll, 1000);
+                            return;
+                        }
+                        stopPkgPoll();
+                        load(true);
+                        if (p.optBoolean("ok", false)) {
+                            Toast.makeText(ctx(), "装好了 · 导入订阅后再启动",
+                                    Toast.LENGTH_LONG).show();
+                            return;
+                        }
+                        JSONObject e = p.optJSONObject("error");
+                        String detail = e == null ? "" : e.optString("detail", "");
+                        Sheet.message(ctx(), "安装失败", detail);
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        // 轮询失败不打断安装，两秒后再试
+                        if (isAdded()) {
+                            pkgHandler.postDelayed(pkgPoll, 2000);
+                        }
+                    }
+                });
+            }
+        };
+        pkgHandler.post(pkgPoll);
+    }
+
+    private void applyPkgState(JSONObject p) {
+        if (tvPkgState == null) {
+            return;
+        }
+        if (p.optBoolean("running", false)) {
+            String step = p.optString("step", "正在安装");
+            long total = p.optLong("total", 0);
+            long got = p.optLong("got", 0);
+            tvPkgState.setText(total > 0
+                    ? step + " " + (got * 100 / Math.max(1L, total)) + "%"
+                    : step);
+            tvPkgState.setTextColor(Ui.color(ctx(), R.color.primary));
+        } else if (p.optBoolean("done", false)) {
+            tvPkgState.setText(p.optBoolean("ok", false) ? "已装好" : "上次安装失败");
+            tvPkgState.setTextColor(Ui.color(ctx(), R.color.text_secondary));
+        }
     }
 
     /** 让 infoRow 的整行可点（插槽本身只有文字宽，点空白区域也该响应） */
@@ -234,6 +544,34 @@ public class ProxyFragment extends BaseFragment {
                 }
             }
         });
+        // 安装任务在 Agent 侧跑：切页签回来要能接上进度，而不是看着像没装
+        Api.get(ctx(), "/api/v1/proxy/install", new Cb() {
+            @Override
+            public void onData(JSONObject data, boolean fromCache) {
+                if (!isAdded()) {
+                    return;
+                }
+                JSONObject p = data.optJSONObject("pkg");
+                if (p == null) {
+                    return;
+                }
+                applyPkgState(p);
+                if (p.optBoolean("running", false)) {
+                    startPkgPoll();
+                }
+            }
+
+            @Override
+            public void onError(String message) {
+                // 拿不到就当没有任务，不打扰用户
+            }
+        });
+    }
+
+    @Override
+    public void onDestroyView() {
+        stopPkgPoll();
+        super.onDestroyView();
     }
 
 

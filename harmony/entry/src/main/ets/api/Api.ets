@@ -98,6 +98,25 @@ export class Api {
     };
   }
 
+  /**
+   * 上传插件安装包。
+   *
+   * 不走 finish()：那层在非 2xx 时会把 body 丢掉，而 Agent 恰恰是用 400 +
+   * `{ok:false,error:"文件太大（上限 128 MB）"}` 来说明拒绝原因的。
+   */
+  static async uploadPkg(filename: string, data: ArrayBuffer): Promise<ApiResult> {
+    const r: HttpResult = await Http.upload(Session.base(), Session.token(),
+      '/api/v1/system/upload', filename, data);
+    const d: J = J.parse(r.body);
+    return {
+      ok: r.ok && d.bool('ok', false),
+      fromCache: false,
+      code: r.code,
+      data: d,
+      error: r.ok ? d.str('error', '') : (r.error.length > 0 ? r.error : ('HTTP ' + r.code))
+    };
+  }
+
   private static async finish(ctx: common.Context, path: string,
     r: HttpResult): Promise<ApiResult> {
     if (r.code === 401) {

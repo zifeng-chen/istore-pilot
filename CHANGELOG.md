@@ -13,6 +13,45 @@
 
 ---
 
+## 0.1.8 · 插件包安装：按系统版本 + 架构取包，支持本地传包
+
+代理页终于能自己装插件了。根因是「源里根本没有这两个包」：8 个 feed、
+1 万多条索引里 openclash / passwall 一个都没有，卸了就装不回来。
+
+### 包源按系统版本分流（新增 `agent/pkgfeed.py`）
+
+上游的组织方式本身就是分版本的，选错不是「慢一点」，是依赖对不上：
+
+| 系统版本 | 来源 | 形态 |
+|---|---|---|
+| 22.03 | `AUK9527/Are-u-ok` 的 `x86/`、`apps/` | 目录里的 .run + README 表格 |
+| 24.10 | `bcseputetto/Are-u-ok` release `iStoreOS_24.10` | 资产页，按架构分开发 |
+| 25.12 | `bcseputetto/Are-u-ok` release `iStoreOS_25.12` | 同上 |
+
+- 按 `DISTRIB_RELEASE` 判版本、按 `DISTRIB_ARCH` 挑架构：`x86_64` /
+  `aarch64_a53` / `aarch64_a72` / `aarch64_generic` 各取各的包
+  （OpenClash 例外，只发 `x86_64` 和 `aarch64` 两种变体）
+- 不碰 GitHub API 列资产：`api.github.com` 403、`data.jsdelivr.com` 列目录 403
+  （整个仓库超 50 MB）、`cdn.jsdelivr.net` 单文件 20 MB 上限（PassWall 80 MB）。
+  改用 `github.com/<repo>/releases/expanded_assets/<tag>` 的 HTML 片段（150 KB）
+- 下载通道按实测带宽排，不按探测延迟：gh-proxy 97 KB/s > 直连 16 KB/s；
+  ghfast 拉 README 只要 1.5 秒，拉 20 MB 的包 15 秒收 0 字节
+
+### 三端代理页加「安装包」入口
+
+- 两条路：从手机选 `.run` / `.ipk` 上传（完全不依赖路由器能不能上外网）、
+  从仓库下载（显示系统版本 + 架构的匹配结果、版本对比、是否与 PassWall 冲突）
+- 安装走新接口 `/api/v1/proxy/pkg/install`：二次确认 + 后台任务 + 进度轮询，
+  不再同步等 HTTP 超时
+- 上传上限 64 MB → 128 MB（24.10 的 PassWall 包 80 MB，原来会被直接拒掉）
+
+### 实测
+
+- 仓库清单：`24.10.8 / x86_64` → `iStoreOS_24.10`，四种架构的包名各不串位
+- 小包 114 KB：5.2 秒；21 MB 的 OpenClash 包：380 秒（约 3.7 分钟）
+
+---
+
 ## 0.1.7 · 鸿蒙状态管理 V1→V2 全量迁移
 
 ### 鸿蒙端架构升级：状态管理 V2（`refactor/arkui-v2`）
