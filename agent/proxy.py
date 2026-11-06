@@ -28,6 +28,19 @@ LABEL = {"openclash": "OpenClash", "passwall": "Passwall"}
 _socks_port = {"openclash": 7891, "passwall": 1070}
 
 
+def _sync_dns() -> None:
+    """代理起停后，AGH 的上游要跟着变。
+
+    否则关掉 OpenClash 时，AGH 还指着没人监听的 7874，整个网络 DNS 全挂
+    （只有不查 DNS 的 IoT 看起来正常）。延迟 import 避免和 adblock 循环依赖。
+    """
+    try:
+        from . import adblock
+        adblock.sync_upstream()
+    except Exception:  # noqa: BLE001 —— 同步失败不能影响代理操作本身
+        pass
+
+
 # --------------------------------------------------------------- 基础工具
 
 
@@ -401,6 +414,8 @@ def service(action: str, backend: str = "") -> dict:
     code, out = _run([INIT[target], action], timeout=120)
     # 刚切过后端，缓存里的 active 立刻作废
     forget_active()
+    # 起停会增减代理的 DNS 端口（OpenClash 7874），AGH 上游要立刻对齐
+    _sync_dns()
     return {
         "ok": code == 0,
         "backend": target,
@@ -476,6 +491,7 @@ def switch_config(path: str) -> dict:
         return {"ok": True, "path": real, "restarted": False}
 
     code, out = _run([INIT["openclash"], "restart"], timeout=180)
+    _sync_dns()
     return {
         "ok": code == 0,
         "path": real,
