@@ -16,9 +16,13 @@ import gzip
 import json
 import os
 import platform
+import re
+import shutil
 import socket
 import threading
 import time
+import urllib.error
+import urllib.request
 from urllib.parse import urlsplit
 
 from . import clash, config, sysinfo
@@ -239,34 +243,67 @@ def _in_feed_index(pkg: str, feed: str) -> bool:
     return False
 
 
-def precheck() -> dict:
-    """装之前先探一次源。
-
-    opkg 失败要等几十秒才回话，而「连不上」占失败原因的一大半 —— 先花 3 秒
-    试一次 TCP，能立刻说清是网络问题，不用让用户盯着进度条猜。
-    只测第一个源的 host：连得上就说明出网正常，不必逐个试。
-    """
-    entries = _feed_entries()
-    if not entries:
-        return {"ok": False, "code": "repo_missing", "title": "没找到软件源",
-                "detail": "/etc/opkg 下没有 src 配置", "host": ""}
-
-    parts = urlsplit(entries[0][1])
-    host = parts.hostname or ""
-    port = 443 if parts.scheme == "https" else 80
+def _probe(host: str, port: int) -> str:
+    """探一个主机，通返回空串，否则返回归因码。"""
     if not host:
-        return {"ok": False, "code": "repo_missing", "title": "软件源地址无效",
-                "detail": entries[0][1], "host": ""}
-
+        return "repo_missing"
     try:
         socket.create_connection((host, port), timeout=3).close()
+        return ""
     except socket.gaierror:
-        return {"ok": False, "code": "dns_failed", "title": "域名解析失败",
-                "detail": "解析不了 %s，可能是 DNS 异常" % host, "host": host}
-    except OSError as exc:
-        return {"ok": False, "code": "net_unreachable", "title": "连不上软件源",
-                "detail": "连接 %s 失败：%s" % (host, exc), "host": host}
-    return {"ok": True, "code": "", "title": "", "detail": "", "host": host}
+        return "dns_failed"
+    except OSError:
+        return "net_unreachable"
+
+
+def precheck(backends: list[str]) -> dict:
+    """装之前探一次本次会用到的通道。
+
+    两条通道：系统软件源（repo=yes 的包走这条）、GitHub（repo≠yes 的走这条）。
+    只探真正会用到的那个 —— 源里没有的包去测 opkg 源毫无意义。
+    全部不通才拦下来；通一条就放行，让 worker 在真正失败的那个包上报具体原因。
+    """
+    repo = repo_state()
+    need_source = any(repo.get(b) == "yes" for b in backends)
+    need_gh = any(repo.get(b) != "yes" for b in backends)
+
+    probes: list[tuple[str, str, str]] = []      # (通道名, host, 归因码)
+    if need_source:
+        entries = _feed_entries()
+        if not entries:
+            probes.append(("软件源", "", "repo_missing"))
+        else:
+            url = entries[0][1]
+            host = urlsplit(url).hostname or ""
+            probes.append(("软件源", host, _probe(host, 443 if url.startswith("https") else 80)))
+    if need_gh:
+        probes.append(("GitHub", "api.github.com", _probe("api.github.com", 443)))
+
+    bad = [p for p in probes if p[2]]
+    if probes and len(bad) == len(probes):
+        name, host, code = bad[0]
+        detail = ("连不上 %s（%s）" % (host, name)) if host else "没有可用的软件源"
+        return _err(code, detail=detail, host=host, precheck=True)
+    return {"ok": True, "code": "", "detail": "", "host": ""}
+
+
+def _classify_fetch(exc: BaseException) -> str:
+    """下载通道的异常归因。"""
+    if isinstance(exc, urllib.error.HTTPError):
+        if exc.code == 404:
+            return "repo_missing"
+        if exc.code in (403, 429):
+            return "gh_limited"
+        return "net_unreachable"
+    if isinstance(exc, urllib.error.URLError):
+        if isinstance(getattr(exc, "reason", None), socket.gaierror):
+            return "dns_failed"
+        return "net_unreachable"
+    if isinstance(exc, ValueError):
+        return "bad_payload"
+    if isinstance(exc, LookupError):
+        return "repo_missing"
+    return "unknown"
 
 
 # 归因表：code -> (标题, 建议动作)。动作由客户端渲染成按钮，
@@ -279,6 +316,9 @@ ERRORS: dict[str, tuple[str, list[str]]] = {
     "no_space": ("存储空间不足", ["retry"]),
     "dep_failed": ("依赖装不上", ["retry", "change_feed"]),
     "locked": ("另一个安装任务正在进行", ["retry"]),
+    "gh_limited": ("GitHub 限流了，过一会儿再试", ["retry"]),
+    "bad_payload": ("下载到的文件不对", ["retry"]),
+    "no_apk_pkg": ("官方只提供 ipk，你的系统是 apk", ["retry", "change_feed"]),
     "unknown": ("安装失败", ["retry"]),
 }
 
@@ -327,6 +367,81 @@ def system_info() -> dict:
     }
 
 
+# ------------------------------------------------------- 官方发布页下载
+#
+# 这两个包**不在 OpenWrt 官方源里**（实测：8 个索引 1 万多个包，一个都没有），
+# 用户机器上能装着，多半是当初手动装的。所以「一键安装」只靠 opkg 源没有意义，
+# 必须有第二条通道：从各自官方 GitHub release 下 ipk，再本地装。
+
+GH_REPO = {
+    "openclash": ("vernesong/OpenClash", r"^luci-app-openclash_.*\.ipk$"),
+    "passwall": ("xiaorouji/openwrt-passwall", r"^luci-app-passwall_.*\.ipk$"),
+}
+GH_API = "https://api.github.com/repos/%s/releases/latest"
+GH_UA = "istore-agent (OpenWrt router client)"
+_GH_TTL = 3600.0
+_gh_cache: dict = {"ts": 0.0, "data": {}}
+
+
+def _gh_asset(backend: str) -> tuple[str, str]:
+    """从官方 release 找 ipk 的下载地址，返回 (url, 文件名)。
+
+    结果缓存一小时：GitHub 未认证 API 限 60 次/小时，装一次问一次太浪费，
+    而且 release 也不会分钟级变动。
+    """
+    now = time.time()
+    hit = _gh_cache["data"].get(backend)
+    if hit and now - _gh_cache["ts"] < _GH_TTL:
+        return hit
+
+    repo, pattern = GH_REPO[backend]
+    req = urllib.request.Request(
+        GH_API % repo,
+        headers={"User-Agent": GH_UA, "Accept": "application/vnd.github+json"},
+    )
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        data = json.loads(resp.read().decode("utf-8", "replace"))
+
+    for asset in data.get("assets") or []:
+        name = asset.get("name") or ""
+        url = asset.get("browser_download_url") or ""
+        if url and re.match(pattern, name):
+            _gh_cache.update(ts=now)
+            _gh_cache["data"][backend] = (url, name)
+            return url, name
+    raise LookupError("发布页里没有 ipk 附件")
+
+
+def _looks_like_ipk(path: str) -> bool:
+    """挡掉「下回来一个 HTML 错误页」这种：opkg 会报一堆看不懂的错。
+
+    ipk 是 gzip / ar / zip 包，但绝不会以 `<` 开头。
+    """
+    try:
+        if os.path.getsize(path) < 8192:
+            return False
+        with open(path, "rb") as fh:
+            return not fh.read(8).lstrip().startswith(b"<")
+    except OSError:
+        return False
+
+
+def _fetch(backend: str) -> tuple[str, str]:
+    """下载 ipk 到 /tmp，返回 (本地路径, 文件名)。失败抛异常，由调用方归因。"""
+    url, name = _gh_asset(backend)
+    dest = os.path.join("/tmp", name)
+    req = urllib.request.Request(url, headers={"User-Agent": GH_UA})
+    with urllib.request.urlopen(req, timeout=120) as resp, open(dest, "wb") as fh:
+        shutil.copyfileobj(resp, fh)
+    if not _looks_like_ipk(dest):
+        try:
+            os.remove(dest)
+        except OSError:
+            pass
+        raise ValueError("下载到的不是 ipk，可能被限流或劫持")
+    return dest, name
+
+
 # ------------------------------------------------------------- 安装任务
 #
 # 异步跑：`opkg install` 动辄 30~60 秒，同步等会撞客户端超时。
@@ -364,7 +479,19 @@ def install_status() -> dict:
 
 def _install_worker(queue: list[str]) -> None:
     mgr = pkg_manager()
+    repo = repo_state()
     total = max(1, len(queue))
+    network_kinds = ("net_unreachable", "dns_failed", "tls_failed", "gh_limited")
+
+    def fail(backend: str, kind: str, detail: str, raw: str, base: int) -> bool:
+        """记一次失败；返回 True 表示后面不必再试（网络类，试也是同样的结果）。"""
+        title = ERRORS.get(kind, ERRORS["unknown"])[0]
+        with _INST_LOCK:
+            _INST["failed"].append(backend)
+            _INST["error"] = _err(kind, detail=detail, raw=raw,
+                                  backend=backend, pkg=PKG[backend])
+        _istep(base + 50, "%s：%s" % (LABEL[backend], title))
+        return kind in network_kinds
 
     for i, backend in enumerate(queue):
         pkg = PKG[backend]
@@ -372,12 +499,31 @@ def _install_worker(queue: list[str]) -> None:
         with _INST_LOCK:
             _INST["index"] = i + 1
             _INST["current"] = backend
-        _istep(base + 5, "正在安装 %s" % pkg)
 
-        if mgr == "apk":
-            code, out = _run(["apk", "add", pkg], timeout=600)
+        in_repo = repo.get(backend) == "yes"
+        if in_repo:
+            _istep(base + 8, "从软件源安装 %s" % pkg)
+            cmd = ["apk", "add", pkg] if mgr == "apk" else ["opkg", "install", pkg]
+            code, out = _run(cmd, timeout=600)
+        elif mgr == "apk":
+            # 上游只发 ipk，apk 系统装不了 —— 与其下回来再报格式错，不如直接说清
+            stop = fail(backend, "no_apk_pkg", "OpenClash / Passwall 官方只发布 ipk",
+                        "", base)
+            break
         else:
-            code, out = _run(["opkg", "install", pkg], timeout=600)
+            _istep(base + 5, "软件源里没有，改从官方发布页下载")
+            try:
+                path, fname = _fetch(backend)
+            except (urllib.error.URLError, OSError, ValueError, LookupError) as exc:
+                kind = _classify_fetch(exc)
+                stop = fail(backend, kind, str(exc), "", base)
+                if stop:
+                    with _INST_LOCK:
+                        _INST["failed"].extend([q for q in queue[i + 1:]])
+                    break
+                continue
+            _istep(base + 35, "正在安装 %s" % fname)
+            code, out = _run(["opkg", "install", path], timeout=600)
 
         ok = code == 0 and _installed(backend)
         # 装过时 opkg 会返回非零（"already installed"），但结果是好的
@@ -387,29 +533,24 @@ def _install_worker(queue: list[str]) -> None:
         if ok:
             with _INST_LOCK:
                 _INST["installed"].append(backend)
-            _istep(base + int(80 / total), "%s 安装完成" % LABEL[backend])
+            _istep(base + int(80 / total),
+                   "%s 安装完成" % LABEL[backend] + ("" if in_repo else "（来自官方发布页）"))
             continue
 
-        kind = _classify(out)
-        title = ERRORS.get(kind, ERRORS["unknown"])[0]
         last = ""
         for line in reversed((out or "").strip().splitlines()):
             if line.strip():
                 last = line.strip()
                 break
-        with _INST_LOCK:
-            _INST["failed"].append(backend)
-            _INST["error"] = _err(kind, detail=last, raw=out or "",
-                                  backend=backend, pkg=pkg)
-        # 网络类错误后面必然也失败，别再白等一个 60 秒
-        if kind in ("net_unreachable", "dns_failed", "tls_failed"):
+        stop = fail(backend, _classify(out), last, out or "", base)
+        if stop:
             with _INST_LOCK:
                 _INST["failed"].extend([q for q in queue[i + 1:]])
-            _istep(base + 50, "%s：%s" % (LABEL[backend], title))
             break
 
     forget_active()
     _repo_cache["ts"] = 0.0          # 装完让源缓存失效，下次重新探
+    _gh_cache["ts"] = 0.0
     with _INST_LOCK:
         failed = bool(_INST["failed"])
         _INST.update(running=False, done=True, finished=time.time(), pct=100,
@@ -450,7 +591,7 @@ def install(target: str = "all", confirm: str = "", force: bool = False) -> dict
                 "message": "要装的都已经装好了"}
 
     if not force:
-        check = precheck()
+        check = precheck(queue)
         if not check.get("ok"):
             return _err(check["code"], detail=check["detail"],
                         host=check["host"], precheck=True)

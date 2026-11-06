@@ -332,6 +332,23 @@ Mihomo / Xray 内核要另外下载（20~30 MB，来源在 GitHub，国内经常
 | `no_space` | 空间不足 | retry |
 | `dep_failed` | 依赖装不上 | retry / change_feed |
 | `locked` | 另一个安装在跑 | retry |
+| `gh_limited` | GitHub API 限流（403/429） | retry |
+| `bad_payload` | 下回来的不是 ipk（限流页/劫持） | retry |
+| `no_apk_pkg` | 系统是 apk，但官方只发 ipk | retry / change_feed |
+
+安装走**两条通道**，按 `repo` 自动选：
+
+| `repo` | 通道 | 说明 |
+|---|---|---|
+| `yes` | 系统软件源 | `opkg install luci-app-xxx` |
+| `no` / `unknown` | GitHub 官方 release | 查 `releases/latest` → 下 ipk 到 `/tmp` → 本地 `opkg install` |
+
+> **实测提醒**：这两个包**不在 OpenWrt 官方源里**（8 个索引、1 万多个包全搜过），
+> 所以大多数机器会走第二条通道。而 GitHub 在国内网络经常不可达 ——
+> 在本项目那台路由器上实测：直连超时、`gh-proxy.com` TLS 被干扰、
+> `ghfast.top` 403、`ghproxy.net` 能连但拿不到资源链接。
+> 因此**真正可靠的是第三条路：App 下载 ipk → 上传 → 安装**
+> （`POST /system/upload` + `POST /system/install`），这条链路不依赖任何外部服务。
 
 一键装两个时，第一个成功、第二个失败会带 `partial: true` +
 `installed` / `failed` 两个数组 —— 界面文案要写成「A 已装好，B 没装上」，
