@@ -19,7 +19,7 @@ from .config import get as cfg, load as load_cfg, save as save_cfg
 START_TS = time.time()
 
 # Agent 自身版本：随 ipk 一起发版，硬件详情页与「关于」都会显示
-VERSION = "0.1.8"
+VERSION = "0.1.9"
 
 _cache_lock = threading.Lock()
 _cache: dict[str, tuple[float, object]] = {}
@@ -393,8 +393,15 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/v1/login":
             body = self._body()
             pwd = str(body.get("password", ""))
-            if not auth.verify_password(pwd, self._client_ip()):
-                self._error(403, "密码错误或尝试过于频繁")
+            remote = self._client_ip()
+            wait = auth.retry_after(remote)
+            if wait > 0:
+                # 429 而不是 403：这两件事用户能做的完全不同 ——
+                # 「口令错了」要改口令，「被退避了」只能等，混在一句话里会误导
+                self._error(429, "尝试过于频繁，请 %d 秒后再试" % wait)
+                return
+            if not auth.verify_password(pwd, remote):
+                self._error(403, "密码错误")
                 return
             self._json({"ok": True, **auth.issue_token()})
             return
@@ -598,8 +605,9 @@ class Handler(BaseHTTPRequestHandler):
                 if not auth.verify_password(cur, self._client_ip()):
                     self._json({"ok": False, "error": "当前密码不正确"}, 403)
                     return
-                if len(new) < 8:
-                    self._json({"ok": False, "error": "新密码至少 8 位"}, 400)
+                problem = auth.password_problem(new)
+                if problem:
+                    self._json({"ok": False, "error": "新密码" + problem}, 400)
                     return
                 conf = load_cfg()
                 conf["auth"]["password"] = new
@@ -790,6 +798,9 @@ class Handler(BaseHTTPRequestHandler):
                     "uptime": round(time.time() - START_TS, 1),
                     "listen": cfg("listen", {}),
                     "password_is_default": cfg("auth", {}).get("password") in ("changeme", ""),
+                    # 空串 = 合格。客户端可以据此在设置页提示「当前口令太弱」
+                    "password_weak": auth.password_problem(
+                        str(cfg("auth", {}).get("password", ""))),
                 })
             else:
                 self._error(404, "not found")
@@ -812,23 +823,79 @@ def _local_v4() -> set[str]:
     return out
 
 
+# 这些网段不是「管理面」：CGNAT（Tailscale 常用 100.64/10）、Clash 的
+# fake-ip tun（198.18/15）、docker 网桥。降级时选中它们，客户端一样连不上，
+# 而且 100.76.0.1 按字符串排序还排在 192.168 前面 —— 实测踩过。
+_NOT_MGMT = (
+    ipaddress.ip_network("100.64.0.0/10"),
+    ipaddress.ip_network("198.18.0.0/15"),
+    ipaddress.ip_network("172.17.0.0/16"),
+    ipaddress.ip_network("172.18.0.0/16"),
+    ipaddress.ip_network("172.19.0.0/16"),
+)
+
+
+def _lan_fallback() -> str:
+    """降级时挑一个 LAN 侧地址，**绝不返回 0.0.0.0**。
+
+    优先 br-lan（iStoreOS 的管理网桥就是它），退一步在本机私有地址里按
+    「像不像局域网」排序，最后才回 127.0.0.1。回环虽然客户端连不上，
+    但至少不会把管理面送出去。
+    """
+    try:
+        out = sysinfo._run(["ip", "-o", "-4", "addr", "show", "br-lan"], timeout=4)
+        for line in out.splitlines():
+            for part in line.split():
+                if "/" in part and part.count(".") == 3:
+                    return part.split("/")[0]
+    except Exception:
+        pass
+
+    cands = []
+    for ip in _local_v4():
+        try:
+            addr = ipaddress.ip_address(ip)
+        except ValueError:
+            continue
+        if addr.is_loopback or addr.is_link_local or not addr.is_private:
+            continue
+        if any(addr in net for net in _NOT_MGMT):
+            continue
+        cands.append(ip)
+
+    def rank(ip: str) -> tuple[int, str]:
+        if ip.startswith("192.168."):
+            return (0, ip)
+        if ip.startswith("10."):
+            return (1, ip)
+        return (2, ip)
+
+    cands.sort(key=rank)
+    return cands[0] if cands else "127.0.0.1"
+
+
 def _bind_host(want: str, wait: float = 0.0) -> str:
-    """绑定地址已经不在本机时，退到通配地址。
+    """决定监听地址。**降级时绝不退 0.0.0.0。**
 
     LAN 管理地址可以从 App 里改，改完那个 IP 就不存在了。agent 如果还死绑
     在上面，socket 就成了孤儿：客户端连不上，也就永远回不来点「确认」，
     结果每次改地址都超时回滚，看起来像功能坏了。
 
-    但**不能一探不到就退**：服务重启经常撞上 network reload，那一瞬间
-    `ip addr` 还没配上地址，退到 0.0.0.0 就等于把管理面摊到 WAN 上
-    （实测重启后确实出现过）。所以启动时先等 wait 秒，等不到才降级，
-    并且把降级这件事明确打出来。
+    以前这里会退到通配地址，但那个兜底很危险：这台机器 wan zone 的 input
+    是 ACCEPT，退到 0.0.0.0 等于把「明文 HTTP 的管理面」直接摊到公网。
+    宁可只绑 LAN —— 客户端一时连不上，用户还能走 SSH 修回来，比管理面
+    裸奔强得多。
+
+    显式配成 0.0.0.0 是另一回事：那是用户自己的要求，保留，但要打告警。
     """
     want = (want or "").strip()
-    if want in ("", "0.0.0.0", "*"):
-        return "0.0.0.0"
     if want in ("localhost", "127.0.0.1"):
         return "127.0.0.1"
+    if want in ("", "0.0.0.0", "*"):
+        print("!!! [istore-agent] 配置要求监听 0.0.0.0 —— 管理面会暴露到 WAN，"
+              "且链路是明文 HTTP。建议把 config.json 的 listen.host 改成 LAN 地址",
+              flush=True)
+        return "0.0.0.0"
 
     deadline = time.time() + max(0.0, wait)
     while True:
@@ -838,9 +905,10 @@ def _bind_host(want: str, wait: float = 0.0) -> str:
             break
         time.sleep(0.5)
 
-    print("!!! [istore-agent] 绑定地址 %s 不在本机，已退到 0.0.0.0"
-          " —— 管理面可能暴露到外网，请检查 LAN 地址" % want, flush=True)
-    return "0.0.0.0"
+    fallback = _lan_fallback()
+    print("!!! [istore-agent] 绑定地址 %s 不在本机，已改绑 %s"
+          "（不再退 0.0.0.0，避免管理面暴露到公网）" % (want, fallback), flush=True)
+    return fallback
 
 
 def _watch_bind(httpd, host: str) -> None:
