@@ -69,6 +69,10 @@ public class ProxyFragment extends BaseFragment {
     private String backendId = "";
     /** 装了但没在跑的后端。订阅、配置这类操作认它，不认 running */
     private String installedBackend = "";
+    /** 有没有任何一个插件是装着的。安装任务是 Agent 进程内存里的状态，重启就没了 */
+    private boolean anyInstalled;
+    /** 已安装的后端：id → 显示名。「安装包」弹窗靠它决定要不要给卸载入口 */
+    private final java.util.Map<String, String> installedMap = new java.util.LinkedHashMap<>();
     /** 已经提示过的那次安装失败（按 finished 时间戳去重） */
     private double pkgFailShown = 0;
     private String backendLabel = "";
@@ -81,6 +85,8 @@ public class ProxyFragment extends BaseFragment {
     /** 弹窗里的节点表容器 + 测速按钮（测速期间要改文案） */
     private LinearLayout sheetList;
     private TextView sheetTestBtn;
+    /** 弹窗副标题。测速失败时得写在这里 —— 页面顶部那条 banner 被弹窗盖住，用户看不到 */
+    private TextView sheetSubTitle;
     private String modeValue = "";
     /** GLOBAL 组当前指向谁，切全局模式前用来判断会不会一把拒掉所有流量 */
     private String globalNow = "";
@@ -283,7 +289,9 @@ public class ProxyFragment extends BaseFragment {
         StringBuilder intro = new StringBuilder();
         intro.append("从手机里装：手机上有 .run / .ipk 就走这条，不需要路由器能上外网。");
         if (items == null || items.length() == 0) {
-            intro.append("\n仓库清单现在读不到，只能用本地文件。");
+            intro.append(installedMap.isEmpty()
+                    ? "\n仓库清单现在读不到，只能用本地文件。"
+                    : "\n仓库清单现在读不到，但本地传包和卸载都不受影响。");
         } else {
             // 仓库按系统版本 + 架构分开发：24.10/25.12 在另一个仓库的 release 里，
             // 同一版本还分 x86_64 / aarch64_a53 / _a72 / _generic
@@ -307,7 +315,6 @@ public class ProxyFragment extends BaseFragment {
         });
 
         if (items != null) {
-            boolean anyInstalled = false;
             for (int i = 0; i < items.length(); i++) {
                 JSONObject it = items.optJSONObject(i);
                 if (it == null) {
@@ -315,27 +322,43 @@ public class ProxyFragment extends BaseFragment {
                 }
                 final String target = it.optString("backend", "");
                 final String file = it.optString("file", "");
-                if (!it.optString("local", "").isEmpty()) {
-                    anyInstalled = true;
-                }
                 box.row(it.optString("label", target) + " " + it.optString("version", "")
                                 + " · " + pkgNote(it), false, false, v -> {
                             box.dismiss();
                             askPkg(target, "github", file);
                         });
             }
-            // 装了却卸不掉，等于只给了半条命。单独一行，不跟「安装」挤在一起误触
-            if (anyInstalled) {
-                final JSONArray snapshot = items;
-                box.row("卸载插件…", true, false, v -> {
-                    box.dismiss();
-                    askUninstall(snapshot);
-                });
-            }
+        }
+
+        // 装了却卸不掉，等于只给了半条命。这一行只看「装没装」，不看仓库清单 ——
+        // 节点不通时清单拉不到，但插件确实还在机器上，这时候更得能卸
+        if (!installedMap.isEmpty()) {
+            final JSONArray snapshot = installedAsItems();
+            box.row("卸载插件…", true, false, v -> {
+                box.dismiss();
+                askUninstall(snapshot);
+            });
         }
 
         box.cancel("关闭");
         box.show();
+    }
+
+    /** 把「已安装」的后端拼成 catalog item 的形状，卸载流程两边共用 */
+    private JSONArray installedAsItems() {
+        JSONArray arr = new JSONArray();
+        for (java.util.Map.Entry<String, String> e : installedMap.entrySet()) {
+            JSONObject o = new JSONObject();
+            try {
+                o.put("backend", e.getKey());
+                o.put("label", e.getValue());
+                o.put("local", "-");
+            } catch (Exception ignored) {
+                continue;
+            }
+            arr.put(o);
+        }
+        return arr;
     }
 
     /** 列出已装的插件让用户选一个卸。卸载是不可逆的（配置会留着），所以走红色确认 */
@@ -596,6 +619,11 @@ public class ProxyFragment extends BaseFragment {
         } else if (p.optBoolean("done", false)) {
             tvPkgState.setText(p.optBoolean("ok", false) ? "已装好" : "上次安装失败");
             tvPkgState.setTextColor(Ui.color(ctx(), R.color.text_secondary));
+        } else {
+            // 装/卸结果只存在 Agent 进程内存里，Agent 重启或 App 重装后就读不到了。
+            // 这时按「实际上装没装」兜底，否则这一行会空着，像功能坏了
+            tvPkgState.setText(anyInstalled ? "已装好" : "");
+            tvPkgState.setTextColor(Ui.color(ctx(), R.color.text_secondary));
         }
     }
 
@@ -684,6 +712,8 @@ public class ProxyFragment extends BaseFragment {
         backendBox.removeAllViews();
         backendLabel = "";
         installedBackend = "";
+        anyInstalled = false;
+        installedMap.clear();
 
         String active = body.optString("active", "none");
         JSONArray arr = body.optJSONArray("backends");
@@ -705,6 +735,10 @@ public class ProxyFragment extends BaseFragment {
                 int count = b.optInt("node_count", 0);
                 if (installed && installedBackend.isEmpty()) {
                     installedBackend = id;
+                }
+                if (installed) {
+                    anyInstalled = true;
+                    installedMap.put(id, label);
                 }
 
                 if (i > 0) {
@@ -795,6 +829,11 @@ public class ProxyFragment extends BaseFragment {
             hero.note.setText(none
                     ? "两个代理后端都停着，所有流量走直连"
                     : join(activeEngine, activeCount + " 个节点可用", modeLabel(modeValue)));
+        }
+
+        // 安装任务状态可能比后端列表先到，也可能后到；空着就按「装没装」补一次
+        if (tvPkgState != null && tvPkgState.getText().length() == 0 && anyInstalled) {
+            tvPkgState.setText("已装好");
         }
         renderMode();
         loadConfigs();
@@ -1171,7 +1210,17 @@ public class ProxyFragment extends BaseFragment {
     }
 
     /** 模式的后果，一句话说清。光有「规则/全局/直连」三个字，多数人不知道差在哪 */
-    private static String modeHint(String backend, String mode) {
+    private String modeHint(String backend, String mode) {
+        if (backend == null || backend.isEmpty()) {
+            // 两个后端都停着时，上面那两档其实是「要不要启动代理」，
+            // 没有模式可读 —— 别把兜底文案「还没读到当前模式」甩给用户
+            if (installedBackend.isEmpty()) {
+                return "还没装代理插件。装好之后这里才会出现模式选择。";
+            }
+            return "点「代理」会启动 "
+                    + ("openclash".equals(installedBackend) ? "OpenClash" : "Passwall")
+                    + "，沿用上次的配置和节点。";
+        }
         boolean oc = "openclash".equals(backend);
         if (oc) {
             switch (mode == null ? "" : mode) {
@@ -1346,6 +1395,7 @@ public class ProxyFragment extends BaseFragment {
                 + " · " + members.length() + " 个节点", 11.5f, R.color.text_secondary);
         sub.setPadding(0, Ui.dp(c, 4), 0, 0);
         titleCol.addView(sub);
+        sheetSubTitle = sub;
         head.addView(titleCol, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
@@ -1595,8 +1645,17 @@ public class ProxyFragment extends BaseFragment {
                 if (data.optBoolean("ok", false) && ok > 0) {
                     notice("测速完成：" + ok + " 个节点可达"
                             + ("tcp".equals(data.optString("kind")) ? "（TCP 握手耗时）" : ""), true);
-                } else if (!data.optBoolean("ok", false)) {
-                    notice("测速失败：" + data.optString("error", "无结果"));
+                    setSheetSub("测速完成 · " + ok + " 个可达", R.color.text_secondary);
+                } else if (data.optBoolean("ok", false)) {
+                    // 全组一个都没通：Mihomo 要么回 504，要么把所有成员都标 0。
+                    // 列表会整排变红「超时」，副标题再点明一句，省得用户以为没测
+                    int n = delays == null ? 0 : delays.length();
+                    notice("测速完成：全部 " + n + " 个节点超时", true);
+                    setSheetSub("全部 " + n + " 个节点超时", R.color.warn);
+                } else {
+                    String why = data.optString("error", "无结果");
+                    notice("测速失败：" + why);
+                    setSheetSub("测速失败：" + why, R.color.warn);
                 }
                 resetTestBtn();
                 if (lastGroups != null) {
@@ -1610,6 +1669,7 @@ public class ProxyFragment extends BaseFragment {
                 testingGroup = "";
                 if (isAdded()) {
                     fail(message);
+                    setSheetSub("测速失败：" + message, R.color.warn);
                     resetTestBtn();
                     if (lastGroups != null) {
                         renderNodes(lastGroups);
@@ -1633,6 +1693,15 @@ public class ProxyFragment extends BaseFragment {
         if (sheetList != null && nodeSheet != null && nodeSheet.isShowing()) {
             fillSheetList(sheetList.getContext());
         }
+    }
+
+    /** 改弹窗副标题。测速的结果得写在这儿，页面顶部那条 banner 被弹窗挡着 */
+    private void setSheetSub(String text, int colorRes) {
+        if (sheetSubTitle == null) {
+            return;
+        }
+        sheetSubTitle.setText(text);
+        sheetSubTitle.setTextColor(Ui.color(sheetSubTitle.getContext(), colorRes));
     }
 
     private void selectNode(String group, String name, boolean topLevel) {

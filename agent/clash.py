@@ -261,6 +261,13 @@ def _one_group_delay(group: str, target: str, timeout_ms: int) -> dict:
     res = _req(path, timeout=timeout_ms / 1000 + 18)
     if isinstance(res, dict) and res.get("__error"):
         raw = res["__error"]
+        # 504 是 Mihomo 把整组成员都等完、一个都没通之后才回的。这跟「请求根本
+        # 发不出去」不是一回事：节点确实全不通，得照样把成员补成 0，界面才能标
+        # 「超时」。否则点完测速列表一动不动，只剩一句转眼就没的 toast。
+        if (res.get("__status") or 0) == 504:
+            dead = {name: 0 for name in _group_members(group)}
+            if dead:
+                return {"ok": True, "delays": dead, "all_dead": True}
         return {"ok": False, "error": _delay_reason(raw), "raw": raw, "delays": {}}
     delays = {}
     for name, ms in (res or {}).items():
