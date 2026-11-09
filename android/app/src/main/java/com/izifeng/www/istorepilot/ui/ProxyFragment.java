@@ -67,6 +67,8 @@ public class ProxyFragment extends BaseFragment {
     private String currentConfigPath = "";
 
     private String backendId = "";
+    /** 装了但没在跑的后端。订阅、配置这类操作认它，不认 running */
+    private String installedBackend = "";
     private String backendLabel = "";
     private String signature = "";
     private android.app.Dialog nodeSheet;
@@ -297,6 +299,7 @@ public class ProxyFragment extends BaseFragment {
         });
 
         if (items != null) {
+            boolean anyInstalled = false;
             for (int i = 0; i < items.length(); i++) {
                 JSONObject it = items.optJSONObject(i);
                 if (it == null) {
@@ -304,16 +307,83 @@ public class ProxyFragment extends BaseFragment {
                 }
                 final String target = it.optString("backend", "");
                 final String file = it.optString("file", "");
+                if (!it.optString("local", "").isEmpty()) {
+                    anyInstalled = true;
+                }
                 box.row(it.optString("label", target) + " " + it.optString("version", "")
                                 + " · " + pkgNote(it), false, false, v -> {
                             box.dismiss();
                             askPkg(target, "github", file);
                         });
             }
+            // 装了却卸不掉，等于只给了半条命。单独一行，不跟「安装」挤在一起误触
+            if (anyInstalled) {
+                final JSONArray snapshot = items;
+                box.row("卸载插件…", true, false, v -> {
+                    box.dismiss();
+                    askUninstall(snapshot);
+                });
+            }
         }
 
         box.cancel("关闭");
         box.show();
+    }
+
+    /** 列出已装的插件让用户选一个卸。卸载是不可逆的（配置会留着），所以走红色确认 */
+    private void askUninstall(JSONArray items) {
+        java.util.List<String> ids = new java.util.ArrayList<>();
+        java.util.List<String> names = new java.util.ArrayList<>();
+        for (int i = 0; i < items.length(); i++) {
+            JSONObject it = items.optJSONObject(i);
+            if (it == null || it.optString("local", "").isEmpty()) {
+                continue;
+            }
+            ids.add(it.optString("backend", ""));
+            names.add(it.optString("label", it.optString("backend", "")));
+        }
+        if (ids.isEmpty()) {
+            notice("没有已安装的插件");
+            return;
+        }
+        Sheet.choose(ctx(), "卸载哪个插件？", names.toArray(new String[0]), -1, idx -> {
+            String id = ids.get(idx);
+            String label = names.get(idx);
+            Sheet.confirm(ctx(), "卸载 " + label + "？",
+                    "会删掉插件本体。实测 OpenClash 的包会连配置和订阅一起清掉，"
+                            + "重装后要重新粘一次订阅地址。",
+                    "卸载", true, () -> doUninstall(id, label));
+        });
+    }
+
+    private void doUninstall(String id, String label) {
+        notice("正在卸载 " + label + "…");
+        JSONObject body = new JSONObject();
+        try {
+            body.put("target", id);
+            body.put("confirm", "remove");
+        } catch (Exception ignored) {
+            return;
+        }
+        Api.postSlow(ctx(), "/api/v1/proxy/uninstall", body, new Cb() {
+            @Override
+            public void onData(JSONObject data, boolean fromCache) {
+                if (!isAdded()) {
+                    return;
+                }
+                boolean ok = data.optBoolean("ok", false);
+                notice(ok ? label + " 已卸载" : "卸载失败：" + data.optString("error", "看日志"),
+                        ok);
+                load(true);
+            }
+
+            @Override
+            public void onError(String message) {
+                if (isAdded()) {
+                    fail("卸载失败：" + message);
+                }
+            }
+        });
     }
 
     /** 一行说明：本机版本与远端版本的关系，以及和谁冲突 */
@@ -598,6 +668,7 @@ public class ProxyFragment extends BaseFragment {
         Context c = backendBox.getContext();
         backendBox.removeAllViews();
         backendLabel = "";
+        installedBackend = "";
 
         String active = body.optString("active", "none");
         JSONArray arr = body.optJSONArray("backends");
@@ -617,6 +688,9 @@ public class ProxyFragment extends BaseFragment {
                 boolean installed = b.optBoolean("installed", false);
                 String engine = b.optString("engine", "");
                 int count = b.optInt("node_count", 0);
+                if (installed && installedBackend.isEmpty()) {
+                    installedBackend = id;
+                }
 
                 if (i > 0) {
                     // hero 是深绿底，卡片那套 divider 色在上面看不见
@@ -662,6 +736,18 @@ public class ProxyFragment extends BaseFragment {
                     backendLabel = label;
                     activeCount = count;
                     activeEngine = engine;
+                    // 运行中的行也得能点 —— 否则这个 App 只能启动、不能停止，
+                    // 想关掉得回 LuCI，「点一行切换」这句话就只对了一半
+                    final String fid = id;
+                    final String flabel = label;
+                    line.setClickable(true);
+                    line.setFocusable(true);
+                    GradientDrawable mask = new GradientDrawable();
+                    mask.setColor(0xFFFFFFFF);
+                    line.setBackground(new android.graphics.drawable.RippleDrawable(
+                            android.content.res.ColorStateList.valueOf(
+                                    Ui.color(c, R.color.ripple)), null, mask));
+                    line.setOnClickListener(v -> askStopBackend(fid, flabel));
                 } else {
                     // 用 text_on_track 而不是 text_secondary：
                     // 灰字配 19% 灰底，在深色下「未运行」几乎读不出来
@@ -742,6 +828,40 @@ public class ProxyFragment extends BaseFragment {
                         public void onError(String message) {
                             if (isAdded()) {
                                 fail("启动失败：" + message);
+                            }
+                        }
+                    });
+                });
+    }
+
+    /** 停掉正在跑的后端。停止比启动更容易出事（当前连接全断），所以走红色确认。 */
+    private void askStopBackend(String id, String label) {
+        Sheet.confirm(ctx(), "停止 " + label + "？",
+                "停掉后所有流量走直连，已建立的连接会断一下。配置和订阅都留着，随时能再启动。",
+                "停止", true, () -> {
+                    notice("正在停止 " + label + "…");
+                    JSONObject body = new JSONObject();
+                    try {
+                        body.put("action", "stop");
+                        body.put("backend", id);
+                    } catch (Exception ignored) {
+                        return;
+                    }
+                    Api.postSlow(ctx(), "/api/v1/proxy/service", body, new Cb() {
+                        @Override
+                        public void onData(JSONObject data, boolean fromCache) {
+                            if (!isAdded()) {
+                                return;
+                            }
+                            boolean ok = data.optBoolean("ok", false);
+                            notice(ok ? label + " 已停止" : "停止失败，看日志确认", ok);
+                            load(true);
+                        }
+
+                        @Override
+                        public void onError(String message) {
+                            if (isAdded()) {
+                                fail("停止失败：" + message);
                             }
                         }
                     });
@@ -884,13 +1004,22 @@ public class ProxyFragment extends BaseFragment {
     }
 
     private void openSubscriptions() {
-        if (backendId.isEmpty()) {
-            notice("两个代理后端都没在运行，订阅不可用");
+        // 订阅存在 uci 里，跟内核跑不跑没关系 —— 「先配好订阅、再启动」是正常顺序。
+        // 原来只有 running 才放行，直连状态下点这一行毫无反应，只在顶部闪一句
+        // 「订阅不可用」，看着像坏了
+        String be = subsBackend();
+        if (be.isEmpty()) {
+            notice("两个代理后端都没装，先装一个");
             return;
         }
         Intent it = new Intent(ctx(), SubscriptionActivity.class);
-        it.putExtra("backend", backendId);
+        it.putExtra("backend", be);
         startActivity(it);
+    }
+
+    /** 订阅、配置这类操作面向「装了哪个后端」，与内核在不在跑无关 */
+    private String subsBackend() {
+        return backendId.isEmpty() ? installedBackend : backendId;
     }
 
     /** 订阅本身在独立页面维护，这张卡只要一个条数 */
@@ -898,11 +1027,12 @@ public class ProxyFragment extends BaseFragment {
         if (tvSubCount == null) {
             return;
         }
-        if (backendId.isEmpty()) {
+        String be = subsBackend();
+        if (be.isEmpty()) {
             tvSubCount.setText("");
             return;
         }
-        Api.get(ctx(), "/api/v1/proxy/subscriptions?backend=" + backendId, new Cb() {
+        Api.get(ctx(), "/api/v1/proxy/subscriptions?backend=" + be, new Cb() {
             @Override
             public void onData(JSONObject body, boolean fromCache) {
                 if (!isAdded() || tvSubCount == null) {

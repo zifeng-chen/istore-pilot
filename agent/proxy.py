@@ -694,11 +694,20 @@ def install(target: str = "all", confirm: str = "", force: bool = False) -> dict
     return {"ok": True, "accepted": True, "queue": queue, "state": install_status()}
 
 
+CONF_PATHS = {
+    "openclash": ["/etc/config/openclash", "/etc/openclash"],
+    "passwall": ["/etc/config/passwall"],
+}
+
+
 def uninstall(target: str, confirm: str = "") -> dict:
     """卸载插件。
 
-    `opkg remove` 默认保留 `/etc/config/<pkg>`，配置和订阅还在 —— 这点要
-    写进返回，别让用户以为清干净了；真要清得用 --force-remove。
+    `opkg remove` 默认保留 `/etc/config/<pkg>`，但 **OpenClash 的 apk 包不这样**：
+    实测 25.12 上 `apk del luci-app-openclash` 会连 `/etc/openclash` 和
+    `/etc/config/openclash` 一起删掉（订阅 yaml、订阅条目全没）。所以
+    `config_kept` 必须按实际残留判断，硬写 true 会让界面告诉用户
+    「配置还在」，重装后才发现订阅要重填。
     """
     if target not in ("openclash", "passwall"):
         return {"ok": False, "error": "target 只能是 openclash / passwall"}
@@ -716,11 +725,12 @@ def uninstall(target: str, confirm: str = "") -> dict:
 
     forget_active()
     _repo_cache["ts"] = 0.0
+    kept = any(os.path.exists(p) for p in CONF_PATHS.get(target, []))
     return {
         "ok": code == 0 and not _installed(target),
         "backend": target,
         "removed": not _installed(target),
-        "config_kept": True,
+        "config_kept": kept,
         "output": (out or "").strip()[-600:],
     }
 

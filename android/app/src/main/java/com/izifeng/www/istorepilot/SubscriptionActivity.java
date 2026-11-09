@@ -1,6 +1,8 @@
 package com.izifeng.www.istorepilot;
 
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.MenuItem;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
@@ -36,6 +38,8 @@ public class SubscriptionActivity extends BaseActivity {
     private TextView tvCount;
     private TextView tvEmpty;
     private String backendId = "";
+    /** 订阅刷新是异步的，60 秒后自动重拉一次列表看结果 */
+    private final Handler handler = new Handler(Looper.getMainLooper());
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -217,7 +221,7 @@ public class SubscriptionActivity extends BaseActivity {
         }
         Sheet.actions(this, item.optString("name", ""),
                 "订阅地址：\n" + item.optString("url", ""),
-                new String[]{"更新节点", "修改名称 / 地址", "删除订阅"},
+                new String[]{"更新节点（约 1 分钟）", "修改名称 / 地址", "删除订阅"},
                 index -> {
                     if (index == 0) {
                         refreshSub(id);
@@ -308,6 +312,11 @@ public class SubscriptionActivity extends BaseActivity {
                 if (!data.optBoolean("ok", true)) {
                     Sheet.message(SubscriptionActivity.this, "操作失败",
                             data.optString("error", "未知原因"));
+                } else if ("refresh".equals(action)) {
+                    // 刷新是异步的：接口立刻返回，配置要几十秒后才生成。
+                    // 不说明白的话用户以为点空了，或者马上回去看配置发现没变
+                    toast("已开始更新，约 20～60 秒后生成配置");
+                    handler.postDelayed(SubscriptionActivity.this::load, 60000);
                 }
                 load();
             }

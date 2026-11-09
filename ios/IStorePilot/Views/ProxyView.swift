@@ -47,6 +47,8 @@ struct ProxyView: View {
     @State private var askName = ""
     @State private var askSource = "github"
     @State private var showAsk = false
+    /// 待停止的后端。运行中的行点一下就能停 —— 只能启动不能停止的界面是残的
+    @State private var stopTarget = ""
 
     @Environment(\.tabIndex) private var tabIndex
     @Environment(\.barAxis) private var axis
@@ -139,6 +141,21 @@ struct ProxyView: View {
                      ? "会把 \(askName) 装到路由器上，过程中会以管理员权限执行包里的安装脚本。"
                      : "会从仓库下载 \(askName) 再安装。包大时（PassWall 约 85 MB）"
                      + "可能要十几分钟，中途别退出。")
+            }
+            .alert("停止 \(stopTarget == "openclash" ? "OpenClash" : "PassWall")？",
+                   isPresented: Binding(
+                    get: { !stopTarget.isEmpty },
+                    set: { if !$0 { stopTarget = "" } }
+                   )) {
+                Button("取消", role: .cancel) { stopTarget = "" }
+                Button("停止", role: .destructive) {
+                    let id = stopTarget
+                    stopTarget = ""
+                    Task { await switchBackend(id, start: false) }
+                }
+            } message: {
+                Text("停掉后所有流量走直连，已建立的连接会断一下。"
+                     + "配置和订阅都留着，随时能再启动。")
             }
         }
     }
@@ -361,8 +378,12 @@ struct ProxyView: View {
             : "未安装"
 
         return Button {
-            guard installed, !on, !busy else { return }
-            Task { await switchBackend(b.str("id")) }
+            guard installed, !busy else { return }
+            if on {
+                stopTarget = b.str("id")
+            } else {
+                Task { await switchBackend(b.str("id")) }
+            }
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "power")
@@ -990,11 +1011,12 @@ struct ProxyView: View {
         await load()
     }
 
-    private func switchBackend(_ id: String) async {
+    private func switchBackend(_ id: String, start: Bool = true) async {
         busy = true
         defer { busy = false }
         _ = try? await Api.post("/api/v1/proxy/service",
-                                ["action": "start", "backend": id], slow: true)
+                                ["action": start ? "start" : "stop", "backend": id],
+                                slow: true)
         await load()
     }
 

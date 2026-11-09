@@ -229,7 +229,20 @@ def group_delay(group: str, url: str = "", timeout_ms: int = 3000) -> dict:
             delays[name] = int(ms)
     if not delays:
         return {"ok": False, "error": "测速无结果", "delays": {}}
+    # Mihomo 对测不通的成员直接不返回，界面于是分不清「这次测了但不通」和
+    # 「从来没测过」——点完测速那一行什么都不变，看着像没反应。
+    # 按成员表补成 0，客户端就能标「超时」。
+    for name in _group_members(group):
+        delays.setdefault(name, 0)
     return {"ok": True, "delays": delays}
+
+
+def _group_members(group: str) -> list[str]:
+    """组的成员名单。取不到就返回空表，不影响测速结果本身。"""
+    data = _req("/proxies/" + urllib.parse.quote(group, safe=""))
+    if isinstance(data, dict):
+        return [str(x) for x in (data.get("all") or [])]
+    return []
 
 
 def connections() -> dict:
