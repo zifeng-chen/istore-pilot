@@ -725,6 +725,7 @@ def uninstall(target: str, confirm: str = "") -> dict:
 
     forget_active()
     _repo_cache["ts"] = 0.0
+    pkgfeed.forget_cache()
     kept = any(os.path.exists(p) for p in CONF_PATHS.get(target, []))
     return {
         "ok": code == 0 and not _installed(target),
@@ -855,6 +856,7 @@ def _pkg_worker(target: str, source: str, name: str) -> None:
                         finished=time.time(), step="安装完成")
         forget_active()
         _repo_cache["ts"] = 0.0
+        pkgfeed.forget_cache()
         return
 
     last = ""

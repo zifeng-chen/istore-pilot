@@ -69,6 +69,8 @@ public class ProxyFragment extends BaseFragment {
     private String backendId = "";
     /** 装了但没在跑的后端。订阅、配置这类操作认它，不认 running */
     private String installedBackend = "";
+    /** 已经提示过的那次安装失败（按 finished 时间戳去重） */
+    private double pkgFailShown = 0;
     private String backendLabel = "";
     private String signature = "";
     private android.app.Dialog nodeSheet;
@@ -250,6 +252,12 @@ public class ProxyFragment extends BaseFragment {
             @Override
             public void onData(JSONObject data, boolean fromCache) {
                 if (!isAdded()) {
+                    return;
+                }
+                // 缓存里可能存着上一次的清单（甚至是失败时那份空的）。
+                // 拿它先弹一次、等网络结果再弹一次，屏幕上就会叠两个「安装包」。
+                // 清单本来就该是最新的，等真实结果即可
+                if (fromCache) {
                     return;
                 }
                 showPkgSheet(data);
@@ -548,6 +556,13 @@ public class ProxyFragment extends BaseFragment {
                                     Toast.LENGTH_LONG).show();
                             return;
                         }
+                        // 同一个失败只提示一次。轮询可能被重复挂上（连点、切页签回来），
+                        // 每次都弹的话，用户关掉一个又冒一个
+                        double finished = p.optDouble("finished", 0);
+                        if (finished > 0 && Math.abs(finished - pkgFailShown) < 0.5) {
+                            return;
+                        }
+                        pkgFailShown = finished;
                         JSONObject e = p.optJSONObject("error");
                         String detail = e == null ? "" : e.optString("detail", "");
                         Sheet.message(ctx(), "安装失败", detail);
