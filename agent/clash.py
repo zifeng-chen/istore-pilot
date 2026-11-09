@@ -201,14 +201,38 @@ def _delay_reason(raw: str) -> str:
     return raw or "测速失败"
 
 
-def delay(name: str, url: str = "http://www.gstatic.com/generate_204", timeout_ms: int = 5000) -> dict:
+def delay(name: str, url: str = "", timeout_ms: int = 5000) -> dict:
+    """单节点测速。一个地址全失败时换一个再试。
+
+    gstatic 是国内最常见的默认值，但实测在部分机场/线路上完全不可达 ——
+    节点其实是好的，只是这个 204 拿不到，界面就会把整排节点判成「超时」。
+    """
+    target = url or delay_url()
+    res = _one_delay(name, target, timeout_ms)
+    if not res.get("ok") and not url:
+        alt = delay_url(alt=True)
+        if alt != target:
+            res2 = _one_delay(name, alt, timeout_ms)
+            if res2.get("ok"):
+                return res2
+    return res
+
+
+def _one_delay(name: str, url: str, timeout_ms: int) -> dict:
     q = urllib.parse.urlencode({"url": url, "timeout": timeout_ms})
     path = "/proxies/" + urllib.parse.quote(name, safe="") + "/delay?" + q
     res = _req(path, timeout=timeout_ms / 1000 + 2)
     if isinstance(res, dict) and "delay" in res:
-        return {"ok": True, "delay": res["delay"]}
+        return {"ok": True, "delay": res["delay"], "url": url}
     raw = (res or {}).get("__error", "timeout")
-    return {"ok": False, "error": _delay_reason(raw), "raw": raw}
+    return {"ok": False, "error": _delay_reason(raw), "raw": raw, "url": url}
+
+
+def delay_url(alt: bool = False) -> str:
+    """测速用的探测地址。配置可覆盖；alt=True 时给备份地址。"""
+    if not alt:
+        return cfg("clash", {}).get("delay_url", "http://www.gstatic.com/generate_204")
+    return cfg("clash", {}).get("delay_url_alt", "https://cp.cloudflare.com/generate_204")
 
 
 def group_delay(group: str, url: str = "", timeout_ms: int = 3000) -> dict:
@@ -216,7 +240,22 @@ def group_delay(group: str, url: str = "", timeout_ms: int = 3000) -> dict:
 
     比逐个 /proxies/{name}/delay 快一个数量级，65 个节点一次两三秒就够。
     """
-    target = url or cfg("clash", {}).get("delay_url", "http://www.gstatic.com/generate_204")
+    target = url or delay_url()
+    res = _one_group_delay(group, target, timeout_ms)
+    alive = [v for v in (res.get("delays") or {}).values() if v > 0]
+    if not alive and not url:
+        # 一个都不通时换备份地址再打一次。全 0 有两种可能：节点真的挂了，
+        # 或者这个 204 地址在这条线路上不可达 —— 后者换一个就能区分开
+        alt = delay_url(alt=True)
+        if alt != target:
+            res2 = _one_group_delay(group, alt, timeout_ms)
+            if any(v > 0 for v in (res2.get("delays") or {}).values()):
+                res2["retried"] = True
+                return res2
+    return res
+
+
+def _one_group_delay(group: str, target: str, timeout_ms: int) -> dict:
     q = urllib.parse.urlencode({"url": target, "timeout": timeout_ms})
     path = "/group/" + urllib.parse.quote(group, safe="") + "/delay?" + q
     res = _req(path, timeout=timeout_ms / 1000 + 18)
