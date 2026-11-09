@@ -404,6 +404,19 @@ def download(channel: str, url: str, dest: str, on_tick=None,
     return got
 
 
+class DownloadFailed(LookupError):
+    """所有通道都失败。
+
+    ``slow`` 区分两种完全不同的情况：链路是通的但太慢（用户该改用本地传包），
+    还是根本连不上（用户该查 DNS / 代理）。混在一起说「连不上」会误导人 ——
+    实测四个通道都能握手、只是 4 KB/s 时报的就是这句。
+    """
+
+    def __init__(self, msg: str, slow: bool) -> None:
+        super().__init__(msg)
+        self.slow = slow
+
+
 def download_any(url: str, dest: str, on_tick=None) -> tuple[str, int]:
     """按 FILE_ORDER 逐条试，慢的自动换下一条。
 
@@ -411,13 +424,21 @@ def download_any(url: str, dest: str, on_tick=None) -> tuple[str, int]:
     首包延迟。实测 ghfast 拉 README 只要 1.5 秒，拉 20 MB 的包 15 秒收 0 字节。
     """
     errors: list[str] = []
+    slow_hits = 0
     for cid in FILE_ORDER:
         try:
             return cid, download(cid, url, dest, on_tick)
-        except (urllib.error.URLError, OSError, ValueError, SlowChannel) as exc:
+        except SlowChannel as exc:
+            slow_hits += 1
             errors.append("%s: %s" % (cid, exc))
             continue
-    raise LookupError("所有通道都下载失败：" + "；".join(errors[-4:]))
+        except (urllib.error.URLError, OSError, ValueError) as exc:
+            errors.append("%s: %s" % (cid, exc))
+            continue
+    raise DownloadFailed(
+        "所有通道都下载失败：" + "；".join(errors[-4:]),
+        slow=bool(errors) and slow_hits == len(errors),
+    )
 
 
 def looks_like_run(path: str) -> bool:

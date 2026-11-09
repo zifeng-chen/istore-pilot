@@ -341,6 +341,7 @@ ERRORS: dict[str, tuple[str, list[str]]] = {
     "no_apk_pkg": ("官方只提供 ipk，你的系统是 apk", ["retry", "change_feed"]),
     "no_file": ("上传的安装包不见了", ["retry"]),
     "no_pkg": ("仓库里没有这个插件", ["retry"]),
+    "too_slow": ("网速太慢，装不了", ["local", "retry"]),
     "unknown": ("安装失败", ["retry"]),
 }
 
@@ -798,7 +799,10 @@ def _pkg_worker(target: str, source: str, name: str) -> None:
                     8 + int(g * 55 / max(1, t or g)), "正在下载 " + _hsize(g, t)),
             )
         except LookupError as exc:
-            _pfail("net_unreachable", str(exc), "", target)
+            # 「太慢」和「连不上」是两种病：前者换本地传包就行，后者要查网络。
+            # 混报成 net_unreachable 会让人以为是 DNS 挂了
+            kind = "too_slow" if getattr(exc, "slow", False) else "net_unreachable"
+            _pfail(kind, str(exc), "", target)
             return
         total = got
         with _PKG_LOCK:

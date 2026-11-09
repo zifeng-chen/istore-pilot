@@ -455,6 +455,13 @@ public class ProxyFragment extends BaseFragment {
                         if (!isAdded()) {
                             return;
                         }
+                        // 缓存里存的可能是上一次安装的结果。拿它判断「这一次」结束，
+                        // 会在点下开始的瞬间弹「安装失败」，而服务端其实还在下载。
+                        // 轮询只认实时结果，缓存直接跳过、下一轮再来。
+                        if (fromCache) {
+                            pkgHandler.postDelayed(pkgPoll, 1000);
+                            return;
+                        }
                         JSONObject p = data.optJSONObject("pkg");
                         if (p == null) {
                             return;

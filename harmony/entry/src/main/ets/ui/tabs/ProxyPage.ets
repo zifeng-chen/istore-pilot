@@ -620,7 +620,9 @@ export struct ProxyPage {
   }
 
   private async pollInstall(): Promise<void> {
-    const r: ApiResult = await Api.get(this.ctx(), '/api/v1/proxy/install');
+    // 必须 getFresh：快照里是上一次安装的结果，拿它判断「这一次」结束
+    // 会在点下开始的瞬间弹失败，而服务端其实还在下载
+    const r: ApiResult = await Api.getFresh(this.ctx(), '/api/v1/proxy/install');
     if (!r.ok) {
       return;
     }
@@ -658,7 +660,7 @@ export struct ProxyPage {
 
   /** 重进页面时接上还在跑的任务（任务在 Agent 侧，杀 App 也不中断） */
   private async resumeInstall(): Promise<void> {
-    const r: ApiResult = await Api.get(this.ctx(), '/api/v1/proxy/install');
+    const r: ApiResult = await Api.getFresh(this.ctx(), '/api/v1/proxy/install');
     if (!r.ok) {
       return;
     }
