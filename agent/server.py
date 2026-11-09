@@ -796,7 +796,7 @@ class Handler(BaseHTTPRequestHandler):
                     "ok": True,
                     "version": VERSION,
                     "uptime": round(time.time() - START_TS, 1),
-                    "listen": cfg("listen", {}),
+                    "listen": _listen_info(),
                     "password_is_default": cfg("auth", {}).get("password") in ("changeme", ""),
                     # 空串 = 合格。客户端可以据此在设置页提示「当前口令太弱」
                     "password_weak": auth.password_problem(
@@ -833,6 +833,23 @@ _NOT_MGMT = (
     ipaddress.ip_network("172.18.0.0/16"),
     ipaddress.ip_network("172.19.0.0/16"),
 )
+
+
+def _listen_info() -> dict:
+    """实际生效的监听配置。
+
+    两个来源：init 脚本把 uci 的 bind/port 通过 ISTORE_AGENT_HOST/PORT 传进来，
+    直接跑 run.py 时没有环境变量、退回 config.json。**uci 优先**，所以
+    /health 不能直接回 config.json 那份 —— 会出现「报 192.168.100.208、
+    实际绑 0.0.0.0」这种自相矛盾的输出。
+    """
+    conf = cfg("listen", {}) or {}
+    host = os.environ.get("ISTORE_AGENT_HOST") or conf.get("host", "")
+    try:
+        port = int(os.environ.get("ISTORE_AGENT_PORT") or conf.get("port", 8443))
+    except (TypeError, ValueError):
+        port = 8443
+    return {"host": host, "port": port}
 
 
 def _lan_fallback() -> str:

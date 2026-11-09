@@ -219,7 +219,10 @@ arch_note() {
 
 lan_ip() {
 	local ip
+	# uci 里的 ipaddr 可能带掩码（182.168.101.1/24）。直接拼进 URL 会变成
+	# http://182.168.101.1/24:8443 —— 看着像个路径，点进去 404。
 	ip=$(uci -q get network.lan.ipaddr 2>/dev/null)
+	ip=${ip%%/*}
 	[ -n "$ip" ] || ip=$(ip -4 addr show br-lan 2>/dev/null \
 		| sed -n 's/.*inet \([0-9.]*\).*/\1/p' | head -1)
 	[ -n "$ip" ] || ip="路由器地址"
