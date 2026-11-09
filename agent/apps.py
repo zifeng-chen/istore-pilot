@@ -683,7 +683,7 @@ def _sample_once() -> None:
     global _prev, _acc, _last_ts, _last_error, _totals, _dev_dirty, _dev, _dev_rate
     data = clash.connections()
     if data.get("error"):
-        _last_error = str(data["error"])
+        _last_error = _reason(data["error"])
         return
     _last_error = ""
 
@@ -856,6 +856,23 @@ def _sample_once() -> None:
         _acc = dict(keep)
 
 
+def _reason(exc: BaseException) -> str:
+    """把采样失败翻成人话。
+
+    这个字符串会直接显示在应用页顶部，原来贴的是
+    `<urlopen error [Errno 111] Connection refused>` —— 用户看不出
+    「代理没开」这件事，只会以为是我们坏了。
+    """
+    low = str(exc).lower()
+    if "refused" in low or "errno 111" in low:
+        return "代理没在运行，暂时没有流量数据"
+    if "timed out" in low or "timeout" in low:
+        return "读取内核超时，稍后会自动重试"
+    if "401" in low or "403" in low:
+        return "内核拒绝了请求（API 密钥不对）"
+    return str(exc)
+
+
 def _loop() -> None:
     global _last_error
     ticks = 0
@@ -871,7 +888,7 @@ def _loop() -> None:
                 with _lock:
                     _trim()
         except Exception as exc:  # 后台线程不能因为一次异常就死掉
-            _last_error = str(exc)
+            _last_error = _reason(exc)
         time.sleep(POLL_SECONDS)
 
 
