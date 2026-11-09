@@ -19,7 +19,7 @@ from .config import get as cfg, load as load_cfg, save as save_cfg
 START_TS = time.time()
 
 # Agent 自身版本：随 ipk 一起发版，硬件详情页与「关于」都会显示
-VERSION = "0.1.9"
+VERSION = "0.2.0"
 
 _cache_lock = threading.Lock()
 _cache: dict[str, tuple[float, object]] = {}
