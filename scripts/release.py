@@ -252,7 +252,24 @@ def notes_for(tag: str, ver: str, full: str) -> str:
             "istore-pilot_%s_armv7.run" % full,
             "istore-pilot_%s.run" % full]
 
-    return """## 本次更新
+    return """## 装哪个版本
+
+先确认路由器系统版本 —— iStoreOS 25.12 把包管理器从 `opkg` 换成了 `apk`，
+两边的包**格式不同、互不通用**：
+
+```sh
+grep DISTRIB_RELEASE /etc/openwrt_release
+```
+
+| 你的系统 | 包管理器 | 路由器端可装 | 说明 |
+|---|---|---|---|
+| **24.10 及更早**（含 22.03） | `opkg` | `.run` 或 `.ipk` | 两种都行，ipk 能被「软件包」页管理 |
+| **25.12 及以后** | `apk` | **只有 `.run`** | `.ipk` 在 25.12 上会报 `opkg: not found` |
+
+`.run` 两种系统通吃：它自己判断当前是 `opkg` 还是 `apk`，缺依赖也按对应的包管理器补装。
+**拿不准就装 `.run`。**
+
+## 本次更新
 
 %s
 
@@ -268,6 +285,9 @@ def notes_for(tag: str, ver: str, full: str) -> str:
 
 > 路由器的四个包**内容完全相同**（载荷是纯 Python），架构只影响文件名与自检提示。
 > 任选其一，不要同时装两个。
+>
+> 如果本页还带了 `luci-app-istore-agent_*.ipk`，它**只能装在 24.10 及更早** ——
+> 25.12 没有 `opkg`，装不上。
 
 ## 安装
 

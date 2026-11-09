@@ -24,40 +24,78 @@
 
 ## 快速开始
 
-到 [**Releases**](https://github.com/zifeng-chen/istore-pilot/releases) 下载，按需要选：
+### 1. 先确认系统版本
 
-| 文件 | 装在哪 | 说明 |
-|---|---|---|
-| `istore-pilot_0.1.3-1.run` | 路由器 | **推荐**。单文件，`sh` 一下就装完，24.10 与 25.12 都能用 |
-| `luci-app-istore-agent_0.1.3-1_all.ipk` | 路由器 | 传统方式，走 opkg（**仅 24.10 及更早**） |
-| `istoreos-0.1.3.apk` | Android 手机 | 连路由器用 |
-| iOS / 鸿蒙 | — | 暂未提供安装包，按 [六、构建](#六构建与打包) 自行编译 |
+iStoreOS 25.12 把包管理器从 `opkg` 换成了 `apk`，两边的包**格式不同、互不通用**：
+25.12 上装 `.ipk` 会直接报 `opkg: not found`，24.10 上装 `.apk` 会报 `apk: not found`。
+所以先看一眼版本，再决定下哪个文件：
+
+```sh
+grep DISTRIB_RELEASE /etc/openwrt_release
+```
+
+| 输出 | 系统线 | 包管理器 | 现状 |
+|---|---|---|---|
+| `DISTRIB_RELEASE='24.10.x'` | 24.10 | `opkg` | 当前主流 |
+| `DISTRIB_RELEASE='25.12.x'` | 25.12 | `apk`（Alpine 那套） | 新线，精简固件可能不带 python3 |
+| `DISTRIB_RELEASE='22.03.x'` | 22.03 | `opkg` | 老线 |
+
+> 决定包管理器的是**系统版本**，不是硬件。同一台机器刷 24.10 就是 `opkg`，刷 25.12 就是 `apk`。
+
+### 2. 路由器端：下哪个文件
+
+到 [**Releases**](https://github.com/zifeng-chen/istore-pilot/releases) 下载：
+
+| 文件 | 24.10 及更早 | 25.12 及以后 | 说明 |
+|---|---|---|---|
+| `istore-pilot_<版本>_x86_64.run`<br>（或 `_arm64` / `_armv7` / 无后缀通用版） | ✅ 推荐 | ✅ **唯一选择** | 单文件，`sh` 一下就装完 |
+| `luci-app-istore-agent_<版本>_all.ipk` | ✅ 可装 | ❌ **装不上** | 走 opkg，能被 LuCI「软件包」页管理 |
+
+**拿不准就装 `.run`**：它自己判断当前系统是 `opkg` 还是 `apk`，缺依赖也按对应的包管理器补装，
+是唯一两边通吃的格式。
 
 `.run` 按架构分了四份（`_x86_64` / `_arm64` / `_armv7` / 无后缀的通用版）。
 载荷是纯 Python，四份内容一致，只是包名不同、`--check` 时会对一下 `uname -m`。
 
+手机端另外下：`istoreos-<版本>.apk`（Android）。iOS / 鸿蒙暂未提供安装包，
+按 [六、构建](#六构建与打包) 自行编译。
+
 路由器端，两种方式**选一种**：
 
 ```sh
-# 方式 A：.run（推荐）—— 把文件传到路由器后执行
-sh istore-pilot_0.1.3-1_x86_64.run --check    # 先只检查环境与架构，不改任何文件
-sh istore-pilot_0.1.3-1_x86_64.run            # 安装或升级，保留现有配置
+# 方式 A：.run（推荐，两种系统都能用）—— 把文件传到路由器后执行
+sh istore-pilot_0.1.9-1_x86_64.run --check    # 先只检查环境与架构，不改任何文件
+sh istore-pilot_0.1.9-1_x86_64.run            # 安装或升级，保留现有配置
 
-# 方式 B：ipk（仅 iStoreOS 24.10 及更早，25.12 换 apk 后装不了 ipk）
+# 方式 B：ipk（仅 iStoreOS 24.10 及更早）
 opkg update && opkg install python3
-opkg install luci-app-istore-agent_0.1.3-1_all.ipk
+opkg install luci-app-istore-agent_0.1.9-1_all.ipk
 ```
 
 `.run` 的其它用法：
 
 ```sh
-sh istore-pilot_0.1.3-1.run --uninstall   # 卸载程序，保留密码与配置
-sh istore-pilot_0.1.3-1.run --purge       # 卸载并清除全部配置
-sh istore-pilot_0.1.3-1.run --force       # 已用 opkg/apk 装过时，改由本包接管
-sh istore-pilot_0.1.3-1.run --no-deps     # 不自动装依赖（离线或已手工备齐）
+sh istore-pilot_0.1.9-1.run --uninstall   # 卸载程序，保留密码与配置
+sh istore-pilot_0.1.9-1.run --purge       # 卸载并清除全部配置
+sh istore-pilot_0.1.9-1.run --force       # 已用 opkg/apk 装过时，改由本包接管
+sh istore-pilot_0.1.9-1.run --no-deps     # 不自动装依赖（离线或已手工备齐）
 ```
 
-### 依赖与系统版本
+### 3. 装完打开
+
+装完打开 `http://<路由器IP>:8443`。首次安装的随机密码在路由器上查看：
+
+```sh
+cat /etc/istore-agent/INITIAL_PASSWORD
+```
+
+Android：装 APK，或者直接在装好插件的路由器上下载
+`http://<路由器IP>/istore-agent/istoreos-0.1.9.apk`（插件自带这个文件）。
+
+> `.run` **不会改动任何网络、防火墙、DHCP、DNS 配置**，装的过程中现有网络不受影响。
+> 已有 `/etc/config/istore-agent` 时一律保留，不会把 `bind` 覆盖成 `0.0.0.0`。
+
+### 依赖与环境
 
 `.run` 会**先探测系统、再看缺什么、缺了就自动装**，x86 与 ARM 走同一套逻辑
 （装哪个架构的包由系统自己的软件源决定，不需要你选）。
@@ -70,26 +108,50 @@ sh istore-pilot_0.1.3-1.run --no-deps     # 不自动装依赖（离线或已手
 | `luci-base` / `luci-compat` / `luci-lua-runtime` | 界面 | 只影响 LuCI 网页版，App 走 API 不受影响 |
 | `pciutils`（`lspci`） | 可选 | 硬件页少一块 PCI 设备列表 |
 
-系统版本差异：
+### 24.10 与 25.12 的差异
 
-- **24.10 及更早**：包管理器是 `opkg`，`.run` 与 ipk 都能用。
-- **25.12 及以后**：包管理器换成 `apk`（基于 OpenWrt 25.12.5），
-  **ipk 装不上**，只能用 `.run`。安装器会自动改用 `apk update` / `apk add`。
-- 两边的软件包名基本一致，少数改动在 `deploy/build_run.py` 的 `DEPS` 表里
-  分别写了 `opkg 包名|apk 包名` 两列，改一个只动一列。
+25.12 不是 24.10 的小版本，它是 OpenWrt 上游把 `opkg` 换成 `apk` 之后的第一条 iStoreOS 线。
+这个切换影响的是**装包这一整套东西**：
 
+| | 24.10（含 22.03） | 25.12 |
+|---|---|---|
+| 包管理器 | `opkg` | `apk`（apk-tools 3.x） |
+| 包格式 | `.ipk`（ar 归档） | `.apk`（tar.gz + 签名） |
+| 装包 | `opkg update && opkg install x.ipk` | `apk update && apk add x.apk --allow-untrusted` |
+| 查已装 | `opkg list-installed` | `apk info -e <包名>` |
+| `python3` | 多数固件自带（实测 3.11.14） | 精简固件**可能不带**（实测需补装 3.13.15） |
+| 本项目 `.run` | ✅ | ✅ 安装器自动改用 `apk` |
+| 本项目 `.ipk` | ✅ | ❌ `opkg: not found` |
 
-装完打开 `http://<路由器IP>:8443`。首次安装的随机密码在路由器上查看：
+跨版本的实测表现（系统不会坏，但也装不上）：
 
-```sh
-cat /etc/istore-agent/INITIAL_PASSWORD
+```
+# 24.10 的插件包，拿到 25.12 上跑
+$ sh install.sh
+install.sh: line 3: opkg: not found
+更新软件源列表错误，请检查路由器自身网络连接以及是否有失效的软件源。
 ```
 
-Android：装 APK，或者直接在装好插件的路由器上下载
-`http://<路由器IP>/istore-agent/istoreos-0.1.3.apk`（插件自带这个文件）。
+安装器里每个装包动作都先看当前系统有哪个包管理器，绝不硬写 `opkg`；
+`DEPS` 表给每个依赖分别写了 `opkg 包名|apk 包名` 两列，改一个只动一列。
 
-> `.run` **不会改动任何网络、防火墙、DHCP、DNS 配置**，装的过程中现有网络不受影响。
-> 已有 `/etc/config/istore-agent` 时一律保留，不会把 `bind` 覆盖成 `0.0.0.0`。
+### 代理插件也要对版本
+
+上游 [`Are-u-ok`](https://github.com/AUK9527/Are-u-ok) 是**按系统线分开发布**的，
+**插件包和第 3 方的 `.ipk` 一样不能跨版本装**：
+
+| 系统线 | 来源 | 插件包文件名特征 |
+|---|---|---|
+| 22.03 | `AUK9527/Are-u-ok` 的 `x86/`、`apps/` 目录 | 部分是 `sdk_22.03.x` |
+| 24.10 | `bcseputetto/Are-u-ok` 的 release `iStoreOS_24.10` | 带 `sdk_24.10`，包内是 `.ipk` |
+| 25.12 | `bcseputetto/Are-u-ok` 的 release `iStoreOS_25.12` | 带 `sdk_25.12`，包内是 `.apk` |
+
+在 App 里走「代理 → 安装包 → 从仓库下载」**不用自己判断**：Agent 读
+`/etc/openwrt_release` 的 `DISTRIB_RELEASE` 与 `DISTRIB_ARCH`，自动选到对应的
+release 与架构包，界面上会显示匹配结果（如 `24.10 · x86_64`）。
+
+手工下载时要自己看后缀：25.12 的包里是 `.apk`，24.10 的包里是 `.ipk`，
+装错了就是上面那个 `not found`。
 
 详细说明见 [`docs/install.md`](docs/install.md)。
 

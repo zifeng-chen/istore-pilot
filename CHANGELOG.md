@@ -13,7 +13,7 @@
 
 ---
 
-## 0.1.9 · 登录安全加固：不再暴露管理面、退避式限流、口令强度校验
+## 0.1.9 · 登录安全加固 + 25.12 真机装包修复
 
 起因是一次审计：登录链路是**纯 HTTP**，实测在 `br-lan` 上抓包能直接看到
 `{"password": "..."}` 和每个请求的 `Authorization: Bearer`。口令一旦被撞开，
@@ -53,6 +53,47 @@ network reload），**明文 HTTP 的管理面就直接摊到公网**。
 
 实测：连续错 4 次返 403「密码错误」，第 5 次起 429「请 N 秒后再试」，
 锁定期内正确口令也进不去，解锁后成功并清零。
+
+### 4. 在 iStoreOS 25.12（apk）上真装一遍，挖出三个 bug
+
+换到一台干净的 25.12.6 机器上，用 `.run` 完整装了一遍，再跑插件安装 /
+卸载 / 订阅全流程，暴露出来的：
+
+- **apk 系统上装 `.ipk` 会假成功**（最严重）。`system.install()` 里
+  「自家 ipk」的分支排在包管理器检查**之前**，于是 25.12 上传
+  `luci-app-istore-agent_*.ipk` 会起一个注定失败的后台任务，还回
+  `ok: true` + `restarting: true`。实测 apk 报 `unable to select packages`、rc=1，
+  版本号没变但用户以为升级了。现在先判 apk 直接拒绝，提示改用 `.run`。
+- **安装完成提示的地址带 CIDR 后缀**。`uci get network.lan.ipaddr` 返回的是
+  `182.168.101.1/24`，直接拼进 URL 变成 `http://182.168.101.1/24:8443`，
+  点进去 404。加剥掩码。
+- **`health.listen` 与实际绑定不符**。init 脚本把 uci 的 bind 通过
+  `ISTORE_AGENT_HOST` 传进进程，uci 优先于 config.json，但 health 只回
+  config.json —— 出现「health 说 192.168.100.208、netstat 说 0.0.0.0」。
+  新增 `_listen_info()`，按实际生效的来源回。
+
+### 5. 报错不再直接贴异常
+
+- 测速：Mihomo 的 `HTTP 503` → 「节点连不上（超时）」，原始串留在 `raw`
+- 应用页：`<urlopen error [Errno 111] Connection refused>` →
+  「代理没在运行，暂时没有流量数据」
+
+### 6. 文档：按系统版本选包
+
+两个实测结论写进了文档，因为「25.12 装哪个包」此前只有一句
+「ipk 仅 24.10 及更早」，不够判断：
+
+- 24.10 的 OpenClash 包内是 `luci-app-openclash_0.47.156_all.ipk`，
+  `install.sh` 用 `opkg update` / `opkg install`
+- 25.12 的包内是 `luci-app-openclash-0.47.156.apk`，
+  `install.sh` 用 `apk update` / `apk add --allow-untrusted`
+- 把 24.10 的 `install.sh` 拿到 25.12 上跑：`opkg: not found` → `exit 1`。
+  **系统不会坏，但包也装不上**
+
+README 的快速开始重排成「确认版本 → 下哪个文件 → 装完打开」，后面补三张表：
+依赖清单、24.10 与 25.12 逐项对比、代理插件按系统线分发。
+`docs/install.md` 顶部加「〇、先对版本」，排错表补 `opkg/apk not found` 两条。
+`release.py` 的正文模板固定带上「装哪个版本」，以后每个 Release 页都有。
 
 ---
 

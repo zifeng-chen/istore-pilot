@@ -1,23 +1,60 @@
 # 路由器端安装
 
+## 〇、先对版本：24.10 与 25.12 不通用
+
+iStoreOS 25.12 起包管理器从 `opkg` 换成了 `apk`（OpenWrt 上游的切换），
+这不只是多一个命令，而是**整条装包链路换掉**：
+
+| | 24.10（含 22.03） | 25.12 |
+|---|---|---|
+| 包管理器 | `opkg` | `apk`（apk-tools 3.x） |
+| 第三方包格式 | `.ipk`（ar 归档） | `.apk`（tar.gz + 签名） |
+| 装包命令 | `opkg update && opkg install x.ipk` | `apk update && apk add x.apk --allow-untrusted` |
+| 查已装 | `opkg list-installed` | `apk info -e <包名>` |
+| `python3` | 多数固件自带 | 精简固件可能不带，安装器会 `apk add` |
+| **本插件 `.run`** | ✅ | ✅ 安装器自动切到 `apk` |
+| **本插件 `.ipk`** | ✅ | ❌ 报 `opkg: not found` |
+
+查自己的版本：
+
+```sh
+grep DISTRIB_RELEASE /etc/openwrt_release
+```
+
+**包不能跨版本装。** 实测把一个 24.10 的 OpenClash 插件包放到 25.12 上跑：
+
+```
+$ sh install.sh
+install.sh: line 3: opkg: not found
+更新软件源列表错误，请检查路由器自身网络连接以及是否有失效的软件源。
+```
+
+系统不会被改坏（第一条命令就失败了），但包也装不上。
+
+> 代理插件（OpenClash / PassWall）同样按系统线分开发布，
+> 选包规则见 [README 的「代理插件也要对版本」](../README.md#代理插件也要对版本)。
+> 在 App 里走「代理 → 安装包」时不用自己判断，Agent 会自动匹配。
+
+---
+
 插件本体是「一个 Python 服务 + 一个 LuCI 页面」，两种安装方式装的是**同一份文件**
 （`.run` 直接复用 ipk 的暂存逻辑，内容逐字节相同），选一种即可。
 
 | | `.run` 自解压包 | `.ipk` |
 |---|---|---|
-| 需要 opkg | 不需要 | 需要 |
+| 需要包管理器 | 不需要（自带解包逻辑） | 需要 `opkg`，**25.12 上没有** |
 | 需要联网装依赖 | 不需要（但要有 python3） | 需要 `opkg update` |
 | 一个文件搞定 | ✅ | ✅ |
 | 出现在「软件包」列表 | ❌ | ✅ |
 | 可被 LuCI 软件包页卸载 | ❌（用 `--uninstall`） | ✅ |
-| 适合 | 普通用户装插件 | 要做包管理/批量部署 |
+| 适合 | 普通用户装插件 | 要做包管理/批量部署（仅 24.10 及更早） |
 
 **两者不能并存。** 并存时 `opkg remove` 会把 `.run` 装进去的程序文件一起删掉，
 而 opkg 记录里还写着「已安装」，之后升级就彻底错乱。
 
 ---
 
-> 下文以 **0.1.3-1** 为例。下载时换成 Releases 里对应的版本号即可，
+> 下文以 **0.1.9-1** 为例。下载时换成 Releases 里对应的版本号即可，
 > 架构后缀按 `uname -m` 选（`x86_64` / `aarch64`→`arm64` / `armv7l`→`armv7`）。
 > 拿不准就直接用不带后缀的通用版。
 
@@ -29,10 +66,10 @@
 
 ```bash
 # 电脑上，用 scp
-scp istore-pilot_0.1.3-1.run root@192.168.1.1:/tmp/
+scp istore-pilot_0.1.9-1.run root@192.168.1.1:/tmp/
 
 # 或者在路由器上直接下载（需要能访问 GitHub）
-wget -O /tmp/pilot.run https://github.com/zifeng-chen/istore-pilot/releases/latest/download/istore-pilot_0.1.3-1_x86_64.run
+wget -O /tmp/pilot.run https://github.com/zifeng-chen/istore-pilot/releases/latest/download/istore-pilot_0.1.9-1_x86_64.run
 ```
 
 也可以在 LuCI 里操作：**系统 → 文件传输**，把 `.run` 上传到 `/tmp/`。
@@ -65,7 +102,7 @@ cat /etc/istore-agent/INITIAL_PASSWORD
 ```
 
 Android 客户端也可以直接在路由器上下载：
-`http://<路由器IP>/istore-agent/istoreos-0.1.3.apk`
+`http://<路由器IP>/istore-agent/istoreos-0.1.9.apk`
 
 ### 全部参数
 
@@ -84,12 +121,15 @@ Android 客户端也可以直接在路由器上下载：
 
 ---
 
-## 二、ipk 安装
+## 二、ipk 安装（仅 24.10 及更早）
+
+> **25.12 上装不了这个。** 那版没有 `opkg`，会直接报 `opkg: not found` ——
+> 请改用上面的 `.run`，它两种系统都能装。
 
 ```sh
 opkg update
 opkg install python3
-opkg install luci-app-istore-agent_0.1.3-1_all.ipk
+opkg install luci-app-istore-agent_0.1.9-1_all.ipk
 ```
 
 或者 LuCI：**系统 → 软件包 → 上传软件包** → 选择 ipk → 安装。
@@ -143,7 +183,7 @@ data/              应用流量账本等
 直接用新版覆盖安装：
 
 ```sh
-sh /tmp/istore-pilot_0.1.3-1.run
+sh /tmp/istore-pilot_0.1.9-1.run
 ```
 
 配置文件、密码、设备绑定、流量账本全部保留。
@@ -158,14 +198,14 @@ sh /tmp/pilot.run --purge       # 全删干净
 `--uninstall` 之后 `/etc/istore-agent` 还在，重装会接着用原来的密码；
 `--purge` 会连密码一起清掉，下次安装重新生成。
 
-## 七、从 ipk 迁移到 .run（或反过来）
+## 七、从 ipk 迁移到 .run（仅 24.10 及更早）
 
 ```sh
 # ipk → .run
 sh /tmp/pilot.run --force        # 会先 opkg remove，再由本包接管
 
 # .run → ipk
-opkg install --force-reinstall luci-app-istore-agent_0.1.3-1_all.ipk
+opkg install --force-reinstall luci-app-istore-agent_0.1.9-1_all.ipk
 ```
 
 迁移时配置文件都会保留，密码不变。
@@ -174,7 +214,9 @@ opkg install --force-reinstall luci-app-istore-agent_0.1.3-1_all.ipk
 
 | 现象 | 原因与处理 |
 |---|---|
-| `没有找到 python3` | `opkg update && opkg install python3` |
+| `opkg: not found` | 在 25.12（apk 系统）上装了 `.ipk`。改用 `.run` |
+| `apk: not found` | 在 24.10（opkg 系统）上装了 25.12 的插件包。换 24.10 的包 |
+| `没有找到 python3` | 24.10：`opkg update && opkg install python3`<br>25.12：`apk update && apk add python3` |
 | `安装包不完整（应 X 字节，实际 Y）` | 下载中断，重新下载。**不会改动任何文件** |
 | `检测到 opkg 安装…加 --force` | 说清了两者互斥，按提示加 `--force` 或先 `opkg remove` |
 | `服务似乎没起来` | `logread -e istore-agent` 看日志；常见是 python3 没装或端口被占 |
