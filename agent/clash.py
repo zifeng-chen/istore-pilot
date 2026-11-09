@@ -182,13 +182,33 @@ def select(group: str, name: str) -> dict:
     return {"ok": True, "group": group, "name": name}
 
 
+def _delay_reason(raw: str) -> str:
+    """把 Mihomo 的报错翻成人话。
+
+    节点不通时它回 503，原来的实现直接把 "HTTP 503" 甩到界面上 ——
+    用户既不知道这是什么意思，也不知道该做什么。这里换成可操作的说明，
+    原始串留在 raw 里给排查用。
+    """
+    low = (raw or "").lower()
+    if "503" in low or "timeout" in low or "timed out" in low:
+        return "节点连不上（超时）"
+    if "404" in low:
+        return "内核里没有这个节点，配置可能刚换过"
+    if "401" in low or "403" in low:
+        return "内核拒绝了请求（API 密钥不对）"
+    if "connect" in low or "refused" in low:
+        return "连不上内核，OpenClash 可能没在跑"
+    return raw or "测速失败"
+
+
 def delay(name: str, url: str = "http://www.gstatic.com/generate_204", timeout_ms: int = 5000) -> dict:
     q = urllib.parse.urlencode({"url": url, "timeout": timeout_ms})
     path = "/proxies/" + urllib.parse.quote(name, safe="") + "/delay?" + q
     res = _req(path, timeout=timeout_ms / 1000 + 2)
     if isinstance(res, dict) and "delay" in res:
         return {"ok": True, "delay": res["delay"]}
-    return {"ok": False, "error": (res or {}).get("__error", "timeout")}
+    raw = (res or {}).get("__error", "timeout")
+    return {"ok": False, "error": _delay_reason(raw), "raw": raw}
 
 
 def group_delay(group: str, url: str = "", timeout_ms: int = 3000) -> dict:
@@ -201,7 +221,8 @@ def group_delay(group: str, url: str = "", timeout_ms: int = 3000) -> dict:
     path = "/group/" + urllib.parse.quote(group, safe="") + "/delay?" + q
     res = _req(path, timeout=timeout_ms / 1000 + 18)
     if isinstance(res, dict) and res.get("__error"):
-        return {"ok": False, "error": res["__error"], "delays": {}}
+        raw = res["__error"]
+        return {"ok": False, "error": _delay_reason(raw), "raw": raw, "delays": {}}
     delays = {}
     for name, ms in (res or {}).items():
         if isinstance(ms, (int, float)):

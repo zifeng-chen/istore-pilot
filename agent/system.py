@@ -270,6 +270,14 @@ def install(name: str, confirm: str = "") -> dict:
 
     if kind == "ipk":
         if _ipk_package(path) == SELF_PKG:
+            # 自安装也必须先过包管理器这一关。apk（25.12+）根本不认 .ipk，
+            # 走 _install_self 会起一个注定失败的后台任务，还回 ok:true ——
+            # 用户以为升级了，实际版本号没变（实测 apk 报 "no such package"）。
+            if pkg_mgr() == "apk":
+                return {"ok": False, "kind": "ipk", "name": name,
+                        "error": "这是 .ipk 格式，而这台机器用 apk 包管理器"
+                                 "（iStoreOS 25.12 及以后），apk 不认 .ipk。"
+                                 "请改用 .run 安装包升级。"}
             return _install_self(path)
         if pkg_mgr() == "apk":
             # 25.12 起没有 opkg，.ipk 解都解不开
