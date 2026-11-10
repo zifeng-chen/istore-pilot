@@ -87,6 +87,8 @@ public class ProxyFragment extends BaseFragment {
     private final java.util.Map<String, String> installedMap = new java.util.LinkedHashMap<>();
     /** 已经提示过的那次安装失败（按 finished 时间戳去重） */
     private double pkgFailShown = 0;
+    /** 这次安装任务里「改 hosts」确认框是否已经弹过（waiting 状态去重） */
+    private boolean pkgConfirmShown = false;
     private String backendLabel = "";
     private String signature = "";
     private android.app.Dialog nodeSheet;
@@ -838,6 +840,7 @@ public class ProxyFragment extends BaseFragment {
                     fail(data.optString("error", "启动安装失败"));
                     return;
                 }
+                pkgConfirmShown = false;
                 startPkgPoll();
                 // 确认完立刻把进度弹出来；关掉也不影响任务，右上角胶囊还在
                 showPkgDialog();
@@ -883,6 +886,7 @@ public class ProxyFragment extends BaseFragment {
                             return;
                         }
                         applyPkgState(p);
+                        maybeAskHostsConfirm(p.optString("waiting", ""));
                         if (p.optBoolean("running", false)) {
                             pkgHandler.postDelayed(pkgPoll, 1000);
                             return;
@@ -919,6 +923,12 @@ public class ProxyFragment extends BaseFragment {
                         pkgFailShown = finished;
                         JSONObject e = p.optJSONObject("error");
                         String detail = e == null ? "" : e.optString("detail", "");
+                        String code = e == null ? "" : e.optString("error_code", "");
+                        if ("cancelled".equals(code)) {
+                            // 用户主动取消，别用红色「安装失败」吓人
+                            Toast.makeText(ctx(), "已取消安装", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
                         Sheet.message(ctx(), "安装失败", detail);
                     }
 
@@ -966,6 +976,48 @@ public class ProxyFragment extends BaseFragment {
                     ? Fmt.bytes(got) + " / " + Fmt.bytes(total)
                     : "");
         }
+    }
+
+    /** 安装线程停下来等「改 hosts」确认时，弹一次确认框（waiting 状态去重） */
+    private void maybeAskHostsConfirm(String waiting) {
+        if (!"hosts_fix".equals(waiting) || pkgConfirmShown) {
+            return;
+        }
+        pkgConfirmShown = true;
+        Sheet.confirm(ctx(), "GitHub 访问不通",
+                "所有加速通道都没下载成功。是否让 agent 修改 hosts 给 GitHub 加速后重试？\n\n"
+                        + "会往路由器的 /etc/hosts 写入 github 域名的可用 IP（先备份、可还原）。",
+                "修改并重试", false,
+                () -> postPkgConfirm("yes"),
+                () -> postPkgConfirm("no"));
+    }
+
+    /** 回应当前安装任务的「改 hosts」确认：yes 继续、no 中止 */
+    private void postPkgConfirm(String choice) {
+        JSONObject body = new JSONObject();
+        try {
+            body.put("choice", choice);
+        } catch (Exception ignored) {
+            return;
+        }
+        Api.post(ctx(), "/api/v1/proxy/pkg/confirm", body, new Cb() {
+            @Override
+            public void onData(JSONObject data, boolean fromCache) {
+                if (!isAdded()) {
+                    return;
+                }
+                if (!data.optBoolean("ok", false)) {
+                    fail(data.optString("error", "回应失败"));
+                }
+            }
+
+            @Override
+            public void onError(String message) {
+                if (isAdded()) {
+                    fail("连不上路由器：" + message);
+                }
+            }
+        });
     }
 
     /** 让 infoRow 的整行可点（插槽本身只有文字宽，点空白区域也该响应） */

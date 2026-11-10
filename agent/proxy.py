@@ -345,6 +345,7 @@ ERRORS: dict[str, tuple[str, list[str]]] = {
     # 安装包已下好，卡在安装脚本自己跑的 `apk update` 上：那是路由器
     # 自己的软件源（镜像/DNS）坏了，跟下载、跟这个包都没关系
     "feed_refresh_failed": ("路由器软件源刷新失败", ["diagnose", "retry"]),
+    "cancelled": ("已取消", ["retry"]),
     "unknown": ("安装失败", ["retry"]),
 }
 
@@ -764,8 +765,14 @@ _PKG: dict = {
     "running": False, "done": False, "ok": False, "pct": 0, "step": "",
     "target": "", "source": "", "name": "", "channel": "",
     "got": 0, "total": 0, "log": [], "error": {}, "started": 0.0, "finished": 0.0,
+    # 非空表示安装线程正停在这里等用户拍板。取值见 _await_hosts_confirm。
+    "waiting": "",
 }
 _PKG_LOCK = threading.Lock()
+
+# 安装线程「等待确认」用的信号：worker 下载失败后 block 在 event 上，
+# 客户端调 pkg_confirm() 写入选择再 set，worker 醒来按选择继续或中止。
+_PKG_CONFIRM: dict = {"event": threading.Event(), "choice": ""}
 
 
 def _pstep(pct: int, text: str) -> None:
@@ -788,6 +795,63 @@ def _pfail(kind: str, detail: str, raw: str = "", target: str = "") -> None:
                     finished=time.time(), step="安装失败", error=err)
 
 
+def _await_hosts_confirm(target: str, kind: str, detail: str) -> bool:
+    """下载全通道失败后，停在这里等用户决定要不要改 hosts。
+
+    返回 True = 用户确认（调用方接着 fix_github_hosts + 重试下载）；
+    False = 用户取消或超时（调用方 _pfail 中止）。
+    """
+    _PKG_CONFIRM["event"].clear()
+    _PKG_CONFIRM["choice"] = ""
+    with _PKG_LOCK:
+        _PKG["waiting"] = "hosts_fix"
+        _PKG["step"] = "GitHub 访问不通，等待确认是否修改 hosts 加速"
+        _PKG["error"] = _err(kind, detail=detail, backend=target, pkg=PKG.get(target, ""))
+    # 最多等 5 分钟；客户端一直不点就当中止，别让线程永远挂在这
+    _PKG_CONFIRM["event"].wait(timeout=300)
+    with _PKG_LOCK:
+        _PKG["waiting"] = ""
+    return _PKG_CONFIRM["choice"] == "yes"
+
+
+def pkg_confirm(choice: str = "") -> dict:
+    """客户端对「等待确认」的回应：yes 继续（改 hosts 重试），no 中止。"""
+    with _PKG_LOCK:
+        waiting = _PKG["waiting"]
+    if not waiting:
+        return {"ok": False, "error": "当前没有等待确认的安装任务"}
+    _PKG_CONFIRM["choice"] = "yes" if choice == "yes" else "no"
+    _PKG_CONFIRM["event"].set()
+    return {"ok": True}
+
+
+def _gh_with_hosts_fallback(target: str, what: str, attempt, retry):
+    """跑一次 GitHub 访问（读清单 / 下载）；全通道失败给一次「改 hosts」机会。
+
+    attempt = 首次尝试；retry = 改 hosts 后重试（下载重试要 direct 优先，所以
+    和 attempt 分开传）。失败（用户取消、改 hosts 失败、重试再失败）都已
+    _pfail 好，返回 None；成功返回 attempt/retry 的结果。
+    """
+    try:
+        return attempt()
+    except (urllib.error.URLError, OSError, LookupError) as exc:
+        kind = "too_slow" if getattr(exc, "slow", False) else "net_unreachable"
+        if not _await_hosts_confirm(target, kind, "%s失败：%s" % (what, exc)):
+            _pfail("cancelled", "用户未确认修改 hosts，安装中止", "", target)
+            return None
+        ok_fix, msg = pkgfeed.fix_github_hosts()
+        if not ok_fix:
+            _pfail(kind, "修改 hosts 失败：" + msg, "", target)
+            return None
+        _pstep(6, "已修改 hosts，重试" + what)
+        try:
+            return retry()
+        except (urllib.error.URLError, OSError, LookupError) as exc2:
+            kind2 = "too_slow" if getattr(exc2, "slow", False) else "net_unreachable"
+            _pfail(kind2, "改 hosts 后%s仍失败：%s" % (what, str(exc2)), "", target)
+            return None
+
+
 def _pkg_worker(target: str, source: str, name: str) -> None:
     path = ""
     channel = ""
@@ -795,10 +859,8 @@ def _pkg_worker(target: str, source: str, name: str) -> None:
 
     if source == "github":
         _pstep(3, "正在读取插件清单")
-        try:
-            cat = pkgfeed.catalog()
-        except (urllib.error.URLError, OSError, LookupError) as exc:
-            _pfail("net_unreachable", "拿不到插件清单：%s" % exc, "", target)
+        cat = _gh_with_hosts_fallback(target, "读清单", pkgfeed.catalog, pkgfeed.catalog)
+        if cat is None:
             return
         item = next((x for x in cat.get("items") or [] if x["backend"] == target), None)
         if not item:
@@ -810,20 +872,23 @@ def _pkg_worker(target: str, source: str, name: str) -> None:
 
         _pstep(6, "正在探测下载通道")
         dest = os.path.join("/tmp", os.path.basename(name))
-        try:
+
+        def _dl(order=None):
             # 传完整地址而不是文件名：24.10/25.12 的包在 release 资产里，
             # 22.03 的在 raw 目录里，两者的 URL 形状完全不同
-            channel, got = pkgfeed.download_any(
+            return pkgfeed.download_any(
                 item["url"], dest,
                 on_tick=lambda g, t: _pstep(
                     8 + int(g * 55 / max(1, t or g)), "正在下载 " + _hsize(g, t)),
-            )
-        except LookupError as exc:
-            # 「太慢」和「连不上」是两种病：前者换本地传包就行，后者要查网络。
-            # 混报成 net_unreachable 会让人以为是 DNS 挂了
-            kind = "too_slow" if getattr(exc, "slow", False) else "net_unreachable"
-            _pfail(kind, str(exc), "", target)
+                order=order)
+
+        # 改 hosts 后重试时把直连提最前：先走修正过的直连，别再撞一遍失败的反代
+        res = _gh_with_hosts_fallback(
+            target, "下载", _dl,
+            lambda: _dl(["direct"] + [c for c in pkgfeed.FILE_ORDER if c != "direct"]))
+        if res is None:
             return
+        channel, got = res
         total = got
         with _PKG_LOCK:
             _PKG.update(channel=channel, got=got, total=total)
@@ -930,7 +995,7 @@ def pkg_install(target: str = "", source: str = "github", name: str = "",
         _PKG.update(running=True, done=False, ok=False, pct=0, step="准备中",
                     target=target, source=source, name=os.path.basename(name or ""),
                     channel="", got=0, total=0, error={}, started=time.time(),
-                    finished=0.0, log=[])
+                    finished=0.0, log=[], waiting="")
     threading.Thread(target=_pkg_worker, args=(target, source, name),
                      name="proxy-pkg", daemon=True).start()
     return {"ok": True, "accepted": True, "state": pkg_status()}

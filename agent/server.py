@@ -488,6 +488,8 @@ class Handler(BaseHTTPRequestHandler):
                     str(body.get("confirm", ""))))
             elif path == "/api/v1/proxy/pkg/probe":
                 self._json(proxy.pkg_probe())
+            elif path == "/api/v1/proxy/pkg/confirm":
+                self._json(proxy.pkg_confirm(str(body.get("choice", ""))))
 
             # ---- 系统维护：安装包、路由器密码、软件包更新
             elif path == "/api/v1/system/install":

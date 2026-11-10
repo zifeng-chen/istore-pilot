@@ -31,6 +31,7 @@ OpenClash 例外，它只发 ``x86_64`` 和 ``aarch64`` 两种。
 
 from __future__ import annotations
 
+import json
 import os
 import platform
 import re
@@ -426,15 +427,19 @@ class DownloadFailed(LookupError):
         self.slow = slow
 
 
-def download_any(url: str, dest: str, on_tick=None) -> tuple[str, int]:
-    """按 FILE_ORDER 逐条试，慢的自动换下一条。
+def download_any(url: str, dest: str, on_tick=None,
+                 order: list[str] | None = None) -> tuple[str, int]:
+    """按顺序逐条试，慢的自动换下一条。
 
     不用 probe_channels 的结果排序：它测的是 3.4 KB 的 README，只能反映
     首包延迟。实测 ghfast 拉 README 只要 1.5 秒，拉 20 MB 的包 15 秒收 0 字节。
+
+    ``order`` 覆盖默认 FILE_ORDER：改过 hosts 之后重试时把 direct 提最前，
+    让它优先走「已经被 hosts 修正过的直连」，而不是再撞一遍失败的反代。
     """
     errors: list[str] = []
     slow_hits = 0
-    for cid in FILE_ORDER:
+    for cid in (order or FILE_ORDER):
         try:
             return cid, download(cid, url, dest, on_tick)
         except SlowChannel as exc:
@@ -460,3 +465,74 @@ def looks_like_run(path: str) -> bool:
         return head.startswith(b"#!") or head.startswith(b"\x1f\x8b")
     except OSError:
         return False
+
+
+# ------------------------------------------------------------- hosts 兜底
+
+
+# 下载链路会碰到的 github 域名：release 页面 / expanded_assets 走 github.com，
+# 22.03 的 raw 目录走 raw.githubusercontent.com，release 资产 302 到下面两个。
+GH_HOSTS = (
+    "github.com",
+    "raw.githubusercontent.com",
+    "objects.githubusercontent.com",
+    "release-assets.githubusercontent.com",
+    "codeload.github.com",
+)
+
+HOSTS_PATH = "/etc/hosts"
+
+
+def _doh_resolve(domain: str) -> list[str]:
+    """腾讯 DoH 查 A 记录，绕过本机被污染的 DNS。返回 IP 列表（去重保序）。"""
+    url = "https://doh.pub/dns-query?name=%s&type=A" % urllib.parse.quote(domain)
+    req = urllib.request.Request(url, headers={"Accept": "application/dns-json"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8", "replace"))
+    except (urllib.error.URLError, OSError, ValueError):
+        return []
+    ips: list[str] = []
+    seen: set[str] = set()
+    for a in data.get("Answer") or []:
+        ip = a.get("data", "")
+        if a.get("type") == 1 and ip and ip not in seen:
+            seen.add(ip)
+            ips.append(ip)
+    return ips
+
+
+def fix_github_hosts() -> tuple[bool, str]:
+    """往 /etc/hosts 写入 github 核心域名的真实 IP，绕过 DNS 污染。
+
+    返回 (ok, 说明)。写之前先把原文件备份到 /etc/hosts.bak，并清掉旧的
+    github 行，避免重复累积。只动 github 相关的行，其它内容原样保留。
+    """
+    try:
+        with open(HOSTS_PATH, "r", encoding="utf-8") as fh:
+            original = fh.read()
+    except OSError as exc:
+        return False, "读不到 %s：%s" % (HOSTS_PATH, exc)
+
+    try:
+        with open(HOSTS_PATH + ".bak", "w", encoding="utf-8") as fh:
+            fh.write(original)
+    except OSError:
+        pass  # 备份失败不阻断，原内容还在内存里
+
+    keep = [ln for ln in original.splitlines()
+            if not any(dom in ln for dom in GH_HOSTS)]
+    added: list[str] = []
+    for dom in GH_HOSTS:
+        for ip in _doh_resolve(dom):
+            keep.append("%s %s" % (ip, dom))
+            added.append("%s %s" % (ip, dom))
+    if not added:
+        return False, "通过 DoH 没查到 github 的可用 IP"
+
+    try:
+        with open(HOSTS_PATH, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(keep) + "\n")
+    except OSError as exc:
+        return False, "写 %s 失败：%s" % (HOSTS_PATH, exc)
+    return True, "已写入 %d 条 hosts（备份在 %s.bak）" % (len(added), HOSTS_PATH)

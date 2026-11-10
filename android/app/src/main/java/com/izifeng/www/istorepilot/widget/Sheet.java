@@ -77,12 +77,19 @@ public final class Sheet {
     /** 二次确认：取消 + 主按钮，danger=true 时主按钮是红色实心 */
     public static Dialog confirm(Context c, String title, CharSequence body,
                                  String okText, boolean danger, Runnable onOk) {
+        return confirm(c, title, body, okText, danger, onOk, null);
+    }
+
+    /** 同上，但「取消」也会回调 —— 用于「不确认就得中止」这类必须知道结果的场景 */
+    public static Dialog confirm(Context c, String title, CharSequence body,
+                                 String okText, boolean danger, Runnable onOk,
+                                 Runnable onCancel) {
         Builder b = new Builder(c);
         b.title(title);
         if (body != null && body.length() > 0) {
             b.body(body.toString());
         }
-        b.cancel("取消");
+        b.cancel("取消", onCancel);
         b.primary(okText, danger, (dd, w) -> {
             // 一定先关弹层再执行动作：primary() 只要传了监听就不会自动 dismiss，
             // 之前确认框点完「删除」还杵在原地，看起来像没生效
@@ -423,8 +430,18 @@ public final class Sheet {
 
         /** 取消按钮（灰底胶囊） */
         public Builder cancel(String text) {
+            return cancel(text, null);
+        }
+
+        /** 取消按钮，onCancel 非空时点掉也会回调（用于「不确认就中止」） */
+        public Builder cancel(String text, Runnable onCancel) {
             TextView b = button(text, R.color.surface_hi, R.color.text_primary, false);
-            b.setOnClickListener(v -> dismiss());
+            b.setOnClickListener(v -> {
+                dismiss();
+                if (onCancel != null) {
+                    onCancel.run();
+                }
+            });
             return this;
         }
 
