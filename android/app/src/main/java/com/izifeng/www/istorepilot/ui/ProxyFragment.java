@@ -1249,13 +1249,16 @@ public class ProxyFragment extends BaseFragment {
         if (hero != null) {
             hero.dot(R.color.hero_fg, none);
             hero.state.setText(none ? "都没在运行" : "运行中");
-            hero.badge.setText(none ? "未启用" : backendLabel);
-            // OpenClash 由 loadConfigs 用配置文件名覆盖；PassWall 没有配置文件，
-            // 用当前出口节点顶上，否则这里只剩一条横线
-            hero.title.setText(none ? "直连"
+            // 没运行时不能写「直连」：「直连」是「后端在跑、模式选了直连」的状态，
+            // 和「装了但没启用」是两回事。写成直连会让人以为自己在用直连模式，
+            // 实际是没启用任何代理
+            hero.badge.setText(none
+                    ? (installedMap.isEmpty() ? "未安装" : installedMap.size() + " 个已安装")
+                    : backendLabel);
+            hero.title.setText(none ? "未启用"
                     : (activeNode.isEmpty() ? "—" : pretty(activeNode)));
             hero.note.setText(none
-                    ? "两个代理后端都停着，所有流量走直连"
+                    ? "点上面任意一行启用；启用后这里显示当前出口"
                     : join(activeEngine, activeCount + " 个节点可用", modeLabel(modeValue)));
         }
 
@@ -1286,6 +1289,9 @@ public class ProxyFragment extends BaseFragment {
         // 这时候全是空转控件（点下去不是空白就是报错），摆着只会让人以为坏了。
         // 装了任意一个就原样恢复 —— 装完之后的界面不做任何改动。
         boolean blank = !anyInstalled;
+        // 装了但都没运行：模式切的是「正在跑的那个后端」的流量走向，没跑就没得切。
+        // 这时把它藏掉，否则用户会以为自己在挑模式，其实全是空转。
+        boolean idle = blank || none;
         if (emptyCard != null) {
             emptyCard.setVisibility(blank ? View.VISIBLE : View.GONE);
         }
@@ -1293,8 +1299,10 @@ public class ProxyFragment extends BaseFragment {
             hero.setVisibility(blank ? View.GONE : View.VISIBLE);
         }
         if (modeCard != null) {
-            modeCard.setVisibility(blank ? View.GONE : View.VISIBLE);
+            modeCard.setVisibility(idle ? View.GONE : View.VISIBLE);
         }
+        // 「配置与节点」保留：订阅管理还得用（先导订阅、再启用是正常顺序），
+        // 节点列表也可以先看看有哪些出口
         if (comboCard != null) {
             comboCard.setVisibility(blank ? View.GONE : View.VISIBLE);
         }
