@@ -882,10 +882,10 @@ def _pkg_worker(target: str, source: str, name: str) -> None:
                     8 + int(g * 55 / max(1, t or g)), "正在下载 " + _hsize(g, t)),
                 order=order)
 
-        # 改 hosts 后重试时把直连提最前：先走修正过的直连，别再撞一遍失败的反代
+        # 改 hosts 后重试：direct 提最前（hosts 已修正），其余按实测速度排
         res = _gh_with_hosts_fallback(
             target, "下载", _dl,
-            lambda: _dl(["direct"] + [c for c in pkgfeed.FILE_ORDER if c != "direct"]))
+            lambda: _dl(["direct"] + pkgfeed.rank_channels(item["url"])))
         if res is None:
             return
         channel, got = res

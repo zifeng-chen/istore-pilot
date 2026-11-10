@@ -54,18 +54,26 @@ BACKENDS = {
     "passwall2": {"label": "PassWall2", "prefix": "PassWall2_", "pkg": "luci-app-passwall2"},
 }
 
-# (id, 前缀, 说明)。前缀拼在真实地址前面，空串表示直连。
-# 实测（2026-11-06，经代理）：gh-proxy 下 21MB 包约 97 KB/s 能跑完；
-# 直连只有 16 KB/s；ghfast 小文件 1.5s 但下大文件 15 秒收 0 字节；
-# ghps.cc / ghproxy.cc / hub.gitmirror.com / github.moeyy.xyz / gitmirror.com
-# 全部 TLS 握手失败，不放进列表。
+# 内置兜底池：远程清单拉不到时用。(id, 前缀, 说明)，空前缀表示直连。
+# 实测（2026-11-10，真实直连环境）：15 个社区常见镜像里只有 gh-proxy / ghfast
+# 能用，且速度在 37～2379 KB/s 之间剧烈波动、两者快慢还会反转 —— 所以绝不能
+# 死顺序，必须每次下载前实测（见 rank_channels / download_any）。
 CHANNELS: list[tuple[str, str, str]] = [
     ("direct", "", "直连"),
     ("ghproxy", "https://gh-proxy.com/", "gh-proxy"),
     ("ghfast", "https://ghfast.top/", "ghfast"),
     ("ghproxy_net", "https://ghproxy.net/", "ghproxy.net"),
 ]
-BY_ID = {cid: prefix for cid, prefix, _ in CHANNELS}
+
+# 远程候选池：改仓库里的 agent/mirrors.json 即对所有设备生效，不用发版。
+# 必须用 jsDelivr 而不是 GitHub raw —— 后者本身就要加速，拉清单成了鸡生蛋。
+# jsDelivr 国内实测 0.49~1.99 秒可达。
+MIRRORS_URLS = (
+    "https://cdn.jsdelivr.net/gh/zifeng-chen/istore-pilot@main/agent/mirrors.json",
+    "https://gcore.jsdelivr.net/gh/zifeng-chen/istore-pilot@main/agent/mirrors.json",
+)
+_MIRRORS_TTL = 24 * 3600.0
+_mirrors_cache: dict = {"ts": 0.0, "channels": []}
 
 # 拉资产列表（HTML）时按这个顺序：直连最稳，镜像反代 HTML 会间歇性 TLS 断
 TEXT_ORDER = ["direct", "ghproxy", "ghfast", "ghproxy_net"]
@@ -168,13 +176,57 @@ def _open(url: str, timeout: float):
     return urllib.request.urlopen(req, timeout=timeout)
 
 
+def _remote_channels() -> list[tuple[str, str, str]]:
+    """从 jsDelivr 拉远程候选池；缓存 24 小时。拉不到返回空（用内置池）。"""
+    now = time.time()
+    if _mirrors_cache["channels"] and now - _mirrors_cache["ts"] < _MIRRORS_TTL:
+        return list(_mirrors_cache["channels"])
+    for url in MIRRORS_URLS:
+        try:
+            with _open(url, 8) as resp:
+                data = json.loads(resp.read().decode("utf-8", "replace"))
+            chans = [(str(c["id"]), str(c["prefix"]), str(c.get("label") or c["id"]))
+                     for c in data.get("channels") or []
+                     if c.get("id") and isinstance(c.get("prefix"), str)]
+            if chans:
+                _mirrors_cache.update(ts=now, channels=chans)
+                return list(chans)
+        except (urllib.error.URLError, OSError, ValueError, KeyError, TypeError):
+            continue
+    return []
+
+
+def all_channels() -> list[tuple[str, str, str]]:
+    """远程池 + 内置池合并（按 id 去重，远程优先）。"""
+    remote = _remote_channels()
+    seen = {c[0] for c in remote}
+    return remote + [c for c in CHANNELS if c[0] not in seen]
+
+
+_mirror_paths_cache: dict = {"ts": 0.0, "map": {}}
+
+
+def _mirror_paths() -> dict[str, str]:
+    """id → 前缀映射；缓存 5 分钟，避免每次下载都重新合并。"""
+    now = time.time()
+    if _mirror_paths_cache["map"] and now - _mirror_paths_cache["ts"] < 300:
+        return _mirror_paths_cache["map"]
+    m = {cid: prefix for cid, prefix, _ in all_channels()}
+    _mirror_paths_cache.update(ts=now, map=m)
+    return m
+
+
+def _mirror(channel: str, url: str) -> str:
+    return _mirror_paths().get(channel, "") + url
+
+
 def _get_text(url: str, order: list[str] | None = None,
               limit: int = 400000, timeout: float = 20) -> tuple[str, str]:
     """依次换通道拉一小段文本，返回 (正文, 通道 id)。"""
     last = ""
     for cid in (order or TEXT_ORDER):
         try:
-            with _open(BY_ID.get(cid, "") + url, timeout) as resp:
+            with _open(_mirror(cid, url), timeout) as resp:
                 body = resp.read(limit).decode("utf-8", "replace")
             if body:
                 return body, cid
@@ -369,10 +421,6 @@ class SlowChannel(Exception):
     """通道太慢，换一条重来。"""
 
 
-def _mirror(channel: str, url: str) -> str:
-    return BY_ID.get(channel, "") + url
-
-
 def download(channel: str, url: str, dest: str, on_tick=None,
              timeout: float = 600.0, floor_bps: float = 20 * 1024) -> int:
     """流式下载，边写边回调 ``on_tick(got, total)``。返回字节数。
@@ -430,19 +478,77 @@ class DownloadFailed(LookupError):
         self.slow = slow
 
 
+PROBE_BYTES = 128 * 1024   # 探针大小：够区分快慢，又不会在慢镜像上等太久
+                            # （镜像实测只有 11~112 KB/s，下 256KB 要 2~23 秒）
+
+
+def _probe_speed(cid: str, url: str, timeout: float = 3.0) -> float | None:
+    """下 PROBE_BYTES 测真实带宽（B/s）；失败返回 None。
+
+    用 Range 只取开头一段：要的是「这条路能跑多快」，不是「文件能不能下完」。
+    镜像不支持 Range 时会回 200 全量，读够 PROBE_BYTES 就断开，同样能测。
+    """
+    started = time.time()
+    got = 0
+    try:
+        req = urllib.request.Request(
+            _mirror(cid, url),
+            headers={"User-Agent": UA, "Range": "bytes=0-%d" % (PROBE_BYTES - 1)})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            while got < PROBE_BYTES:
+                chunk = resp.read(65536)
+                if not chunk:
+                    break
+                got += len(chunk)
+                if time.time() - started > timeout:
+                    break
+    except (urllib.error.URLError, OSError, ValueError):
+        return None
+    elapsed = time.time() - started
+    if got <= 0 or elapsed <= 0:
+        return None
+    return got / elapsed
+
+
+def rank_channels(url: str, timeout: float = 3.0) -> list[str]:
+    """并发实测各反代通道真实带宽，返回按速度降序的可用通道 id。
+
+    不能靠死顺序：实测 gh-proxy 和 ghfast 会在 37～2379 KB/s 之间各自跳动，
+    且两者快慢会反转。只有现场测才选得对。
+
+    不探 direct：github 直连基本连不通，探它只会白等一个超时（实测拖慢 6 秒）。
+    直连只在 download_any 里当「反代全挂」的最后兜底。
+    """
+    chans = [c for c in all_channels() if c[0] != "direct"]
+    if not chans:
+        return []
+    with ThreadPoolExecutor(max_workers=len(chans)) as pool:
+        results = list(pool.map(lambda c: (c[0], _probe_speed(c[0], url, timeout)), chans))
+    ok = [(cid, sp) for cid, sp in results if sp]
+    ok.sort(key=lambda x: -x[1])
+    return [cid for cid, _ in ok]
+
+
 def download_any(url: str, dest: str, on_tick=None,
                  order: list[str] | None = None) -> tuple[str, int]:
-    """按顺序逐条试，慢的自动换下一条。
+    """先并发实测带宽、按快慢逐条试；中途掉速自动换下一条。
 
-    不用 probe_channels 的结果排序：它测的是 3.4 KB 的 README，只能反映
-    首包延迟。实测 ghfast 拉 README 只要 1.5 秒，拉 20 MB 的包 15 秒收 0 字节。
-
-    ``order`` 覆盖默认 FILE_ORDER：改过 hosts 之后重试时把 direct 提最前，
-    让它优先走「已经被 hosts 修正过的直连」，而不是再撞一遍失败的反代。
+    ``order`` 覆盖默认：改过 hosts 之后重试时把 direct 提最前，让它优先走
+    「已经被 hosts 修正过的直连」，而不是再撞一遍失败的反代。
     """
+    if order:
+        ranked = list(order)
+    else:
+        ranked = rank_channels(url)
+        if ranked:
+            ranked.append("direct")   # 探针只测反代，直连当最后兜底排末尾
+        else:
+            # 探针全失败（可能镜像不支持 Range / 都慢）：退回内置死顺序再试一次全量，
+            # 全量流式下载和 Range 探针是两条不同的路，不能因为探针失败就放弃。
+            ranked = ["direct"] + [c[0] for c in CHANNELS if c[0] != "direct"]
     errors: list[str] = []
     slow_hits = 0
-    for cid in (order or FILE_ORDER):
+    for cid in ranked:
         try:
             return cid, download(cid, url, dest, on_tick)
         except SlowChannel as exc:
