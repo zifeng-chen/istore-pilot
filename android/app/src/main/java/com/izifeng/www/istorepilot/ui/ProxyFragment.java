@@ -111,6 +111,22 @@ public class ProxyFragment extends BaseFragment {
     private String pkgSource = "github";
     private String pkgName = "";
 
+    // ---- 一个插件都没装时的引导卡
+    // 这时运行模式 / 配置 / 节点全是空转控件，整页换成一张卡：选插件 → 安装。
+    // 装了任意一个就整页恢复原样（那张卡隐藏，其余照旧），装完的界面不做任何改动。
+    private Ui.Card emptyCard;
+    private View modeCard;
+    private View comboCard;
+    private View pkgCard;
+    /** 引导卡里选中的插件，默认 OpenClash */
+    private String pickTarget = "openclash";
+    private final java.util.Map<String, LinearLayout> pickRows = new java.util.HashMap<>();
+    private final java.util.Map<String, Radio> pickRadios = new java.util.HashMap<>();
+    /** 「全部安装」的排队：Agent 同时只跑一个安装任务，得一个装完再起下一个 */
+    private final java.util.ArrayDeque<String> installQueue = new java.util.ArrayDeque<>();
+    /** 仓库清单里的包名，只用来写确认框那句话；取不到就留空，后端自己会查 */
+    private final java.util.Map<String, String> catalogFiles = new java.util.HashMap<>();
+
     /**
      * 选安装包。必须在字段初始化时注册 —— 放进 build() 会抛
      * "attempting to register while current state is RESUMED"。
@@ -173,6 +189,7 @@ public class ProxyFragment extends BaseFragment {
         tvModeHint.setLineSpacing(Ui.dp(c, 2), 1f);
         mode.addView(tvModeHint);
         root.addView(mode);
+        modeCard = mode;
 
         // ---------------------------------------------------------- 配置与节点
         Ui.Card combo = Ui.card(c);
@@ -229,6 +246,7 @@ public class ProxyFragment extends BaseFragment {
         combo.addView(nodesBox);
 
         root.addView(combo);
+        comboCard = combo;
 
         // ---------------------------------------------------------- 安装包
         // 这两个插件不在任何软件源里：卸了就装不回来，GitHub 又常常打不开。
@@ -243,6 +261,185 @@ public class ProxyFragment extends BaseFragment {
         pkgSlot.addView(Ui.chevron(c));
         tapRow(pkgSlot, this::openPkgSheet);
         root.addView(pkg);
+        pkgCard = pkg;
+
+        buildEmptyCard(c, root);
+    }
+
+    /**
+     * 一个插件都没装时唯一的界面：一张卡选插件、装插件。
+     *
+     * 为什么要单做一屏：这时候「运行模式 / 配置与节点 / 节点」全是空转控件，
+     * 点下去不是报错就是空白，摆在那儿只会让人以为坏了。
+     */
+    private void buildEmptyCard(Context c, LinearLayout root) {
+        emptyCard = Ui.card(c);
+        Ui.cardPadding(emptyCard, 0);
+        Ui.cardTitle(c, emptyCard, Glyph.UPLOAD,
+                "还没安装代理插件", "装一个才能管节点和订阅");
+
+        TextView tip = Ui.text(c,
+                "两个后端可以同时装，但同一时间只能跑一个。"
+                        + "不确定就先装 OpenClash，规则分流用得最多。",
+                11.5f, R.color.text_secondary);
+        tip.setLineSpacing(Ui.dp(c, 2), 1f);
+        tip.setPadding(Ui.dp(c, 16), 0, Ui.dp(c, 16), Ui.dp(c, 6));
+        emptyCard.addView(tip);
+
+        emptyCard.addView(pickRow(c, "openclash", "OpenClash",
+                "规则分流，支持订阅与测速"));
+        emptyCard.addView(pickRow(c, "passwall", "PassWall",
+                "轻量，协议支持面广"));
+
+        TextView go = Ui.filled(c, "安装所选", R.color.primary, R.color.on_primary);
+        LinearLayout.LayoutParams glp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        glp.leftMargin = Ui.dp(c, 16);
+        glp.rightMargin = Ui.dp(c, 16);
+        glp.topMargin = Ui.dp(c, 14);
+        go.setOnClickListener(v -> installSelected());
+        emptyCard.addView(go, glp);
+
+        // 次按钮用描边：实底浅绿太淡，看着像禁用
+        TextView all = Ui.text(c, "全部安装", 15f, R.color.primary);
+        all.setTypeface(android.graphics.Typeface.create(
+                "sans-serif-medium", android.graphics.Typeface.NORMAL));
+        all.setGravity(Gravity.CENTER);
+        all.setPadding(Ui.dp(c, 16), Ui.dp(c, 11), Ui.dp(c, 16), Ui.dp(c, 11));
+        GradientDrawable allBg = new GradientDrawable();
+        allBg.setCornerRadius(Ui.dp(c, 100));
+        allBg.setColor(0x00000000);
+        allBg.setStroke(Ui.dp(c, 1.5f), Ui.color(c, R.color.primary));
+        all.setBackground(allBg);
+        LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        alp.leftMargin = Ui.dp(c, 16);
+        alp.rightMargin = Ui.dp(c, 16);
+        alp.topMargin = Ui.dp(c, 8);
+        all.setOnClickListener(v -> installAll());
+        emptyCard.addView(all, alp);
+
+        TextView allNote = Ui.text(c, "OpenClash + PassWall 依次装，约 5–10 分钟",
+                11f, R.color.text_secondary);
+        allNote.setGravity(Gravity.CENTER);
+        allNote.setPadding(0, Ui.dp(c, 6), 0, Ui.dp(c, 14));
+        emptyCard.addView(allNote);
+
+        // 仓库下载经常只有几 KB/s，本地传包是不依赖外网的那条路
+        emptyCard.addView(Ui.hairline(c, 16));
+        LinearLayout local = Ui.row(c);
+        local.setGravity(Gravity.CENTER_VERTICAL);
+        local.setPadding(Ui.dp(c, 16), Ui.dp(c, 12), Ui.dp(c, 16), Ui.dp(c, 12));
+        LinearLayout localCol = Ui.column(c);
+        localCol.addView(Ui.text(c, "从手机里选安装包", 14f, R.color.primary));
+        TextView localSub = Ui.text(c, "自己下载好的 .run / .ipk，不用路由器联网",
+                11f, R.color.text_secondary);
+        localSub.setPadding(0, Ui.dp(c, 2), 0, 0);
+        localCol.addView(localSub);
+        local.addView(localCol, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        local.addView(Ui.chevron(c));
+        local.setClickable(true);
+        local.setOnClickListener(v -> pickPkgFile());
+        emptyCard.addView(local);
+
+        root.addView(emptyCard);
+        emptyCard.setVisibility(View.GONE);
+        paintPick();
+    }
+
+    /** 引导卡里的一行：名称 + 一句说明 + 右侧单选点 */
+    private LinearLayout pickRow(Context c, String id, String label, String desc) {
+        LinearLayout row = Ui.row(c);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(Ui.dp(c, 14), Ui.dp(c, 11), Ui.dp(c, 14), Ui.dp(c, 11));
+
+        LinearLayout col = Ui.column(c);
+        TextView name = Ui.text(c, label, 14.5f, R.color.text_primary);
+        col.addView(name);
+        TextView sub = Ui.text(c, desc, 11.5f, R.color.text_secondary);
+        sub.setPadding(0, Ui.dp(c, 3), 0, 0);
+        col.addView(sub);
+        row.addView(col, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        // 单选点用现成的 Radio：外环 + 内点都是自绘的，不随字号抖
+        Radio radio = new Radio(c, R.color.primary);
+        radio.setOn(id.equals(pickTarget));
+        pickRadios.put(id, radio);
+        row.addView(radio);
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.leftMargin = Ui.dp(c, 16);
+        lp.rightMargin = Ui.dp(c, 16);
+        lp.topMargin = Ui.dp(c, 8);
+        row.setLayoutParams(lp);
+
+        row.setClickable(true);
+        row.setFocusable(true);
+        row.setOnClickListener(v -> {
+            pickTarget = id;
+            paintPick();
+        });
+        pickRows.put(id, row);
+        return row;
+    }
+
+    /** 选中态：选中的那行加绿色描边和淡绿底，其余是浅灰描边 */
+    private void paintPick() {
+        Context c = ctx();
+        for (java.util.Map.Entry<String, LinearLayout> e : pickRows.entrySet()) {
+            boolean on = e.getKey().equals(pickTarget);
+            GradientDrawable bg = new GradientDrawable();
+            bg.setCornerRadius(Ui.dp(c, 12));
+            if (on) {
+                bg.setColor(Ui.alpha(Ui.color(c, R.color.primary), 0.07f));
+                bg.setStroke(Ui.dp(c, 1.5f), Ui.color(c, R.color.primary));
+            } else {
+                bg.setColor(Ui.color(c, R.color.app_bg));
+                bg.setStroke(Ui.dp(c, 1), Ui.alpha(Ui.color(c, R.color.text_secondary), 0.22f));
+            }
+            e.getValue().setBackground(bg);
+            Radio radio = pickRadios.get(e.getKey());
+            if (radio != null) {
+                radio.setOn(on);
+            }
+        }
+    }
+
+    private static String pluginLabel(String id) {
+        return "passwall".equals(id) ? "PassWall" : "OpenClash";
+    }
+
+    private void installSelected() {
+        String file = catalogFiles.getOrDefault(pickTarget, "");
+        askPkg(pickTarget, "github", file);
+    }
+
+    /** 队列里的下一个：已经确认过一次了，不再弹确认框 */
+    private void startQueued(String target) {
+        pkgSource = "github";
+        pkgName = catalogFiles.getOrDefault(target, "");
+        doPkgInstall(target);
+    }
+
+    /**
+     * 全部安装 = OpenClash + PassWall。
+     *
+     * PassWall2 不在 Agent 的白名单里（它和 PassWall 装的时候就冲突），
+     * 所以「全部」只能是这两个，别在这里凑三个。
+     */
+    private void installAll() {
+        Sheet.confirm(ctx(), "全部安装",
+                "会依次装 OpenClash 和 PassWall，两个都装完后自己挑一个启动。"
+                        + "PassWall2 与 PassWall 冲突，不会装。"
+                        + "单个包 20–85 MB，网络不好时可能中途失败。",
+                "开始", false, () -> {
+                    installQueue.clear();
+                    installQueue.add("passwall");
+                    askPkg("openclash", "github", catalogFiles.getOrDefault("openclash", ""));
+                });
     }
 
     // ------------------------------------------------------------ 安装包
@@ -495,10 +692,18 @@ public class ProxyFragment extends BaseFragment {
         pkgSource = source;
         pkgName = name;
         String label = "openclash".equals(target) ? "OpenClash" : "PassWall";
-        String body = "local".equals(source)
-                ? "会把刚上传的 " + name + " 装到路由器上，过程中会以管理员权限执行包里的安装脚本。"
-                : "会从仓库下载 " + name + " 再安装。包比较大时（PassWall 约 80 MB）"
-                + "可能要十几分钟，中途别退出。";
+        String body;
+        if ("local".equals(source)) {
+            body = "会把刚上传的 " + name + " 装到路由器上，"
+                    + "过程中会以管理员权限执行包里的安装脚本。";
+        } else if (name.isEmpty()) {
+            // 引导卡里还没拿到清单时点安装，服务端会自己查包名，这里就不报文件名
+            body = "会从仓库下载对应的安装包再安装。包比较大时（PassWall 约 80 MB）"
+                    + "可能要十几分钟，中途别退出。";
+        } else {
+            body = "会从仓库下载 " + name + " 再安装。包比较大时（PassWall 约 80 MB）"
+                    + "可能要十几分钟，中途别退出。";
+        }
         Sheet.confirm(ctx(), "安装 " + label, body, "开始安装", false,
                 () -> doPkgInstall(target));
     }
@@ -575,9 +780,23 @@ public class ProxyFragment extends BaseFragment {
                         stopPkgPoll();
                         load(true);
                         if (p.optBoolean("ok", false)) {
+                            // 「全部安装」是排队跑的：前一个装完再起下一个，
+                            // 因为 Agent 同时只能跑一个安装任务
+                            if (!installQueue.isEmpty()) {
+                                String next = installQueue.poll();
+                                Toast.makeText(ctx(), "继续安装 " + pluginLabel(next) + "…",
+                                        Toast.LENGTH_SHORT).show();
+                                startQueued(next);
+                                return;
+                            }
                             Toast.makeText(ctx(), "装好了 · 导入订阅后再启动",
                                     Toast.LENGTH_LONG).show();
                             return;
+                        }
+                        if (!installQueue.isEmpty()) {
+                            installQueue.clear();
+                            Toast.makeText(ctx(), "全部安装已中断",
+                                    Toast.LENGTH_LONG).show();
                         }
                         // 同一个失败只提示一次。轮询可能被重复挂上（连点、切页签回来），
                         // 每次都弹的话，用户关掉一个又冒一个
@@ -835,9 +1054,73 @@ public class ProxyFragment extends BaseFragment {
         if (tvPkgState != null && tvPkgState.getText().length() == 0 && anyInstalled) {
             tvPkgState.setText("已装好");
         }
+
+        // 一个插件都没装时，整页只剩那张引导卡：运行模式、配置与节点、节点、安装包
+        // 这时候全是空转控件（点下去不是空白就是报错），摆着只会让人以为坏了。
+        // 装了任意一个就原样恢复 —— 装完之后的界面不做任何改动。
+        boolean blank = !anyInstalled;
+        if (emptyCard != null) {
+            emptyCard.setVisibility(blank ? View.VISIBLE : View.GONE);
+        }
+        if (hero != null) {
+            hero.setVisibility(blank ? View.GONE : View.VISIBLE);
+        }
+        if (modeCard != null) {
+            modeCard.setVisibility(blank ? View.GONE : View.VISIBLE);
+        }
+        if (comboCard != null) {
+            comboCard.setVisibility(blank ? View.GONE : View.VISIBLE);
+        }
+        if (pkgCard != null) {
+            pkgCard.setVisibility(blank ? View.GONE : View.VISIBLE);
+        }
+        if (blank) {
+            loadCatalogFiles();
+        }
+
         renderMode();
         loadConfigs();
         loadSubCount();
+    }
+
+    /**
+     * 取一份仓库清单，只为把包名写进安装确认框。
+     *
+     * 拿不到不影响安装 —— Agent 收到 source=github 会自己查清单取包，
+     * 这里传空名字就行，确认框里换成一句不带文件名的话。
+     */
+    private void loadCatalogFiles() {
+        if (!catalogFiles.isEmpty()) {
+            return;
+        }
+        Api.get(ctx(), "/api/v1/proxy/pkg/catalog", new Cb() {
+            @Override
+            public void onData(JSONObject data, boolean fromCache) {
+                if (!isAdded() || data == null) {
+                    return;
+                }
+                org.json.JSONArray items = data.optJSONArray("items");
+                if (items == null) {
+                    return;
+                }
+                for (int i = 0; i < items.length(); i++) {
+                    JSONObject it = items.optJSONObject(i);
+                    if (it == null) {
+                        continue;
+                    }
+                    String backend = it.optString("backend", "");
+                    String file = it.optString("file", "");
+                    if (!backend.isEmpty() && !file.isEmpty()) {
+                        catalogFiles.put(backend, file);
+                    }
+                }
+            }
+
+            @Override
+            public void onError(String message) {
+                // 清单只是用来写文案的，拿不到就算了
+            }
+        });
     }
 
     private static String join(String... parts) {
