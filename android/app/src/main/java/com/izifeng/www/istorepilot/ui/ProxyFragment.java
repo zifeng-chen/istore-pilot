@@ -1,5 +1,6 @@
 package com.izifeng.www.istorepilot.ui;
 
+import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Typeface;
@@ -7,6 +8,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -15,6 +17,7 @@ import com.izifeng.www.istorepilot.R;
 import com.izifeng.www.istorepilot.SubscriptionActivity;
 import com.izifeng.www.istorepilot.api.Api;
 import com.izifeng.www.istorepilot.api.Cb;
+import com.izifeng.www.istorepilot.util.Fmt;
 import com.izifeng.www.istorepilot.util.Ui;
 import com.izifeng.www.istorepilot.widget.Glyph;
 import com.izifeng.www.istorepilot.widget.Hero;
@@ -102,7 +105,8 @@ public class ProxyFragment extends BaseFragment {
 
     // ---- 安装包：本地传包 / 从仓库下
     /** 「安装包」那行的状态文字，安装中要实时改 */
-    private TextView tvPkgState;
+    /** 「卸载插件」那行右侧：装了几个 */
+    private TextView tvPkgCount;
     /** 安装进度轮询。任务在 Agent 侧跑，页面销毁不会影响安装本身 */
     private final android.os.Handler pkgHandler =
             new android.os.Handler(android.os.Looper.getMainLooper());
@@ -126,6 +130,29 @@ public class ProxyFragment extends BaseFragment {
     private final java.util.ArrayDeque<String> installQueue = new java.util.ArrayDeque<>();
     /** 仓库清单里的包名，只用来写确认框那句话；取不到就留空，后端自己会查 */
     private final java.util.Map<String, String> catalogFiles = new java.util.HashMap<>();
+    /** 清单只拉一次，失败也不重试 —— 它只影响确认框里那半句文案 */
+    private boolean catalogTried;
+    /** 页面打开时是否已经问过「有没有在跑的任务」 */
+    private boolean pkgResumeTried;
+
+    /** 「当前配置」整行 + 它下面那条分隔线。PassWall 用不到，要一起藏 */
+    private View cfgRow;
+    private View cfgHair;
+    private TextView comboSub;
+
+    /** 右上角「安装状态」胶囊：安装中才出现，装完或失败就消失。
+     *  进度原来只写在「插件安装」那一行小字里，滑走就看不见了。 */
+    private TextView pkgChip;
+    private Dialog pkgDialog;
+    private TextView pkgDlgStep;
+    private TextView pkgDlgPct;
+    private TextView pkgDlgSize;
+    private android.widget.ProgressBar pkgDlgBar;
+    /** 上传进度弹窗，和安装那条是两段，分开显示 */
+    private Dialog upDialog;
+    private TextView upPct;
+    private TextView upStep;
+    private android.widget.ProgressBar upBar;
 
     /**
      * 选安装包。必须在字段初始化时注册 —— 放进 build() 会抛
@@ -194,9 +221,12 @@ public class ProxyFragment extends BaseFragment {
         // ---------------------------------------------------------- 配置与节点
         Ui.Card combo = Ui.card(c);
         Ui.cardPadding(combo, 3);  // 最后一行是分组标题，底部留 3
-        Ui.cardTitle(c, combo, Glyph.LIST, "配置与节点", "换配置会重启内核，断网十几秒");
+        comboSub = Ui.cardTitleLive(c, combo, Glyph.LIST, "配置与节点",
+                "换配置会重启内核，断网十几秒").sub;
 
-        // 当前配置：整行可点，右侧「切换」胶囊给出明确的可操作性
+        // 当前配置：整行可点，右侧「切换」胶囊给出明确的可操作性。
+        // 这一行只对 OpenClash 有意义 —— PassWall 没有「配置文件」，
+        // 它的节点直接来自订阅，所以下面会按后端把这一行藏掉
         LinearLayout cfgSlot = Ui.infoRow(c, combo, Glyph.KEY, "当前配置", true);
         tvCurConfig = Ui.num(c, "读取中…", 13.5f, R.color.text_primary);
         tvCurConfig.setGravity(Gravity.END);
@@ -211,6 +241,7 @@ public class ProxyFragment extends BaseFragment {
         splp.leftMargin = Ui.dp(c, 8);
         cfgSlot.addView(switchPill, splp);
         tapRow(cfgSlot, this::showConfigPicker);
+        cfgRow = (View) cfgSlot.getParent();
 
         // 订阅：增删改在独立页面，这里只给入口和条数
         LinearLayout subSlot = Ui.infoRow(c, combo, Glyph.UPLOAD, "订阅管理", false);
@@ -218,6 +249,13 @@ public class ProxyFragment extends BaseFragment {
         subSlot.addView(tvSubCount);
         subSlot.addView(Ui.chevron(c));
         tapRow(subSlot, this::openSubscriptions);
+
+        // infoRow(first=false) 会在行前插一条分隔线，藏「当前配置」时得连它一起藏，
+        // 否则标题下面会留一条悬空的横线
+        int cfgIdx = combo.indexOfChild(cfgRow);
+        if (cfgIdx >= 0 && cfgIdx + 1 < combo.getChildCount()) {
+            cfgHair = combo.getChildAt(cfgIdx + 1);
+        }
 
         // 隐藏超时节点：显示偏好存在路由器上（不是这台手机的设置），
         // 几台设备看到的是同一份列表；Web 端读的也是这个值
@@ -248,22 +286,131 @@ public class ProxyFragment extends BaseFragment {
         root.addView(combo);
         comboCard = combo;
 
-        // ---------------------------------------------------------- 安装包
-        // 这两个插件不在任何软件源里：卸了就装不回来，GitHub 又常常打不开。
-        // 所以给两条不依赖软件源的路 —— 手机里传包 / 从仓库下。
+        // ---------------------------------------------------------- 插件管理
+        // 原来叫「安装包」，只有一行「插件安装」通向一个弹窗。现在拆成两件正事：
+        // 传包装、卸插件。仓库下载那条路放到 hero 里未安装的行上（点一下就装），
+        // 这里就不再重复列一遍清单了。
         Ui.Card pkg = Ui.card(c);
-        Ui.cardTitle(c, pkg, Glyph.UPLOAD, "安装包", "本地传包，不用路由器联网");
-        LinearLayout pkgSlot = Ui.infoRow(c, pkg, Glyph.UPLOAD, "插件安装", true);
-        tvPkgState = Ui.num(c, "", 13.5f, R.color.text_secondary);
-        tvPkgState.setSingleLine(true);
-        tvPkgState.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        pkgSlot.addView(tvPkgState);
-        pkgSlot.addView(Ui.chevron(c));
-        tapRow(pkgSlot, this::openPkgSheet);
+        Ui.cardTitle(c, pkg, Glyph.UPLOAD, "插件管理", "上传安装包 / 卸载插件");
+
+        LinearLayout upSlot = Ui.infoRow(c, pkg, Glyph.UPLOAD, "上传安装包", true);
+        TextView upNote = Ui.num(c, "选 .run / .ipk", 12f, R.color.text_secondary);
+        upSlot.addView(upNote);
+        upSlot.addView(Ui.chevron(c));
+        tapRow(upSlot, this::pickPkgFile);
+
+        LinearLayout unSlot = Ui.infoRow(c, pkg, Glyph.LIST, "卸载插件", false);
+        tvPkgCount = Ui.num(c, "", 13f, R.color.text_secondary);
+        unSlot.addView(tvPkgCount);
+        unSlot.addView(Ui.chevron(c));
+        tapRow(unSlot, () -> askUninstall(installedAsItems()));
+
         root.addView(pkg);
         pkgCard = pkg;
 
         buildEmptyCard(c, root);
+        buildPkgChip(c);
+        resumePkgIfRunning();
+    }
+
+    /**
+     * 页面刚打开时接上还在跑的任务。
+     *
+     * 安装任务跑在路由器上，App 重启不会中断 —— 但进度也不会自己回来，
+     * 不接的话用户会以为装丢了。
+     */
+    private void resumePkgIfRunning() {
+        if (pkgResumeTried) {
+            return;
+        }
+        pkgResumeTried = true;
+        Api.get(ctx(), "/api/v1/proxy/install", new Cb() {
+            @Override
+            public void onData(JSONObject data, boolean fromCache) {
+                if (!isAdded() || fromCache) {
+                    return;
+                }
+                JSONObject p = data.optJSONObject("pkg");
+                if (p != null && p.optBoolean("running", false)) {
+                    applyPkgState(p);
+                    startPkgPoll();
+                }
+            }
+
+            @Override
+            public void onError(String message) {
+                // 接不上就算了，下次刷新再说
+            }
+        });
+    }
+
+    /** 右上角那颗「安装状态」胶囊，安装中才出现 */
+    private void buildPkgChip(Context c) {
+        pkgChip = Ui.text(c, "", 12f, R.color.on_primary);
+        pkgChip.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        pkgChip.setPadding(Ui.dp(c, 12), Ui.dp(c, 7), Ui.dp(c, 12), Ui.dp(c, 7));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(Ui.dp(c, 100));
+        bg.setColor(Ui.color(c, R.color.primary));
+        pkgChip.setBackground(bg);
+        pkgChip.setVisibility(View.GONE);
+        pkgChip.setOnClickListener(v -> showPkgDialog());
+
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.gravity = Gravity.TOP | Gravity.END;
+        lp.topMargin = Ui.dp(c, 14);
+        lp.rightMargin = Ui.dp(c, 18);
+        if (overlay != null) {
+            overlay.addView(pkgChip, lp);
+        }
+    }
+
+    /** 打开（或重新打开）安装进度弹窗。弹窗只是「看」，关掉不影响后台任务 */
+    private void showPkgDialog() {
+        if (pkgDialog != null && pkgDialog.isShowing()) {
+            return;
+        }
+        Context c = ctx();
+        LinearLayout box = Ui.column(c);
+        box.setPadding(Ui.dp(c, 2), Ui.dp(c, 2), Ui.dp(c, 2), Ui.dp(c, 2));
+
+        pkgDlgPct = Ui.num(c, "0%", 28f, R.color.primary);
+        box.addView(pkgDlgPct);
+
+        pkgDlgStep = Ui.text(c, "准备中", 13.5f, R.color.text_primary);
+        pkgDlgStep.setPadding(0, Ui.dp(c, 2), 0, Ui.dp(c, 12));
+        box.addView(pkgDlgStep);
+
+        pkgDlgBar = new android.widget.ProgressBar(c, null,
+                android.R.attr.progressBarStyleHorizontal);
+        pkgDlgBar.setMax(100);
+        pkgDlgBar.setProgress(0);
+        if (pkgDlgBar.getProgressDrawable() != null) {
+            pkgDlgBar.getProgressDrawable().setColorFilter(
+                    Ui.color(c, R.color.primary), android.graphics.PorterDuff.Mode.SRC_IN);
+        }
+        box.addView(pkgDlgBar, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(c, 6)));
+
+        pkgDlgSize = Ui.text(c, "", 11.5f, R.color.text_secondary);
+        pkgDlgSize.setPadding(0, Ui.dp(c, 8), 0, 0);
+        box.addView(pkgDlgSize);
+
+        pkgDialog = Sheet.custom(c, "安装状态").content(box).cancel("关闭").show();
+        pkgDialog.setOnDismissListener(d -> pkgDialog = null);
+    }
+
+    /** 关掉安装进度弹窗，但不动后台任务 —— 任务在路由器上跑，关窗只是不看 */
+    private void closePkgDialog() {
+        if (pkgDialog != null && pkgDialog.isShowing()) {
+            pkgDialog.dismiss();
+        }
+        pkgDialog = null;
+        pkgDlgStep = null;
+        pkgDlgPct = null;
+        pkgDlgSize = null;
+        pkgDlgBar = null;
     }
 
     /**
@@ -449,98 +596,6 @@ public class ProxyFragment extends BaseFragment {
     //   /api/v1/proxy/pkg/install —— 走一个完整 .run（带内核），本地传或仓库下
     // 这里用的是后者，因为前者在「源里没有 + GitHub 打不开」时就彻底没辙了。
 
-    private void openPkgSheet() {
-        // 先拿清单再弹窗：弹窗内容是静态的，异步回来再改会闪
-        Api.get(ctx(), "/api/v1/proxy/pkg/catalog", new Cb() {
-            @Override
-            public void onData(JSONObject data, boolean fromCache) {
-                if (!isAdded()) {
-                    return;
-                }
-                // 缓存里可能存着上一次的清单（甚至是失败时那份空的）。
-                // 拿它先弹一次、等网络结果再弹一次，屏幕上就会叠两个「安装包」。
-                // 清单本来就该是最新的，等真实结果即可
-                if (fromCache) {
-                    return;
-                }
-                showPkgSheet(data);
-            }
-
-            @Override
-            public void onError(String message) {
-                if (!isAdded()) {
-                    return;
-                }
-                // 清单拉不到不等于不能装 —— 本地传包这条路与网络无关
-                showPkgSheet(null);
-            }
-        });
-    }
-
-    private void showPkgSheet(JSONObject data) {
-        Context c = ctx();
-        JSONArray items = data == null ? null : data.optJSONArray("items");
-        String channel = data == null ? "" : data.optString("channel", "");
-        Sheet.Builder box = Sheet.custom(c, "安装包");
-
-        StringBuilder intro = new StringBuilder();
-        intro.append("从手机里装：手机上有 .run / .ipk 就走这条，不需要路由器能上外网。");
-        if (items == null || items.length() == 0) {
-            intro.append(installedMap.isEmpty()
-                    ? "\n仓库清单现在读不到，只能用本地文件。"
-                    : "\n仓库清单现在读不到，但本地传包和卸载都不受影响。");
-        } else {
-            // 仓库按系统版本 + 架构分开发：24.10/25.12 在另一个仓库的 release 里，
-            // 同一版本还分 x86_64 / aarch64_a53 / _a72 / _generic
-            String fam = data.optString("family", "");
-            String arch = data.optString("arch", "");
-            if (!fam.isEmpty()) {
-                intro.append("\n已按当前系统匹配：").append(fam);
-                if (!arch.isEmpty()) {
-                    intro.append(" · ").append(arch);
-                }
-            }
-            if (!channel.isEmpty()) {
-                intro.append("\n下载通道：").append(channel);
-            }
-        }
-        box.bodyLeft(intro.toString());
-
-        box.row("从本地文件安装", false, false, v -> {
-            box.dismiss();
-            pickPkgFile();
-        });
-
-        if (items != null) {
-            for (int i = 0; i < items.length(); i++) {
-                JSONObject it = items.optJSONObject(i);
-                if (it == null) {
-                    continue;
-                }
-                final String target = it.optString("backend", "");
-                final String file = it.optString("file", "");
-                box.row(it.optString("label", target) + " " + it.optString("version", "")
-                                + " · " + pkgNote(it), false, false, v -> {
-                            box.dismiss();
-                            askPkg(target, "github", file);
-                        });
-            }
-        }
-
-        // 装了却卸不掉，等于只给了半条命。这一行只看「装没装」，不看仓库清单 ——
-        // 节点不通时清单拉不到，但插件确实还在机器上，这时候更得能卸
-        if (!installedMap.isEmpty()) {
-            final JSONArray snapshot = installedAsItems();
-            box.row("卸载插件…", true, false, v -> {
-                box.dismiss();
-                askUninstall(snapshot);
-            });
-        }
-
-        box.cancel("关闭");
-        box.show();
-    }
-
     /** 把「已安装」的后端拼成 catalog item 的形状，卸载流程两边共用 */
     private JSONArray installedAsItems() {
         JSONArray arr = new JSONArray();
@@ -614,23 +669,6 @@ public class ProxyFragment extends BaseFragment {
         });
     }
 
-    /** 一行说明：本机版本与远端版本的关系，以及和谁冲突 */
-    private static String pkgNote(JSONObject it) {
-        String local = it.optString("local", "");
-        String s;
-        if (local.isEmpty()) {
-            s = "未安装";
-        } else if (it.optBoolean("newer", false)) {
-            s = "本机 " + local + "，可升级";
-        } else {
-            s = "本机 " + local + "，仓库里的更旧";
-        }
-        String conflict = it.optString("conflict", "");
-        if (!conflict.isEmpty()) {
-            s += " · 与 " + ("passwall".equals(conflict) ? "PassWall" : "PassWall2") + " 冲突";
-        }
-        return s;
-    }
 
     private void pickPkgFile() {
         try {
@@ -655,36 +693,96 @@ public class ProxyFragment extends BaseFragment {
     }
 
     private void uploadPkgFile(android.net.Uri uri) {
-        notice("正在上传安装包…");
+        showUploadDialog();
         Api.upload(ctx(), uri, new Cb() {
             @Override
             public void onData(JSONObject data, boolean fromCache) {
+                dismissUploadDialog();
                 if (!isAdded()) {
                     return;
                 }
                 String saved = data.optString("name", "");
                 if (!data.optBoolean("ok", false) || saved.isEmpty()) {
-                    notice("");
                     fail(data.optString("error", "上传失败"));
                     return;
                 }
-                notice("");
                 String target = targetOfName(saved);
                 if (target.isEmpty()) {
                     fail("文件名里要带 OpenClash 或 PassWall，否则分不清装哪个");
                     return;
                 }
-                askPkg(target, "local", saved);
+                // 已经装过就明说会覆盖，别让用户以为是在装第二个
+                String have = installedMap.get(target);
+                if (have != null) {
+                    Sheet.confirm(ctx(), "覆盖安装 " + have + "？",
+                            "本机已经装着 " + have + "，这次会用刚上传的 " + saved
+                                    + " 覆盖它（先卸旧版本再装新的），配置和订阅会被清掉。",
+                            "覆盖安装", true,
+                            () -> askPkg(target, "local", saved));
+                } else {
+                    askPkg(target, "local", saved);
+                }
             }
 
             @Override
             public void onError(String message) {
+                dismissUploadDialog();
                 if (isAdded()) {
                     notice("");
                     fail("上传失败：" + message);
                 }
             }
+        }, (sent, total) -> {
+            int pct = (int) (sent * 100 / Math.max(1L, total));
+            if (upPct != null) {
+                upPct.setText(pct + "%");
+            }
+            if (upBar != null) {
+                upBar.setProgress(pct);
+            }
+            if (upStep != null) {
+                upStep.setText("正在上传 " + Fmt.bytes(sent) + " / " + Fmt.bytes(total));
+            }
         });
+    }
+
+    /** 上传进度弹窗。跟安装那条分开：传完才轮到装 */
+    private void showUploadDialog() {
+        if (upDialog != null && upDialog.isShowing()) {
+            return;
+        }
+        Context c = ctx();
+        LinearLayout box = Ui.column(c);
+        box.setPadding(Ui.dp(c, 2), Ui.dp(c, 2), Ui.dp(c, 2), Ui.dp(c, 2));
+
+        upPct = Ui.num(c, "0%", 28f, R.color.primary);
+        box.addView(upPct);
+        upStep = Ui.text(c, "正在上传…", 12.5f, R.color.text_secondary);
+        upStep.setPadding(0, Ui.dp(c, 2), 0, Ui.dp(c, 12));
+        box.addView(upStep);
+
+        upBar = new android.widget.ProgressBar(c, null,
+                android.R.attr.progressBarStyleHorizontal);
+        upBar.setMax(100);
+        if (upBar.getProgressDrawable() != null) {
+            upBar.getProgressDrawable().setColorFilter(
+                    Ui.color(c, R.color.primary), android.graphics.PorterDuff.Mode.SRC_IN);
+        }
+        box.addView(upBar, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(c, 6)));
+
+        upDialog = Sheet.custom(c, "上传安装包").content(box).cancel("后台进行").show();
+        upDialog.setOnDismissListener(d -> upDialog = null);
+    }
+
+    private void dismissUploadDialog() {
+        if (upDialog != null && upDialog.isShowing()) {
+            upDialog.dismiss();
+        }
+        upDialog = null;
+        upPct = null;
+        upStep = null;
+        upBar = null;
     }
 
     /** 装包 = 用 root 执行对方的脚本，先问一句再动手 */
@@ -692,17 +790,18 @@ public class ProxyFragment extends BaseFragment {
         pkgSource = source;
         pkgName = name;
         String label = "openclash".equals(target) ? "OpenClash" : "PassWall";
+        String size = "openclash".equals(target) ? "约 20 MB" : "约 80 MB";
         String body;
         if ("local".equals(source)) {
             body = "会把刚上传的 " + name + " 装到路由器上，"
                     + "过程中会以管理员权限执行包里的安装脚本。";
         } else if (name.isEmpty()) {
             // 引导卡里还没拿到清单时点安装，服务端会自己查包名，这里就不报文件名
-            body = "会从仓库下载对应的安装包再安装。包比较大时（PassWall 约 80 MB）"
-                    + "可能要十几分钟，中途别退出。";
+            body = "会从仓库下载对应的安装包再安装（" + size + "），"
+                    + "可能要几分钟到十几分钟，中途别退出。";
         } else {
-            body = "会从仓库下载 " + name + " 再安装。包比较大时（PassWall 约 80 MB）"
-                    + "可能要十几分钟，中途别退出。";
+            body = "会从仓库下载 " + name + " 再安装（" + size + "），"
+                    + "可能要几分钟到十几分钟，中途别退出。";
         }
         Sheet.confirm(ctx(), "安装 " + label, body, "开始安装", false,
                 () -> doPkgInstall(target));
@@ -731,6 +830,8 @@ public class ProxyFragment extends BaseFragment {
                     return;
                 }
                 startPkgPoll();
+                // 确认完立刻把进度弹出来；关掉也不影响任务，右上角胶囊还在
+                showPkgDialog();
             }
 
             @Override
@@ -780,6 +881,7 @@ public class ProxyFragment extends BaseFragment {
                         stopPkgPoll();
                         load(true);
                         if (p.optBoolean("ok", false)) {
+                            closePkgDialog();
                             // 「全部安装」是排队跑的：前一个装完再起下一个，
                             // 因为 Agent 同时只能跑一个安装任务
                             if (!installQueue.isEmpty()) {
@@ -793,6 +895,7 @@ public class ProxyFragment extends BaseFragment {
                                     Toast.LENGTH_LONG).show();
                             return;
                         }
+                        closePkgDialog();
                         if (!installQueue.isEmpty()) {
                             installQueue.clear();
                             Toast.makeText(ctx(), "全部安装已中断",
@@ -824,25 +927,35 @@ public class ProxyFragment extends BaseFragment {
     }
 
     private void applyPkgState(JSONObject p) {
-        if (tvPkgState == null) {
-            return;
+        boolean running = p.optBoolean("running", false);
+        int pct = p.optInt("pct", 0);
+        String step = p.optString("step", "");
+        long total = p.optLong("total", 0);
+        long got = p.optLong("got", 0);
+
+        // 悬浮胶囊只在「正在装」时出现；装完或失败就收起来
+        if (pkgChip != null) {
+            if (running) {
+                pkgChip.setText("安装 " + pct + "%");
+                pkgChip.setVisibility(View.VISIBLE);
+            } else {
+                pkgChip.setVisibility(View.GONE);
+            }
         }
-        if (p.optBoolean("running", false)) {
-            String step = p.optString("step", "正在安装");
-            long total = p.optLong("total", 0);
-            long got = p.optLong("got", 0);
-            tvPkgState.setText(total > 0
-                    ? step + " " + (got * 100 / Math.max(1L, total)) + "%"
-                    : step);
-            tvPkgState.setTextColor(Ui.color(ctx(), R.color.primary));
-        } else if (p.optBoolean("done", false)) {
-            tvPkgState.setText(p.optBoolean("ok", false) ? "已装好" : "上次安装失败");
-            tvPkgState.setTextColor(Ui.color(ctx(), R.color.text_secondary));
-        } else {
-            // 装/卸结果只存在 Agent 进程内存里，Agent 重启或 App 重装后就读不到了。
-            // 这时按「实际上装没装」兜底，否则这一行会空着，像功能坏了
-            tvPkgState.setText(anyInstalled ? "已装好" : "");
-            tvPkgState.setTextColor(Ui.color(ctx(), R.color.text_secondary));
+        // 弹窗可能被用户关掉了，关掉就只更新胶囊
+        if (pkgDlgPct != null) {
+            pkgDlgPct.setText(pct + "%");
+        }
+        if (pkgDlgStep != null && !step.isEmpty()) {
+            pkgDlgStep.setText(step);
+        }
+        if (pkgDlgBar != null) {
+            pkgDlgBar.setProgress(pct);
+        }
+        if (pkgDlgSize != null) {
+            pkgDlgSize.setText(total > 0
+                    ? Fmt.bytes(got) + " / " + Fmt.bytes(total)
+                    : "");
         }
     }
 
@@ -1032,6 +1145,19 @@ public class ProxyFragment extends BaseFragment {
                                 android.content.res.ColorStateList.valueOf(
                                         Ui.color(c, R.color.ripple)), null, mask));
                         line.setOnClickListener(v -> askSwitchBackend(fid, flabel));
+                    } else {
+                        // 没装就点了直接装：确认框 → 进度弹窗。
+                        // 让用户跑去下面的「插件管理」再传包，等于把最简单的路藏起来
+                        final String fid = id;
+                        line.setClickable(true);
+                        line.setFocusable(true);
+                        GradientDrawable mask = new GradientDrawable();
+                        mask.setColor(0xFFFFFFFF);
+                        line.setBackground(new android.graphics.drawable.RippleDrawable(
+                                android.content.res.ColorStateList.valueOf(
+                                        Ui.color(c, R.color.ripple)), null, mask));
+                        line.setOnClickListener(v -> askPkg(fid, "github",
+                                catalogFiles.getOrDefault(fid, "")));
                     }
                 }
 
@@ -1050,9 +1176,27 @@ public class ProxyFragment extends BaseFragment {
                     : join(activeEngine, activeCount + " 个节点可用", modeLabel(modeValue)));
         }
 
-        // 安装任务状态可能比后端列表先到，也可能后到；空着就按「装没装」补一次
-        if (tvPkgState != null && tvPkgState.getText().length() == 0 && anyInstalled) {
-            tvPkgState.setText("已装好");
+        // 安装任务状态可能比后端列表先到，也可能后到
+        if (tvPkgCount != null) {
+            tvPkgCount.setText(installedMap.isEmpty()
+                    ? "未安装"
+                    : installedMap.size() + " 个");
+        }
+
+        // PassWall 没有「配置文件」这个概念：它的节点直接来自订阅。
+        // 所以「当前配置 + 切换」这一行对它没意义（点了也没反应），整行藏掉，
+        // 节点列表照常显示 —— 这就是两个后端在界面上的差异
+        boolean pw = "passwall".equals(uiBackend());
+        if (cfgRow != null) {
+            cfgRow.setVisibility(pw ? View.GONE : View.VISIBLE);
+        }
+        if (cfgHair != null) {
+            cfgHair.setVisibility(pw ? View.GONE : View.VISIBLE);
+        }
+        if (comboSub != null) {
+            comboSub.setText(pw
+                    ? "PassWall 的节点来自订阅，没有配置文件"
+                    : "换配置会重启内核，断网十几秒");
         }
 
         // 一个插件都没装时，整页只剩那张引导卡：运行模式、配置与节点、节点、安装包
@@ -1074,13 +1218,19 @@ public class ProxyFragment extends BaseFragment {
         if (pkgCard != null) {
             pkgCard.setVisibility(blank ? View.GONE : View.VISIBLE);
         }
-        if (blank) {
-            loadCatalogFiles();
-        }
+        // 清单里只有包名，但确认框会用到 —— 点未安装的行也要能说出装的是哪个包
+        loadCatalogFiles();
 
         renderMode();
-        loadConfigs();
+        if (!pw) {
+            loadConfigs();
+        }
         loadSubCount();
+    }
+
+    /** 这一页现在在管哪个后端：正在跑的那个，没跑就是装着的那个 */
+    private String uiBackend() {
+        return backendId.isEmpty() ? installedBackend : backendId;
     }
 
     /**
@@ -1090,9 +1240,10 @@ public class ProxyFragment extends BaseFragment {
      * 这里传空名字就行，确认框里换成一句不带文件名的话。
      */
     private void loadCatalogFiles() {
-        if (!catalogFiles.isEmpty()) {
+        if (catalogTried) {
             return;
         }
+        catalogTried = true;
         Api.get(ctx(), "/api/v1/proxy/pkg/catalog", new Cb() {
             @Override
             public void onData(JSONObject data, boolean fromCache) {

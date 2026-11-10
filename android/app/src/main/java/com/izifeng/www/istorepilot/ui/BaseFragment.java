@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -37,6 +38,14 @@ public abstract class BaseFragment extends Fragment implements Refreshable {
     protected LinearLayout content;
     /** 真实内容的容器。build() 的目标 —— 骨架屏占位时它整体隐藏 */
     protected LinearLayout body;
+
+    /**
+     * 悬浮层：盖在整个页面之上、不随内容滚动。
+     *
+     * 给「安装状态」这类一直要看得见的小控件用 —— 塞进滚动内容里的话，
+     * 用户滑到下面就找不着了。
+     */
+    protected FrameLayout overlay;
     protected TextView banner;
 
     private NestedScrollView scroller;
@@ -55,6 +64,10 @@ public abstract class BaseFragment extends Fragment implements Refreshable {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
         Context c = requireContext();
+
+        // 悬浮层要先建出来：build() 里可能就要往里挂东西（比如安装状态胶囊）
+        FrameLayout host = new FrameLayout(c);
+        overlay = host;
 
         swipe = new SwipeRefreshLayout(c);
         swipe.setColorSchemeColors(c.getColor(R.color.primary));
@@ -130,7 +143,10 @@ public abstract class BaseFragment extends Fragment implements Refreshable {
 
         swipe.addView(shell);
         swipe.setOnRefreshListener(() -> refresh(false));
-        return swipe;
+
+        host.addView(swipe, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        return host;
     }
 
     /**

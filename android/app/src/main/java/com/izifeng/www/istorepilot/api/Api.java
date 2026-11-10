@@ -150,6 +150,18 @@ public final class Api {
      * 文件名放在头里而不是 URL 里，是因为 .ipk / .run 的名字可能带空格和中文。
      */
     public static void upload(Context c, android.net.Uri uri, Cb cb) {
+        upload(c, uri, cb, null);
+    }
+
+    /** 上传进度回调。在主线程回调，可以直接改控件 */
+    public interface Prog {
+        void onProgress(long sent, long total);
+    }
+
+    /**
+     * 带进度的上传。安装包动辄七八十 MB，没有进度的话用户只能盯着转圈猜。
+     */
+    public static void upload(Context c, android.net.Uri uri, Cb cb, Prog prog) {
         final Context app = c.getApplicationContext();
         final String base = Session.base(app);
         final String token = Session.token(app);
@@ -181,8 +193,17 @@ public final class Api {
                     }
                     byte[] buf = new byte[65536];
                     int n;
+                    long sent = 0;
+                    long last = 0;
                     while ((n = in.read(buf)) != -1) {
                         os.write(buf, 0, n);
+                        sent += n;
+                        // 每 512 KB 报一次，太密反而卡 UI
+                        if (prog != null && (sent - last >= 524288 || sent >= size)) {
+                            last = sent;
+                            final long s = sent;
+                            UI.post(() -> prog.onProgress(s, size));
+                        }
                     }
                     os.flush();
                 }

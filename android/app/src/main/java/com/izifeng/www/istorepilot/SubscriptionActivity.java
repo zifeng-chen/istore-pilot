@@ -1,8 +1,10 @@
 package com.izifeng.www.istorepilot;
 
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.Gravity;
 import android.view.MenuItem;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
@@ -171,18 +173,32 @@ public class SubscriptionActivity extends BaseActivity {
         boolean enabled = item.optBoolean("enabled", true);
         String traffic = item.optString("traffic", "");
         String expired = item.optString("expired", "");
+        final String id = item.optString("id", "");
 
         LinearLayout line = Ui.row(this);
         line.setPadding(0, Ui.dp(this, 12), 0, Ui.dp(this, 12));
         line.setClickable(true);
 
         LinearLayout col = Ui.column(this);
+
+        // 名称 + 启用角标同一行：角标放进右侧竖列会被挤窄，三个字只显示得下两个
+        LinearLayout nameRow = Ui.row(this);
+        nameRow.setGravity(Gravity.CENTER_VERTICAL);
         TextView name = Ui.text(this, item.optString("name", "未命名"), 15f, R.color.text_primary);
         name.setTypeface(android.graphics.Typeface.create(
                 "sans-serif-medium", android.graphics.Typeface.NORMAL));
         name.setMaxLines(1);
         name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        col.addView(name);
+        nameRow.addView(name);
+        // 名称有上限，超了省略 —— 角标要紧跟在名字后面，不能被顶到最右边
+        name.setMaxWidth(Ui.dp(this, 180));
+        TextView badge = Ui.pill(this, enabled ? "已启用" : "已停用",
+                enabled ? R.color.primary : R.color.text_secondary);
+        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        blp.leftMargin = Ui.dp(this, 8);
+        nameRow.addView(badge, blp);
+        col.addView(nameRow);
 
         // 地址里带 token，只显示首尾，避免截图把订阅送人
         TextView url = Ui.text(this, item.optString("url_masked", ""), 11.5f, R.color.text_secondary);
@@ -206,8 +222,31 @@ public class SubscriptionActivity extends BaseActivity {
 
         line.addView(col, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        line.addView(Ui.pill(this, enabled ? "已启用" : "已停用",
-                enabled ? R.color.primary : R.color.text_on_track));
+
+        // 右侧只留一个「更新」：状态已经挪到名称旁边了，
+        // 更新是这一页最常用的动作，藏在长按菜单里每次都要多点两下
+        LinearLayout right = Ui.column(this);
+        right.setGravity(Gravity.END);
+
+        // 更新做成描边：跟角标那种实底区分开，一眼看出是能点的
+        TextView upd = Ui.text(this, "更新", 11.5f, R.color.primary);
+        upd.setTypeface(android.graphics.Typeface.create(
+                "sans-serif-medium", android.graphics.Typeface.NORMAL));
+        upd.setGravity(Gravity.CENTER);
+        upd.setPadding(Ui.dp(this, 14), Ui.dp(this, 4),
+                Ui.dp(this, 14), Ui.dp(this, 4));
+        GradientDrawable ubg = new GradientDrawable();
+        ubg.setCornerRadius(Ui.dp(this, 100));
+        ubg.setColor(0x00000000);
+        ubg.setStroke(Ui.dp(this, 1.2f), Ui.color(this, R.color.primary));
+        upd.setBackground(ubg);
+        LinearLayout.LayoutParams ulp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        ulp.topMargin = Ui.dp(this, 8);
+        upd.setOnClickListener(v -> refreshSub(id));
+        right.addView(upd, ulp);
+
+        line.addView(right);
         line.setOnClickListener(v -> openSub(item));
         return line;
     }
