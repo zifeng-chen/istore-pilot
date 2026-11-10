@@ -1,7 +1,6 @@
 package com.izifeng.www.istorepilot.ui;
 
 import android.content.Context;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -9,6 +8,7 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -46,7 +46,6 @@ public abstract class BaseFragment extends Fragment implements Refreshable {
      * 用户滑到下面就找不着了。
      */
     protected FrameLayout overlay;
-    protected TextView banner;
 
     private NestedScrollView scroller;
     private boolean navTitleShown = false;
@@ -81,21 +80,6 @@ public abstract class BaseFragment extends Fragment implements Refreshable {
         content = Ui.column(c);
         int pad = Ui.dp(c, 16);
         content.setPadding(pad, Ui.dp(c, 0), pad, Ui.dp(c, 30));
-
-        banner = Ui.text(c, "", 12.5f, R.color.warn);
-        int h = Ui.dp(c, 10);
-        banner.setPadding(Ui.dp(c, 12), h, Ui.dp(c, 12), h);
-        banner.setVisibility(View.GONE);
-        banner.setLineSpacing(Ui.dp(c, 2), 1f);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setCornerRadius(Ui.dp(c, 14));
-        bg.setColor(Ui.alpha(Ui.color(c, R.color.warn), 0.10f));
-        banner.setBackground(bg);
-        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        blp.bottomMargin = Ui.dp(c, 12);
-        banner.setLayoutParams(blp);
-        content.addView(banner);
 
         // 大标题放在内容最上面，跟着一起滚
         String title = title();
@@ -370,23 +354,18 @@ public abstract class BaseFragment extends Fragment implements Refreshable {
         notice(text, false);
     }
 
-    /** 提示条：ok=true 用绿色（操作成功），否则用琥珀色（进行中 / 需要注意） */
+    /**
+     * 一次性回执：一律走 Toast，不再往标题下面挂常驻横幅。
+     *
+     * 之前用 banner 的毛病是：它占版面、不会自己消失，用户把内容滑走后横幅还在，
+     * 看起来像页面的永久状态；而「正在测速 / 测速完成 / 已切换」这类只是一句话
+     * 回执，说完就该消失。ok 参数保留只为不改 30 多处调用点，Toast 本身不分色。
+     */
     protected void notice(String text, boolean ok) {
-        if (banner == null) {
-            return;
-        }
         if (text == null || text.isEmpty()) {
-            banner.setVisibility(View.GONE);
             return;
         }
-        Context c = banner.getContext();
-        GradientDrawable bg = new GradientDrawable();
-        bg.setCornerRadius(Ui.dp(c, 14));
-        bg.setColor(Ui.alpha(Ui.color(c, ok ? R.color.ok : R.color.warn), 0.10f));
-        banner.setBackground(bg);
-        banner.setTextColor(c.getColor(ok ? R.color.ok : R.color.warn));
-        banner.setText(text);
-        banner.setVisibility(View.VISIBLE);
+        Toast.makeText(requireContext(), text, Toast.LENGTH_SHORT).show();
     }
 
     /** 请求失败时统一提示：已经用快照渲染过的情况下，只挂个提示条，不动界面 */

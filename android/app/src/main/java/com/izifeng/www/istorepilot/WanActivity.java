@@ -297,7 +297,7 @@ public class WanActivity extends BaseActivity {
     private void buildWeb(LinearLayout root) {
         Ui.Card card = Ui.card(this);
         card.setPadding(0, Ui.dp(this, 4), 0, Ui.dp(this, 4));
-        Ui.settingRow(this, card, Glyph.BOX, "路由器网页端",
+        Ui.settingRow(this, card, Glyph.GLOBE, "路由器网页端",
                 "改网段、地址池、端口转发、DDNS", "", true, false, this::openLuci);
         root.addView(card);
     }

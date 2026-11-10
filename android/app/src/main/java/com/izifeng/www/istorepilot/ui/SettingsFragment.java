@@ -149,7 +149,7 @@ public class SettingsFragment extends BaseFragment {
                 "IPv6", "外网入口", "—", false, false, null);
         // 完整 IPv6 是 39 个字符，13.5sp 刚好一行放下
         tvWanV6.setTextSize(12.5f);
-        tvLanV4 = Ui.settingRow(c, net, com.izifeng.www.istorepilot.widget.Glyph.CHIP,
+        tvLanV4 = Ui.settingRow(c, net, com.izifeng.www.istorepilot.widget.Glyph.LINK,
                 "内网网关", "设备默认走这个地址", "—", false, false, null);
         TextView netNote = Ui.text(c,
                 "外网访问走 IPv6，DNS 里配好 AAAA 记录就能用域名连回来。",
@@ -254,7 +254,7 @@ public class SettingsFragment extends BaseFragment {
                 "安全", "两个密码，别记混");
         Ui.settingRow(c, security, com.izifeng.www.istorepilot.widget.Glyph.KEY,
                 "修改 App 登录密码", "只管这个 App", "", true, false, this::changePassword);
-        Ui.settingRow(c, security, com.izifeng.www.istorepilot.widget.Glyph.POWER,
+        Ui.settingRow(c, security, com.izifeng.www.istorepilot.widget.Glyph.KEY,
                 "修改路由器密码", "root 账号，影响后台与 SSH", "", false, true,
                 this::changeRootPassword);
         TextView note = Ui.text(c,

@@ -238,7 +238,7 @@ public class ProxyFragment extends BaseFragment {
         // 当前配置：整行可点，右侧「切换」胶囊给出明确的可操作性。
         // 这一行只对 OpenClash 有意义 —— PassWall 没有「配置文件」，
         // 它的节点直接来自订阅，所以下面会按后端把这一行藏掉
-        LinearLayout cfgSlot = Ui.infoRow(c, combo, Glyph.KEY, "当前配置", true);
+        LinearLayout cfgSlot = Ui.infoRow(c, combo, Glyph.BOX, "当前配置", true);
         tvCurConfig = Ui.num(c, "读取中…", 13.5f, R.color.text_primary);
         tvCurConfig.setGravity(Gravity.END);
         tvCurConfig.setSingleLine(true);
@@ -255,7 +255,7 @@ public class ProxyFragment extends BaseFragment {
         cfgRow = (View) cfgSlot.getParent();
 
         // 订阅：增删改在独立页面，这里只给入口和条数
-        LinearLayout subSlot = Ui.infoRow(c, combo, Glyph.UPLOAD, "订阅管理", false);
+        LinearLayout subSlot = Ui.infoRow(c, combo, Glyph.LINK, "订阅管理", false);
         tvSubCount = Ui.num(c, "", 13.5f, R.color.text_secondary);
         subSlot.addView(tvSubCount);
         subSlot.addView(Ui.chevron(c));
