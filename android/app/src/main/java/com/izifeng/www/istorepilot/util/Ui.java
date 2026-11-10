@@ -726,6 +726,19 @@ public final class Ui {
     public static TextView settingRow(Context c, LinearLayout card, int glyph,
                                       String title, String subtitle, String value,
                                       boolean first, boolean danger, Runnable onClick) {
+        return settingRowPair(c, card, glyph, title, subtitle, value, first, danger, onClick)[0];
+    }
+
+    /**
+     * 同 {@link #settingRow}，但把副标题也一并返回：<code>[0]</code> 是右侧值，
+     * <code>[1]</code> 是副标题（没传副标题时为 null）。
+     *
+     * 给「要等接口回来才知道副标题写什么」的行用 —— 比如处理器，型号当值，
+     * 核心数和频率只能等硬件接口返回后才能填到下面一行。
+     */
+    public static TextView[] settingRowPair(Context c, LinearLayout card, int glyph,
+                                            String title, String subtitle, String value,
+                                            boolean first, boolean danger, Runnable onClick) {
         if (!first) {
             // 分隔线起点对齐标题文字，图标区域留空 —— 和 iOS inset grouped 一致
             card.addView(hairline(c, 60));
@@ -749,12 +762,13 @@ public final class Ui {
         t.setSingleLine(true);
         t.setEllipsize(android.text.TextUtils.TruncateAt.END);
         col.addView(t);
+        TextView sub = null;
         if (subtitle != null && !subtitle.isEmpty()) {
-            TextView s = text(c, subtitle, 11.5f, R.color.text_secondary);
-            s.setPadding(0, dp(c, 4), 0, 0);
-            s.setSingleLine(true);
-            s.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            col.addView(s);
+            sub = text(c, subtitle, 11.5f, R.color.text_secondary);
+            sub.setPadding(0, dp(c, 4), 0, 0);
+            sub.setSingleLine(true);
+            sub.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            col.addView(sub);
         }
         row.addView(col, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -793,7 +807,7 @@ public final class Ui {
             arrowPlaceholder(c, row);
         }
         card.addView(row);
-        return v;
+        return new TextView[]{v, sub};
     }
 
     /** 不可点的行也补一个和箭头等宽的占位，保证右侧值能对齐成一条线 */

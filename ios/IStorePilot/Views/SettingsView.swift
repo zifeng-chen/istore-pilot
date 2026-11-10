@@ -317,15 +317,22 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - 外观
-
-
     // MARK: - 设备信息
+
+    /// 处理器的副标题：核心数 + 主频。型号占右边那列，规格写这儿。
+    private func cpuBrief() -> String {
+        let cpu = d.obj("cpu") ?? [:]
+        var parts = ["\(cpu.int("cores")) 核"]
+        let mhz = cpu.int("max_mhz")
+        if mhz > 0 {
+            parts.append(String(format: "%.1f GHz", Double(mhz) / 1000))
+        }
+        return parts.joined(separator: " · ")
+    }
 
     /// 原来在概览页叫「机器信息」。它是「查资料」型内容，一个月看一次，
     /// 放在打开就要看的概览里每次占掉三分之一屏，搬到设置更合适。
     private var deviceCard: some View {
-        let board = d.obj("board") ?? [:]
         let cpu = d.obj("cpu") ?? [:]
         let mem = d.obj("memory") ?? [:]
         let store = d.obj("storage") ?? [:]
@@ -333,14 +340,13 @@ struct SettingsView: View {
 
         return Card {
             VStack(alignment: .leading, spacing: 0) {
-                CardHead(icon: "iphone", title: "设备信息", sub: "型号、固件、运行时长")
+                CardHead(icon: "iphone", title: "设备信息", sub: "处理器、内存与系统盘")
 
-                // 主机名已在上面的 hero 大标题里，这里不再重复
-                plainRow(icon: "desktopcomputer", title: "型号",
-                         note: "主板与平台", value: board.str("model"))
-                Hairline(inset: 62)
+                // 主机名已在上面的 hero 大标题里，这里不再重复。
+                // 「型号」和「系统版本」也删了：x86 软路由的 board.model 常年是
+                // Default string，这一行只会显示「—」；内核版本概览页已经有了
                 plainRow(icon: "cpu", title: "处理器",
-                         note: "\(cpu.int("cores")) 核",
+                         note: cpuBrief(),
                          value: cpu.str("model").replacingOccurrences(of: "(R)", with: "")
                             .replacingOccurrences(of: "(TM)", with: ""))
                 Hairline(inset: 62)
@@ -351,10 +357,6 @@ struct SettingsView: View {
                 plainRow(icon: "internaldrive", title: "系统盘",
                          note: store.str("mount").isEmpty ? "" : store.str("mount"),
                          value: F.bytes(store.dbl("total")))
-                Hairline(inset: 62)
-                plainRow(icon: "info.circle", title: "系统版本",
-                         note: board.str("kernel").isEmpty ? "" : "内核 \(board.str("kernel"))",
-                         value: board.str("version"))
 
                 Button {
                     goHardware = true

@@ -18,7 +18,6 @@ import com.izifeng.www.istorepilot.api.Cb;
 import com.izifeng.www.istorepilot.core.Session;
 import com.izifeng.www.istorepilot.core.Snap;
 import com.izifeng.www.istorepilot.util.Fmt;
-import com.izifeng.www.istorepilot.util.Hz;
 import com.izifeng.www.istorepilot.util.Theme;
 import com.izifeng.www.istorepilot.util.Ui;
 import com.izifeng.www.istorepilot.widget.Glyph;
@@ -48,11 +47,11 @@ public class SettingsFragment extends BaseFragment {
     private TextView tvLanV4;
 
     // 设备信息（原概览页的「机器信息」）
-    private TextView tvDevModel;
     private TextView tvDevCpu;
+    /** 处理器那行的副标题：核心数与主频，等硬件接口回来才填 */
+    private TextView tvDevCpuSub;
     private TextView tvDevMem;
     private TextView tvDevDisk;
-    private TextView tvDevSys;
     private TextView tvTheme;
 
     /**
@@ -163,39 +162,28 @@ public class SettingsFragment extends BaseFragment {
         // ---------------------------------------------------------------- 设备信息
         // 原来在概览页叫「机器信息」。它是「查资料」型内容：一个月看一次，
         // 放在打开就要看的概览里，每次都占掉一屏的三分之一。
+        // 这里只留三项「一眼要确认」的：什么 CPU、多少内存、多大的盘。
+        // 「型号」删了 —— x86 软路由的 board.model 基本是 Default string，
+        // 这一行长期显示「—」；「系统版本」也删了，内核版本概览页已经有了。
         Ui.Card dev = Ui.card(c);
         Ui.cardPadding(dev, 11);
         Ui.cardTitle(c, dev, com.izifeng.www.istorepilot.widget.Glyph.CHIP,
-                "设备信息", "这台路由器的硬件与固件");
+                "设备信息", "处理器、内存与系统盘");
 
-        // 「主机名」这一行删掉了：它已经是 hero 的大标题，卡片里再说一遍是重复
-        tvDevModel = Ui.settingRow(c, dev, com.izifeng.www.istorepilot.widget.Glyph.BOX,
-                "型号", "主板与平台", "—", false, false, null);
-        tvDevCpu = Ui.settingRow(c, dev, com.izifeng.www.istorepilot.widget.Glyph.CHIP,
-                "处理器", "核心与最高频率", "—", false, false, null);
+        TextView[] cpuRow = Ui.settingRowPair(c, dev,
+                com.izifeng.www.istorepilot.widget.Glyph.CHIP,
+                "处理器", "核心与最高频率", "—", true, false, null);
+        tvDevCpu = cpuRow[0];
+        tvDevCpuSub = cpuRow[1];
         tvDevMem = Ui.settingRow(c, dev, com.izifeng.www.istorepilot.widget.Glyph.CHIP,
-                "内存", "容量与规格", "—", false, false, null);
+                "内存", "", "—", false, false, null);
         tvDevDisk = Ui.settingRow(c, dev, com.izifeng.www.istorepilot.widget.Glyph.BOX,
-                "系统盘", "容量与总线", "—", false, false, null);
-        tvDevSys = Ui.settingRow(c, dev, com.izifeng.www.istorepilot.widget.Glyph.INFO,
-                "系统版本", "固件与内核", "—", false, false, null);
+                "系统盘", "", "—", false, false, null);
         Ui.settingRow(c, dev, com.izifeng.www.istorepilot.widget.Glyph.LIST,
                 "查看全部硬件", "内存条、网卡、温度、PCI 设备", "", false, false,
                 () -> startActivity(new Intent(ctx(),
                         com.izifeng.www.istorepilot.HardwareActivity.class)));
         root.addView(dev);
-
-        // ---------------------------------------------------------------- 外观
-        Ui.Card look = Ui.card(c);
-        Ui.cardPadding(look, 11);
-        Ui.cardTitle(c, look, com.izifeng.www.istorepilot.widget.Glyph.PALETTE,
-                "显示", "画面刷新率");
-        // 高刷是这一版新加的：窗口不主动申请，120Hz 屏也只有 60 帧，
-        // 把结果显示出来，用户能自己确认是不是真的跑在高刷上
-        Ui.settingRow(c, look, com.izifeng.www.istorepilot.widget.Glyph.BOLT,
-                "画面刷新率", "已按本机最高刷新率申请", Hz.label(getActivity()),
-                true, false, null);
-        root.addView(look);
 
         // ---------------------------------------------------------------- 系统维护
         Ui.Card system = Ui.card(c);
@@ -487,22 +475,25 @@ public class SettingsFragment extends BaseFragment {
                 tvHeroHost.setText(host);
             }
         }
-        if (tvDevModel != null) {
-            String model = sys == null ? "" : sys.optString("model", "");
-            tvDevModel.setText(model.isEmpty() ? "—" : model);
-        }
         if (cpu != null && tvDevCpu != null) {
+            // 型号当值（「Intel N150」这种一眼认得出的），核心和频率退到副标题。
+            // 原来这里写的是 sb.toString() 的三元，两边一模一样，型号等于永远不显示
             StringBuilder sb = new StringBuilder();
             sb.append(cpu.optInt("cores", 0)).append(" 核");
             if (cpu.optInt("threads", 0) > cpu.optInt("cores", 0)) {
                 sb.append(" ").append(cpu.optInt("threads", 0)).append(" 线程");
             }
             if (cpu.optInt("max_mhz", 0) > 0) {
-                sb.append(" · ").append(cpu.optInt("max_mhz", 0)).append(" MHz");
+                sb.append(" · ").append(String.format(java.util.Locale.US, "%.1f",
+                        cpu.optInt("max_mhz", 0) / 1000f)).append(" GHz");
             }
             String name = cpu.optString("model", "")
-                    .replace("(R)", "").replace("(TM)", "");
-            tvDevCpu.setText(name.isEmpty() ? sb.toString() : sb.toString());
+                    .replace("(R)", "").replace("(TM)", "")
+                    .replace("CPU ", "").replace("  ", " ").trim();
+            tvDevCpu.setText(name.isEmpty() ? "—" : name);
+            if (tvDevCpuSub != null) {
+                tvDevCpuSub.setText(sb.toString());
+            }
         }
         if (mem != null && tvDevMem != null) {
             String total = Fmt.bytes(mem.optLong("total", 0));
@@ -531,18 +522,6 @@ public class SettingsFragment extends BaseFragment {
                 tvDevDisk.setText(d.optString("size_text", "—")
                         + (transport.isEmpty() ? "" : " " + transport));
             }
-        }
-        if (sys != null && tvDevSys != null) {
-            String distro = sys.optString("description", "");
-            String kernel = sys.optString("kernel", "");
-            StringBuilder sb = new StringBuilder(distro);
-            if (!kernel.isEmpty()) {
-                if (sb.length() > 0) {
-                    sb.append(" · ");
-                }
-                sb.append("内核 ").append(kernel);
-            }
-            tvDevSys.setText(sb.length() == 0 ? "—" : sb.toString());
         }
     }
 
