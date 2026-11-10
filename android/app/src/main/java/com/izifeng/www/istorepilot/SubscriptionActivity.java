@@ -26,9 +26,11 @@ import org.json.JSONObject;
 import com.izifeng.www.istorepilot.core.BaseActivity;
 
 /**
- * 订阅管理（OpenClash 的「订阅」段）。
+ * 订阅管理（**一个后端一套**：OpenClash 的订阅段，或 PassWall 的订阅节点）。
  *
- * 从代理页的「配置与节点」进来。代理页本身只留一行入口，这里才是增删改的地方：
+ * 从代理页的「配置与节点」进来，带 backend 参数决定管哪个后端 —— 两边的订阅
+ * 存在各自的 uci 包（openclash / passwall）里，互不通用，所以标题必须点名，
+ * 否则用户以为这里能同时管两个。代理页本身只留一行入口，这里才是增删改的地方：
  * 右上角「添加」，列表点一行改成编辑/更新/删除。
  *
  * 订阅改的是 uci 里的 subscription 段，改完必须「更新节点」才会真正拉一次；
@@ -54,7 +56,10 @@ public class SubscriptionActivity extends BaseActivity {
         }
 
         MaterialToolbar toolbar = new MaterialToolbar(this);
-        toolbar.setTitle("订阅管理");
+        // 订阅是每个后端各一套（uci 里分属 openclash / passwall），标题必须点名
+        // 管的是哪个 —— 只写「订阅管理」会让人以为这里能同时管两个后端
+        toolbar.setTitle(backendId.isEmpty() ? "订阅管理"
+                : "订阅管理 · " + ("passwall".equals(backendId) ? "PassWall" : "OpenClash"));
         toolbar.setNavigationIcon(R.drawable.ic_back);
         toolbar.setNavigationIconTint(Ui.color(this, R.color.text_primary));
         toolbar.setNavigationOnClickListener(v -> finish());

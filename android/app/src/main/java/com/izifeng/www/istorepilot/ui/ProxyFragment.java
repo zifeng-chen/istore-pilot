@@ -150,6 +150,19 @@ public class ProxyFragment extends BaseFragment {
     private View cfgRow;
     private View cfgHair;
     private TextView comboSub;
+    /**
+     * 「配置与节点」卡后面的后端切换器。
+     *
+     * 订阅和节点都是**每个后端各一套**（OpenClash 的订阅和节点在内核里，
+     * PassWall 的存在 uci 里），这张卡不可能同时管两个。有后端在跑时就跟它，
+     * 都停着时必须让用户自己点名管哪个 —— 否则会默默按 PassWall 展示，
+     * 用户以为在配 OpenClash，实际改的是 PassWall。
+     */
+    private LinearLayout comboSwitchBox;
+    /** 用户在这张卡里点名的后端（只在「都没运行」时有意义） */
+    private String comboPick = "";
+    /** 切换器当前画的是哪个后端，避免 3 秒轮询里反复重建 */
+    private String comboPickShown = "";
 
     /** 右上角「安装状态」胶囊：安装中才出现，装完或失败就消失。
      *  进度原来只写在「插件安装」那一行小字里，滑走就看不见了。 */
@@ -234,6 +247,14 @@ public class ProxyFragment extends BaseFragment {
         Ui.cardPadding(combo, 3);  // 最后一行是分组标题，底部留 3
         comboSub = Ui.cardTitleLive(c, combo, Glyph.LIST, "配置与节点",
                 "换配置会重启内核，断网十几秒").sub;
+
+        // 两个后端都装着、都没运行时，这张卡必须点名管哪一个：
+        // 订阅和节点各一套，不点名就只能偷偷按 PassWall 展示。
+        // 有后端在跑时跟它（切换器藏起来）。
+        comboSwitchBox = Ui.column(c);
+        comboSwitchBox.setPadding(Ui.dp(c, 16), Ui.dp(c, 4), Ui.dp(c, 16), Ui.dp(c, 10));
+        comboSwitchBox.setVisibility(View.GONE);
+        combo.addView(comboSwitchBox);
 
         // 当前配置：整行可点，右侧「切换」胶囊给出明确的可操作性。
         // 这一行只对 OpenClash 有意义 —— PassWall 没有「配置文件」，
@@ -1269,21 +1290,11 @@ public class ProxyFragment extends BaseFragment {
                     : installedMap.size() + " 个");
         }
 
-        // PassWall 没有「配置文件」这个概念：它的节点直接来自订阅。
-        // 所以「当前配置 + 切换」这一行对它没意义（点了也没反应），整行藏掉，
-        // 节点列表照常显示 —— 这就是两个后端在界面上的差异
-        boolean pw = "passwall".equals(uiBackend());
-        if (cfgRow != null) {
-            cfgRow.setVisibility(pw ? View.GONE : View.VISIBLE);
-        }
-        if (cfgHair != null) {
-            cfgHair.setVisibility(pw ? View.GONE : View.VISIBLE);
-        }
-        if (comboSub != null) {
-            comboSub.setText(pw
-                    ? "PassWall 的节点来自订阅，没有配置文件"
-                    : "换配置会重启内核，断网十几秒");
-        }
+        // 两个后端都装着、都没在跑：这张卡得先问清楚「管哪一个」。
+        // 订阅、节点、配置文件全是各一套，不点名就只能按 PassWall 展示，
+        // 用户以为在配 OpenClash、其实改的是 PassWall。
+        renderComboSwitch(installedMap.size() >= 2 && backendId.isEmpty());
+        applyComboView();
 
         // 一个插件都没装时，整页只剩那张引导卡：运行模式、配置与节点、节点、安装包
         // 这时候全是空转控件（点下去不是空白就是报错），摆着只会让人以为坏了。
@@ -1313,7 +1324,7 @@ public class ProxyFragment extends BaseFragment {
         loadCatalogFiles();
 
         renderMode();
-        if (!pw) {
+        if (!"passwall".equals(comboBackend())) {
             loadConfigs();
         }
         loadSubCount();
@@ -1335,6 +1346,108 @@ public class ProxyFragment extends BaseFragment {
             return "passwall";
         }
         return installedBackend;
+    }
+
+    /**
+     * 「配置与节点」这张卡正在管哪个后端。
+     *
+     * 有后端在跑就跟它 —— 那时改配置、换节点会立刻生效，跟错后端是真会断网的。
+     * 都没跑时听用户在这张卡里点名的那个；没点名先按 PassWall 展示，因为它的
+     * 节点存在 uci 里，停着也能看、也能先把节点选好再启动（OpenClash 的节点
+     * 在内核里，停着只有一句「启动后才看得到」）。
+     *
+     * 关键点：订阅和节点**每个后端各一套**，这张卡永远只管一个，不存在「一起管」。
+     */
+    private String comboBackend() {
+        if (!backendId.isEmpty()) {
+            return backendId;
+        }
+        if (!comboPick.isEmpty() && installedMap.containsKey(comboPick)) {
+            return comboPick;
+        }
+        if (installedMap.containsKey("passwall")) {
+            return "passwall";
+        }
+        return installedBackend;
+    }
+
+    /**
+     * 两个后端都装着、都没运行时，在卡片顶部摆一个「管哪个」的分段控件。
+     *
+     * 不摆的话卡片只能默默按 PassWall 展示：订阅条数是 PassWall 的、节点是
+     * PassWall 的，而用户以为在看 OpenClash —— 同一类「没选过后端就替用户
+     * 决定」的 bug。有后端在跑时藏起来，卡片自动跟运行中的那个。
+     */
+    private void renderComboSwitch(boolean show) {
+        if (comboSwitchBox == null) {
+            return;
+        }
+        if (!show) {
+            comboSwitchBox.setVisibility(View.GONE);
+            comboPickShown = "";
+            return;
+        }
+        String cur = comboBackend();
+        if (cur.equals(comboPickShown) && comboSwitchBox.getChildCount() > 0) {
+            comboSwitchBox.setVisibility(View.VISIBLE);
+            return;
+        }
+        comboPickShown = cur;
+        Context c = comboSwitchBox.getContext();
+        comboSwitchBox.removeAllViews();
+        comboSwitchBox.addView(Ui.segmented(c, new String[]{"OpenClash", "PassWall"},
+                "passwall".equals(cur) ? 1 : 0, i -> {
+                    String pick = i == 0 ? "openclash" : "passwall";
+                    if (pick.equals(comboBackend())) {
+                        return;
+                    }
+                    comboPick = pick;
+                    applyComboView();
+                    renderComboSwitch(true);
+                    reloadComboData();
+                }));
+        comboSwitchBox.setVisibility(View.VISIBLE);
+    }
+
+    /** 卡片里那几行的显隐与说明文字，只跟「当前管哪个后端」有关 */
+    private void applyComboView() {
+        // PassWall 没有「配置文件」这个概念：节点直接来自订阅，所以
+        // 「当前配置 + 切换」整行藏掉（点了也没反应），节点列表照常显示
+        boolean pw = "passwall".equals(comboBackend());
+        if (cfgRow != null) {
+            cfgRow.setVisibility(pw ? View.GONE : View.VISIBLE);
+        }
+        if (cfgHair != null) {
+            cfgHair.setVisibility(pw ? View.GONE : View.VISIBLE);
+        }
+        if (comboSub != null) {
+            comboSub.setText(comboSubtitle());
+        }
+    }
+
+    private String comboSubtitle() {
+        if ("passwall".equals(comboBackend())) {
+            return "PassWall 的节点来自订阅，没有配置文件";
+        }
+        if (backendId.isEmpty()) {
+            return "OpenClash 没在运行，启动后才看得到节点";
+        }
+        return "换配置会重启内核，断网十几秒";
+    }
+
+    /** 在卡片里换了后端：订阅条数、配置文件、节点列表都得按新的重拉 */
+    private void reloadComboData() {
+        if ("passwall".equals(comboBackend())) {
+            if (tvCurConfig != null) {
+                tvCurConfig.setText("—");
+            }
+        } else {
+            loadConfigs();
+        }
+        loadSubCount();
+        // 两个后端的节点响应体不同，但保险起见清掉签名，强制重画一次
+        signature = "";
+        loadGroups();
     }
 
     /**
@@ -1642,7 +1755,9 @@ public class ProxyFragment extends BaseFragment {
 
     /** 订阅、配置这类操作面向「当前这个后端」，与内核在不在跑无关 */
     private String subsBackend() {
-        return uiBackend();
+        // 订阅每个后端各一套（uci 里分属 openclash / passwall 两个包），
+        // 所以必须跟着这张卡当前点的那个，不能一律按「正在跑的」猜
+        return comboBackend();
     }
 
     /** 订阅本身在独立页面维护，这张卡只要一个条数 */
@@ -1721,10 +1836,11 @@ public class ProxyFragment extends BaseFragment {
      *
      * 服务端不传 backend 时按「正在跑的那个」猜；两个后端都停着时就是 none，
      * 整块节点区只会显示「没有正在运行的代理后端」—— 可 Passwall 装了就能看
-     * 节点、也能先把节点选好再启动。所以这里优先正在跑的，其次已装的。
+     * 节点、也能先把节点选好再启动。所以这里优先正在跑的，其次用户在卡片里
+     * 点名的（都没跑时才轮得到点名，见 comboBackend）。
      */
     private String nodeBackend() {
-        return uiBackend();
+        return comboBackend();
     }
 
     private String nodeBackendQuery() {
