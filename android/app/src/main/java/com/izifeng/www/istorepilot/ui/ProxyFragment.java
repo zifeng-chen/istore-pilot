@@ -1660,7 +1660,9 @@ public class ProxyFragment extends BaseFragment {
         }
         Context c = modeBox.getContext();
         modeBox.removeAllViews();
-        boolean oc = "openclash".equals(backendId);
+        // 用 uiBackend 而不是 backendId：都停着时 backendId 是空的，但界面
+        // 已经按 PassWall 展示了（见 uiBackend 的注释），两档标签得跟着走
+        boolean oc = "openclash".equals(uiBackend());
         String[] labels = oc ? new String[]{"规则", "全局", "直连"} : new String[]{"代理", "直连"};
         int selected = oc
                 ? ("rule".equals(modeValue) ? 0 : ("global".equals(modeValue) ? 1 : 2))
@@ -1676,12 +1678,14 @@ public class ProxyFragment extends BaseFragment {
     private String modeHint(String backend, String mode) {
         if (backend == null || backend.isEmpty()) {
             // 两个后端都停着时，上面那两档其实是「要不要启动代理」，
-            // 没有模式可读 —— 别把兜底文案「还没读到当前模式」甩给用户
-            if (installedBackend.isEmpty()) {
+            // 没有模式可读 —— 别把兜底文案「还没读到当前模式」甩给用户。
+            // 说哪个后端要跟界面走（uiBackend 在都停着时优先 PassWall）
+            String bid = uiBackend();
+            if (bid.isEmpty()) {
                 return "还没装代理插件。装好之后这里才会出现模式选择。";
             }
             return "点「代理」会启动 "
-                    + ("openclash".equals(installedBackend) ? "OpenClash" : "Passwall")
+                    + ("openclash".equals(bid) ? "OpenClash" : "Passwall")
                     + "，沿用上次的配置和节点。";
         }
         boolean oc = "openclash".equals(backend);
@@ -2218,7 +2222,7 @@ public class ProxyFragment extends BaseFragment {
 
     /** 点分段控件直接切，省掉一次弹窗 */
     private void pickModeAt(int index) {
-        boolean oc = "openclash".equals(backendId);
+        boolean oc = "openclash".equals(uiBackend());
         final String[] values = oc
                 ? new String[]{"rule", "global", "direct"}
                 : new String[]{"proxy", "disable"};
@@ -2256,9 +2260,19 @@ public class ProxyFragment extends BaseFragment {
     }
 
     private void applyMode(String mode) {
+        String be = uiBackend();
+        // 后端没在跑时，这两三档其实是「把代理开起来」。
+        // 只写 tcp_proxy_mode / clash mode 不会拉起内核，界面还会报「切换失败」
+        if (backendId.isEmpty()) {
+            askSwitchBackend(be, pluginLabel(be));
+            return;
+        }
         JSONObject body = new JSONObject();
         try {
             body.put("mode", mode);
+            if (!be.isEmpty()) {
+                body.put("backend", be);
+            }
         } catch (Exception ignored) {
             return;
         }
