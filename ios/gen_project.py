@@ -20,8 +20,8 @@ APP = "IStorePilot"
 PROJ = "IStorePilot.xcodeproj"
 BUNDLE_ID = "com.izifeng.www.istorepilot"
 NAME = "iStore Pilot"
-VERSION = "0.2.0"
-BUILD = "33"
+VERSION = "0.3.0"
+BUILD = "34"
 DEPLOY = "16.0"
 
 

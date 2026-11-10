@@ -77,8 +77,6 @@ _mirrors_cache: dict = {"ts": 0.0, "channels": []}
 
 # 拉资产列表（HTML）时按这个顺序：直连最稳，镜像反代 HTML 会间歇性 TLS 断
 TEXT_ORDER = ["direct", "ghproxy", "ghfast", "ghproxy_net"]
-# 拉大文件时按这个顺序：反代比直连快一个数量级，实测 97 KB/s vs 16 KB/s
-FILE_ORDER = ["ghproxy", "direct", "ghfast", "ghproxy_net"]
 
 TREE_REPO = "AUK9527/Are-u-ok"
 TREE_BRANCH = "main"
@@ -239,7 +237,7 @@ def probe_channels(timeout: float = 6.0) -> list[dict]:
     """并发探一遍通道，给界面显示「哪条路通、多快」。
 
     探的是 3.4 KB 的 README 而不是大包 —— 但它只测得出 TLS 握手和首包延迟，
-    测不出带宽，所以下载顺序不按这个排（见 FILE_ORDER）。
+    测不出带宽，所以下载顺序不按这个排（见 rank_channels）。
     """
     import concurrent.futures
 

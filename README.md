@@ -64,21 +64,21 @@ grep DISTRIB_RELEASE /etc/openwrt_release
 
 ```sh
 # 方式 A：.run（推荐，两种系统都能用）—— 把文件传到路由器后执行
-sh istore-pilot_0.1.9-1_x86_64.run --check    # 先只检查环境与架构，不改任何文件
-sh istore-pilot_0.1.9-1_x86_64.run            # 安装或升级，保留现有配置
+sh istore-pilot_0.3.0-1_x86_64.run --check    # 先只检查环境与架构，不改任何文件
+sh istore-pilot_0.3.0-1_x86_64.run            # 安装或升级，保留现有配置
 
 # 方式 B：ipk（仅 iStoreOS 24.10 及更早）
 opkg update && opkg install python3
-opkg install luci-app-istore-agent_0.1.9-1_all.ipk
+opkg install luci-app-istore-agent_0.3.0-1_all.ipk
 ```
 
 `.run` 的其它用法：
 
 ```sh
-sh istore-pilot_0.1.9-1.run --uninstall   # 卸载程序，保留密码与配置
-sh istore-pilot_0.1.9-1.run --purge       # 卸载并清除全部配置
-sh istore-pilot_0.1.9-1.run --force       # 已用 opkg/apk 装过时，改由本包接管
-sh istore-pilot_0.1.9-1.run --no-deps     # 不自动装依赖（离线或已手工备齐）
+sh istore-pilot_0.3.0-1.run --uninstall   # 卸载程序，保留密码与配置
+sh istore-pilot_0.3.0-1.run --purge       # 卸载并清除全部配置
+sh istore-pilot_0.3.0-1.run --force       # 已用 opkg/apk 装过时，改由本包接管
+sh istore-pilot_0.3.0-1.run --no-deps     # 不自动装依赖（离线或已手工备齐）
 ```
 
 ### 3. 装完打开
@@ -90,7 +90,7 @@ cat /etc/istore-agent/INITIAL_PASSWORD
 ```
 
 Android：装 APK，或者直接在装好插件的路由器上下载
-`http://<路由器IP>/istore-agent/istoreos-0.1.9.apk`（插件自带这个文件）。
+`http://<路由器IP>/istore-agent/istoreos-0.3.0.apk`（插件自带这个文件）。
 
 > `.run` **不会改动任何网络、防火墙、DHCP、DNS 配置**，装的过程中现有网络不受影响。
 > 已有 `/etc/config/istore-agent` 时一律保留，不会把 `bind` 覆盖成 `0.0.0.0`。
@@ -213,8 +213,15 @@ iStore Pilot 想做的是**一个合格的手机端仪表盘**：
 | 　└ 设备详情 | 品牌/类型/型号；实时上下行 + 累计流量；正在访问的域名（带代理链和命中规则）；连接明细；改备注 / 禁网 / 固定 IP / 唤醒 |
 | 　└ 应用流量 | 按 App 汇总近 5 天用量，77 个官方图标；从域名特征反推，路由器看不到进程名也能认 |
 | 　└ 广告拦截 | 拦截率、查询次数、规则数；**DNS 链路图**（家庭设备 → dnsmasq → AGH → 上游）；拦截 Top 5；规则与更新；接管全网 / 退出接管 |
-| **代理** | OpenClash 与 Passwall 谁在跑；引擎与节点数；规则/全局/直连一键切换；节点分组折叠 + 一键测速；配置文件切换；订阅管理 |
+| **代理** | OpenClash 与 Passwall 谁在跑；引擎与节点数；规则/全局/直连一键切换；节点分组折叠 + 一键测速；配置文件切换；订阅管理。两个后端的**订阅、节点、配置文件各一套**，卡片顶部的 `OpenClash \| PassWall` 分段决定这块在管谁 |
 | **设置** | 连接信息与响应延迟；服务器地址 / 重新登录 / 清缓存；WAN 与 LAN 明细（含 IPv6 全局地址）；外观与刷新率；配置备份与恢复；固件与软件包更新 |
+
+界面还有两条固定规矩：
+
+- **状态不说谎**：`直连` = 有后端在跑、且模式选了直连；`未启用` = 一个后端都
+  没启动。两者分开表达，不会把「没启用」写成「直连」。运行中的后端名称加粗高亮。
+- **一次性回执走 Toast**：正在测速 / 测速完成 / 已启动这类说完就没的消息不占版面，
+  只有需要持续注意的状态才用卡片表达。
 
 有两处是别的客户端不做的：
 

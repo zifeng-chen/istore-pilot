@@ -252,7 +252,7 @@ def _pw_save_selection() -> None:
         pass
 
 
-def _pw_restore_selection() -> bool:
+def _pw_restore_selection() -> bool:  # noqa: vulture 看不到子进程调用
     """订阅拉完后，按名字把节点选回去。返回是否真的改了 uci。"""
     try:
         with open(_PW_SEL_FILE, encoding="utf-8") as fh:
