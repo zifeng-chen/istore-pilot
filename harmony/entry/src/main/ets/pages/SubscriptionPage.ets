@@ -13,6 +13,8 @@ interface SubItem {
   url: string;
   masked: string;
   enabled: boolean;
+  /** 正在用的那一条。只有它打角标，未启用的不显示 */
+  inUse: boolean;
 }
 
 /**
@@ -63,7 +65,8 @@ struct SubscriptionPage {
         name: it.str('name', ''),
         url: it.str('url', ''),
         masked: it.str('url_masked', ''),
-        enabled: it.bool('enabled', true)
+        enabled: it.bool('enabled', true),
+        inUse: it.bool('in_use', false)
       });
     }
     this.items = out;
@@ -195,13 +198,13 @@ struct SubscriptionPage {
                     .alignItems(HorizontalAlign.Start)
                     .layoutWeight(1);
 
-                    if (!it.enabled) {
-                      Text('停用')
+                    if (it.inUse) {
+                      Text('使用中')
                         .fontSize(T.F_TINY)
-                        .fontColor($r('app.color.text_tertiary'))
+                        .fontColor($r('app.color.primary'))
                         .padding({ left: 6, right: 6, top: 2, bottom: 2 })
                         .borderRadius(99)
-                        .backgroundColor($r('app.color.surface_sunken'));
+                        .backgroundColor($r('app.color.accent_soft'));
                     }
                   }
                   .width('100%')

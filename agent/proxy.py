@@ -974,6 +974,10 @@ def _passwall_nodes(flat: dict[str, str]) -> list[dict]:
 
     out = []
     for node in nodes.values():
+        # protocol 以下划线开头的是 Passwall 自己的「壳」（_shunt 分流总节点），
+        # 不是真节点：混进列表会多出一个「未分组」，还会出现在节点选择里
+        if str(node.get("protocol", "")).startswith("_"):
+            continue
         # 只保留展示与测速需要的字段，uuid / publicKey 等敏感项不外泄
         out.append(
             {
@@ -1125,6 +1129,11 @@ def overview() -> dict:
 def groups(backend: str = "") -> dict:
     target = backend or active()
     if target == "openclash":
+        # 节点表在内核里，没跑就只剩一句 socket 报错 —— 换成能看懂的话
+        if not _service_running("openclash"):
+            return {"groups": [], "node_count": 0, "backend": "openclash",
+                    "error": "OpenClash 没在运行，启动后才看得到节点",
+                    "hide_timeout": prefs()["hide_timeout"], "hidden": 0}
         data = clash.proxies()
         data["backend"] = "openclash"
         return _shape(data)
@@ -1217,6 +1226,10 @@ def select(name: str, group: str = "", backend: str = "") -> dict:
         code, out = _run(["uci", "set", f"passwall.{global_sec}.tcp_node={node['id']}"], timeout=5)
         if code != 0:
             return {"ok": False, "error": out.strip(), "backend": "passwall"}
+        # UDP 节点没单独指定、或本来就跟着 TCP 走时一起换掉。
+        # 只改 tcp 会出现「TCP 走新节点、UDP 还留旧节点」的半切换状态
+        if flat.get(f"passwall.{global_sec}.udp_node", "") in ("", state["current_id"]):
+            _run(["uci", "set", f"passwall.{global_sec}.udp_node={node['id']}"], timeout=5)
         _run(["uci", "commit", "passwall"], timeout=5)
         changed = node["id"] != state["current_id"]
         # 节点变更需要重启内核才生效；Passwall 没有热切换能力
@@ -1229,7 +1242,10 @@ def select(name: str, group: str = "", backend: str = "") -> dict:
             "name": node["name"],
             "group": node["group"],
             "restarted": restarted,
-            "note": "Passwall 无热切换，已重启内核生效" if changed else "已是当前节点",
+            # 停着的时候只写 uci，别写「已重启」—— 用户会以为立刻生效了
+            "note": ("已是当前节点" if not changed else
+                     ("Passwall 无热切换，已重启内核生效" if restarted
+                      else "已保存，启动 Passwall 后生效")),
         }
     return {"ok": False, "error": "没有正在运行的代理后端", "backend": target}
 

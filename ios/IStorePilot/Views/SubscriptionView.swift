@@ -105,7 +105,9 @@ struct SubscriptionView: View {
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(C.textPrimary)
                         .lineLimit(1)
-                    if !it.bool("enabled") { Pill(text: "已停用", color: C.textSecondary) }
+                    // 只给「正在用的那条」打角标：uci 里的 enabled 是
+                    // 「要不要包含在订阅列表里」，跟「现在生效的是谁」不是一回事
+                    if it.bool("in_use") { Pill(text: "使用中", color: C.primary) }
                     if working == it.str("id") { ProgressView().scaleEffect(0.6) }
                 }
                 Text(it.str("url_masked", it.str("url")))

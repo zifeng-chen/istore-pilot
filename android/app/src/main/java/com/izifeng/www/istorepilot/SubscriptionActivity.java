@@ -170,7 +170,9 @@ public class SubscriptionActivity extends BaseActivity {
     }
 
     private LinearLayout subRow(JSONObject item) {
-        boolean enabled = item.optBoolean("enabled", true);
+        // 「启用」= 正在用的那一条。uci 里的 enabled 是「要不要包含在订阅列表里」，
+        // 跟「现在生效的是谁」不是一回事，不能拿来当角标
+        boolean inUse = item.optBoolean("in_use", false);
         String traffic = item.optString("traffic", "");
         String expired = item.optString("expired", "");
         final String id = item.optString("id", "");
@@ -181,7 +183,7 @@ public class SubscriptionActivity extends BaseActivity {
 
         LinearLayout col = Ui.column(this);
 
-        // 名称 + 启用角标同一行：角标放进右侧竖列会被挤窄，三个字只显示得下两个
+        // 名称 + 使用中角标同一行：角标放进右侧竖列会被挤窄，三个字只显示得下两个
         LinearLayout nameRow = Ui.row(this);
         nameRow.setGravity(Gravity.CENTER_VERTICAL);
         TextView name = Ui.text(this, item.optString("name", "未命名"), 15f, R.color.text_primary);
@@ -192,12 +194,13 @@ public class SubscriptionActivity extends BaseActivity {
         nameRow.addView(name);
         // 名称有上限，超了省略 —— 角标要紧跟在名字后面，不能被顶到最右边
         name.setMaxWidth(Ui.dp(this, 180));
-        TextView badge = Ui.pill(this, enabled ? "已启用" : "已停用",
-                enabled ? R.color.primary : R.color.text_secondary);
-        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        blp.leftMargin = Ui.dp(this, 8);
-        nameRow.addView(badge, blp);
+        if (inUse) {
+            TextView badge = Ui.pill(this, "使用中", R.color.primary);
+            LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            blp.leftMargin = Ui.dp(this, 8);
+            nameRow.addView(badge, blp);
+        }
         col.addView(nameRow);
 
         // 地址里带 token，只显示首尾，避免截图把订阅送人

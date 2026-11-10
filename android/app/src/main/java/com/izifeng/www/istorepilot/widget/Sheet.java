@@ -197,7 +197,9 @@ public final class Sheet {
                     ContextCompat.getColor(c, R.color.glass_stroke));
             root.setBackground(bg);
             int pad = Ui.dp(c, 4);
-            root.setPadding(pad, Ui.dp(c, 6), pad, pad);
+            // 底部单独留 16：按钮盒自己 bottom padding 是 0，只留 4 的话
+            // 胶囊按钮几乎贴着卡片底边（安装 / 卸载这类双按钮弹窗最明显）
+            root.setPadding(pad, Ui.dp(c, 6), pad, Ui.dp(c, 16));
 
             // 拖拽条：告诉用户「这是可以往下甩掉的」
             FrameLayout grab = new FrameLayout(c);

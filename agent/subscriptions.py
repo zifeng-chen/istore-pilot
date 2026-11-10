@@ -24,6 +24,7 @@
 from __future__ import annotations
 
 import ipaddress
+import json
 import os
 import re
 import subprocess
@@ -114,8 +115,34 @@ def _backend_list() -> list[dict]:
     ]
 
 
+def _oc_current_file() -> str:
+    """OpenClash 当前挂着的配置文件（openclash.config.config_path）。"""
+    code, out = _run(["uci", "get", "openclash.config.config_path"], timeout=6)
+    return out.strip() if code == 0 else ""
+
+
+def _pw_current_group() -> str:
+    """PassWall 当前节点所属的分组名。
+
+    PassWall 的订阅没有「启用」这个概念 —— 节点属于哪个分组，就是哪条订阅
+    在生效（订阅拉下来的节点都带 ``group=<订阅备注>``）。所以「在用哪条订阅」
+    等于「当前节点属于哪个组」。
+    """
+    types, opts = _show("passwall")
+    tcp = ""
+    for sec, typ in types.items():
+        if typ == "global":
+            tcp = opts.get(sec, {}).get("tcp_node", "")
+            break
+    if not tcp:
+        return ""
+    return opts.get(tcp, {}).get("group", "")
+
+
 def list_subs(backend: str = "") -> dict:
     targets = [backend] if backend in PKG else ["openclash", "passwall"]
+    cur_file = _oc_current_file().rsplit("/", 1)[-1] if "openclash" in targets else ""
+    pw_group = _pw_current_group() if "passwall" in targets else ""
     items: list[dict] = []
     for b in targets:
         types, opts = _show(PKG[b])
@@ -126,6 +153,14 @@ def list_subs(backend: str = "") -> dict:
             o = opts.get(sec, {})
             url = o.get("address") or o.get("url") or ""
             name = o.get("name") or o.get("remark") or ""
+            # 界面上只给「正在用的那条」打角标，所以这里算的是 in_use，
+            # 不是 uci 里的 enabled（那个是「要不要包含在订阅列表里」，两回事）
+            if not name:
+                in_use = False
+            elif b == "openclash":
+                in_use = cur_file in (name + ".yaml", name + ".yml")
+            else:
+                in_use = name == pw_group
             items.append({
                 "backend": b,
                 "backend_label": LABEL[b],
@@ -133,6 +168,7 @@ def list_subs(backend: str = "") -> dict:
                 "name": name or "未命名订阅",
                 "url": url,
                 "enabled": (o.get("enabled", "1") != "0"),
+                "in_use": in_use,
                 "auto_update": (o.get("auto_update", "0") == "1"),
                 "expired": o.get("expired_date", ""),
                 "traffic": o.get("rem_traffic", ""),
@@ -152,6 +188,99 @@ def _mask(url: str) -> str:
 
 def _bad(backend: str, msg: str) -> dict:
     return {"ok": False, "error": msg, "backend": backend}
+
+
+# Passwall 装完时 /usr/share/passwall/0_default_config 会塞一个「分流总节点」
+# 和 6 条分流规则。它们不是订阅节点，却会在节点列表里多出一个「未分组」，
+# 让人以为订阅没拉全 —— 拉订阅时清掉。
+_PW_FACTORY_SHUNT = "myshunt"
+_PW_FACTORY_RULES = ("DirectGame", "ProxyGame", "AIGC", "Streaming", "Proxy", "Direct")
+
+
+def _pw_drop_factory_shunt() -> bool:
+    """删掉 Passwall 出厂自带的「分流总节点」，返回是否真删了。
+
+    只认出厂状态：成员必须全指向 ``_direct`` / ``_default``，且没有
+    tcp_node / udp_node 挂在这个节点上。用户配过的分流一律不碰 ——
+    删了等于把人家的分流规则一起废掉。
+    """
+    types, opts = _show("passwall")
+    if types.get(_PW_FACTORY_SHUNT) != "nodes":
+        return False
+    o = opts.get(_PW_FACTORY_SHUNT, {})
+    if o.get("protocol") != "_shunt":
+        return False
+    members = {k: v for k, v in o.items() if k in _PW_FACTORY_RULES}
+    if len(members) != len(_PW_FACTORY_RULES):
+        return False
+    if any(v not in ("_direct", "_default") for v in members.values()):
+        return False
+    for sec, typ in types.items():
+        if typ == "global" and opts.get(sec, {}).get("tcp_node", "") == _PW_FACTORY_SHUNT:
+            return False
+
+    code, _ = _run(["uci", "delete", "passwall." + _PW_FACTORY_SHUNT], timeout=8)
+    if code != 0:
+        return False
+    _run(["uci", "commit", "passwall"], timeout=8)
+    return True
+
+
+_PW_SEL_FILE = "/tmp/istore-pw-selection.json"
+
+
+def _pw_save_selection() -> None:
+    """拉订阅前记住当前节点。
+
+    subscribe.lua 会把订阅节点全部删掉重建，section id 每次都变 ——
+    只记 id 的话，刷完 tcp_node 就指向一个不存在的段，界面上变成「未选择」。
+    所以按 remarks 记名字，拉完再按名字找回来。
+    """
+    types, opts = _show("passwall")
+    global_sec = next((s for s, t in types.items() if t == "global"), "")
+    if not global_sec:
+        return
+    names = {sec: o.get("remarks", "") for sec, o in opts.items()
+             if types.get(sec) == "nodes"}
+    g = opts.get(global_sec, {})
+    try:
+        with open(_PW_SEL_FILE, "w", encoding="utf-8") as fh:
+            json.dump({"tcp": names.get(g.get("tcp_node", ""), ""),
+                       "udp": names.get(g.get("udp_node", ""), "")}, fh,
+                      ensure_ascii=False)
+    except OSError:
+        pass
+
+
+def _pw_restore_selection() -> bool:
+    """订阅拉完后，按名字把节点选回去。返回是否真的改了 uci。"""
+    try:
+        with open(_PW_SEL_FILE, encoding="utf-8") as fh:
+            want = json.load(fh)
+    except (OSError, ValueError):
+        return False
+    try:
+        os.remove(_PW_SEL_FILE)
+    except OSError:
+        pass
+
+    types, opts = _show("passwall")
+    global_sec = next((s for s, t in types.items() if t == "global"), "")
+    if not global_sec:
+        return False
+    by_name = {o.get("remarks", ""): sec for sec, o in opts.items()
+               if types.get(sec) == "nodes"}
+    changed = False
+    for key, opt in (("tcp", "tcp_node"), ("udp", "udp_node")):
+        name = want.get(key, "")
+        sec = by_name.get(name, "")
+        if not name or not sec or opts.get(global_sec, {}).get(opt, "") == sec:
+            continue
+        _run(["uci", "set", f"passwall.{global_sec}.{opt}={sec}"], timeout=6)
+        changed = True
+    if changed:
+        _run(["uci", "commit", "passwall"], timeout=6)
+    return changed
 
 
 def add(backend: str, name: str, url: str, enabled: bool = True) -> dict:
@@ -262,11 +391,22 @@ def refresh(backend: str, sec: str = "") -> dict:
     script = "/usr/share/passwall/subscribe.lua"
     if not os.path.exists(script):
         return _bad(backend, "找不到 " + script)
+
+    # 出厂那个「分流总节点」在拉订阅之前清掉：它不属于任何订阅，
+    # 留着节点列表就会多出一个空分组，把真正的订阅节点挤到下面
+    dropped = _pw_drop_factory_shunt()
+    # 订阅节点每次都是删掉重建，先按名字记住选的是哪个，拉完再选回去
+    _pw_save_selection()
+    restore = ("cd /usr/lib/istore-agent && python3 -c "
+               "\"import sys;sys.path.insert(0,'/usr/lib/istore-agent');"
+               "from agent import subscriptions as s;s._pw_restore_selection()\"")
     # Passwall 的订阅段是匿名的，脚本只认段名，所以只能整批更新
-    _spawn(f"lua {script} start all manual >/tmp/istore-sub-update.log 2>&1",
+    _spawn(f"lua {script} start all manual >/tmp/istore-sub-update.log 2>&1;"
+           f" {restore} >>/tmp/istore-sub-update.log 2>&1",
            "/dev/null")
     return {
         "ok": True, "backend": backend, "async": True,
+        "dropped_default": dropped,
         "note": "已开始更新全部订阅（Passwall 不支持只更新一条），"
                 "通常需要 20～60 秒。",
     }

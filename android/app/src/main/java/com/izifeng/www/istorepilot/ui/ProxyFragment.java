@@ -1229,8 +1229,21 @@ public class ProxyFragment extends BaseFragment {
     }
 
     /** 这一页现在在管哪个后端：正在跑的那个，没跑就是装着的那个 */
+    /**
+     * 界面当前该以哪个后端为主。
+     *
+     * 正在跑的那个优先。都停着时不能随手拿「先装的那个」—— OpenClash 的节点
+     * 要靠内核 API 才拿得到，停着就只剩一句连接失败；PassWall 的节点存在 uci
+     * 里，停着也能看、也能先把节点选好再启动。所以都停着时优先 PassWall。
+     */
     private String uiBackend() {
-        return backendId.isEmpty() ? installedBackend : backendId;
+        if (!backendId.isEmpty()) {
+            return backendId;
+        }
+        if (installedMap.containsKey("passwall")) {
+            return "passwall";
+        }
+        return installedBackend;
     }
 
     /**
@@ -1505,9 +1518,9 @@ public class ProxyFragment extends BaseFragment {
         startActivity(it);
     }
 
-    /** 订阅、配置这类操作面向「装了哪个后端」，与内核在不在跑无关 */
+    /** 订阅、配置这类操作面向「当前这个后端」，与内核在不在跑无关 */
     private String subsBackend() {
-        return backendId.isEmpty() ? installedBackend : backendId;
+        return uiBackend();
     }
 
     /** 订阅本身在独立页面维护，这张卡只要一个条数 */
@@ -1581,8 +1594,24 @@ public class ProxyFragment extends BaseFragment {
         });
     }
 
+    /**
+     * 节点相关接口都带上 backend。
+     *
+     * 服务端不传 backend 时按「正在跑的那个」猜；两个后端都停着时就是 none，
+     * 整块节点区只会显示「没有正在运行的代理后端」—— 可 Passwall 装了就能看
+     * 节点、也能先把节点选好再启动。所以这里优先正在跑的，其次已装的。
+     */
+    private String nodeBackend() {
+        return uiBackend();
+    }
+
+    private String nodeBackendQuery() {
+        String id = nodeBackend();
+        return id.isEmpty() ? "" : "?backend=" + id;
+    }
+
     private void loadGroups() {
-        Api.get(ctx(), "/api/v1/proxy/groups", new Cb() {
+        Api.get(ctx(), "/api/v1/proxy/groups" + nodeBackendQuery(), new Cb() {
             @Override
             public void onData(JSONObject body, boolean fromCache) {
                 if (!isAdded()) {
@@ -1796,6 +1825,8 @@ public class ProxyFragment extends BaseFragment {
             case "fallback": return "故障转移";
             case "loadbalance": return "负载均衡";
             case "relay": return "链式";
+            // Passwall 没有 selector 概念，服务端按订阅分组返回 type=group
+            case "group": return "分组";
             default: return (raw == null || raw.isEmpty()) ? "分组" : raw;
         }
     }
@@ -2052,6 +2083,9 @@ public class ProxyFragment extends BaseFragment {
         try {
             body.put("group", group);
             body.put("timeout", 3000);
+            if (!nodeBackend().isEmpty()) {
+                body.put("backend", nodeBackend());
+            }
         } catch (Exception ignored) {
             testingGroup = "";
             return;
@@ -2143,6 +2177,9 @@ public class ProxyFragment extends BaseFragment {
         try {
             body.put("name", name);
             body.put("group", group);
+            if (!nodeBackend().isEmpty()) {
+                body.put("backend", nodeBackend());
+            }
         } catch (Exception ignored) {
             return;
         }
