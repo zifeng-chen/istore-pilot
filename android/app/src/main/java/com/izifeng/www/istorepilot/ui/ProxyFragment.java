@@ -1965,7 +1965,9 @@ public class ProxyFragment extends BaseFragment {
 
         LinearLayout head = Ui.row(c);
         head.setGravity(Gravity.CENTER_VERTICAL);
-        head.setPadding(0, Ui.dp(c, 6), 0, Ui.dp(c, 12));
+        // 左右 16：Sheet 外框只有 4dp，这里补到 20dp，才和下面列表行的左边距对齐。
+        // 之前是 0，标题直接贴屏幕边，看着像没做完
+        head.setPadding(Ui.dp(c, 16), Ui.dp(c, 8), Ui.dp(c, 16), Ui.dp(c, 12));
 
         // 左上：组名 + 副标题
         LinearLayout titleCol = Ui.column(c);
@@ -2027,7 +2029,8 @@ public class ProxyFragment extends BaseFragment {
                 continue;
             }
             if (added > 0) {
-                sheetList.addView(Ui.hairline(c, 42));
+                // 46 = 行边距 16 + 单选点 18 + 间距 12，正好对齐名字的起笔
+                sheetList.addView(Ui.hairline(c, 46));
             }
             if (addNodeRow(c, sheetList, m, sheetGroup, sheetNow)) {
                 added++;
@@ -2037,13 +2040,18 @@ public class ProxyFragment extends BaseFragment {
 
     /** 测速胶囊：主色淡底 + 主色字 */
     private TextView testPill(Context c, boolean testing) {
-        TextView v = Ui.text(c, testing ? "测速中…" : "测速", 12f, R.color.primary);
+        TextView v = Ui.text(c, testing ? "测速中…" : "测速", 12.5f, R.color.primary);
         v.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        v.setPadding(Ui.dp(c, 10), Ui.dp(c, 5), Ui.dp(c, 10), Ui.dp(c, 5));
+        v.setGravity(Gravity.CENTER);
+        v.setPadding(Ui.dp(c, 14), 0, Ui.dp(c, 14), 0);
         GradientDrawable bg = new GradientDrawable();
-        bg.setCornerRadius(Ui.dp(c, 100));
+        // 和右上角「关闭」同一套规格：30dp 高、9dp 圆角。
+        // 之前测速是全圆胶囊、关闭是方角方块，并排像两个人画的
+        bg.setCornerRadius(Ui.dp(c, 9));
         bg.setColor(Ui.color(c, R.color.accent_soft));
         v.setBackground(bg);
+        v.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(c, 30)));
         return v;
     }
 
@@ -2115,18 +2123,19 @@ public class ProxyFragment extends BaseFragment {
 
         LinearLayout line = Ui.row(c);
         line.setGravity(Gravity.CENTER_VERTICAL);
-        line.setPadding(Ui.dp(c, 16), Ui.dp(c, 11), Ui.dp(c, 16), Ui.dp(c, 11));
+        // 13dp 上下：原先 11 太挤，一列节点看起来像贴在一起
+        line.setPadding(Ui.dp(c, 16), Ui.dp(c, 13), Ui.dp(c, 16), Ui.dp(c, 13));
         line.setClickable(true);
         line.setFocusable(true);
 
         Radio radio = new Radio(c, selected ? onColor : R.color.text_tertiary);
         radio.setOn(selected);
         LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
-                Ui.dp(c, 15), Ui.dp(c, 15));
-        rlp.rightMargin = Ui.dp(c, 11);
+                Ui.dp(c, 18), Ui.dp(c, 18));
+        rlp.rightMargin = Ui.dp(c, 12);
         line.addView(radio, rlp);
 
-        TextView label = Ui.text(c, pretty(name), 14f,
+        TextView label = Ui.text(c, pretty(name), 15f,
                 selected ? onColor : (policy ? R.color.text_secondary : R.color.text_primary));
         label.setMaxLines(1);
         label.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -2156,11 +2165,19 @@ public class ProxyFragment extends BaseFragment {
             }
         }
 
+        // 选中行铺一层极淡的同色底 + 圆角：一列扫下来先认出「当前用的是哪个」，
+        // 而不是只能靠左边那个小圆点
+        GradientDrawable rowBg = new GradientDrawable();
+        rowBg.setCornerRadius(Ui.dp(c, 12));
+        rowBg.setColor(selected
+                ? Ui.alpha(Ui.color(c, onColor), 0.07f)
+                : android.graphics.Color.TRANSPARENT);
         GradientDrawable mask = new GradientDrawable();
+        mask.setCornerRadius(Ui.dp(c, 12));
         mask.setColor(0xFFFFFFFF);
         line.setBackground(new android.graphics.drawable.RippleDrawable(
                 android.content.res.ColorStateList.valueOf(Ui.color(c, R.color.ripple)),
-                null, mask));
+                rowBg, mask));
         line.setOnClickListener(v -> selectNode(group, name, true));
         host.addView(line);
         return true;
@@ -2190,7 +2207,8 @@ public class ProxyFragment extends BaseFragment {
         tested.clear();
         if (sheetTestBtn != null) {
             sheetTestBtn.setText("测速中…");
-            sheetTestBtn.setTextColor(Ui.color(sheetTestBtn.getContext(), R.color.text_secondary));
+            // 保持主色：之前测速中把字变灰、底还是绿淡底，绿底灰字看着像按钮失效了
+            sheetTestBtn.setTextColor(Ui.color(sheetTestBtn.getContext(), R.color.primary));
         }
         if (lastGroups != null) {
             renderNodes(lastGroups);
