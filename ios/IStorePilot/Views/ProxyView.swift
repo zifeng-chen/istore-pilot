@@ -13,6 +13,8 @@ import SwiftUI
 struct ProxyView: View {
     @State private var d: J = Api.cached("/api/v1/proxy") ?? [:]
     @State private var groups: [J] = Api.cached("/api/v1/proxy/groups").map { $0.objs("groups") } ?? []
+    /// 节点区为什么空着（如「OpenClash 没在运行，启动后才看得到节点」）
+    @State private var groupsErr = ""
     /// 「隐藏超时节点」：偏好存在路由器上（不是本机设置），几台设备 + Web 端读的是同一个值
     @State private var hideTimeout: Bool = false
     /// 服务端按偏好裁掉了几个
@@ -49,6 +51,12 @@ struct ProxyView: View {
     @State private var showAsk = false
     /// 待停止的后端。运行中的行点一下就能停 —— 只能启动不能停止的界面是残的
     @State private var stopTarget = ""
+    /// 「配置与节点」卡点名的后端。
+    ///
+    /// 订阅和节点**每个后端各一套**（OpenClash 的在 uci + 内核里，PassWall 的在
+    /// uci 里），这张卡不可能同时管两个。有后端在跑时默认跟它，但允许切到另一个
+    /// 去整理订阅 —— 切走后副标题会写明「只改配置」，别让人以为把代理切走了。
+    @State private var comboPick = ""
 
     @Environment(\.tabIndex) private var tabIndex
     @Environment(\.barAxis) private var axis
@@ -63,26 +71,41 @@ struct ProxyView: View {
     }
     private var running: Bool { backend.bool("running") }
 
+    /// 已安装的后端 id
+    private var installedIDs: [String] {
+        backends.filter { $0.bool("installed") }.map { $0.str("id") }
+    }
+
+    /// 「配置与节点」这张卡在管哪个后端：用户点名 > 正在运行 > 已装的（PassWall 优先）。
+    ///
+    /// 点名优先于「正在运行」是故意的：运行中的那个要跟（改配置立刻生效），
+    /// 但另一个的订阅也得能整理，不能因为它在跑就把这张卡焊死。
+    private var comboBackend: String {
+        if !comboPick.isEmpty, installedIDs.contains(comboPick) { return comboPick }
+        if active != "none" { return active }
+        if installedIDs.contains("passwall") { return "passwall" }
+        return installedIDs.first ?? ""
+    }
+
+    /// 这张卡管的后端是不是「正在跑的那个」：不是的话副标题要提醒只改配置
+    private var comboIsActive: Bool { !active.isEmpty && active != "none" && comboBackend == active }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
                     scrollTopProbe()
                     hero
-                    // 窄屏顺序 = 安卓：先模式、后配置与节点。
-                    // 宽屏把节点摊到左边，配置/模式挤右栏，省一次长滚动
-                    DuoColumns(rightFirstInNarrow: true) {
-                        if loading {
-                            Card {
-                                VStack(alignment: .leading, spacing: 10) {
-                                    Bone(w: 90, h: 15); Bone(h: 10); Bone(h: 10)
-                                }
-                            }
-                        } else {
-                            comboCard
+                    // 「运行模式」切的是「正在跑的那个后端」的流量走向，没跑就没得切。
+                    // 这时整块不出现，否则用户以为自己在挑模式，其实点下去空转
+                    if anyRunning() {
+                        DuoColumns(rightFirstInNarrow: true) {
+                            comboRegion
+                        } right: {
+                            modeCard
                         }
-                    } right: {
-                        modeCard
+                    } else {
+                        comboRegion
                     }
                     if !err.isEmpty {
                         Text(err).font(F.tiny).foregroundStyle(C.danger)
@@ -97,7 +120,10 @@ struct ProxyView: View {
             .background(C.appBg)
             .navigationTitle("代理")
             .pageTitle("代理")
-            .navigationDestination(isPresented: $goSubs) { SubscriptionView() }
+            .navigationDestination(isPresented: $goSubs) {
+                // 带上这张卡点名的后端：订阅各一套，进去必须看到对应的那份
+                SubscriptionView(initialBackend: comboBackend)
+            }
             .onAppear { chrome.set(tabIndex, goSubs) }
             .onChange(of: goSubs) { chrome.set(tabIndex, $0) }
             .task { await load() }
@@ -288,17 +314,19 @@ struct ProxyView: View {
     // MARK: - Hero
 
     private var hero: some View {
+        // 没后端在跑时不能写「直连」：「直连」是「后端在跑、模式选了直连」，
+        // 和「装了但没启用」是两回事，写成直连会让人以为自己在用直连模式
         let title: String = running
             ? (cfg.str("current") as NSString).lastPathComponent
                 .replacingOccurrences(of: ".yaml", with: "")
-            : "直连"
+            : "未启用"
         let nodes = backend.int("node_count")
         let engine = backend.str("engine", "")
         var bits: [String] = []
         if !engine.isEmpty { bits.append(engine) }
         if nodes > 0 { bits.append("\(nodes) 个节点可用") }
         if !mode.isEmpty { bits.append(modeLabel(mode)) }
-        if bits.isEmpty { bits.append("两个代理后端都停着，所有流量走直连") }
+        if !running { bits = ["点上面任意一行启用；启用后这里显示当前出口"] }
 
         return Hero {
             VStack(alignment: .leading, spacing: 0) {
@@ -309,7 +337,10 @@ struct ProxyView: View {
                         .font(.system(size: 12.5, weight: .medium))
                         .foregroundStyle(C.heroFg)
                     Spacer()
-                    Text(backend.str("label", running ? active : "未启用"))
+                    // 没在跑时这里给「装了 N 个」，比一个「未启用」更有用：
+                    // 它回答了「我到底装了几个、为什么还不能用」
+                    Text(running ? backend.str("label", active)
+                                 : "\(installedIDs.count) 个已安装")
                         .font(F.tiny)
                         .foregroundStyle(C.heroFgSoft)
                         .padding(.horizontal, 9).padding(.vertical, 3)
@@ -400,8 +431,10 @@ struct ProxyView: View {
                         }
                     }
                 VStack(alignment: .leading, spacing: 3) {
+                    // 运行中的那个要一眼认出来：加粗 + 放大半档 + 满白。
+                    // 只靠右侧胶囊不够，两个名字并排时视线先落在字上
                     Text(name)
-                        .font(.system(size: 15, weight: on ? .semibold : .medium))
+                        .font(.system(size: on ? 16 : 15, weight: on ? .bold : .medium))
                         .foregroundStyle(on ? C.heroFg : C.heroFg.opacity(0.55))
                     if !sub.isEmpty {
                         Text(sub)
@@ -509,6 +542,78 @@ struct ProxyView: View {
 
     // MARK: - 配置与节点
 
+    /// 骨架 / 真卡片：拆出来是为了「没后端在跑时」能让它独占一行（不跟模式并排）
+    @ViewBuilder
+    private var comboRegion: some View {
+        if loading {
+            Card {
+                VStack(alignment: .leading, spacing: 10) {
+                    Bone(w: 90, h: 15); Bone(h: 10); Bone(h: 10)
+                }
+            }
+        } else {
+            comboCard
+        }
+    }
+
+    /// 这张卡管的后端。订阅、节点、配置文件全是各一套，必须先点名
+    private var comboSub: String {
+        // 切到「没在跑的那个」时必须说清楚：这里改的是它的配置，
+        // 正在跑的后端不受影响 —— 否则用户以为刚把代理切走了
+        if active != "none" && !comboIsActive {
+            return "只改配置，不影响正在运行的 " + labelOf(active)
+        }
+        if comboBackend == "passwall" {
+            return "PassWall 的节点来自订阅，没有配置文件"
+        }
+        if !comboIsActive {
+            return "OpenClash 没在运行，启动后才看得到节点"
+        }
+        return "换配置会重启内核，断网十几秒"
+    }
+
+    private func labelOf(_ id: String) -> String {
+        backends.first { $0.str("id") == id }.map { $0.str("label", id) } ?? id
+    }
+
+    /// 后端切换器：两个都装着才出现（只有一个时点不点都一样）
+    private var comboPicker: some View {
+        let labels = ["OpenClash", "PassWall"]
+        let sel = comboBackend == "passwall" ? 1 : 0
+        return HStack(spacing: 0) {
+            ForEach(Array(labels.enumerated()), id: \.offset) { i, t in
+                let on = i == sel
+                Button {
+                    let pick = i == 0 ? "openclash" : "passwall"
+                    guard pick != comboBackend else { return }
+                    comboPick = pick
+                    Task { await load() }
+                } label: {
+                    Text(t)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(on ? C.textPrimary : C.textSecondary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 26)
+                        .background {
+                            if on {
+                                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                    .fill(C.segmentThumb)
+                                    .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                        .strokeBorder(C.glassStroke, lineWidth: 0.7))
+                            }
+                        }
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(3)
+        .background(C.segmentTrack)
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .padding(.horizontal, 18)
+        .padding(.bottom, 10)
+    }
+
     private var comboCard: some View {
         let cur = cfg.str("current")
         let curName = (cur as NSString).lastPathComponent.replacingOccurrences(of: ".yaml", with: "")
@@ -521,51 +626,58 @@ struct ProxyView: View {
         return Card(padding: 0) {
             VStack(alignment: .leading, spacing: 0) {
                 CardHead(icon: "list.bullet", title: "配置与节点",
-                         sub: "换配置会重启内核，断网十几秒")
+                         sub: comboSub)
                     .padding(.horizontal, 18)
                     .padding(.top, 18)
                     .padding(.bottom, 10)
 
-                // 当前配置：整行可点，右侧「切换」胶囊给出明确的可操作性
-                HStack(spacing: 10) {
-                    Image(systemName: "key")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(C.primary)
-                        .frame(width: 30, height: 30)
-                        .background(C.accentSoft)
-                        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("当前配置").font(F.body).foregroundStyle(C.textPrimary)
-                        Text(curName.isEmpty ? "未选择" : curName)
-                            .font(F.num(12, .regular))
-                            .foregroundStyle(C.textSecondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-                    Spacer(minLength: 6)
-                    Button {
-                        showCfg = true
-                    } label: {
-                        Text("切换")
-                            .font(.system(size: 12.5, weight: .medium))
-                            .foregroundStyle(C.primary)
-                            .padding(.horizontal, 11).padding(.vertical, 5)
-                            .background(C.accentSoft)
-                            .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(busy)
-                }
-                .padding(.horizontal, 18)
-                .padding(.vertical, 9)
+                if installedIDs.count >= 2 { comboPicker }
 
-                Hairline(inset: 18)
+                // 当前配置：整行可点，右侧「切换」胶囊给出明确的可操作性。
+                // PassWall 没有「配置文件」这个概念（节点直接来自订阅），整行藏掉
+                if comboBackend == "openclash" {
+                    HStack(spacing: 10) {
+                        // 配置文件用文档图标：钥匙是「密码」的语义，安卓那边同款改过
+                        Image(systemName: "doc.text")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(C.primary)
+                            .frame(width: 30, height: 30)
+                            .background(C.accentSoft)
+                            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("当前配置").font(F.body).foregroundStyle(C.textPrimary)
+                            Text(curName.isEmpty ? "未选择" : curName)
+                                .font(F.num(12, .regular))
+                                .foregroundStyle(C.textSecondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                        Spacer(minLength: 6)
+                        Button {
+                            showCfg = true
+                        } label: {
+                            Text("切换")
+                                .font(.system(size: 12.5, weight: .medium))
+                                .foregroundStyle(C.primary)
+                                .padding(.horizontal, 11).padding(.vertical, 5)
+                                .background(C.accentSoft)
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(busy)
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 9)
+
+                    Hairline(inset: 18)
+                }
 
                 Button {
                     goSubs = true
                 } label: {
                     HStack(spacing: 10) {
-                        Image(systemName: "arrow.up.doc")
+                        // 订阅是「链接」（订阅地址），不是上传 —— 跟安卓一致
+                        Image(systemName: "link")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(C.primary)
                             .frame(width: 30, height: 30)
@@ -615,8 +727,11 @@ struct ProxyView: View {
                     Text("读取中…").font(F.tiny).foregroundStyle(C.textSecondary)
                         .padding(.horizontal, 18).padding(.vertical, 10)
                 } else if sorted.isEmpty {
-                    Text(anyRunning() ? "节点分组还没读取到，这块会自动重试"
-                                      : "代理没在运行，所以没有节点")
+                    // 服务端会说明为什么空着（OpenClash 停着时就是「启动后才看得到」），
+                    // 直接用它，别在这儿另编一句
+                    Text(groupsErr.isEmpty
+                         ? (anyRunning() ? "节点分组还没读取到，这块会自动重试" : "没有可用的节点")
+                         : groupsErr)
                         .font(F.tiny)
                         .foregroundStyle(C.textSecondary)
                         .padding(.horizontal, 18).padding(.vertical, 10)
@@ -975,12 +1090,26 @@ struct ProxyView: View {
     private func load() async {
         do {
             let p = try await Api.get("/api/v1/proxy")
-            let g = try await Api.get("/api/v1/proxy/groups")
+            // 这张卡管哪个后端：点名 > 正在运行 > 已装的（PassWall 优先）。
+            // 必须先用刚拿到的列表算出来再取节点 —— 读 @State 会晚一拍，
+            // 换后端后第一轮就会拿错数据
+            let list = p.objs("backends")
+            let installed = list.filter { $0.bool("installed") }.map { $0.str("id") }
+            let act = p.str("active", "none")
+            var target = comboPick
+            if target.isEmpty || !installed.contains(target) {
+                target = act != "none" ? act
+                    : (installed.contains("passwall") ? "passwall" : (installed.first ?? ""))
+            }
+            var gPath = "/api/v1/proxy/groups"
+            if !target.isEmpty { gPath += "?backend=" + target }
+            let g = try await Api.get(gPath)
             let m = try? await Api.get("/api/v1/proxy/mode")
             let c = try? await Api.get("/api/v1/proxy/configs")
             await MainActor.run {
                 d = p
                 groups = (g["groups"] as? [Any])?.compactMap { $0 as? J } ?? []
+                groupsErr = g.str("error")
                 hideTimeout = g.bool("hide_timeout")
                 hiddenCount = g.int("hidden")
                 // 分组一律默认折叠（与安卓一致）：一屏先看到所有组的当前节点和节点数，
@@ -1014,9 +1143,14 @@ struct ProxyView: View {
     private func switchBackend(_ id: String, start: Bool = true) async {
         busy = true
         defer { busy = false }
-        _ = try? await Api.post("/api/v1/proxy/service",
-                                ["action": start ? "start" : "stop", "backend": id],
-                                slow: true)
+        let r = try? await Api.post("/api/v1/proxy/service",
+                                    ["action": start ? "start" : "stop", "backend": id],
+                                    slow: true)
+        await MainActor.run {
+            // 刚启停的这个就是接下来要跟的对象：清掉旧的点名，
+            // 否则卡片会停在「只改配置」的旁观态
+            if r?.bool("ok") ?? false { comboPick = "" }
+        }
         await load()
     }
 
@@ -1031,7 +1165,10 @@ struct ProxyView: View {
     private func selectNode(group: String, node: String) async {
         busy = true
         defer { busy = false }
-        _ = try? await Api.post("/api/v1/proxy/select", ["group": group, "name": node])
+        // 必须带 backend：这张卡可能正管着没在跑的那个后端，
+        // 不带就会落到「正在运行的那个」身上，等于改了另一套节点
+        _ = try? await Api.post("/api/v1/proxy/select",
+                                ["group": group, "name": node, "backend": comboBackend])
         await MainActor.run { tested = [:] }
         await load()
     }
@@ -1041,7 +1178,8 @@ struct ProxyView: View {
         testingGroup = name
         Task {
             let r = try? await Api.post("/api/v1/proxy/delays",
-                                        ["group": name, "timeout": 3000], slow: true)
+                                        ["group": name, "timeout": 3000,
+                                         "backend": comboBackend], slow: true)
             var got: [String: Int] = [:]
             if let list = r?.objs("delays") {
                 for x in list {

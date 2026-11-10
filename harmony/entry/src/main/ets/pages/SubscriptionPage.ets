@@ -32,6 +32,12 @@ struct SubscriptionPage {
   @State loading: boolean = true;
   @State busy: string = '';
   @State safeTop: number = 0;
+  /**
+   * 管的是哪个后端。订阅**每个后端各一套**（uci 里分属 openclash /
+   * passwall 两个包），代理页带过来；以前这里不分后端把两边混在一列里，
+   * 用户以为一条能管两个
+   */
+  @State backend: string = '';
   /** 新增/编辑表单 */
   @State editing: boolean = false;
   @State editId: string = '';
@@ -41,6 +47,10 @@ struct SubscriptionPage {
 
   aboutToAppear(): void {
     this.safeTop = UI.safeTop;
+    const p = router.getParams() as Record<string, string>;
+    if (p !== undefined && p !== null && p['backend'] !== undefined) {
+      this.backend = p['backend'];
+    }
     this.load();
   }
 
@@ -49,7 +59,10 @@ struct SubscriptionPage {
   }
 
   private async load(): Promise<void> {
-    const r: ApiResult = await Api.get(this.ctx(), '/api/v1/proxy/subscriptions');
+    const path: string = this.backend.length > 0
+      ? '/api/v1/proxy/subscriptions?backend=' + this.backend
+      : '/api/v1/proxy/subscriptions';
+    const r: ApiResult = await Api.get(this.ctx(), path);
     this.loading = false;
     if (!r.ok) {
       promptAction.showToast({ message: r.error.length > 0 ? r.error : '读取失败' });
@@ -137,7 +150,10 @@ struct SubscriptionPage {
           .onClick(() => {
             router.back();
           });
-        Text('订阅管理')
+        // 标题点名管的是哪个后端：只写「订阅管理」会让人以为这里能同时管两个
+        Text(this.backend.length === 0
+          ? '订阅管理'
+          : '订阅管理 · ' + (this.backend === 'passwall' ? 'PassWall' : 'OpenClash'))
           .fontSize(T.F_H1)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
@@ -150,6 +166,8 @@ struct SubscriptionPage {
           .backgroundColor($r('app.color.accent_soft'))
           .onClick(() => {
             this.editId = '';
+            // 新增的订阅必须落在当前这个后端上，否则会写进另一套
+            this.editBackend = this.backend.length > 0 ? this.backend : 'openclash';
             this.nameDraft = '';
             this.urlDraft = '';
             this.editing = true;

@@ -1,6 +1,11 @@
 import SwiftUI
 
 struct SubscriptionView: View {
+    /// 从代理页带进来的后端。订阅**每个后端各一套**（uci 里分属 openclash /
+    /// passwall 两个包），所以不能靠「正在跑的那个」猜 —— 没在跑时以前会猜成
+    /// "none"，过滤完一条都不剩，看着像两边都没有订阅
+    var initialBackend: String = ""
+
     @State private var items: [J] = []
     @State private var backend = ""
     @State private var loading = true
@@ -49,7 +54,10 @@ struct SubscriptionView: View {
         }
         .scrollIndicators(.hidden)
         .background(C.appBg)
-        .navigationTitle("订阅管理")
+        // 标题点名管的是哪个后端：只写「订阅管理」会让人以为这里能同时管两个
+        .navigationTitle(backend.isEmpty
+                         ? "订阅管理"
+                         : "订阅管理 · " + (backend == "passwall" ? "PassWall" : "OpenClash"))
         .navigationBarTitleDisplayMode(.inline)
         // 一级页把系统导航栏藏了，二级页显式声明「要显示」，免得跟着一起消失
         .toolbar(.visible, for: .navigationBar)
@@ -138,18 +146,16 @@ struct SubscriptionView: View {
 
     private func load() async {
         do {
-            var j = try await Api.get("/api/v1/proxy/subscriptions")
-            var list = j.objs("items")
-            // 后端会同时返回 OpenClash 和 Passwall 两套；只显示当前在跑的那个
-            if let cur = try? await Api.get("/api/v1/proxy") {
-                let active = cur.str("active")
-                if !active.isEmpty {
-                    backend = active
-                    let only = list.filter { $0.str("backend") == active }
-                    if !only.isEmpty { list = only }
-                }
+            // 点名了后端就只要它那份；没点名（老入口）才退回「正在跑的那个」
+            if backend.isEmpty { backend = initialBackend }
+            if backend.isEmpty, let cur = try? await Api.get("/api/v1/proxy") {
+                let act = cur.str("active", "none")
+                backend = act == "none" ? "" : act
             }
-            items = list
+            var path = "/api/v1/proxy/subscriptions"
+            if !backend.isEmpty { path += "?backend=" + backend }
+            let j = try await Api.get(path)
+            items = j.objs("items")
             loading = false
             err = ""
         } catch {

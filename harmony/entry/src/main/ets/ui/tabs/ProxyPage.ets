@@ -131,6 +131,16 @@ export struct ProxyPage {
   @Local backends: Backend[] = [];
   @Local active: string = '';
   @Local groups: NodeGroup[] = [];
+  /** 节点区为什么空着（如「OpenClash 没在运行，启动后才看得到节点」） */
+  @Local groupsErr: string = '';
+  /**
+   * 「配置与订阅」卡点名的后端。
+   *
+   * 订阅和节点**每个后端各一套**（OpenClash 的在 uci + 内核里，PassWall 的在
+   * uci 里），一张卡不可能同时管两个。有后端在跑时默认跟它，但允许切到另一个
+   * 去整理订阅 —— 切走后副标题会写明「只改配置」，别让人以为把代理切走了。
+   */
+  @Local comboPick: string = '';
   @Local nodeCount: number = 0;
   @Local backend: string = '';
   @Local mode: string = '';
@@ -278,6 +288,56 @@ export struct ProxyPage {
 
   private labelOf(id: string): string {
     return id === 'openclash' ? 'OpenClash' : 'Passwall';
+  }
+
+  /** 已安装的后端 id */
+  private installedIds(): string[] {
+    const out: string[] = [];
+    for (let i = 0; i < this.backends.length; i++) {
+      if (this.backends[i].installed) {
+        out.push(this.backends[i].id);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * 「配置与订阅」这张卡管哪个后端：点名 > 正在运行 > 已装的（PassWall 优先）。
+   *
+   * 点名优先于「正在运行」是故意的：运行中的那个要跟（改配置立刻生效），
+   * 但另一个的订阅也得能整理，不能因为它在跑就把这张卡焊死。
+   */
+  private comboBackend(): string {
+    const ids: string[] = this.installedIds();
+    if (this.comboPick.length > 0 && ids.indexOf(this.comboPick) >= 0) {
+      return this.comboPick;
+    }
+    if (this.active.length > 0 && this.active !== 'none') {
+      return this.active;
+    }
+    if (ids.indexOf('passwall') >= 0) {
+      return 'passwall';
+    }
+    return ids.length > 0 ? ids[0] : '';
+  }
+
+  /** 管的后端是不是「正在跑的那个」：不是的话副标题要提醒只改配置 */
+  private comboIsActive(): boolean {
+    return this.active.length > 0 && this.active !== 'none'
+      && this.comboBackend() === this.active;
+  }
+
+  private comboSub(): string {
+    if (this.active.length > 0 && this.active !== 'none' && !this.comboIsActive()) {
+      return '只改配置，不影响正在运行的 ' + this.labelOf(this.active);
+    }
+    if (this.comboBackend() === 'passwall') {
+      return 'PassWall 的节点来自订阅，没有配置文件';
+    }
+    if (!this.comboIsActive()) {
+      return 'OpenClash 没在运行，启动后才看得到节点';
+    }
+    return '换配置会重启内核，断网十几秒';
   }
 
   private descOf(id: string): string {
@@ -730,11 +790,18 @@ export struct ProxyPage {
   }
 
   private async loadGroups(): Promise<void> {
-    const r: ApiResult = await Api.get(this.ctx(), '/api/v1/proxy/groups');
+    // 必须带 backend：节点每个后端一套，不带就会落到「正在跑的那个」，
+    // 看 PassWall 的卡片却显示 OpenClash 的节点
+    const be: string = this.comboBackend();
+    const path: string = be.length > 0
+      ? '/api/v1/proxy/groups?backend=' + be
+      : '/api/v1/proxy/groups';
+    const r: ApiResult = await Api.get(this.ctx(), path);
     if (!r.ok) {
       return;
     }
     this.backend = r.data.str('backend', '');
+    this.groupsErr = r.data.str('error', '');
     this.nodeCount = r.data.num('node_count', 0);
     // 开关状态跟服务端对齐：可能在另一台手机上改过
     this.hideTimeout = r.data.bool('hide_timeout', this.hideTimeout);
@@ -789,6 +856,13 @@ export struct ProxyPage {
   }
 
   private async loadConfigs(): Promise<void> {
+    // 配置文件只有 OpenClash 有；PassWall 的节点直接来自订阅。
+    // 这张卡在 PassWall 上会被藏掉，就别白拉一次接口
+    if (this.comboBackend() !== 'openclash') {
+      this.configs = [];
+      this.currentPath = '';
+      return;
+    }
     const r: ApiResult = await Api.get(this.ctx(), '/api/v1/proxy/configs');
     if (!r.ok) {
       return;
@@ -818,6 +892,11 @@ export struct ProxyPage {
     const body: Record<string, Object> = { 'action': start ? 'start' : 'stop', 'backend': id };
     const r: ApiResult = await Api.post(this.ctx(), '/api/v1/proxy/service', body);
     this.busyBackend = '';
+    // 刚启停的这个就是接下来要跟的对象：清掉旧的点名，
+    // 否则卡片会停在「只改配置」的旁观态
+    if (r.ok) {
+      this.comboPick = '';
+    }
     this.toast = r.ok ? (start ? '已启动，正在生效' : '已停止')
       : ('操作失败：' + (r.error.length > 0 ? r.error : '未知错误'));
     await this.load(false);
@@ -870,7 +949,9 @@ export struct ProxyPage {
       return;
     }
     this.testingGroup = name;
-    const body: Record<string, Object> = { 'group': name, 'timeout': 3000 };
+    const body: Record<string, Object> = {
+      'group': name, 'timeout': 3000, 'backend': this.comboBackend()
+    };
     const r: ApiResult = await Api.post(this.ctx(), '/api/v1/proxy/delays', body);
     this.testingGroup = '';
     if (!r.ok || !r.data.bool('ok', false)) {
@@ -907,7 +988,11 @@ export struct ProxyPage {
       return;
     }
     this.busy = group + '/' + name;
-    const body: Record<string, Object> = { 'name': name, 'group': group };
+    // 必须带 backend：这张卡可能正管着没在跑的那个后端，
+    // 不带就会落到「正在运行的那个」身上，等于改了另一套节点
+    const body: Record<string, Object> = {
+      'name': name, 'group': group, 'backend': this.comboBackend()
+    };
     const r: ApiResult = await Api.post(this.ctx(), '/api/v1/proxy/select', body);
     this.busy = '';
     if (r.ok && r.data.bool('ok', true)) {
@@ -986,8 +1071,15 @@ export struct ProxyPage {
         } else {
           Column() {
             this.backendCard();
-            this.modeCard();
-            this.configCard();
+            // 「运行模式」切的是「正在跑的那个后端」的流量走向，没跑就没得切。
+            // 摆出来只会让人以为自己在挑模式，其实点下去空转
+            if (this.anyRunning()) {
+              this.modeCard();
+            }
+            // 配置文件只有 OpenClash 有；这张卡跟着「当前管哪个后端」走
+            if (this.comboBackend() === 'openclash') {
+              this.configCard();
+            }
             this.subsEntry();
             this.groupList();
           }
@@ -1332,9 +1424,14 @@ export struct ProxyPage {
           }
           Row() {
             Column() {
+              // 运行中的那个要一眼认出来：加粗 + 放大一档 + 主色。
+              // 只靠右侧「运行中」胶囊不够，两个名字并排时视线先落在字上
               Text(b.label)
-                .fontSize(T.F_H2)
-                .fontColor($r('app.color.text_primary'));
+                .fontSize(b.running ? T.F_H2 + 1 : T.F_H2)
+                .fontWeight(b.running ? FontWeight.Bold : FontWeight.Normal)
+                .fontColor(b.running
+                  ? $r('app.color.primary')
+                  : $r('app.color.text_primary'));
               // 未安装时只写「未安装」：之前无条件拼 engine+nodes，
               // Passwall 的 engine 是硬编码 "Xray"，于是胶囊说未安装、
               // 副标题却写着「Xray · 0 节点」，自相矛盾。
@@ -1385,13 +1482,19 @@ export struct ProxyPage {
   @Builder
   modeCard() {
     Card({ gapTop: T.GAP }) {
-      CardTitle({ glyph: Glyph.BOLT, title: '运行模式', sub: '规则模式按域名分流，全局模式全部走代理' });
+      CardTitle({ glyph: Glyph.BOLT, title: '运行模式', sub: '改完立即生效' });
       // 分段控件必须有「槽」：选中项原来用纯白做底，而卡片也是白的，
       // 三个选项看起来一模一样，根本看不出当前是规则还是全局
       Row({ space: 4 }) {
-        this.modeChip('rule', '规则');
-        this.modeChip('global', '全局');
-        this.modeChip('direct', '直连');
+        // 两个后端的档位不一样：OpenClash 三档，PassWall 只有代理/直连
+        if (this.active === 'openclash') {
+          this.modeChip('rule', '规则');
+          this.modeChip('global', '全局');
+          this.modeChip('direct', '直连');
+        } else {
+          this.modeChip('proxy', '代理');
+          this.modeChip('disable', '直连');
+        }
       }
       .width('100%')
       .padding(3)
@@ -1468,27 +1571,86 @@ export struct ProxyPage {
   @Builder
   subsEntry() {
     Card({ gapTop: T.GAP }) {
-      Row() {
-        // 自定义组件后面不能直接链 .margin()，套一层 Row
-        Row() {
-          GlyphIcon({ kind: Glyph.LINK, color: Pal.primary(), side: 18, lineWidth: 1.9 });
+      Column() {
+        // 两个都装着就得点名管哪个：订阅、节点、配置文件全是各一套，
+        // 不点名只能默默按某一个展示，用户以为在配另一个
+        if (this.installedIds().length >= 2) {
+          Row({ space: 4 }) {
+            this.comboChip('openclash', 'OpenClash');
+            this.comboChip('passwall', 'PassWall');
+          }
+          .width('100%')
+          .padding(3)
+          .borderRadius(15)
+          .backgroundColor($r('app.color.surface_hi'))
+          .margin({ bottom: 6 });
         }
-        .margin({ right: 10 });
-        Text('订阅管理')
-          .fontSize(T.F_BODY)
-          .fontColor($r('app.color.text_primary'))
-          .layoutWeight(1);
-        Text('›')
-          .fontSize(18)
-          .fontColor($r('app.color.text_tertiary'));
+
+        Row() {
+          // 自定义组件后面不能直接链 .margin()，套一层 Row
+          Row() {
+            GlyphIcon({ kind: Glyph.LINK, color: Pal.primary(), side: 18, lineWidth: 1.9 });
+          }
+          .margin({ right: 10 });
+          Text(this.comboBackend().length > 0
+            ? '订阅管理 · ' + this.labelOf(this.comboBackend())
+            : '订阅管理')
+            .fontSize(T.F_BODY)
+            .fontColor($r('app.color.text_primary'))
+            .layoutWeight(1);
+          Text('›')
+            .fontSize(18)
+            .fontColor($r('app.color.text_tertiary'));
+        }
+        .width('100%')
+        .padding({ top: 4, bottom: 4 })
+        .alignItems(VerticalAlign.Center)
+        .onClick(() => {
+          router.pushUrl({
+            url: 'pages/SubscriptionPage',
+            params: { backend: this.comboBackend() }
+          });
+        });
+
+        Text(this.comboSub())
+          .fontSize(T.F_TINY)
+          .fontColor($r('app.color.text_secondary'))
+          .width('100%')
+          .margin({ top: 2 });
       }
-      .width('100%')
-      .padding({ top: 4, bottom: 4 })
-      .alignItems(VerticalAlign.Center)
-      .onClick(() => {
-        router.pushUrl({ url: 'pages/SubscriptionPage' });
-      });
+      .width('100%');
     }
+  }
+
+  /** 后端切换器里的一个格子 */
+  @Builder
+  comboChip(id: string, text: string) {
+    Text(text)
+      .fontSize(T.F_SUB)
+      .fontWeight(this.comboBackend() === id ? FontWeight.Medium : FontWeight.Normal)
+      .fontColor(this.comboBackend() === id
+        ? $r('app.color.text_primary')
+        : $r('app.color.text_secondary'))
+      .textAlign(TextAlign.Center)
+      .layoutWeight(1)
+      .height(30)
+      .borderRadius(12)
+      .backgroundColor(this.comboBackend() === id
+        ? $r('app.color.segment_thumb')
+        : Color.Transparent)
+      .onClick(() => {
+        this.pickCombo(id);
+      });
+  }
+
+  /** 换后端：节点、配置文件都按新的重拉；正在跑的那个不受影响 */
+  private async pickCombo(id: string): Promise<void> {
+    if (this.comboPick === id || this.comboBackend() === id) {
+      return;
+    }
+    this.comboPick = id;
+    await this.loadGroups();
+    await this.loadConfigs();
   }
 
   /** 安装包入口。空态和已装态都要有 —— 装不上时正好用本地上传兜底 */
@@ -1856,14 +2018,20 @@ export struct ProxyPage {
       // 这里原来一律写「没有正在运行的代理后端」，可上面的卡片明明显示「运行中 ·
       // 63 节点」—— 自相矛盾。分成两种：后端在跑但分组没读到，和后端确实没跑。
       Card({ gapTop: this.rail() ? 0 : T.GAP }) {
-        Text(this.anyRunning() ? '节点分组还没读取到' : '没有正在运行的代理后端')
+        // 服务端会说明为什么空着（OpenClash 停着时就是「启动后才看得到」），
+        // 直接用它，别在这儿另编一句
+        Text(this.groupsErr.length > 0
+          ? this.groupsErr
+          : (this.anyRunning() ? '节点分组还没读取到' : '没有可用的节点'))
           .fontSize(T.F_H2)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .width('100%');
-        Text(this.anyRunning()
-          ? '后端正在启动或刚切换过配置，这一块会自动重试，不用手动刷新'
-          : '在上面选一个后端启动，节点分组和测速才会出现')
+        Text(this.groupsErr.length > 0
+          ? '点上面的后端启动，节点就会出现'
+          : (this.anyRunning()
+            ? '后端正在启动或刚切换过配置，这一块会自动重试，不用手动刷新'
+            : '在上面选一个后端启动，节点分组和测速才会出现'))
           .fontSize(T.F_SUB)
           .fontColor($r('app.color.text_secondary'))
           .width('100%')

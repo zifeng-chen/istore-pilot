@@ -495,7 +495,7 @@ struct SettingsView: View {
                     showPwd = true
                 }
                 Hairline(inset: 62)
-                row(icon: "power", title: "修改路由器密码",
+                row(icon: "key", title: "修改路由器密码",
                     note: "root 账号，影响后台与 SSH", danger: true) {
                     showRootPwd = true
                 }

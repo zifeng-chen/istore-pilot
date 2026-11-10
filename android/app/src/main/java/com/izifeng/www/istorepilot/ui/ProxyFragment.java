@@ -1185,9 +1185,14 @@ public class ProxyFragment extends BaseFragment {
                 line.addView(tile, tlp);
 
                 LinearLayout col = Ui.column(c);
-                TextView name = Ui.text(c, label, 15f, R.color.hero_fg);
+                // 运行中的那个要一眼认出来：名称加粗 + 放大半档 + 满白，
+                // 另一个只留 62% 白的中等字重。只靠右侧「运行中」胶囊不够，
+                // 两个名字并排时视线先落在字上，不是落在胶囊上
+                TextView name = Ui.text(c, label, running ? 16f : 15f, R.color.hero_fg);
                 name.setTextColor(Ui.alpha(Ui.color(c, R.color.hero_fg), running ? 1f : 0.62f));
-                name.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+                name.setTypeface(running
+                        ? Typeface.create("sans-serif", Typeface.BOLD)
+                        : Typeface.create("sans-serif-medium", Typeface.NORMAL));
                 name.setSingleLine(true);
                 col.addView(name);
 
@@ -1290,10 +1295,10 @@ public class ProxyFragment extends BaseFragment {
                     : installedMap.size() + " 个");
         }
 
-        // 两个后端都装着、都没在跑：这张卡得先问清楚「管哪一个」。
-        // 订阅、节点、配置文件全是各一套，不点名就只能按 PassWall 展示，
-        // 用户以为在配 OpenClash、其实改的是 PassWall。
-        renderComboSwitch(installedMap.size() >= 2 && backendId.isEmpty());
+        // 两个都装着就常驻这个切换器：运行中的后端要跟（改配置立刻生效），
+        // 但另一个后端的订阅也该能整理 —— 所以允许主动切过去看/改，
+        // 副标题会注明「只改配置，不影响正在运行的那个」。
+        renderComboSwitch(installedMap.size() >= 2);
         applyComboView();
 
         // 一个插件都没装时，整页只剩那张引导卡：运行模式、配置与节点、节点、安装包
@@ -1351,19 +1356,19 @@ public class ProxyFragment extends BaseFragment {
     /**
      * 「配置与节点」这张卡正在管哪个后端。
      *
-     * 有后端在跑就跟它 —— 那时改配置、换节点会立刻生效，跟错后端是真会断网的。
-     * 都没跑时听用户在这张卡里点名的那个；没点名先按 PassWall 展示，因为它的
-     * 节点存在 uci 里，停着也能看、也能先把节点选好再启动（OpenClash 的节点
-     * 在内核里，停着只有一句「启动后才看得到」）。
+     * 顺序：用户在卡片里点名的 > 正在运行的 > 已装的（PassWall 优先）。
+     * 点名优先于「正在运行」是故意的：运行中的后端要跟（改配置立刻生效），
+     * 但另一个后端的订阅也得能整理，不能因为它在跑就把这张卡焊死。
+     * 点名的那个被卸载了自然退回运行中/已装的。
      *
      * 关键点：订阅和节点**每个后端各一套**，这张卡永远只管一个，不存在「一起管」。
      */
     private String comboBackend() {
-        if (!backendId.isEmpty()) {
-            return backendId;
-        }
         if (!comboPick.isEmpty() && installedMap.containsKey(comboPick)) {
             return comboPick;
+        }
+        if (!backendId.isEmpty()) {
+            return backendId;
         }
         if (installedMap.containsKey("passwall")) {
             return "passwall";
@@ -1372,11 +1377,11 @@ public class ProxyFragment extends BaseFragment {
     }
 
     /**
-     * 两个后端都装着、都没运行时，在卡片顶部摆一个「管哪个」的分段控件。
+     * 两个都装着就常驻「管哪个」的分段控件。
      *
-     * 不摆的话卡片只能默默按 PassWall 展示：订阅条数是 PassWall 的、节点是
-     * PassWall 的，而用户以为在看 OpenClash —— 同一类「没选过后端就替用户
-     * 决定」的 bug。有后端在跑时藏起来，卡片自动跟运行中的那个。
+     * 不摆的话卡片只能默默按某个后端展示：订阅条数、节点、配置文件全是那一个
+     * 的，而用户以为在看另一个 —— 同一类「没选过后端就替用户决定」的 bug。
+     * 有后端在跑时默认跟它，但允许切走（切走后副标题会说明只改配置）。
      */
     private void renderComboSwitch(boolean show) {
         if (comboSwitchBox == null) {
@@ -1426,7 +1431,14 @@ public class ProxyFragment extends BaseFragment {
     }
 
     private String comboSubtitle() {
-        if ("passwall".equals(comboBackend())) {
+        String be = comboBackend();
+        // 切到「没在跑的那个」时必须说清楚：这里改的是它的配置，
+        // 正在跑的后端不受影响 —— 否则用户会以为刚把代理切走了
+        if (!backendId.isEmpty() && !be.equals(backendId)) {
+            return "只改配置，不影响正在运行的 "
+                    + installedMap.getOrDefault(backendId, backendId);
+        }
+        if ("passwall".equals(be)) {
             return "PassWall 的节点来自订阅，没有配置文件";
         }
         if (backendId.isEmpty()) {
@@ -1534,6 +1546,11 @@ public class ProxyFragment extends BaseFragment {
                             }
                             finishSwitch();
                             boolean ok = data.optBoolean("ok", false);
+                            // 刚启动的就是接下来要跟的那个：清掉旧的点名，
+                            // 否则卡片会停在「只改配置」的旁观态
+                            if (ok) {
+                                comboPick = "";
+                            }
                             // 提示只走 Toast：顶部那条 banner 会一直挂着，
                             // 「已启动」这种一次性消息没必要占着版面
                             Toast.makeText(ctx(), ok
@@ -1581,6 +1598,10 @@ public class ProxyFragment extends BaseFragment {
                             }
                             finishSwitch();
                             boolean ok = data.optBoolean("ok", false);
+                            // 停了就不再是「运行中」，卡片回到默认跟随（按已装的挑）
+                            if (ok) {
+                                comboPick = "";
+                            }
                             Toast.makeText(ctx(), ok ? label + " 已停止" : "停止失败，看日志确认",
                                     ok ? Toast.LENGTH_SHORT : Toast.LENGTH_LONG).show();
                             load(true);
