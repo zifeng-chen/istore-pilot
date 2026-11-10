@@ -928,13 +928,13 @@ def _service_running(backend: str) -> bool:
         try:
             data = json.loads(out or "{}")
             instances = data.get(backend, {}).get("instances") or {}
-            for item in instances.values():
-                if item.get("running"):
-                    return True
-            if instances:
-                return False
+            if any(item.get("running") for item in instances.values()):
+                return True
         except json.JSONDecodeError:
             pass
+    # 注意别在这儿提前 return False：procd 里有个「壳实例、还没 running」的空窗
+    # （刚启动那几秒就是），提前返回会让状态在「未运行 / 运行中」之间来回跳。
+    # 两个来源都查，任一为真即为真。
     # Passwall 是 legacy init，未必有 procd 实例，用它的运行目录兜底。
     # 不能用 "xray|passwall" 这类宽泛匹配，会把本进程自己的命令行也命中。
     if backend == "passwall":
@@ -1076,6 +1076,9 @@ def backends() -> list[dict]:
             "running": bool(pw_running),
             "node_count": len(pw_state["nodes"]),
             "engine": "Xray",
+            # 当前节点名：OpenClash 那边用配置文件名当标题，PassWall 没有配置文件，
+            # 拿当前出口节点顶上，主卡片才不至于空成一条横线
+            "node": pw_state.get("current", ""),
             "mode": _uci_get("passwall.@global[0].dns_shunt") or "chinadns-ng",
         },
     ]
@@ -1230,6 +1233,9 @@ def select(name: str, group: str = "", backend: str = "") -> dict:
         # 只改 tcp 会出现「TCP 走新节点、UDP 还留旧节点」的半切换状态
         if flat.get(f"passwall.{global_sec}.udp_node", "") in ("", state["current_id"]):
             _run(["uci", "set", f"passwall.{global_sec}.udp_node={node['id']}"], timeout=5)
+        # 默认节点（@global[0].node）也得跟着走：PassWall 判断「默认 ACL 有没有
+        # 节点」看的是它，只写 tcp_node 的话启动内核时等于没有节点可用
+        _run(["uci", "set", f"passwall.{global_sec}.node={node['id']}"], timeout=5)
         _run(["uci", "commit", "passwall"], timeout=5)
         changed = node["id"] != state["current_id"]
         # 节点变更需要重启内核才生效；Passwall 没有热切换能力
@@ -1271,6 +1277,21 @@ def service(action: str, backend: str = "") -> dict:
             _run(["uci", "set", "openclash.config.enable=1"], timeout=5)
         else:
             _run(["uci", "set", "passwall.@global[0].enabled=1"], timeout=5)
+            # Passwall 的 app.sh 只在「@global[0].node 指向一个节点」时才认为
+            # 有默认 ACL 要代理；node 空着它就打印「运行于非代理模式」直接退出，
+            # init 照样返回 0 —— 界面上就是「已启动」但一直未运行。
+            # 所以启动前把默认节点补上（优先 node，其次 tcp_node）。
+            flat = _uci_show("passwall")
+            gsec = next((k.split(".", 1)[1] for k, v in flat.items() if v == "global"), "")
+            if gsec:
+                node = flat.get(f"passwall.{gsec}.node", "") or flat.get(f"passwall.{gsec}.tcp_node", "")
+                if node:
+                    _run(["uci", "set", f"passwall.{gsec}.node={node}"], timeout=5)
+                    if not flat.get(f"passwall.{gsec}.tcp_node"):
+                        _run(["uci", "set", f"passwall.{gsec}.tcp_node={node}"], timeout=5)
+                # 「直连」档下点启动本来就什么都不做，既然用户要开代理，先拨回 proxy
+                if flat.get(f"passwall.{gsec}.tcp_proxy_mode", "") == "disable":
+                    _run(["uci", "set", f"passwall.{gsec}.tcp_proxy_mode=proxy"], timeout=5)
         _run(["uci", "commit", target if target == "openclash" else "passwall"], timeout=5)
     elif action == "stop":
         if target == "openclash":
@@ -1280,18 +1301,46 @@ def service(action: str, backend: str = "") -> dict:
         _run(["uci", "commit", target if target == "openclash" else "passwall"], timeout=5)
 
     code, out = _run([INIT[target], action], timeout=120)
+
+    # init 返回 0 只说明脚本跑完了，不代表内核真起来（PassWall 会在没有默认
+    # 节点时安静退出）。等它真在跑再报成功 —— 否则界面先显示「已启动」，
+    # 下一轮轮询又变回「未运行」，看起来就是状态在来回跳。
+    up = None
+    if action in ("start", "restart") and code == 0:
+        for _ in range(20):
+            if _service_running(target):
+                up = True
+                break
+            time.sleep(0.5)
+        if up is None:
+            up = False
+
     # 刚切过后端，缓存里的 active 立刻作废
     forget_active()
     # 起停会增减代理的 DNS 端口（OpenClash 7874），AGH 上游要立刻对齐
     _sync_dns()
+    failed = action in ("start", "restart") and code == 0 and up is False
     return {
-        "ok": code == 0,
+        "ok": code == 0 and not failed,
         "backend": target,
         "action": action,
         "code": code,
         "stopped_other": stopped,
+        "reason": _start_failed_reason(target) if failed else "",
         "output": out[-800:],
     }
+
+
+def _start_failed_reason(backend: str) -> str:
+    """启动没起效时，从后端自己的日志里取最后几行当原因。"""
+    log = "/tmp/log/passwall.log" if backend == "passwall" else "/tmp/openclash.log"
+    try:
+        with open(log, "r", errors="replace") as fh:
+            lines = [x.strip() for x in fh.readlines() if x.strip()]
+    except OSError:
+        return "启动脚本跑完了，但内核没起来（没找到日志）"
+    tail = [x for x in lines[-6:] if not x.startswith("20")][-3:] or lines[-3:]
+    return "启动脚本跑完了，但内核没起来：" + "；".join(tail)[-300:]
 
 
 CONFIG_DIR = "/etc/openclash/config"

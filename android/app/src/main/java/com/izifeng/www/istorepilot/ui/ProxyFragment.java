@@ -70,6 +70,15 @@ public class ProxyFragment extends BaseFragment {
     private String currentConfigPath = "";
 
     private String backendId = "";
+    /** 启停请求在途。这期间不跑后台轮询，也别把行上的「启动中」冲掉 */
+    private boolean switching;
+    /** 正在启停的后端 id，用来在行上标「启动中 / 停止中」 */
+    private String startingBackend = "";
+    private String pendingText = "启动中";
+    /** 最近一次 /proxy 的响应，启停开始时用它原地重绘 */
+    private JSONObject lastBackends;
+    /** 运行中后端的当前出口节点名（PassWall 用它当主卡片标题） */
+    private String activeNode = "";
     /** 装了但没在跑的后端。订阅、配置这类操作认它，不认 running */
     private String installedBackend = "";
     /** 有没有任何一个插件是装着的。安装任务是 Agent 进程内存里的状态，重启就没了 */
@@ -977,6 +986,11 @@ public class ProxyFragment extends BaseFragment {
 
     @Override
     protected void load(boolean quiet) {
+        // 启停还没回来就跳过这一轮：3 秒一次的轮询会在内核还没起来的空窗里
+        // 把「未运行」画上去，用户看到的就是状态来回跳。请求回来后会主动刷一次
+        if (switching) {
+            return;
+        }
         Api.get(ctx(), "/api/v1/proxy", new Cb() {
             @Override
             public void onData(JSONObject body, boolean fromCache) {
@@ -1040,11 +1054,16 @@ public class ProxyFragment extends BaseFragment {
     }
 
     private void renderBackends(JSONObject body) {
+        if (body == null) {
+            return;
+        }
+        lastBackends = body;
         Context c = backendBox.getContext();
         backendBox.removeAllViews();
         backendLabel = "";
         installedBackend = "";
         anyInstalled = false;
+        activeNode = "";
         installedMap.clear();
 
         String active = body.optString("active", "none");
@@ -1113,28 +1132,38 @@ public class ProxyFragment extends BaseFragment {
                         ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
                 if (running) {
-                    line.addView(heroPill(c, "运行中", true));
+                    boolean pendingNow = switching && id.equals(startingBackend);
+                    line.addView(heroPill(c, pendingNow ? pendingText : "运行中", true));
                     backendLabel = label;
                     activeCount = count;
                     activeEngine = engine;
-                    // 运行中的行也得能点 —— 否则这个 App 只能启动、不能停止，
-                    // 想关掉得回 LuCI，「点一行切换」这句话就只对了一半
-                    final String fid = id;
-                    final String flabel = label;
-                    line.setClickable(true);
-                    line.setFocusable(true);
-                    GradientDrawable mask = new GradientDrawable();
-                    mask.setColor(0xFFFFFFFF);
-                    line.setBackground(new android.graphics.drawable.RippleDrawable(
-                            android.content.res.ColorStateList.valueOf(
-                                    Ui.color(c, R.color.ripple)), null, mask));
-                    line.setOnClickListener(v -> askStopBackend(fid, flabel));
+                    activeNode = b.optString("node", "");
+                    if (pendingNow) {
+                        // 停止在途，别再让用户重复点
+                        line.setClickable(false);
+                    } else {
+                        // 运行中的行也得能点 —— 否则这个 App 只能启动、不能停止，
+                        // 想关掉得回 LuCI，「点一行切换」这句话就只对了一半
+                        final String fid = id;
+                        final String flabel = label;
+                        line.setClickable(true);
+                        line.setFocusable(true);
+                        GradientDrawable mask = new GradientDrawable();
+                        mask.setColor(0xFFFFFFFF);
+                        line.setBackground(new android.graphics.drawable.RippleDrawable(
+                                android.content.res.ColorStateList.valueOf(
+                                        Ui.color(c, R.color.ripple)), null, mask));
+                        line.setOnClickListener(v -> askStopBackend(fid, flabel));
+                    }
                 } else {
-                    // 用 text_on_track 而不是 text_secondary：
-                    // 灰字配 19% 灰底，在深色下「未运行」几乎读不出来
-                    line.addView(heroPill(c, installed ? "未运行" : "未安装", false));
+                    // 启停在途：行上直接写「启动中」，别再显示「未运行」——
+                    // 那两个状态来回闪就是用户看到的「跳动」
+                    boolean pending = switching && id.equals(startingBackend);
+                    line.addView(heroPill(c, pending ? pendingText
+                                    : (installed ? "未运行" : "未安装"),
+                            pending));
                     // 装好了但没跑，点一下就能切过去 —— 比让用户去后台点强
-                    if (installed) {
+                    if (installed && !pending) {
                         final String fid = id;
                         final String flabel = label;
                         line.setClickable(true);
@@ -1170,7 +1199,10 @@ public class ProxyFragment extends BaseFragment {
             hero.dot(R.color.hero_fg, none);
             hero.state.setText(none ? "都没在运行" : "运行中");
             hero.badge.setText(none ? "未启用" : backendLabel);
-            hero.title.setText(none ? "直连" : "—");
+            // OpenClash 由 loadConfigs 用配置文件名覆盖；PassWall 没有配置文件，
+            // 用当前出口节点顶上，否则这里只剩一条横线
+            hero.title.setText(none ? "直连"
+                    : (activeNode.isEmpty() ? "—" : pretty(activeNode)));
             hero.note.setText(none
                     ? "两个代理后端都停着，所有流量走直连"
                     : join(activeEngine, activeCount + " 个节点可用", modeLabel(modeValue)));
@@ -1306,12 +1338,20 @@ public class ProxyFragment extends BaseFragment {
         Sheet.confirm(ctx(), "切换到 " + label + "？",
                 "两个代理后端互斥，启动这个会先停掉另一个，网络会断十几秒。",
                 "切换", false, () -> {
-                    notice("正在启动 " + label + "…");
+                    // 启动通常 5～10 秒。这期间不做后台轮询、行上直接标「启动中」，
+                    // 否则 3 秒一次的那次刷新会在内核还没起来时把「未运行」画上去，
+                    // 看起来就像状态在「未运行 / 运行中」之间来回跳
+                    switching = true;
+                    startingBackend = id;
+                    pendingText = "启动中";
+                    renderBackends(lastBackends);
+                    Toast.makeText(ctx(), "正在启动 " + label + "…", Toast.LENGTH_SHORT).show();
                     JSONObject body = new JSONObject();
                     try {
                         body.put("action", "start");
                         body.put("backend", id);
                     } catch (Exception ignored) {
+                        switching = false;
                         return;
                     }
                     Api.postSlow(ctx(), "/api/v1/proxy/service", body, new Cb() {
@@ -1320,15 +1360,23 @@ public class ProxyFragment extends BaseFragment {
                             if (!isAdded()) {
                                 return;
                             }
+                            finishSwitch();
                             boolean ok = data.optBoolean("ok", false);
-                            notice(ok ? label + " 已启动" : "启动失败，看日志确认", ok);
+                            // 提示只走 Toast：顶部那条 banner 会一直挂着，
+                            // 「已启动」这种一次性消息没必要占着版面
+                            Toast.makeText(ctx(), ok
+                                            ? label + " 已启动"
+                                            : data.optString("reason", "启动失败，看日志确认"),
+                                    ok ? Toast.LENGTH_SHORT : Toast.LENGTH_LONG).show();
                             load(true);
                         }
 
                         @Override
                         public void onError(String message) {
+                            finishSwitch();
                             if (isAdded()) {
                                 fail("启动失败：" + message);
+                                load(true);
                             }
                         }
                     });
@@ -1340,12 +1388,17 @@ public class ProxyFragment extends BaseFragment {
         Sheet.confirm(ctx(), "停止 " + label + "？",
                 "停掉后所有流量走直连，已建立的连接会断一下。配置和订阅都留着，随时能再启动。",
                 "停止", true, () -> {
-                    notice("正在停止 " + label + "…");
+                    switching = true;
+                    startingBackend = id;
+                    pendingText = "停止中";
+                    renderBackends(lastBackends);
+                    Toast.makeText(ctx(), "正在停止 " + label + "…", Toast.LENGTH_SHORT).show();
                     JSONObject body = new JSONObject();
                     try {
                         body.put("action", "stop");
                         body.put("backend", id);
                     } catch (Exception ignored) {
+                        switching = false;
                         return;
                     }
                     Api.postSlow(ctx(), "/api/v1/proxy/service", body, new Cb() {
@@ -1354,19 +1407,28 @@ public class ProxyFragment extends BaseFragment {
                             if (!isAdded()) {
                                 return;
                             }
+                            finishSwitch();
                             boolean ok = data.optBoolean("ok", false);
-                            notice(ok ? label + " 已停止" : "停止失败，看日志确认", ok);
+                            Toast.makeText(ctx(), ok ? label + " 已停止" : "停止失败，看日志确认",
+                                    ok ? Toast.LENGTH_SHORT : Toast.LENGTH_LONG).show();
                             load(true);
                         }
 
                         @Override
                         public void onError(String message) {
+                            finishSwitch();
                             if (isAdded()) {
                                 fail("停止失败：" + message);
+                                load(true);
                             }
                         }
                     });
                 });
+    }
+
+    private void finishSwitch() {
+        switching = false;
+        startingBackend = "";
     }
 
     /** 当前启用的 OpenClash 配置文件。切换走弹窗，这里只负责显示。 */
@@ -1399,7 +1461,8 @@ public class ProxyFragment extends BaseFragment {
                     name = "未设置";
                 }
                 tvCurConfig.setText(name);
-                if (hero != null && !backendId.isEmpty()) {
+                // 只有 OpenClash 的标题是「配置文件名」；PassWall 用节点名，别覆盖
+                if (hero != null && "openclash".equals(uiBackend())) {
                     hero.title.setText(name);
                 }
             }
