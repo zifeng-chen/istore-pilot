@@ -342,6 +342,9 @@ ERRORS: dict[str, tuple[str, list[str]]] = {
     "no_file": ("上传的安装包不见了", ["retry"]),
     "no_pkg": ("仓库里没有这个插件", ["retry"]),
     "too_slow": ("网速太慢，装不了", ["local", "retry"]),
+    # 安装包已下好，卡在安装脚本自己跑的 `apk update` 上：那是路由器
+    # 自己的软件源（镜像/DNS）坏了，跟下载、跟这个包都没关系
+    "feed_refresh_failed": ("路由器软件源刷新失败", ["diagnose", "retry"]),
     "unknown": ("安装失败", ["retry"]),
 }
 
@@ -353,6 +356,12 @@ def _classify(raw: str) -> str:
     失败也可能是连不上，但只有带 "could not resolve" 才是 DNS。
     """
     low = (raw or "").lower()
+    # 安装脚本（.run 里的 install.sh）先跑 apk update，任一索引坏了就整体退出。
+    # 它的输出是「更新软件源列表错误」+「unexpected end of file」，
+    # 跟「下载失败」是两码事，单独归类，别让用户去查下载通道。
+    if ("更新软件源列表错误" in raw or "unexpected end of file" in low
+            or "wget: exited with error" in low):
+        return "feed_refresh_failed"
     if ("could not resolve" in low or "bad address" in low
             or "name or service not known" in low):
         return "dns_failed"
@@ -864,7 +873,14 @@ def _pkg_worker(target: str, source: str, name: str) -> None:
         if line.strip():
             last = line.strip()
             break
-    _pfail(_classify(out), last or ("脚本退出码 %d" % code), out or "", target)
+    kind = _classify(out)
+    detail = last or ("脚本退出码 %d" % code)
+    if kind == "feed_refresh_failed":
+        detail = ("安装包已经下好了，但包里的安装脚本要先跑 apk update。"
+                  "刷新时有个软件源返回了损坏的索引（或域名解析不出来），"
+                  "脚本就整体退出了 —— 跟下载通道无关。"
+                  "先在路由器上把 apk 源修好（能访问 mirrors.cernet.edu.cn），再装一次。")
+    _pfail(kind, detail, out or "", target)
 
 
 def pkg_status() -> dict:
