@@ -36,11 +36,14 @@ import os
 import platform
 import re
 import shutil
+import socket
+import ssl
 import subprocess
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 UA = "istore-agent"
 
@@ -502,11 +505,69 @@ def _doh_resolve(domain: str) -> list[str]:
     return ips
 
 
-def fix_github_hosts() -> tuple[bool, str]:
-    """往 /etc/hosts 写入 github 核心域名的真实 IP，绕过 DNS 污染。
+# 内置候选 IP：DoH 返回的第一个往往是被限速/被 RST 的（实测 20.205.243.166
+# 直连 6 秒还 RST，而 140.82.112.3 只要 1.66 秒）。github.com 用 140.82 段，
+# 其余（raw / objects / release-assets / codeload）都挂在 Fastly 的 185.199 段。
+_BUILTIN_IPS: dict[str, tuple[str, ...]] = {
+    "github.com": (
+        "140.82.112.3", "140.82.113.3", "140.82.114.3",
+        "140.82.116.3", "140.82.121.3", "140.82.121.4",
+    ),
+    "raw.githubusercontent.com": (
+        "185.199.108.133", "185.199.109.133", "185.199.110.133", "185.199.111.133",
+    ),
+    "objects.githubusercontent.com": (
+        "185.199.108.133", "185.199.109.133", "185.199.110.133", "185.199.111.133",
+    ),
+    "release-assets.githubusercontent.com": (
+        "185.199.108.133", "185.199.109.133", "185.199.110.133", "185.199.111.133",
+    ),
+    "codeload.github.com": (
+        "140.82.112.9", "140.82.113.9", "140.82.114.9", "140.82.116.9",
+    ),
+}
 
-    返回 (ok, 说明)。写之前先把原文件备份到 /etc/hosts.bak，并清掉旧的
-    github 行，避免重复累积。只动 github 相关的行，其它内容原样保留。
+
+def _tls_probe(domain: str, ip: str, timeout: float = 3.0) -> float | None:
+    """TLS 握手耗时（毫秒），用真实域名做 SNI；失败/超时返回 None。
+
+    不能只看 TCP：实测 140.82.116.3 TCP 秒连但 TLS 卡 6 秒，140.82.112.3
+    TLS 只要 1.66 秒。只有 TLS 层才反映「能不能真把 HTTPS 建起来」。
+    """
+    try:
+        ctx = ssl.create_default_context()
+        started = time.time()
+        with socket.create_connection((ip, 443), timeout=timeout) as sock:
+            with ctx.wrap_socket(sock, server_hostname=domain) as _:
+                return (time.time() - started) * 1000
+    except (OSError, ssl.SSLError, ValueError):
+        return None
+
+
+def _pick_ip(domain: str) -> str:
+    """从内置候选 + DoH 结果里挑 TLS 握手最快能连通的 IP；都不通返回空串。"""
+    candidates: list[str] = list(_BUILTIN_IPS.get(domain, ()))
+    candidates.extend(_doh_resolve(domain))
+    seen: set[str] = set()
+    uniq = [ip for ip in candidates if ip and not (ip in seen or seen.add(ip))]
+    if not uniq:
+        return ""
+    # 并发探，总耗时约等于最慢的那个（3 秒），而不是串行累加
+    with ThreadPoolExecutor(max_workers=len(uniq)) as pool:
+        results = list(pool.map(lambda ip: (ip, _tls_probe(domain, ip)), uniq))
+    best_ip, best_ms = "", None
+    for ip, ms in results:
+        if ms is not None and (best_ms is None or ms < best_ms):
+            best_ip, best_ms = ip, ms
+    return best_ip
+
+
+def fix_github_hosts() -> tuple[bool, str]:
+    """往 /etc/hosts 写入 github 核心域名的可用 IP，绕过 DNS 污染。
+
+    每个域名从「内置候选 + DoH」里挑 TCP 443 最快能连通的 IP 写进去
+    （不是随手写 DoH 第一个 —— 那常常是被 RST 的）。返回 (ok, 说明)。
+    写之前先把原文件备份到 /etc/hosts.bak，并清掉旧的 github 行，避免重复。
     """
     try:
         with open(HOSTS_PATH, "r", encoding="utf-8") as fh:
@@ -524,11 +585,12 @@ def fix_github_hosts() -> tuple[bool, str]:
             if not any(dom in ln for dom in GH_HOSTS)]
     added: list[str] = []
     for dom in GH_HOSTS:
-        for ip in _doh_resolve(dom):
+        ip = _pick_ip(dom)
+        if ip:
             keep.append("%s %s" % (ip, dom))
             added.append("%s %s" % (ip, dom))
     if not added:
-        return False, "通过 DoH 没查到 github 的可用 IP"
+        return False, "没找到 github 域名能连通的 IP"
 
     try:
         with open(HOSTS_PATH, "w", encoding="utf-8") as fh:

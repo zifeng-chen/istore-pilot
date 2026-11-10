@@ -984,9 +984,8 @@ public class ProxyFragment extends BaseFragment {
             return;
         }
         pkgConfirmShown = true;
-        Sheet.confirm(ctx(), "GitHub 访问不通",
-                "所有加速通道都没下载成功。是否让 agent 修改 hosts 给 GitHub 加速后重试？\n\n"
-                        + "会往路由器的 /etc/hosts 写入 github 域名的可用 IP（先备份、可还原）。",
+        Sheet.confirm(ctx(), "GitHub 下载失败",
+                "所有加速通道都连不上。是否修改 hosts 后重试？",
                 "修改并重试", false,
                 () -> postPkgConfirm("yes"),
                 () -> postPkgConfirm("no"));
