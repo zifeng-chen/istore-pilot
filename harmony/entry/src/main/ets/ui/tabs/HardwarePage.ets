@@ -177,6 +177,8 @@ export struct HardwarePage {
           .fontSize(T.F_TINY)
           .fontColor($r('app.color.hero_fg_soft'))
           .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .constraintSize({ maxWidth: '45%' })
           .margin({ left: 8 });
       }
       .width('100%')
@@ -502,6 +504,9 @@ export struct HardwarePage {
                 Text(n.str('driver', ''))
                   .fontSize(T.F_TINY)
                   .fontColor($r('app.color.text_secondary'))
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  .constraintSize({ maxWidth: '32%' })
                   .padding({ left: 7, right: 7, top: 3, bottom: 3 })
                   .borderRadius(T.R_PILL)
                   .backgroundColor($r('app.color.surface_sunken'))

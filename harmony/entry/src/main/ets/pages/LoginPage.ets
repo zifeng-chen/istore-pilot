@@ -77,8 +77,11 @@ struct LoginPage {
     this.probe = '正在连接…';
     const res: ApiResult = await Api.ping(Session.normalize(this.host));
     if (res.ok) {
-      const v: string = res.data.str('version', '');
-      this.probe = v.length > 0 ? ('已连接 · Agent v' + v) : '已连接';
+      // 只说「通了、Agent 在跑」，不报版本号。
+      // 以前显示「Agent v0.19」这种裸版本，用户不知道是好是坏、也看不出
+      // 和自己路由器上的 Agent 版本是否匹配 —— 对「连不连得上」这个动作
+      // 没有帮助，反而制造疑问。
+      this.probe = '连上了，Agent 正常响应';
     } else {
       this.probe = '连不上：' + res.error;
     }

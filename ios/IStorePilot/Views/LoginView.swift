@@ -120,7 +120,9 @@ struct LoginView: View {
                 await MainActor.run {
                     busy = false
                     form.addr = target
-                    okTip = "通了：\(j.str("hostname", "路由器"))· v\(j.str("version", "?"))"
+                    // 只说「连上了、Agent 在跑」，不报版本号 —— 裸版本号对用户
+                    // 「能不能连」这件事没有帮助，反而制造疑问
+                    okTip = "连上了，Agent 正常响应"
                 }
             } catch {
                 await MainActor.run {

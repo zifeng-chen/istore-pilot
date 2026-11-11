@@ -858,76 +858,109 @@ export struct NetworkPage {
   }
 
   build() {
-    Scroll() {
-      Column() {
-        Row({ space: 8 }) {
-          if (this.showBack) {
-            Stack() {
-              GlyphIcon({ kind: Glyph.CHEVRON_LEFT, color: Pal.textPrimary(),
-                side: 19, lineWidth: 2.2 });
-            }
-            .width(34)
-            .height(34)
-            .alignContent(Alignment.Center)
-            .onClick(() => router.back());
+    Column() {
+      // 返回栏必须固定在滚动区外。
+      // 以前整页只有一个 Scroll，标题栏和「让出状态栏」的 padding 都在滚动内容里 ——
+      // 往上一滑，栏被带走、顶部留白也一起滚没，看起来就像导航栏跟着页面跑了。
+      if (this.showBack) {
+        Row({ space: 4 }) {
+          Row() {
+            GlyphIcon({
+              kind: Glyph.CHEVRON,
+              color: Pal.textPrimary(),
+              side: 20,
+              lineWidth: 1.9
+            });
           }
+          .layoutWeight(0)
+          .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+          .rotate({ angle: 180 })
+          .onClick(() => {
+            router.back();
+          });
+
           Text('网络')
-            .fontSize(T.F_TITLE)
+            .fontSize(T.F_H2)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'))
             .layoutWeight(1);
+
           Text(this.wanUp ? '外网已连接' : '外网未连接')
             .fontSize(T.F_TINY)
-            .fontColor(this.wanUp ? $r('app.color.text_secondary') : $r('app.color.warn'));
+            .fontColor(this.wanUp ? $r('app.color.text_secondary') : $r('app.color.warn'))
+            .margin({ right: T.PAD });
         }
         .width('100%')
-        .alignItems(VerticalAlign.Bottom)
-        .padding({ bottom: 10 });
-
-        if (this.rail()) {
-          // Pad：左边「线路」，右边「内网与边界」，一屏放完不用滚
-          Row({ space: T.GAP }) {
-            Column({ space: T.GAP }) {
-              this.heroCard();
-              this.actionCard();
-              this.wanEditCard();
-              Card() {
-                CardHeader({ title: '宽带接入', sub: '对外那一根线' });
-                this.wanCardBody();
-              }
-            }
-            .layoutWeight(1)
-            .alignItems(HorizontalAlign.Start);
-
-            Column({ space: T.GAP }) {
-              Card() {
-                CardHeader({ title: '局域网', sub: '内网网段与 DHCP' });
-                this.lanCardBody();
-              }
-              Card() {
-                CardHeader({ title: '防火墙', sub: '谁能从外面进来' });
-                this.fwCardBody();
-              }
-            }
-            .layoutWeight(1)
-            .alignItems(HorizontalAlign.Start);
-          }
-          .width('100%')
-          .alignItems(VerticalAlign.Top);
-        } else {
-          this.pageBody();
-        }
-
-        Row().width('100%').height(24);
+        .height(44)
+        .alignItems(VerticalAlign.Center);
       }
+
+      Scroll() {
+        Column() {
+          if (!this.showBack) {
+            Row({ space: 8 }) {
+              Text('网络')
+                .fontSize(T.F_TITLE)
+                .fontWeight(FontWeight.Medium)
+                .fontColor($r('app.color.text_primary'))
+                .layoutWeight(1);
+              Text(this.wanUp ? '外网已连接' : '外网未连接')
+                .fontSize(T.F_TINY)
+                .fontColor(this.wanUp ? $r('app.color.text_secondary') : $r('app.color.warn'));
+            }
+            .width('100%')
+            .alignItems(VerticalAlign.Bottom)
+            .padding({ bottom: 10 });
+          }
+
+          if (this.rail()) {
+            // Pad：左边「线路」，右边「内网与边界」，一屏放完不用滚
+            Row({ space: T.GAP }) {
+              Column({ space: T.GAP }) {
+                this.heroCard();
+                this.actionCard();
+                this.wanEditCard();
+                Card() {
+                  CardHeader({ title: '宽带接入', sub: '对外那一根线' });
+                  this.wanCardBody();
+                }
+              }
+              .layoutWeight(1)
+              .alignItems(HorizontalAlign.Start);
+
+              Column({ space: T.GAP }) {
+                Card() {
+                  CardHeader({ title: '局域网', sub: '内网网段与 DHCP' });
+                  this.lanCardBody();
+                }
+                Card() {
+                  CardHeader({ title: '防火墙', sub: '谁能从外面进来' });
+                  this.fwCardBody();
+                }
+              }
+              .layoutWeight(1)
+              .alignItems(HorizontalAlign.Start);
+            }
+            .width('100%')
+            .alignItems(VerticalAlign.Top);
+          } else {
+            this.pageBody();
+          }
+
+          Row().width('100%').height(24);
+        }
+        .width('100%')
+        .padding({ left: T.PAD, right: T.PAD, top: 8 });
+      }
+      .layoutWeight(1)
       .width('100%')
-      .padding({ left: T.PAD, right: T.PAD, top: 8 + (this.showBack ? this.ui.safeTop : 0) });
+      .scrollBar(BarState.Off)
+      .edgeEffect(EdgeEffect.Spring)
+      .align(Alignment.Top);
     }
     .width('100%')
     .height('100%')
-    .scrollBar(BarState.Off)
-    .edgeEffect(EdgeEffect.Spring)
     .backgroundColor($r('app.color.app_bg'))
-    .align(Alignment.Top);
+    .padding({ top: this.showBack ? this.ui.safeTop : 0 });
   }
 }

@@ -29,6 +29,12 @@ export default class EntryAbility extends UIAbility {
     try {
       const win = windowStage.getMainWindowSync();
       win.setWindowLayoutFullScreen(true);
+      // 在这里就把状态栏高度量出来写进 UI.safeTop：
+      // 冷启动直接落在登录页时，Index 还没跑过 boot()，UI.safeTop 是 0 ——
+      // 从登录页推开的帮助页、以及重新登录后的二级页都会顶到状态栏底下。
+      // Index 里的 measureSafeArea() 保留，窗口尺寸变化时它会再校准一次。
+      const sys = win.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM);
+      UI.safeTop = px2vp(sys.topRect.height);
     } catch (e) {
       hilog.warn(DOMAIN, TAG, 'setWindowLayoutFullScreen failed');
     }

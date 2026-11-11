@@ -466,7 +466,6 @@ export struct OverviewPage {
                 this.wanCard();
                 this.portCard();
                 this.machineCard();
-                this.netEntryCard();
               }
               .layoutWeight(1)
               .alignItems(HorizontalAlign.Start);
@@ -480,7 +479,6 @@ export struct OverviewPage {
               this.wanCard();
               this.portCard();
               this.machineCard();
-              this.netEntryCard();
             }
             .width('100%');
           }
@@ -759,6 +757,7 @@ export struct OverviewPage {
     }
   }
 
+  /** 机器卡：型号 / 系统 / 内核 / 在线时长，纯只读信息，不放入口 */
   @Builder
   machineCard() {
     Card({ gapTop: 0, gapBottom: 0 }) {
@@ -770,40 +769,6 @@ export struct OverviewPage {
       Kv({ label: '内核', value: Fmt.orDash(this.kernel), valueSize: 0, accent: false });
       Hairline({ indent: 0 });
       Kv({ label: '在线时长', value: this.uptime, valueSize: 0, accent: false });
-    }
-  }
-
-  /** 网络设置入口：原来那个「网络」页签现在从这儿进 */
-  @Builder
-  netEntryCard() {
-    Card({ gapTop: 0, gapBottom: this.rail() ? Bp.gap(this.winW) : T.GAP }) {
-      Row({ space: 12 }) {
-        Stack() {
-          GlyphIcon({ kind: Glyph.SWAP, color: Pal.primary(), side: 17, lineWidth: 1.7 });
-        }
-        .width(30)
-        .height(30)
-        .borderRadius(9)
-        .backgroundColor($r('app.color.accent_soft'))
-        .alignContent(Alignment.Center);
-        Column({ space: 3 }) {
-          Text('网络设置')
-            .fontSize(T.F_BODY)
-            .fontColor($r('app.color.text_primary'));
-          Text('宽带参数、重拨、局域网与防火墙')
-            .fontSize(T.F_TINY)
-            .fontColor($r('app.color.text_secondary'));
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1);
-        GlyphIcon({ kind: Glyph.CHEVRON, color: Pal.textTertiary(),
-          side: 14, lineWidth: 1.9 });
-      }
-      .width('100%')
-      .alignItems(VerticalAlign.Center)
-      .onClick(() => {
-        router.pushUrl({ url: 'pages/NetSettingsPage' });
-      });
     }
   }
 

@@ -1,7 +1,8 @@
 import { router } from '@kit.ArkUI';
 import { UI } from '../core/UIState';
-import { T } from '../ui/Theme';
-import { Card, CardHeader, Note } from '../ui/Comp';
+import { Pal, T } from '../ui/Theme';
+import { Card, CardHeader, LineIcon, Note } from '../ui/Comp';
+import { Ico } from '../ui/comp/Icons';
 
 /**
  * 使用帮助：从「路由器上还没有 Agent」讲到「四个页签怎么用」。
@@ -19,17 +20,24 @@ struct HelpPage {
 
   build() {
     Column() {
-      // 顶栏：和订阅页同一套（‹ + 标题），路由页整页压上来，不需要画底线
-      Row({ space: 6 }) {
-        Text('‹')
-          .fontSize(26)
-          .fontColor($r('app.color.primary'))
-          .width(34)
-          .height(34)
-          .textAlign(TextAlign.Center)
-          .onClick(() => {
-            router.back();
+      // 顶栏：和另外几个二级页同一套（只有箭头，不写「返回」），路由页整页压上来
+      Row({ space: 4 }) {
+        Row() {
+          LineIcon({
+            path: Ico.CHEVRON,
+            color: Pal.textPrimary(),
+            side: 20,
+            lineWidth: 1.9,
+            spin: 180
           });
+        }
+        .width(38)
+        .height(34)
+        .justifyContent(FlexAlign.Center)
+        .onClick(() => {
+          router.back();
+        });
+
         Text('使用帮助')
           .fontSize(T.F_H1)
           .fontWeight(FontWeight.Medium)
@@ -37,7 +45,7 @@ struct HelpPage {
           .layoutWeight(1);
       }
       .width('100%')
-      .padding({ left: 8, right: T.PAD, top: 6, bottom: 8 })
+      .padding({ left: 6, right: T.PAD, top: 6, bottom: 8 })
       .alignItems(VerticalAlign.Center);
 
       Scroll() {
@@ -74,7 +82,10 @@ struct HelpPage {
         this.step(1, '下载安装包',
           '打开 github.com/zifeng-chen/istore-pilot/releases/latest ，'
             + '按架构挑一个 .run：Intel / AMD 选 x86_64，ARM 选 arm64。');
-        this.step(2, '传到路由器', 'scp，或者 LuCI 的「系统 → 文件传输」，放到 /tmp/ 下。');
+        this.step(2, '传到路由器',
+          '方式一（推荐）：iStoreOS 自带「iStore 商店」，进商店 → 上传插件，'
+            + '把下载好的 .run 传上去，它会在商店里自动安装。'
+            + '\n方式二：scp，或 LuCI 的「系统 → 文件传输」，放到 /tmp/ 下再手动执行。');
         this.step(3, '先检查再安装', 'SSH 登录路由器，执行下面两行：');
         this.code('sh /tmp/istore-pilot_<版本>_x86_64.run --check\n'
           + 'sh /tmp/istore-pilot_<版本>_x86_64.run');

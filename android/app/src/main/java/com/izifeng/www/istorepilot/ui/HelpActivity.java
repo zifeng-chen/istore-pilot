@@ -69,7 +69,9 @@ public class HelpActivity extends BaseActivity {
                 "打开 github.com/zifeng-chen/istore-pilot/releases/latest ，"
                         + "按架构挑一个 .run：Intel / AMD 选 x86_64，ARM 选 arm64。");
         step(c1, 2, "传到路由器",
-                "scp，或者 LuCI 的「系统 → 文件传输」，放到 /tmp/ 下。");
+                "方式一（推荐）：iStoreOS 自带「iStore 商店」，进商店 → 上传插件，"
+                        + "把下载好的 .run 传上去，它会在商店里自动安装。\n"
+                        + "方式二：scp，或 LuCI 的「系统 → 文件传输」，放到 /tmp/ 下再手动执行。");
         step(c1, 3, "先检查再安装", "SSH 登录路由器，执行下面两行：");
         code(c1, "sh /tmp/istore-pilot_<版本>_x86_64.run --check\n"
                 + "sh /tmp/istore-pilot_<版本>_x86_64.run");

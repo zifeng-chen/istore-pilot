@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import UIKit
 
 /// 设置。结构与安卓端 `ui/SettingsFragment` 对齐：
 /// 连接 → 网络 → 外观 → 系统维护 → 安全 → 关于。
@@ -24,6 +25,7 @@ struct SettingsView: View {
     @State private var ping: J = [:]
     @State private var busy = ""
     @State private var popup: Popup?
+    @State private var copyAddr: AddrCopy?
     @State private var showPwd = false
     @State private var showRootPwd = false
     @State private var showImporter = false
@@ -82,6 +84,15 @@ struct SettingsView: View {
             .alert(item: $popup) { p in
                 Alert(title: Text(p.title), message: Text(p.body),
                       dismissButton: .default(Text("好")))
+            }
+            // 长地址点开看全的，顺手能复制
+            .alert(item: $copyAddr) { a in
+                Alert(title: Text(a.title), message: Text(a.value),
+                      primaryButton: .default(Text("复制")) {
+                          UIPasteboard.general.string = a.value
+                          popup = Popup(title: "已复制", body: "")
+                      },
+                      secondaryButton: .cancel(Text("关闭")))
             }
             // 电源动作一律二次确认：先把「会断多久、怎么恢复」写清楚，
             // 再让用户点确定。关机额外多一次确认，因为它不可远程恢复
@@ -296,13 +307,16 @@ struct SettingsView: View {
                          value: wan.bool("up") ? "已连接" : "未连接",
                          valueColor: wan.bool("up") ? C.primary : C.danger)
                 Hairline(inset: 62)
-                plainRow(icon: "number", title: "IPv4", note: "运营商分配", value: v4)
+                plainRow(icon: "number", title: "IPv4", note: "运营商分配", value: v4,
+                         onTap: { showAddress("外网 IPv4", v4) })
                 Hairline(inset: 62)
                 plainRow(icon: "number", title: "IPv6", note: "外网入口",
-                         value: v6.isEmpty ? "—" : v6)
+                         value: v6.isEmpty ? "—" : v6,
+                         onTap: { showAddress("外网 IPv6", v6) })
                 Hairline(inset: 62)
                 plainRow(icon: "house", title: "内网网关", note: "设备默认走这个地址",
-                         value: lan.objs("ipv4").first?.str("address") ?? "—")
+                         value: lan.objs("ipv4").first?.str("address") ?? "—",
+                         onTap: { showAddress("内网网关", lan.objs("ipv4").first?.str("address") ?? "") })
 
                 Hairline(inset: 62)
                 row(icon: "wifi", title: "宽带详情与配置",
@@ -620,7 +634,8 @@ struct SettingsView: View {
     }
 
     private func plainRow(icon: String, title: String, note: String,
-                          value: String, valueColor: Color? = nil) -> some View {
+                          value: String, valueColor: Color? = nil,
+                          onTap: (() -> Void)? = nil) -> some View {
         HStack(spacing: 12) {
             iconTile(icon, danger: false)
             VStack(alignment: .leading, spacing: 2) {
@@ -643,6 +658,8 @@ struct SettingsView: View {
                 .minimumScaleFactor(0.7)
                 .truncationMode(.middle)
         }
+        .contentShape(Rectangle())
+        .onTapGesture { onTap?() }
         .padding(.vertical, 10)
     }
 
@@ -663,6 +680,15 @@ struct SettingsView: View {
         if let p = try? await Api.ping(base: Session.base) { ping = p }
         if let u = try? await Api.get("/api/v1/system/uploads") {
             uploads = u.objs("files")
+        }
+    }
+
+    /// 长地址点开看全的，顺手能复制
+    private func showAddress(_ title: String, _ value: String) {
+        if value.isEmpty || value == "—" {
+            popup = Popup(title: title + "还没读到", body: "")
+        } else {
+            copyAddr = AddrCopy(title: title, value: value)
         }
     }
 
@@ -921,4 +947,11 @@ struct PasswordSheet: View {
             }
         }
     }
+}
+
+/// 可复制的地址弹窗：长地址在行里只能看一半，点开看全 + 复制
+struct AddrCopy: Identifiable {
+    let title: String
+    let value: String
+    var id: String { title + value }
 }

@@ -1,6 +1,8 @@
 package com.izifeng.www.istorepilot.ui;
 
 import android.app.Dialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Typeface;
@@ -144,13 +146,16 @@ public class SettingsFragment extends BaseFragment {
         tvWanState = Ui.settingRow(c, net, com.izifeng.www.istorepilot.widget.Glyph.LINK,
                 "外网状态", "拨号与链路", "—", true, false, null);
         tvWanV4 = Ui.settingRow(c, net, com.izifeng.www.istorepilot.widget.Glyph.GLOBE,
-                "IPv4", "运营商分配的地址", "—", false, false, null);
+                "IPv4", "运营商分配的地址", "—", false, false,
+                () -> showAddress("外网 IPv4", tvWanV4.getText().toString()));
         tvWanV6 = Ui.settingRow(c, net, com.izifeng.www.istorepilot.widget.Glyph.GLOBE,
-                "IPv6", "外网入口", "—", false, false, null);
+                "IPv6", "外网入口", "—", false, false,
+                () -> showAddress("外网 IPv6", tvWanV6.getText().toString()));
         // 完整 IPv6 是 39 个字符，13.5sp 刚好一行放下
         tvWanV6.setTextSize(12.5f);
         tvLanV4 = Ui.settingRow(c, net, com.izifeng.www.istorepilot.widget.Glyph.LINK,
-                "内网网关", "设备默认走这个地址", "—", false, false, null);
+                "内网网关", "设备默认走这个地址", "—", false, false,
+                () -> showAddress("内网网关", tvLanV4.getText().toString()));
         TextView netNote = Ui.text(c,
                 "外网访问走 IPv6，DNS 里配好 AAAA 记录就能用域名连回来。",
                 11.5f, R.color.text_secondary);
@@ -627,6 +632,25 @@ public class SettingsFragment extends BaseFragment {
     private void clearCache() {
         Snap.clear(ctx());
         Toast.makeText(ctx(), "本地缓存已清除", Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * 长地址在行里只能显示一半（IPv6 有 39 个字符），点一下弹出来看全的，
+     * 顺手给个「复制」——想粘到浏览器或 DDNS 设置里时不用手抄。
+     */
+    private void showAddress(String title, String value) {
+        if (value == null || value.isEmpty() || value.equals("—")) {
+            Toast.makeText(ctx(), title + "还没读到", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Sheet.confirm(ctx(), title, value, "复制", false, () -> {
+            ClipboardManager cm = (ClipboardManager)
+                    ctx().getSystemService(Context.CLIPBOARD_SERVICE);
+            if (cm != null) {
+                cm.setPrimaryClip(ClipData.newPlainText(title, value));
+                Toast.makeText(ctx(), "已复制", Toast.LENGTH_SHORT).show();
+            }
+        }, null);
     }
 
     // ---------------------------------------------------------------- 改密码

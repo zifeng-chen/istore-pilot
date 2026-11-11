@@ -332,6 +332,7 @@ export struct SecurityPage {
 
   // ---------------------------------------------------------------- 视图
 
+  /** 二级页返回栏：只留箭头，不写字 */
   @Builder
   backBar(title: string) {
     Row() {
@@ -339,16 +340,13 @@ export struct SecurityPage {
         LineIcon({
           path: Ico.CHEVRON,
           color: Pal.textPrimary(),
-          side: 18,
+          side: 20,
           lineWidth: 1.9,
           spin: 180
-        })
-        Text('返回')
-          .fontSize(T.F_BODY)
-          .fontColor($r('app.color.primary'))
-          .margin({ left: 2 });
+        });
       }
       .layoutWeight(0)
+      .padding({ left: 2, right: 10, top: 4, bottom: 4 })
       .onClick(() => {
         this.getUIContext().animateTo({ duration: 200, curve: Curve.EaseIn }, () => {
           this.sub = 0;
@@ -364,7 +362,7 @@ export struct SecurityPage {
 
       Blank();
 
-      Text('').width(56);
+      Row().width(32).height(1);
     }
     .width('100%')
     .height(44)

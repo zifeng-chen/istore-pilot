@@ -1,7 +1,9 @@
 import { common } from '@kit.AbilityKit';
 import { router } from '@kit.ArkUI';
+import { pasteboard } from '@kit.BasicServicesKit';
 import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
+import { AppInfo } from '../../core/AppInfo';
 import { UI, UIState } from '../../core/UIState';
 import { Session } from '../../core/Session';
 import { Shell } from '../../core/Shell';
@@ -10,7 +12,7 @@ import { Fmt } from '../../util/Fmt';
 import { Appearance } from '../Appearance';
 import { Bp } from '../Breakpoint';
 import { Pal, T } from '../Theme';
-import { Card, CardTitle, GlyphIcon, Hairline, LineIcon, Note, RowCard, SettingRow } from '../Comp';
+import { Card, CardTitle, Comp, GlyphIcon, Hairline, LineIcon, Note, RowCard, SettingRow } from '../Comp';
 import { Glyph, Ico } from '../comp/Icons';
 import { BackupsPage } from './BackupsPage';
 import { HardwarePage } from './HardwarePage';
@@ -37,7 +39,6 @@ const SHEET_INFO: string = 'info';
 @ComponentV2
 export struct SettingsPage {
   @Local server: string = '';
-  @Local hostname: string = '';
   @Local agentVersion: string = '';
   @Local latency: string = '';
   @Local online: boolean = false;
@@ -155,11 +156,11 @@ export struct SettingsPage {
       this.online = false;
     }
 
-    // 主机名：hero 的大标题用它。服务器地址只在下面「连接」卡里出现一次，
-    // 原来是 hero 和「连接」卡各写一遍地址 —— 同一件事说两遍
+    // overview 只需要确认在线，主机名不再单独取 —— hero 大标题改成了用户名，
+    // 地址在「关于」卡里有一行，网络卡里也有内网网关，不需要第三处
     const ov: ApiResult = await Api.get(ctx, '/api/v1/overview');
     if (ov.ok) {
-      this.hostname = ov.data.obj('board').str('hostname', '');
+      // 保留在线探测本身，避免单独为它再发一次 ping
     }
 
     const n: ApiResult = await Api.get(ctx, '/api/v1/network');
@@ -271,7 +272,6 @@ export struct SettingsPage {
                 Row({ space: Bp.gap(this.winW) }) {
                   Column() {
                     this.heroCard();
-                    this.connCard();
                     this.netCard();
                   }
                   .layoutWeight(1)
@@ -282,7 +282,6 @@ export struct SettingsPage {
                     this.powerCard();
                     this.hardwareCard();
                     this.securityCard();
-                    this.actionCard();
                     this.aboutCard();
                   }
                   .layoutWeight(1)
@@ -293,13 +292,11 @@ export struct SettingsPage {
               } else {
                 Column() {
                   this.heroCard();
-                  this.connCard();
                   this.netCard();
                   this.systemCard();
                   this.powerCard();
                   this.hardwareCard();
                   this.securityCard();
-                  this.actionCard();
                   this.aboutCard();
                 }
                 .width('100%');
@@ -352,6 +349,7 @@ export struct SettingsPage {
   // ================================================================ 卡片
 
   /** 子页返回栏。和 SecurityPage 的那一条保持一致，避免两个二级页两种返回样式 */
+  /** 二级页返回栏：只留箭头，不写字 —— 「返回」两个字在中文界面里是噪音 */
   @Builder
   backBar(title: string) {
     Row() {
@@ -359,16 +357,13 @@ export struct SettingsPage {
         LineIcon({
           path: Ico.CHEVRON,
           color: Pal.textPrimary(),
-          side: 18,
+          side: 20,
           lineWidth: 1.9,
           spin: 180
-        })
-        Text('返回')
-          .fontSize(T.F_BODY)
-          .fontColor($r('app.color.primary'))
-          .margin({ left: 2 });
+        });
       }
       .layoutWeight(0)
+      .padding({ left: 2, right: 10, top: 4, bottom: 4 })
       .onClick(() => {
         this.closeSub();
       });
@@ -382,7 +377,7 @@ export struct SettingsPage {
       Blank();
 
       // 与左侧返回同宽，标题才真正居中
-      Row().width(46).height(1);
+      Row().width(32).height(1);
     }
     .width('100%')
     .height(44)
@@ -409,7 +404,10 @@ export struct SettingsPage {
       .width('100%')
       .alignItems(VerticalAlign.Center);
 
-      Text(this.hostname.length > 0 ? this.hostname : this.hostText())
+      // 大标题放「我是谁」，下一行才是「连到哪」。
+      // 原来标题是路由器的主机名，而主机名在概览页已经出现过一次；
+      // 这一页真正需要一眼确认的是「我现在用哪个账号、连的是哪台」。
+      Text(this.userName.length > 0 ? this.userName : '未登录')
         .fontSize(24)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.hero_fg'))
@@ -447,78 +445,35 @@ export struct SettingsPage {
     .margin({ bottom: this.rail() ? Bp.gap(this.winW) : T.GAP });
   }
 
-  /** 操作卡片：退出 / 清缓存 / 主题，收在页面底部 */
-  @Builder
-  actionCard() {
-    RowCard({ gapBottom: T.GAP }) {
-      CardTitle({ pad: 16, glyph: Glyph.LIST, title: '操作', sub: '登录、缓存与主题' });
-      SettingRow({
-        glyph: Glyph.LOGOUT,
-        title: '退出登录',
-        subtitle: '清除凭证并返回登录页',
-        value: '',
-        valueSize: 0,
-        first: true,
-        danger: false,
-        arrow: true,
-        onTap: () => { this.relogin(); }
-      });
-      SettingRow({
-        glyph: Glyph.TRASH,
-        title: '清缓存',
-        subtitle: '只清手机上的快照，不动路由器',
-        value: '',
-        valueSize: 0,
-        first: false,
-        danger: false,
-        arrow: true,
-        onTap: () => { this.clearCache(); }
-      });
-      SettingRow({
-        glyph: Glyph.MOON,
-        title: '主题',
-        subtitle: '跟随系统或固定深浅色',
-        value: this.themeName,
-        valueSize: 0,
-        first: false,
-        danger: false,
-        arrow: true,
-        onTap: () => { this.pickTheme(); }
-      });
+  /**
+   * 长地址在行里只能显示一半（IPv6 有 39 个字符），所以点一下弹出来看全的，
+   * 顺手给个「复制」——想粘到浏览器或 DDNS 设置里时不用手抄。
+   */
+  private showAddr(title: string, value: string): void {
+    if (value.length === 0 || value === '—') {
+      this.flash(title + '还没读到');
+      return;
     }
-  }
-
-
-  @Builder
-  connCard() {
-    RowCard({ gapBottom: this.rail() ? 0 : T.GAP }) {
-      CardTitle({ pad: 16, glyph: Glyph.LINK, title: '连接', sub: '凭证与服务器' });
-      SettingRow({
-        glyph: Glyph.GLOBE,
-        title: '服务器地址',
-        subtitle: '改地址不会清掉登录状态',
-        value: this.hostText(),
-        valueSize: 0,
-        first: true,
-        danger: false,
-        arrow: true,
-        onTap: () => {
-          this.pickBase();
+    this.getUIContext().showAlertDialog({
+      title: title,
+      message: value,
+      primaryButton: {
+        value: '复制',
+        action: () => {
+          const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, value);
+          pasteboard.getSystemPasteboard().setData(data).then(() => {
+            this.flash('已复制');
+          }).catch(() => {
+            this.flash('复制失败');
+          });
         }
-      });
-      SettingRow({
-        glyph: Glyph.INFO,
-        title: '登录用户',
-        subtitle: '这台设备当前的凭证',
-        value: this.userName.length > 0 ? this.userName : '默认',
-        valueSize: 0,
-        first: false,
-        danger: false,
-        arrow: false,
-        onTap: () => {
+      },
+      secondaryButton: {
+        value: '关闭',
+        action: () => {
         }
-      });
-    }
+      }
+    });
   }
 
   @Builder
@@ -549,8 +504,9 @@ export struct SettingsPage {
         valueSize: 0,
         first: false,
         danger: false,
-        arrow: false,
+        arrow: true,
         onTap: () => {
+          this.showAddr('外网 IPv4', this.ipv4);
         }
       });
       SettingRow({
@@ -561,8 +517,9 @@ export struct SettingsPage {
         valueSize: 12,
         first: false,
         danger: false,
-        arrow: false,
+        arrow: true,
         onTap: () => {
+          this.showAddr('外网 IPv6', this.ipv6);
         }
       });
       SettingRow({
@@ -573,11 +530,12 @@ export struct SettingsPage {
         valueSize: 0,
         first: false,
         danger: false,
-        arrow: false,
+        arrow: true,
         onTap: () => {
+          this.showAddr('内网网关', this.lanV4);
         }
       });
-      Note({ text: '外网访问走 IPv6，DNS 里配好 AAAA 记录就能用域名连回来。' });
+      Note({ text: '外网访问走 IPv6，DNS 里配好 AAAA 记录就能用域名连回来。点地址那一行可以看完整地址并复制。' });
     }
   }
 
@@ -585,25 +543,35 @@ export struct SettingsPage {
   powerCard() {
     Card({ gapTop: T.GAP }) {
       Column() {
-        Text('电源')
-          .fontSize(T.F_H2)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.text_primary'))
-          .width('100%')
-          .margin({ bottom: 6 });
-        this.powerRow('重启网络服务', '只重拨 WAN，局域网不掉线', 'restart_network');
+        CardTitle({ glyph: Glyph.POWER, title: '电源', sub: '重启与关机都会短暂断网' });
+        this.powerRow(Glyph.REFRESH, '重启网络服务', '只重拨 WAN，局域网不掉线', 'restart_network');
         Hairline({ indent: 0 });
-        this.powerRow('重启路由器', '整机重启，约一分钟', 'reboot');
+        this.powerRow(Glyph.REFRESH, '重启路由器', '整机重启，约一分钟', 'reboot');
         Hairline({ indent: 0 });
-        this.powerRow('关机', '关机后只能按电源键开机', 'poweroff');
+        this.powerRow(Glyph.POWER, '关机', '关机后只能按电源键开机', 'poweroff');
       }
       .width('100%');
     }
   }
 
   @Builder
-  powerRow(title: string, sub: string, action: string) {
-    Row({ space: 8 }) {
+  powerRow(glyph: string, title: string, sub: string, action: string) {
+    Row({ space: 10 }) {
+      Stack() {
+        GlyphIcon({
+          kind: glyph,
+          color: action === 'poweroff' ? Pal.danger() : Pal.primary(),
+          side: 17,
+          lineWidth: 1.9
+        });
+      }
+      .width(30)
+      .height(30)
+      .borderRadius(10)
+      .backgroundColor(action === 'poweroff'
+        ? Comp.alpha(Pal.danger(), 0.12)
+        : $r('app.color.accent_soft'));
+
       Column() {
         Text(this.pendingPower === action ? '再点一次确认' : title)
           .fontSize(T.F_BODY)
@@ -656,16 +624,16 @@ export struct SettingsPage {
   hardwareCard() {
     RowCard({ gapBottom: T.GAP }) {
       CardTitle({ pad: 16, glyph: Glyph.CHIP, title: '设备信息', sub: '处理器、内存与系统盘' });
+      // 长字符串一律放副标题（单行省略），右侧值只放短数字。
+      // 之前型号放在值里，SettingRow 的值列最宽 50% 会折成两行，一行字变成两行高
       SettingRow({
         glyph: Glyph.CHIP,
         title: '处理器',
-        subtitle: this.hwLoaded
-          ? this.hw.obj('cpu').num('cores', 0) + ' 核 '
-            + this.hw.obj('cpu').num('threads', 0) + ' 线程 · '
-            + (this.hw.obj('cpu').num('mhz', 0) / 1000).toFixed(1) + ' GHz'
-          : '核心与频率',
-        value: this.hwLoaded ? Fmt.orDash(this.hw.obj('cpu').str('model', '')) : '—',
-        valueSize: 12,
+        subtitle: this.hwLoaded ? Fmt.orDash(this.hw.obj('cpu').str('model', '')) : '型号',
+        value: this.hwLoaded
+          ? this.hw.obj('cpu').num('cores', 0) + ' 核 ' + this.hw.obj('cpu').num('threads', 0) + ' 线程'
+          : '—',
+        valueSize: 0,
         first: true,
         danger: false,
         arrow: false,
@@ -811,7 +779,9 @@ export struct SettingsPage {
         }
       });
       SettingRow({
-        glyph: Glyph.POWER,
+        // 这一行改的是 root 口令，和上面那行一样是「钥匙」语义；
+        // 之前用的是电源图标，看着像要重启路由器
+        glyph: Glyph.KEY,
         title: '修改路由器密码',
         subtitle: 'root 账号，影响后台与 SSH',
         value: '',
@@ -827,21 +797,29 @@ export struct SettingsPage {
     }
   }
 
+  /**
+   * 关于 + 操作合成一张卡。
+   *
+   * 分成两张时「关于」只有图标和三行字，自己占一张卡很空；
+   * 真正要点的几行（地址 / 主题 / 缓存 / 退出）反而被推到屏幕更下面。
+   * 合起来之后顺序是：这是谁 → 连到哪（可改）→ 个性化 → 清缓存 → 退出。
+   */
   @Builder
   aboutCard() {
-    Column() {
+    RowCard({ gapBottom: T.GAP }) {
       Row() {
         Image($r('app.media.app_icon'))
-          .width(56)
-          .height(56)
-          .borderRadius(15)
-          .margin({ right: 14 });
+          .width(52)
+          .height(52)
+          .borderRadius(14)
+          .margin({ right: 13 });
         Column() {
           Text('iStore Pilot')
-            .fontSize(19)
+            .fontSize(18)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'));
-          Text('版本 2.14.0 · HarmonyOS')
+          // 版本号问系统要（AppScope/app.json5 的 versionName），不再写死
+          Text('版本 ' + AppInfo.version() + ' · HarmonyOS')
             .fontSize(12.5)
             .fontColor($r('app.color.text_secondary'))
             .margin({ top: 4 });
@@ -850,21 +828,71 @@ export struct SettingsPage {
         .layoutWeight(1);
       }
       .width('100%')
+      .padding({ left: 16, right: 16, top: 2, bottom: 8 })
       .alignItems(VerticalAlign.Center);
 
       Text('iStoreOS 路由器的随身管理台：状态、设备、代理、拦截、硬件，一处看完，不用再开浏览器后台。')
-        .fontSize(12.5)
+        .fontSize(T.F_TINY)
         .lineHeight(18)
         .fontColor($r('app.color.text_secondary'))
-        .margin({ top: 14 });
+        .width('100%')
+        .padding({ left: 16, right: 16, bottom: 10 });
+
+      Hairline({ indent: 16 });
+
+      SettingRow({
+        glyph: Glyph.GLOBE,
+        title: '服务器地址',
+        subtitle: '改地址不会清掉登录状态',
+        value: this.hostText(),
+        valueSize: 12,
+        first: true,
+        danger: false,
+        arrow: true,
+        onTap: () => {
+          this.pickBase();
+        }
+      });
+      SettingRow({
+        glyph: Glyph.MOON,
+        title: '主题',
+        subtitle: '跟随系统或固定深浅色',
+        value: this.themeName,
+        valueSize: 0,
+        first: false,
+        danger: false,
+        arrow: true,
+        onTap: () => {
+          this.pickTheme();
+        }
+      });
+      SettingRow({
+        glyph: Glyph.TRASH,
+        title: '清缓存',
+        subtitle: '只清手机上的快照，不动路由器',
+        value: '',
+        valueSize: 0,
+        first: false,
+        danger: false,
+        arrow: true,
+        onTap: () => {
+          this.clearCache();
+        }
+      });
+      SettingRow({
+        glyph: Glyph.LOGOUT,
+        title: '退出登录',
+        subtitle: '清除凭证并返回登录页',
+        value: '',
+        valueSize: 0,
+        first: false,
+        danger: false,
+        arrow: true,
+        onTap: () => {
+          this.relogin();
+        }
+      });
     }
-    .width('100%')
-    .alignItems(HorizontalAlign.Start)
-    .padding(T.CARD_PAD)
-    .backgroundColor($r('app.color.surface'))
-    .borderRadius(T.R_CARD)
-    .border({ width: 0.7, color: $r('app.color.glass_stroke') })
-    .shadow({ radius: 6, color: '#0D000000', offsetX: 0, offsetY: 1 });
   }
 
   private hostText(): string {
