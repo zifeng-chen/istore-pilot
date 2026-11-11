@@ -114,7 +114,8 @@ export struct ShieldPage {
   aboutToAppear(): void {
     this.winW = this.ui.winW;
     this.load(true);
-    if (this.tab === 2) {
+    // 拦截页是「设备」页签里的二级页，父页签序号 1；原来写 2（代理页），轮询起不来
+    if (this.tab === 1) {
       this.startPoll();
     }
   }
@@ -131,7 +132,7 @@ export struct ShieldPage {
   @Monitor('ui.tab')
   onTab(): void {
     this.tab = this.ui.tab;
-    if (this.tab === 2) {
+    if (this.tab === 1) {
       this.startPoll();
       this.load(false);
     } else {

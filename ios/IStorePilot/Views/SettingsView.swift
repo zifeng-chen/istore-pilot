@@ -71,6 +71,7 @@ struct SettingsView: View {
             .navigationTitle("设置")
             .pageTitle("设置")
             .task { await load() }
+            .refreshable { await load() }
             .navigationDestination(isPresented: $goHardware) { HardwareView() }
             .navigationDestination(isPresented: $goWan) { WanView() }
             .navigationDestination(isPresented: $goBackups) { BackupsView() }

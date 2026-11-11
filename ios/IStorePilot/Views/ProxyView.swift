@@ -134,6 +134,7 @@ struct ProxyView: View {
             .onAppear { chrome.set(tabIndex, goSubs) }
             .onChange(of: goSubs) { chrome.set(tabIndex, $0) }
             .task { await load() }
+            .refreshable { await load() }
             .onReceive(tick) { _ in Task { await load() } }
             #if DEBUG
             // 截图用：-sub group 直接弹开第一个分组，省得手动点

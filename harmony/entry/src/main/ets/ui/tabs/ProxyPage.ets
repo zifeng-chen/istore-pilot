@@ -162,6 +162,8 @@ export struct ProxyPage {
   @Local ui: UIState = UI;
   @Local tab: number = UI.tab;
   @Local winW: number = 360;
+  /** 下拉刷新：Refresh 组件要求绑一个布尔，松手后由代码收回去 */
+  @Local pulling: boolean = false;
   /** 后端启停中，占位防止连点 */
   @Local busyBackend: string = '';
   /** 配置文件列表与当前生效的那个 */
@@ -844,6 +846,17 @@ export struct ProxyPage {
     this.loaded = true;
   }
 
+  /**
+   * 下拉一次。除了页面主数据，插件状态也要一起刷 ——
+   * 装完插件回来下拉一下就想看到「已安装」，不该等下一轮轮询。
+   */
+  private async pull(): Promise<void> {
+    this.pulling = true;
+    await this.load(false);
+    await this.loadPkg(true);
+    this.pulling = false;
+  }
+
   private applyBackends(j: J): void {
     this.active = j.str('active', 'none');
     const list: J[] = j.arr('backends');
@@ -1112,93 +1125,101 @@ export struct ProxyPage {
   }
 
   build() {
-    Scroll() {
-      Column() {
-        Row() {
-          Text('代理')
-            .fontSize(T.F_TITLE)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.text_primary'))
-            .layoutWeight(1);
-          // 空态时后端都没装，nodeCount 还留着上一轮的缓存值，别显示
-          Text(!this.noneInstalled() && this.nodeCount > 0
-            ? this.nodeCount + ' 个节点'
-            : '')
-            .fontSize(T.F_SUB)
-            .fontColor($r('app.color.text_secondary'));
-        }
-        .width('100%')
-        .alignItems(VerticalAlign.Bottom)
-        .padding({ bottom: 12 });
-
-        if (this.noneInstalled()) {
-          // 两个都没装：整页换成「教你装」。摆两行未安装的空卡片对用户没信息量，
-          // 下面的运行模式、节点分组更是死的
-          this.installGuide();
-        } else if (this.rail()) {
-          // 平板：左边「走哪条线」（后端 + 模式），右边「能选哪些线」（节点分组）
-          Row({ space: Bp.gap(this.winW) }) {
-            Column() {
-              this.backendCard();
-              this.modeCard();
-              this.configCard();
-              this.subsEntry();
-            }
-            .layoutWeight(1)
-            .alignItems(HorizontalAlign.Start);
-
-            Column() {
-              this.groupList();
-            }
-            .layoutWeight(1)
-            .alignItems(HorizontalAlign.Start);
+    Refresh({ refreshing: $$this.pulling }) {
+      Scroll() {
+        Column() {
+          Row() {
+            Text('代理')
+              .fontSize(T.F_TITLE)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.text_primary'))
+              .layoutWeight(1);
+            // 空态时后端都没装，nodeCount 还留着上一轮的缓存值，别显示
+            Text(!this.noneInstalled() && this.nodeCount > 0
+              ? this.nodeCount + ' 个节点'
+              : '')
+              .fontSize(T.F_SUB)
+              .fontColor($r('app.color.text_secondary'));
           }
           .width('100%')
-          .alignItems(VerticalAlign.Top);
-        } else {
-          Column() {
-            this.backendCard();
-            // 「运行模式」切的是「正在跑的那个后端」的流量走向，没跑就没得切。
-            // 摆出来只会让人以为自己在挑模式，其实点下去空转
-            if (this.anyRunning()) {
-              this.modeCard();
+          .alignItems(VerticalAlign.Bottom)
+          .padding({ bottom: 12 });
+
+          if (this.noneInstalled()) {
+            // 两个都没装：整页换成「教你装」。摆两行未安装的空卡片对用户没信息量，
+            // 下面的运行模式、节点分组更是死的
+            this.installGuide();
+          } else if (this.rail()) {
+            // 平板：左边「走哪条线」（后端 + 模式），右边「能选哪些线」（节点分组）
+            Row({ space: Bp.gap(this.winW) }) {
+              Column() {
+                this.backendCard();
+                this.modeCard();
+                this.configCard();
+                this.subsEntry();
+              }
+              .layoutWeight(1)
+              .alignItems(HorizontalAlign.Start);
+
+              Column() {
+                this.groupList();
+              }
+              .layoutWeight(1)
+              .alignItems(HorizontalAlign.Start);
             }
-            // 配置文件只有 OpenClash 有；这张卡跟着「当前管哪个后端」走
-            if (this.comboBackend() === 'openclash') {
-              this.configCard();
+            .width('100%')
+            .alignItems(VerticalAlign.Top);
+          } else {
+            Column() {
+              this.backendCard();
+              // 「运行模式」切的是「正在跑的那个后端」的流量走向，没跑就没得切。
+              // 摆出来只会让人以为自己在挑模式，其实点下去空转
+              if (this.anyRunning()) {
+                this.modeCard();
+              }
+              // 配置文件只有 OpenClash 有；这张卡跟着「当前管哪个后端」走
+              if (this.comboBackend() === 'openclash') {
+                this.configCard();
+              }
+              this.subsEntry();
+              this.groupList();
             }
-            this.subsEntry();
-            this.groupList();
+            .width('100%');
           }
-          .width('100%');
+
+          // 安装包入口放在最后：空态时是「源里没有就自己传」，已装时是「重装/升级」
+          this.pkgEntry();
+
+          Row().width('100%').height(24);
         }
-
-        // 安装包入口放在最后：空态时是「源里没有就自己传」，已装时是「重装/升级」
-        this.pkgEntry();
-
-        Row().width('100%').height(24);
+        .width('100%')
+        .constraintSize({ maxWidth: Bp.CONTENT_MAX })
+        .padding({
+          left: this.rail() ? 20 : T.PAD,
+          right: this.rail() ? 20 : T.PAD,
+          top: 8
+        });
       }
       .width('100%')
-      .constraintSize({ maxWidth: Bp.CONTENT_MAX })
-      .padding({
-        left: this.rail() ? 20 : T.PAD,
-        right: this.rail() ? 20 : T.PAD,
-        top: 8
+      .height('100%')
+      .scrollBar(BarState.Off)
+      .edgeEffect(EdgeEffect.Spring)
+      .backgroundColor($r('app.color.app_bg'))
+      .align(Alignment.Top)
+      .bindSheet($$this.showGroup, this.nodeSheet(), {
+        height: 560,
+        dragBar: true,
+        backgroundColor: $r('app.color.app_bg'),
+        onDisappear: () => {
+          this.showGroup = false;
+        }
       });
     }
     .width('100%')
     .height('100%')
-    .scrollBar(BarState.Off)
-    .edgeEffect(EdgeEffect.Spring)
     .backgroundColor($r('app.color.app_bg'))
-    .align(Alignment.Top)
-    .bindSheet($$this.showGroup, this.nodeSheet(), {
-      height: 560,
-      dragBar: true,
-      backgroundColor: $r('app.color.app_bg'),
-      onDisappear: () => {
-        this.showGroup = false;
-      }
+    .onRefreshing(() => {
+      this.pull();
     });
   }
 

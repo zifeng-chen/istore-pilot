@@ -90,6 +90,8 @@ export struct SecurityPage {
   @Local busy: boolean = false;
 
   @Local winW: number = 360;
+  /** 下拉刷新：Refresh 组件要求绑一个布尔，松手后由代码收回去 */
+  @Local pulling: boolean = false;
   @Local ui: UIState = UI;
   @Local tab: number = UI.tab;
 
@@ -98,7 +100,9 @@ export struct SecurityPage {
   aboutToAppear(): void {
     this.winW = this.ui.winW;
     this.load(true);
-    if (this.tab === 2) {
+    // 页签序号：0 概览 / 1 设备 / 2 代理 / 3 设置。这里原来写的是 2（代理页），
+    // 于是切到「设备」时永远走 else 把轮询停掉 —— 整页只有进入时取过一次数
+    if (this.tab === 1) {
       this.startPoll();
     }
   }
@@ -118,7 +122,7 @@ export struct SecurityPage {
   @Monitor('ui.tab')
   onTab(): void {
     this.tab = this.ui.tab;
-    if (this.tab === 2) {
+    if (this.tab === 1) {
       this.startPoll();
       this.load(false);
     } else {
@@ -146,6 +150,13 @@ export struct SecurityPage {
 
   private ctx(): common.UIAbilityContext {
     return this.getUIContext().getHostContext() as common.UIAbilityContext;
+  }
+
+  /** 下拉一次：等接口回来再收起转圈 */
+  private async pull(): Promise<void> {
+    this.pulling = true;
+    await this.load(false);
+    this.pulling = false;
   }
 
   private async load(withCache: boolean): Promise<void> {
@@ -1135,69 +1146,77 @@ export struct SecurityPage {
       .transition(TransitionEffect.OPACITY
         .combine(TransitionEffect.translate({ x: 32 })))
     } else {
-      Scroll() {
-        Column() {
-          Row() {
-            Text('设备')
-              .fontSize(T.F_TITLE)
-              .fontWeight(FontWeight.Medium)
-              .fontColor($r('app.color.text_primary'))
-              .layoutWeight(1);
-            Text(this.neverLoaded() ? '未连接' : this.online + ' 在线 / ' + this.total + ' 台')
-              .fontSize(T.F_TINY)
-              .fontColor($r('app.color.text_secondary'));
-          }
-          .width('100%')
-          .alignItems(VerticalAlign.Bottom)
-          .padding({ bottom: 10 });
+      Refresh({ refreshing: $$this.pulling }) {
+        Scroll() {
+          Column() {
+            Row() {
+              Text('设备')
+                .fontSize(T.F_TITLE)
+                .fontWeight(FontWeight.Medium)
+                .fontColor($r('app.color.text_primary'))
+                .layoutWeight(1);
+              Text(this.neverLoaded() ? '未连接' : this.online + ' 在线 / ' + this.total + ' 台')
+                .fontSize(T.F_TINY)
+                .fontColor($r('app.color.text_secondary'));
+            }
+            .width('100%')
+            .alignItems(VerticalAlign.Bottom)
+            .padding({ bottom: 10 });
 
-          if (this.err.length > 0 && this.total === 0) {
-            Text('读取失败：' + this.err)
-              .fontSize(T.F_SUB)
-              .fontColor($r('app.color.danger'))
+            if (this.err.length > 0 && this.total === 0) {
+              Text('读取失败：' + this.err)
+                .fontSize(T.F_SUB)
+                .fontColor($r('app.color.danger'))
+                .width('100%')
+                .margin({ bottom: 10 });
+            }
+
+            if (this.rail()) {
+              Row({ space: T.GAP }) {
+                Column({ space: T.GAP }) {
+                  this.heroCard();
+                  this.deviceCard();
+                }
+                .layoutWeight(1)
+                .alignItems(HorizontalAlign.Start);
+
+                Column({ space: T.GAP }) {
+                  this.appsCard();
+                  this.adCard();
+                }
+                .layoutWeight(1)
+                .alignItems(HorizontalAlign.Start);
+              }
               .width('100%')
-              .margin({ bottom: 10 });
-          }
-
-          if (this.rail()) {
-            Row({ space: T.GAP }) {
+              .alignItems(VerticalAlign.Top);
+            } else {
               Column({ space: T.GAP }) {
                 this.heroCard();
                 this.deviceCard();
-              }
-              .layoutWeight(1)
-              .alignItems(HorizontalAlign.Start);
-
-              Column({ space: T.GAP }) {
                 this.appsCard();
                 this.adCard();
               }
-              .layoutWeight(1)
-              .alignItems(HorizontalAlign.Start);
+              .width('100%');
             }
-            .width('100%')
-            .alignItems(VerticalAlign.Top);
-          } else {
-            Column({ space: T.GAP }) {
-              this.heroCard();
-              this.deviceCard();
-              this.appsCard();
-              this.adCard();
-            }
-            .width('100%');
-          }
 
-          Row().width('100%').height(24);
+            Row().width('100%').height(24);
+          }
+          .width('100%')
+          .padding({ left: T.PAD, right: T.PAD, top: 8 });
         }
         .width('100%')
-        .padding({ left: T.PAD, right: T.PAD, top: 8 });
+        .height('100%')
+        .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.Spring)
+        .backgroundColor($r('app.color.app_bg'))
+        .align(Alignment.Top);
       }
       .width('100%')
       .height('100%')
-      .scrollBar(BarState.Off)
-      .edgeEffect(EdgeEffect.Spring)
       .backgroundColor($r('app.color.app_bg'))
-      .align(Alignment.Top);
+      .onRefreshing(() => {
+        this.pull();
+      });
     }
   }
 }

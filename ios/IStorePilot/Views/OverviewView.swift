@@ -68,6 +68,9 @@ struct OverviewView: View {
             .navigationTitle("概览")
             .pageTitle("概览")
             .task { await load() }
+            // 下拉刷新：安卓四个页签都有 SwipeRefresh，这里补上同一套手势。
+            // 轮询是 3 秒一次，但「刚重启完路由器想立刻确认」的时候等不了
+            .refreshable { await load() }
             .onReceive(tick) { _ in Task { await load() } }
             .onReceive(secTick) { now = $0 }
             .navigationDestination(isPresented: $goHardware) { HardwareView() }

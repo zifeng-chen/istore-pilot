@@ -98,7 +98,9 @@ export struct DevicesPage {
     this.winW = this.ui.winW;
     this.filter = this.presetFilter;
     this.load(true);
-    if (this.tab === 2) {
+    // 设备清单挂在「设备」页签下，序号是 1（0 概览 / 1 设备 / 2 代理 / 3 设置）。
+    // 原来写成 2，等于只有在代理页才轮询，进设备清单后数字一直不动
+    if (this.tab === 1) {
       this.startPoll();
     }
   }
@@ -119,7 +121,7 @@ export struct DevicesPage {
   @Monitor('ui.tab')
   onTab(): void {
     this.tab = this.ui.tab;
-    if (this.tab === 2) {
+    if (this.tab === 1) {
       this.startPoll();
       this.load(false);
     } else {

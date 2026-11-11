@@ -127,6 +127,7 @@ struct SecurityView: View {
             .navigationTitle("设备")
             .pageTitle("设备")
             .task { await load() }
+            .refreshable { await load() }
             .onReceive(tick) { _ in Task { await load(quiet: true) } }
             .confirmationDialog(takeover ? "退出 DNS 接管？" : "让所有设备走 AdGuard Home 解析？",
                                 isPresented: Binding(

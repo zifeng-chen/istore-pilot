@@ -1,9 +1,9 @@
 # 三端差异清单（以 Android 为基准）
 
-> 审查日期：2026-11-11
+> 审查日期：2026-11-11（同日修复完毕，见第三节）
 > 方法：先对齐三端文件与接口清单，再用「接口调用对比 + 功能词存在性检查」定位差异，
 > 对每个疑点回读源码确认。
-> 覆盖：14 个界面 + 8 处接口差异。**未做**逐行通读（三端合计约 3.9 万行），
+> 覆盖：14 个界面 + 接口差异。**未做**逐行通读（三端合计约 3.9 万行），
 > 布局细节、动画、无障碍等未覆盖。
 
 ## 一、页面映射（三端结构基本一致）
@@ -21,25 +21,26 @@
 | 订阅 | `SubscriptionActivity` (383) | `SubscriptionView` (303) | `pages/SubscriptionPage` (350) | — |
 | 设置 | `SettingsFragment` (1093) | `SettingsView` (923) | `SettingsPage` (1289) | — |
 | 网络/宽带 | `WanActivity` (860) | `WanView` (628) | `NetworkPage` (933) | 鸿蒙是独立 tab 文件但不在页签里 |
-| 硬件 | `HardwareActivity` (614) | `HardwareView` (420) | 内嵌在 `SettingsPage` | **形态不同，见 D6** |
+| 硬件 | `HardwareActivity` (614) | `HardwareView` (420) | `HardwarePage` (设置内子页) | 见 D6（已统一） |
 | 备份 | `BackupActivity` (340) | `BackupsView` (280) | `BackupsPage` (295) | — |
 | 登录 | `LoginActivity` | `LoginView` (290) | `LoginPage` (225) | — |
 | 内置网页 | `WebActivity` (356) | `WebScreen` (328) | `pages/WebPage` (307) | — |
 
 ## 二、接口一致性
 
-三端去重后：Android 51 / iOS 50 / 鸿蒙 52 条，**共同 47 条**。差异 8 条：
+修复前：Android 51 / iOS 50 / 鸿蒙 52 条，共同 47 条，差异 8 条。
+**修复后：Android 53 / iOS 54 / 鸿蒙 54 条，共同 51 条，只剩 4 条差异**
+（`python scripts/api_parity_check.py`，2026-11-11 实测）：
 
-| 接口 | Android | iOS | 鸿蒙 | 说明 |
+| 接口 | Android | iOS | 鸿蒙 | 结论 |
 |---|---|---|---|---|
-| `/proxy/pkg/confirm` | ✅ | ❌ | ❌ | 见 D2 |
-| `/proxy/uninstall` | ✅ | ❌ | ❌ | 见 D3 |
-| `/system/uploads` | ❌ | ✅ | ❌ | 见 D8 |
-| `/net/pending` | ❌ | ❌ | ✅ | 见 D1 |
-| `/net/confirm` | ❌ | ❌ | ✅ | 见 D1 |
-| `/net/rollback` | ❌ | ❌ | ✅ | 见 D1 |
-| `/proxy/pkg/probe` | ❌ | ❌ | ✅ | 鸿蒙多一次通道探测，无功能影响 |
-| `/traffic` | ❌ | ❌ | ✅ | 鸿蒙单独拉流量；另两端从 `/overview` 取，需确认字段等价 |
+| `/system/uploads` | ❌ | ✅ | ❌ | D8，用户决定不做 |
+| `/net/pending` | ❌ | ❌ | ✅ | 鸿蒙的网络页有常驻「待确认」卡片；另两端走 D1 的即时弹窗，不需要 |
+| `/proxy/pkg/probe` | ❌ | ❌ | ✅ | 鸿蒙装插件前多探一次下载通道，无功能影响 |
+| `/traffic` | ❌ | ❌ | ✅ | 鸿蒙单独拉流量；另两端从 `/overview` 取 |
+
+`/proxy/pkg/confirm`、`/proxy/uninstall`、`/net/confirm`、`/net/rollback`
+四条在 D1–D3 修完后三端都已调用。
 
 ## 三、差异清单
 
@@ -52,10 +53,11 @@
 | D3 | ✅ 已修 | iOS 插件管理 Sheet 加「已安装」段（点击确认后卸载）；鸿蒙同位置加「已安装」+ 卸载按钮，接 `/proxy/uninstall` |
 | D4 | ✅ 已修 | 鸿蒙 `DevicesPage` 加搜索框（名称/IP/MAC/厂商，不区分大小写），列表走 `hit()` 过滤 |
 | D5 | ❌ 撤销 | **原判断有误**：iOS 与鸿蒙并不缺这个标记。agent 把随机地址的 `vendor` 直接填成 `"随机 MAC"`，两端都是原样展示 vendor，效果与 Android 一致。之前用关键词统计得到「缺失」是假阳性 |
-| D6 | ⏸ 保留 | 硬件页形态差异属设计选择，功能等价（`/system/hardware` 三端都调）。鸿蒙内嵌为设置页卡片，少一次跳转。要统一成独立页需新建页面与路由，收益不明，暂不动 |
-| D7 | ⏸ 保留 | iOS/鸿蒙靠 3 秒轮询自动刷新，没有下拉手势。补 `.refreshable` 收益有限且要逐页改，暂不动 |
-| D8 | ⏸ 待定 | `system/uploads` 是「列出路由器上已有的升级包」，属**新增功能**而非修补（Android/鸿蒙现在只能现传）。要做需在固件升级区块加一个选择列表 |
-| D9 | ⏸ 待定 | 改 LAN 网段（`/net/lan`）三端都没有入口，属**新功能**且改错会断网。是否提供需要产品决策，不擅自加 |
+| D6 | ✅ 已修 | 三端统一成「设置 → 设备信息（处理器/内存/系统盘）→ 查看全部硬件 → 独立页」。鸿蒙新增 `ui/tabs/HardwarePage.ets`（hero + CPU + 内存条 + 磁盘 + 网卡 + 温度 + PCI），设置页原来那六行内联字段收成三行概览 + 一个入口 |
+| D7 | ✅ 已修 | iOS 四个页签加 `.refreshable`（概览/设备/代理/设置），鸿蒙四个页签最外层 `Scroll` 包 `Refresh`（`$$this.pulling` + `onRefreshing`）；两侧都是等接口回来才收转圈 |
+| D8 | ⛔ 不做 | 用户 2026-11-11 决定：`/system/uploads`（列出路由器上已有的升级包）不补，Android/鸿蒙保持现传 |
+| D9 | ⛔ 不做 | 用户 2026-11-11 决定：改 LAN 网段（`/net/lan`）不加入口，改错会断网，不值得 |
+| D10 | ✅ 已修 | **新发现（审查漏掉的）**：鸿蒙页签序号写错。设备页/设备清单/拦截页判 `tab === 2`（那是代理页）、设置页判 `tab === 4`（只有四个页签）。结果这三页切过去时走 else 分支把轮询停掉，进页面后数字再也不动，设置页的 WAN 地址也不跟着刷新。改为 1 / 1 / 1 / 3 |
 
 ### D1【严重】恢复配置备份后，Android / iOS 无法确认，90 秒后被自动回滚
 
@@ -101,35 +103,59 @@ iOS/鸿蒙安装代理插件时，如果所有下载通道都失败，agent 会�
 Android `DevicesFragment`/`DeviceDetailActivity` 识别并标注随机 MAC（`"随机"` 出现 4 次）。
 iOS 与鸿蒙全仓 **零处**，同一台设备在两端看不出是随机地址。
 
-### D6【低】硬件页形态不同
+### D6【低】硬件页形态不同 —— ✅ 已修（2026-11-11）
 
-| 端 | 形态 |
-|---|---|
-| Android | 独立页 `HardwareActivity`，从设置进入 |
-| iOS | 独立页 `HardwareView`，**概览和设置都能进** |
-| 鸿蒙 | 设置页内的 `hardwareCard()`，没有独立页 |
+| 端 | 修前 | 修后 |
+|---|---|---|
+| Android | 独立页 `HardwareActivity`，从设置进入 | 不动 |
+| iOS | 独立页 `HardwareView`，概览和设置都能进 | 不动（超集，概览那个入口留着，删掉是减功能） |
+| 鸿蒙 | 设置页内 `hardwareCard()`，只有 6 行字 | 新增独立页 `ui/tabs/HardwarePage.ets` |
 
-功能（`/system/hardware`）三端都有，只是入口与承载方式不同。
-附带发现：iOS 比 Android 多一个概览页入口。
+鸿蒙这一页按另两端的顺序铺：hero（主机名 / 发行版 / 架构 + CPU 核数、内存、运行时长）→
+处理器（含 VT / AES 标记）→ 内存（占比条 + 内存条明细）→ 存储 → 网卡 → 温度 → PCI。
 
-### D7【低】下拉刷新，只有 Android 有
+入口也换成和 Android 一样的形状：设置页「设备信息」卡只留处理器 / 内存 / 系统盘三行，
+第四行「查看全部硬件」进子页。原来的六行内联字段（型号、核心、主频、缓存、机型、BIOS）
+往后加一项就要往下挪一屏，而真正值钱的明细（内存条、磁盘、温度）一处也没露。
 
-Android `BaseFragment` 用 `SwipeRefreshLayout`（所有页签都有）。
-iOS 全仓无 `.refreshable`，鸿蒙全仓无 `Refresh` 组件 —— 两端靠 3 秒定时轮询。
+子页走的是设置页自己的 `sub` 状态（`'backup' | 'hardware'`），并接上 `Shell.enter/leave`：
+底部导航收起、系统返回手势退回设置页，和「设备 → 设备清单」那套一致。
+顺带修掉了「配置备份」子页此前不通知壳层、底部导航压在内容上的问题。
 
-不算功能缺失，但用户想「立刻刷一次」时没有手势。
+### D7【低】下拉刷新，只有 Android 有 —— ✅ 已修（2026-11-11）
 
-### D8【低】系统上传，只有 iOS 有
+- iOS：四个页签的 `ScrollView` 加 `.refreshable { await load() }`
+  （`OverviewView` / `SecurityView` / `ProxyView` / `SettingsView`）。
+  部署目标是 iOS 16.0，ScrollView 支持 `.refreshable` 正好从 16 开始。
+- 鸿蒙：四个页签最外层包 `Refresh({ refreshing: $$this.pulling })`，
+  `onRefreshing` 里 `await` 真正的取数、回来再收起转圈 —— 提前松手会看着像没刷新。
+  代理页下拉会把插件状态一起重读（`loadPkg(true)`），装完插件下拉一下就能看到「已安装」。
 
-`/system/uploads`（上传安装包/升级包）只在 `SettingsView.swift`。
-Android 与鸿蒙不能上传，只能在线检查更新。
+### D8【低】系统上传，只有 iOS 有 —— ⛔ 不做（2026-11-11 用户决定）
 
-### D9【提示】鸿蒙的「待确认」UI 在正常路径下不会触发
+`/system/uploads`（列出路由器上已有的升级包）属新增功能，Android / 鸿蒙保持
+「现从手机里选文件上传」这一条路，不再加选择列表。
 
-`NetworkPage` 的 pending 卡片依赖 `/net/pending`。而创建事务的只有两处：
-`cfgbak.restore`（配置恢复）和 `lanedit.apply`（改 LAN 网段）。
-三端**都没有** `/net/lan` 调用 → 除了「恢复备份」这个场景，这套 UI 平时不会出现。
-如果本意是要支持改 LAN 网段，那三端都还差一个入口。
+### D9【提示】鸿蒙的「待确认」UI 在正常路径下不会触发 —— ⛔ 不做（2026-11-11 用户决定）
+
+改 LAN 网段（`/net/lan`）三端都不加入口。改错会直接断网，收益不抵风险。
+`/net/pending` 那套卡片保留，只服务「恢复配置备份」这一个场景（D1）。
+
+### D10【中】鸿蒙页签序号写错，三页从不轮询 —— ✅ 已修（2026-11-11）
+
+**证据**（`UI.tab` 就是页签下标：0 概览 / 1 设备 / 2 代理 / 3 设置）
+
+| 文件 | 修前 | 修后 |
+|---|---|---|
+| `SecurityPage.ets` | `this.tab === 2` | `=== 1` |
+| `DevicesPage.ets` | `this.tab === 2` | `=== 1` |
+| `ShieldPage.ets` | `this.tab === 2` | `=== 1` |
+| `SettingsPage.ets` | `this.tab === 4` | `=== 3` |
+
+**后果**：切到「设备」页（`tab=1`）时 `onTab` 走 else 分支把定时器停掉，
+`aboutToAppear` 里也因为同一个条件不启动 —— 设备页、设备清单、拦截页只有首次
+进入时取过一次数，之后在线数、流量、拦截条数全是死的；设置页的 WAN 地址同理，
+从网络页回来不会重取。Android 的 `BaseFragment` 是按 `position` 传的，没有这个问题。
 
 ## 四、已核实「不是差异」的项
 
@@ -142,13 +168,23 @@ Android 与鸿蒙不能上传，只能在线检查更新。
 | iOS 没有「可达」字样 | 用的是「N 个节点可用」 |
 | `/traffic` 只在鸿蒙 | 另两端从 `/overview` 取流量，需确认字段一致（未验证数值等价） |
 
-## 五、建议修复顺序
+## 五、处置结果
 
-1. **D1**（严重，用户数据会"莫名回滚"）—— 两端补确认入口
-2. **D2**（安装会卡死无提示）—— 两端补 `waiting` 轮询与确认框
-3. **D3**（缺功能）
-4. **D4**（鸿蒙搜索）
-5. D5–D8 按排期
+| # | 结论 | 落地 |
+|---|---|---|
+| D1 | 已修 | 三端恢复备份后当场确认 / 撤销 |
+| D2 | 已修 | iOS / 鸿蒙补 `waiting="hosts_fix"` 确认框 |
+| D3 | 已修 | iOS / 鸿蒙补插件卸载 |
+| D4 | 已修 | 鸿蒙补设备搜索 |
+| D5 | 撤销 | 原判断是假阳性（agent 直接把 vendor 填成「随机 MAC」） |
+| D6 | 已修 | 鸿蒙新增硬件详情页 + 「查看全部硬件」入口 |
+| D7 | 已修 | iOS `.refreshable` ×4，鸿蒙 `Refresh` ×4 |
+| D8 | 不做 | 用户决定 |
+| D9 | 不做 | 用户决定 |
+| D10 | 已修 | 鸿蒙页签序号 2→1 / 4→3 |
+
+到此三端界面与功能对齐，没有待办项。后续新增界面时：
+**先在三端各过一遍，别让某一端单独长出一个形态。**
 
 ## 六、复跑命令
 

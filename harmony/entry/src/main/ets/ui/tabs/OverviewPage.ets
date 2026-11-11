@@ -80,6 +80,8 @@ export struct OverviewPage {
   /** 最近一次 overview 取数失败：界面上的数字是缓存，要如实告诉用户 */
   @Local stale: boolean = false;
   @Local winW: number = 360;
+  /** 下拉刷新：Refresh 组件要求绑一个布尔，松手后由代码收回去 */
+  @Local pulling: boolean = false;
 
   @Local ui: UIState = UI;
   @Local tab: number = UI.tab;
@@ -158,6 +160,14 @@ export struct OverviewPage {
 
   private ctx(): common.UIAbilityContext {
     return this.getUIContext().getHostContext() as common.UIAbilityContext;
+  }
+
+  /** 下拉一次：等接口回来再收起转圈，中途不能提前松手，否则看着像没刷新 */
+  private async pull(): Promise<void> {
+    this.pulling = true;
+    await this.refreshAll(false);
+    await this.refreshTraffic(false);
+    this.pulling = false;
   }
 
   private rail(): boolean {
@@ -433,63 +443,71 @@ export struct OverviewPage {
   }
 
   build() {
-    Scroll() {
-      Column() {
-        Text('概览')
-          .fontSize(T.F_TITLE)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.text_primary'))
-          .width('100%')
-          .margin({ bottom: 10 });
+    Refresh({ refreshing: $$this.pulling }) {
+      Scroll() {
+        Column() {
+          Text('概览')
+            .fontSize(T.F_TITLE)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.text_primary'))
+            .width('100%')
+            .margin({ bottom: 10 });
 
-        if (this.rail()) {
-          Row({ space: Bp.gap(this.winW) }) {
+          if (this.rail()) {
+            Row({ space: Bp.gap(this.winW) }) {
+              Column() {
+                this.heroCard();
+              }
+              .layoutWeight(1)
+              .alignItems(HorizontalAlign.Start);
+
+              Column() {
+                this.ringCard();
+                this.wanCard();
+                this.portCard();
+                this.machineCard();
+                this.netEntryCard();
+              }
+              .layoutWeight(1)
+              .alignItems(HorizontalAlign.Start);
+            }
+            .width('100%')
+            .alignItems(VerticalAlign.Top);
+          } else {
             Column() {
               this.heroCard();
-            }
-            .layoutWeight(1)
-            .alignItems(HorizontalAlign.Start);
-
-            Column() {
               this.ringCard();
               this.wanCard();
               this.portCard();
               this.machineCard();
               this.netEntryCard();
             }
-            .layoutWeight(1)
-            .alignItems(HorizontalAlign.Start);
+            .width('100%');
           }
-          .width('100%')
-          .alignItems(VerticalAlign.Top);
-        } else {
-          Column() {
-            this.heroCard();
-            this.ringCard();
-            this.wanCard();
-            this.portCard();
-            this.machineCard();
-            this.netEntryCard();
-          }
-          .width('100%');
-        }
 
-        Row().width('100%').height(24);
+          Row().width('100%').height(24);
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Center)
+        .padding({
+          left: this.rail() ? 20 : T.PAD,
+          right: this.rail() ? 20 : T.PAD,
+          top: 8
+        });
       }
       .width('100%')
-      .alignItems(HorizontalAlign.Center)
-      .padding({
-        left: this.rail() ? 20 : T.PAD,
-        right: this.rail() ? 20 : T.PAD,
-        top: 8
-      });
+      .height('100%')
+      .scrollBar(BarState.Off)
+      .edgeEffect(EdgeEffect.Spring)
+      .backgroundColor($r('app.color.app_bg'))
+      .align(Alignment.Top);
     }
     .width('100%')
     .height('100%')
-    .scrollBar(BarState.Off)
-    .edgeEffect(EdgeEffect.Spring)
     .backgroundColor($r('app.color.app_bg'))
-    .align(Alignment.Top);
+    .onRefreshing(() => {
+      this.pull();
+    });
   }
 
   // ================================================================ 卡片

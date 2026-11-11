@@ -4,6 +4,7 @@ import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
 import { UI, UIState } from '../../core/UIState';
 import { Session } from '../../core/Session';
+import { Shell } from '../../core/Shell';
 import { Snap } from '../../core/Snap';
 import { Fmt } from '../../util/Fmt';
 import { Appearance } from '../Appearance';
@@ -12,6 +13,7 @@ import { Pal, T } from '../Theme';
 import { Card, CardTitle, GlyphIcon, Hairline, LineIcon, Note, RowCard, SettingRow } from '../Comp';
 import { Glyph, Ico } from '../comp/Icons';
 import { BackupsPage } from './BackupsPage';
+import { HardwarePage } from './HardwarePage';
 
 const SHEET_THEME: string = 'theme';
 const SHEET_BASE: string = 'base';
@@ -41,8 +43,12 @@ export struct SettingsPage {
   @Local online: boolean = false;
   @Local userName: string = '';
   @Local tokenOk: boolean = false;
-  /** 是否正在看「配置备份」子页。设置页的子页用状态切换，不另开路由 */
-  @Local subBackup: boolean = false;
+  /**
+   * 设置页的子页：'' 停在一级页，'backup' 配置备份，'hardware' 硬件详情。
+   * 用状态切换而不是路由：这两个页面带的是「从设置进去」的上下文，
+   * 走路由会把底部页签一起盖掉，和安卓两个 Activity 的手感对不上。
+   */
+  @Local sub: string = '';
 
   @Local protoText: string = '';
   @Local wanUp: boolean = false;
@@ -63,6 +69,8 @@ export struct SettingsPage {
   @Local toast: string = '';
 
   @Local winW: number = 360;
+  /** 下拉刷新：Refresh 组件要求绑一个布尔，松手后由代码收回去 */
+  @Local pulling: boolean = false;
   /** 电源：先点一次变「再点一次确认」，避免误触 */
   @Local pendingPower: string = '';
   @Local powerBusy: boolean = false;
@@ -88,8 +96,31 @@ export struct SettingsPage {
 
   private onTab(): void {
     // 从别的页签切回来时重算一次：设置页显示的 WAN 地址可能已经换了
-    if (this.tab === 4) {
+    if (this.tab === 3) {
       this.load();
+    }
+  }
+
+  /** 进子页：同时告诉壳层，藏掉底部导航、把返回手势改成「退回一级页」 */
+  private openSub(s: string): void {
+    Shell.enter(s === 'backup' ? '配置备份' : '硬件信息');
+    this.getUIContext().animateTo({ duration: 220, curve: Curve.EaseOut }, () => {
+      this.sub = s;
+    });
+  }
+
+  private closeSub(): void {
+    this.getUIContext().animateTo({ duration: 200, curve: Curve.EaseIn }, () => {
+      this.sub = '';
+    });
+    Shell.leave();
+  }
+
+  /** 壳收到系统返回手势：关掉子页 */
+  @Monitor('ui.backTick')
+  onBackAsked(): void {
+    if (this.sub.length > 0) {
+      this.closeSub();
     }
   }
 
@@ -145,6 +176,15 @@ export struct SettingsPage {
     this.lanV4 = this.firstAddr(n.data.obj('lan').arr('ipv4'));
   }
 
+  /** 下拉一次：这一页的数字多半是「别人改完我来看」，随手拉一下是最自然的确认动作 */
+  private async pull(): Promise<void> {
+    this.pulling = true;
+    // 硬件缓存会挡住重新读取，先放开
+    this.hwLoaded = false;
+    await this.load();
+    this.pulling = false;
+  }
+
   /** "192.168.100.1/24" 这种带前缀的写法比裸地址有用 */
   private firstAddr(list: J[]): string {
     if (list.length === 0) {
@@ -188,11 +228,15 @@ export struct SettingsPage {
   // ================================================================ 布局
 
   build() {
-    if (this.subBackup) {
+    if (this.sub.length > 0) {
       Column() {
-        this.backBar('配置备份');
+        this.backBar(this.sub === 'backup' ? '配置备份' : '硬件信息');
         Row() {
-          BackupsPage()
+          if (this.sub === 'backup') {
+            BackupsPage()
+          } else {
+            HardwarePage()
+          }
         }
         .layoutWeight(1)
         .width('100%');
@@ -204,75 +248,86 @@ export struct SettingsPage {
         left: this.rail() ? 20 : T.PAD,
         right: this.rail() ? 20 : T.PAD,
         top: 8
-      });
+      })
+      // 从右边推进来，和另两个二级页同一个手感
+      .transition(TransitionEffect.OPACITY
+        .combine(TransitionEffect.translate({ x: 32 })));
     } else {
       Stack({ alignContent: Alignment.Bottom }) {
-      Scroll() {
-        Column() {
-          // 安卓四个页签都有大标题（BaseFragment 的 title()），这里原来没有，
-          // 进去直接是一张绿卡，和另外三页不是一套
-          Text('设置')
-            .fontSize(T.F_TITLE)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.text_primary'))
-            .width('100%')
-            .margin({ bottom: 10 });
-
-          if (this.rail()) {
-            // 平板：左「我是谁 / 连到哪」，右「怎么用 / 怎么改」
-            Row({ space: Bp.gap(this.winW) }) {
-              Column() {
-                this.heroCard();
-                this.connCard();
-                this.netCard();
-              }
-              .layoutWeight(1)
-              .alignItems(HorizontalAlign.Start);
-
-              Column() {
-                this.systemCard();
-                this.powerCard();
-                this.hardwareCard();
-                this.securityCard();
-                this.actionCard();
-                this.aboutCard();
-              }
-              .layoutWeight(1)
-              .alignItems(HorizontalAlign.Start);
-            }
-            .width('100%')
-            .alignItems(VerticalAlign.Top);
-          } else {
+        Refresh({ refreshing: $$this.pulling }) {
+          Scroll() {
             Column() {
-              this.heroCard();
-              this.connCard();
-              this.netCard();
-              this.systemCard();
-              this.powerCard();
-              this.hardwareCard();
-              this.securityCard();
-              this.actionCard();
-              this.aboutCard();
-            }
-            .width('100%');
-          }
+              // 安卓四个页签都有大标题（BaseFragment 的 title()），这里原来没有，
+              // 进去直接是一张绿卡，和另外三页不是一套
+              Text('设置')
+                .fontSize(T.F_TITLE)
+                .fontWeight(FontWeight.Medium)
+                .fontColor($r('app.color.text_primary'))
+                .width('100%')
+                .margin({ bottom: 10 });
 
-          Row().width('100%').height(24);
+              if (this.rail()) {
+                // 平板：左「我是谁 / 连到哪」，右「怎么用 / 怎么改」
+                Row({ space: Bp.gap(this.winW) }) {
+                  Column() {
+                    this.heroCard();
+                    this.connCard();
+                    this.netCard();
+                  }
+                  .layoutWeight(1)
+                  .alignItems(HorizontalAlign.Start);
+
+                  Column() {
+                    this.systemCard();
+                    this.powerCard();
+                    this.hardwareCard();
+                    this.securityCard();
+                    this.actionCard();
+                    this.aboutCard();
+                  }
+                  .layoutWeight(1)
+                  .alignItems(HorizontalAlign.Start);
+                }
+                .width('100%')
+                .alignItems(VerticalAlign.Top);
+              } else {
+                Column() {
+                  this.heroCard();
+                  this.connCard();
+                  this.netCard();
+                  this.systemCard();
+                  this.powerCard();
+                  this.hardwareCard();
+                  this.securityCard();
+                  this.actionCard();
+                  this.aboutCard();
+                }
+                .width('100%');
+              }
+
+              Row().width('100%').height(24);
+            }
+            .width('100%')
+            .alignItems(HorizontalAlign.Center)
+            .padding({
+              left: this.rail() ? 20 : T.PAD,
+              right: this.rail() ? 20 : T.PAD,
+              top: 8
+            });
+          }
+          .width('100%')
+          .height('100%')
+          .scrollBar(BarState.Off)
+          .edgeEffect(EdgeEffect.Spring)
+          .backgroundColor($r('app.color.app_bg'))
+          .align(Alignment.Top);
         }
         .width('100%')
-        .alignItems(HorizontalAlign.Center)
-        .padding({
-          left: this.rail() ? 20 : T.PAD,
-          right: this.rail() ? 20 : T.PAD,
-          top: 8
+        .height('100%')
+        .backgroundColor($r('app.color.app_bg'))
+        .onRefreshing(() => {
+          this.pull();
         });
-      }
-      .width('100%')
-      .height('100%')
-      .scrollBar(BarState.Off)
-      .edgeEffect(EdgeEffect.Spring)
-      .backgroundColor($r('app.color.app_bg'))
-      .align(Alignment.Top);
 
       if (this.toast.length > 0) {
         Text(this.toast)
@@ -315,7 +370,7 @@ export struct SettingsPage {
       }
       .layoutWeight(0)
       .onClick(() => {
-        this.subBackup = false;
+        this.closeSub();
       });
 
       Blank();
@@ -592,65 +647,77 @@ export struct SettingsPage {
       : ('失败：' + (r.error.length > 0 ? r.error : '未知错误'));
   }
 
+  /**
+   * 设备信息卡。三端统一成「三行概览 + 查看全部硬件」：
+   * 概览页只回答「什么 CPU / 多大内存 / 多大的盘」，内存条、网卡、温度、PCI
+   * 这些翻一次就够的内容挪进子页 —— 设置页里铺六行，往后加一项就要往下挪一屏。
+   */
   @Builder
   hardwareCard() {
-    Card({ gapTop: T.GAP }) {
-      Column() {
-        Row() {
-          Text('硬件信息')
-            .fontSize(T.F_H2)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.text_primary'))
-            .layoutWeight(1);
-          if (!this.hwLoaded) {
-            Text('读取中…')
-              .fontSize(T.F_TINY)
-              .fontColor($r('app.color.text_secondary'));
-          }
+    RowCard({ gapBottom: T.GAP }) {
+      CardTitle({ pad: 16, glyph: Glyph.CHIP, title: '设备信息', sub: '处理器、内存与系统盘' });
+      SettingRow({
+        glyph: Glyph.CHIP,
+        title: '处理器',
+        subtitle: this.hwLoaded
+          ? this.hw.obj('cpu').num('cores', 0) + ' 核 '
+            + this.hw.obj('cpu').num('threads', 0) + ' 线程 · '
+            + (this.hw.obj('cpu').num('mhz', 0) / 1000).toFixed(1) + ' GHz'
+          : '核心与频率',
+        value: this.hwLoaded ? Fmt.orDash(this.hw.obj('cpu').str('model', '')) : '—',
+        valueSize: 12,
+        first: true,
+        danger: false,
+        arrow: false,
+        onTap: () => {
         }
-        .width('100%')
-        .margin({ bottom: 6 });
-
-        if (!this.hwLoaded) {
-          Text('')
-            .fontSize(T.F_SUB);
-        } else {
-          // build() / @Builder 里不能写 const 声明（ArkTS 只认 UI 组件语法），
-          // 所以直接按需取，不先存到局部变量
-          this.hwRow('处理器', this.hw.obj('cpu').str('model', '—'));
-          this.hwRow('核心 / 线程', this.hw.obj('cpu').num('cores', 0) + ' / '
-            + this.hw.obj('cpu').num('threads', 0));
-          this.hwRow('主频', (this.hw.obj('cpu').num('mhz', 0) / 1000).toFixed(1) + ' GHz');
-          this.hwRow('缓存', Fmt.orDash(this.hw.obj('cpu').str('cache', '')));
-          this.hwRow('机型', Fmt.orDash(this.hw.obj('machine').str('chassis', '')));
-          this.hwRow('BIOS', Fmt.orDash(this.hw.obj('machine').str('bios_vendor', '')) + ' '
-            + this.hw.obj('machine').str('bios_version', ''));
+      });
+      SettingRow({
+        glyph: Glyph.CHIP,
+        title: '内存',
+        subtitle: this.hwLoaded
+          ? Fmt.bytes(this.hw.obj('memory').num('used', 0)) + ' / '
+            + Fmt.bytes(this.hw.obj('memory').num('total', 0))
+          : '',
+        value: this.hwLoaded
+          ? this.hw.obj('memory').num('percent', 0).toFixed(0) + '%' : '—',
+        valueSize: 0,
+        first: false,
+        danger: false,
+        arrow: false,
+        onTap: () => {
         }
-      }
-      .width('100%');
+      });
+      SettingRow({
+        glyph: Glyph.BOX,
+        title: '系统盘',
+        subtitle: this.hw.arr('disks').length > 0
+          ? Fmt.orDash(this.hw.arr('disks')[0].str('model', '')) + '　·　'
+            + this.hw.arr('disks')[0].str('transport', '')
+          : '',
+        value: this.hw.arr('disks').length > 0
+          ? this.hw.arr('disks')[0].str('size_text', '—') : '—',
+        valueSize: 0,
+        first: false,
+        danger: false,
+        arrow: false,
+        onTap: () => {
+        }
+      });
+      SettingRow({
+        glyph: Glyph.LIST,
+        title: '查看全部硬件',
+        subtitle: '内存条、网卡、温度、PCI 设备',
+        value: '',
+        valueSize: 0,
+        first: false,
+        danger: false,
+        arrow: true,
+        onTap: () => {
+          this.openSub('hardware');
+        }
+      });
     }
-  }
-
-  @Builder
-  hwRow(label: string, value: string) {
-    Row() {
-      Text(label)
-        .fontSize(T.F_SUB)
-        .fontColor($r('app.color.text_secondary'))
-        .flexShrink(0);
-      Blank();
-      Text(value)
-        .fontSize(T.F_SUB)
-        .fontColor($r('app.color.text_primary'))
-        .fontFeature("\"tnum\" on")
-        .textAlign(TextAlign.End)
-        .layoutWeight(1)
-        .margin({ left: 12 })
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis });
-    }
-    .width('100%')
-    .padding({ top: 7, bottom: 7 });
   }
 
   private async loadHardware(): Promise<void> {
@@ -680,7 +747,7 @@ export struct SettingsPage {
         danger: false,
         arrow: true,
         onTap: () => {
-          this.subBackup = true;
+          this.openSub('backup');
         }
       });
       SettingRow({
