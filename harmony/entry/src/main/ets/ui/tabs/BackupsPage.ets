@@ -142,7 +142,53 @@ export struct BackupsPage {
       await this.toast(r.data.str('error', '没有恢复'));
       return;
     }
-    await this.toast(r.data.str('message', '已恢复') + '，请到网络页确认');
+    // 有 token 就必须当场确认：agent 起了回滚守护，不确认到点就自己还原。
+    // 只在 toast 里说「去网络页确认」等于把用户支去另一个页面找入口。
+    const token: string = r.data.str('token', '');
+    if (token.length === 0) {
+      await this.toast(r.data.str('message', '已恢复'));
+    } else {
+      this.askTxn(token, r.data.num('wait', 60));
+    }
+    await this.load();
+  }
+
+  /** 恢复备份后的确认：留着，还是退回去 */
+  private askTxn(token: string, wait: number): void {
+    this.getUIContext().showAlertDialog({
+      title: '配置已恢复',
+      message: '能正常上网就点「确认保留」。不点的话，' + wait
+        + ' 秒后路由器会自动还原成恢复前的状态。',
+      primaryButton: {
+        value: '确认保留',
+        fontColor: Pal.primary(),
+        action: () => {
+          this.postTxn('/api/v1/net/confirm', token, '已确认，这份配置会保留下来。');
+        }
+      },
+      secondaryButton: {
+        value: '撤销改动',
+        fontColor: Pal.textSecondary(),
+        action: () => {
+          this.postTxn('/api/v1/net/rollback', token, '已撤销，配置已退回恢复前的状态。');
+        }
+      }
+    });
+  }
+
+  /** 给事务收尾。超时回滚已经发生时这里也会失败，如实报，不假装成功 */
+  private async postTxn(path: string, token: string, okMsg: string): Promise<void> {
+    const body: Record<string, Object> = { 'token': token };
+    const r: ApiResult = await Api.post(this.ctx(), path, body);
+    if (!r.ok) {
+      await this.toast(r.error);
+      return;
+    }
+    if (!r.data.bool('ok', true)) {
+      await this.toast(r.data.str('error', '路由器没有接受这次操作'));
+      return;
+    }
+    await this.toast(okMsg);
     await this.load();
   }
 

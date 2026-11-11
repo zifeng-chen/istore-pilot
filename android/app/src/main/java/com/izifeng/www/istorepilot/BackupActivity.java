@@ -263,10 +263,25 @@ public class BackupActivity extends BaseActivity {
                                         b.optString("error", "未知原因"));
                                 return;
                             }
-                            Sheet.message(BackupActivity.this, "已恢复",
-                                    b.optString("message", "配置已铺回")
-                                            + "\n\n" + b.optString("detail", "")
-                                            + "\n\n请到网络页确认这次改动。");
+                            // 有 token 就必须当场确认：agent 那边起了回滚守护，
+                            // 不确认到点就自己还原。以前只提示「去网络页确认」，
+                            // 而网络页根本没有确认入口 —— 用户会看到「恢复成功」
+                            // 之后配置自己变回去，所以确认入口必须放在这一步。
+                            final String token = b.optString("token", "");
+                            final int wait = b.optInt("wait", 60);
+                            if (token.isEmpty()) {
+                                // 老 Agent 没有事务机制，恢复即生效
+                                Sheet.message(BackupActivity.this, "已恢复",
+                                        b.optString("message", "配置已铺回"));
+                            } else {
+                                Sheet.confirm(BackupActivity.this, "配置已恢复",
+                                        b.optString("message", "配置已铺回")
+                                                + "\n\n能正常上网就点「确认保留」。不点的话，"
+                                                + wait + " 秒后路由器会自动还原成恢复前的状态。",
+                                        "确认保留", false,
+                                        () -> postNetConfirm(token),
+                                        () -> postNetRollback(token));
+                            }
                             load();
                         }
 
@@ -276,6 +291,43 @@ public class BackupActivity extends BaseActivity {
                         }
                     });
                 });
+    }
+
+    /** 恢复备份后确认保留：把 agent 的 netapply 事务收尾，超时就不会回滚 */
+    private void postNetConfirm(String token) {
+        postNetTxn("/api/v1/net/confirm", token, "已确认", "这份配置会保留下来。");
+    }
+
+    /** 立刻撤销刚才的恢复，等价于主动回滚 */
+    private void postNetRollback(String token) {
+        postNetTxn("/api/v1/net/rollback", token, "已撤销", "配置已退回恢复前的状态。");
+    }
+
+    private void postNetTxn(String path, String token, String okTitle, String okBody) {
+        JSONObject body = new JSONObject();
+        try {
+            body.put("token", token);
+        } catch (Exception ignored) {
+            return;
+        }
+        Api.post(this, path, body, new Cb() {
+            @Override
+            public void onData(JSONObject b, boolean fromCache) {
+                if (!b.optBoolean("ok", true)) {
+                    Sheet.message(BackupActivity.this, "没有生效",
+                            b.optString("error", "路由器没有接受这次操作"));
+                    return;
+                }
+                Sheet.message(BackupActivity.this, okTitle, okBody);
+                load();
+            }
+
+            @Override
+            public void onError(String message) {
+                // 超时回滚已经发生时这里也会失败，如实说，别假装成功
+                Sheet.message(BackupActivity.this, "没有生效", message);
+            }
+        });
     }
 
     private void askDelete(String id, String name) {

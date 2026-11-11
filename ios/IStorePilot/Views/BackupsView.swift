@@ -18,6 +18,11 @@ struct BackupsView: View {
     /// 不在行内塞两个按钮 —— 行太窄，两个按钮会互相挤到看不见
     @State private var pick: J?
     @State private var busy = ""
+    /// 恢复备份后拿到的待确认事务。agent 起了回滚守护，不确认到点就自己还原，
+    /// 所以确认入口必须放在恢复这一页 —— 网络页没有这个入口。
+    @State private var txnToken = ""
+    @State private var txnWait = 60
+    @State private var askTxn = false
 
     private var items: [J] { d.objs("items") }
 
@@ -64,6 +69,16 @@ struct BackupsView: View {
         .alert(item: $popup) { p in
             Alert(title: Text(p.title), message: Text(p.body),
                   dismissButton: .default(Text("好")))
+        }
+        .alert("配置已恢复", isPresented: $askTxn) {
+            Button("确认保留") {
+                postTxn("/api/v1/net/confirm", "已确认", "这份配置会保留下来。")
+            }
+            Button("撤销改动", role: .destructive) {
+                postTxn("/api/v1/net/rollback", "已撤销", "配置已退回恢复前的状态。")
+            }
+        } message: {
+            Text("能正常上网就点「确认保留」。不点的话，\(txnWait) 秒后路由器会自动还原成恢复前的状态。")
         }
         .alert("新建备份", isPresented: $askName) {
             TextField("例如：改防火墙前", text: $newName)
@@ -240,15 +255,49 @@ struct BackupsView: View {
                         popup = Popup(title: "没有恢复", body: r.str("error"))
                         return
                     }
-                    popup = Popup(title: "已恢复",
-                                  body: r.str("message") + "\n\n" + r.str("detail")
-                                        + "\n\n请到网络页确认这次改动。")
+                    // 有 token 就当场确认：以前只提示「去网络页确认」，
+                    // 而网络页没有确认入口，用户会看到「恢复成功」之后配置自己变回去
+                    let token = r.str("token")
+                    if token.isEmpty {
+                        // 老 Agent 没有事务机制，恢复即生效
+                        popup = Popup(title: "已恢复", body: r.str("message"))
+                    } else {
+                        txnToken = token
+                        txnWait = r.int("wait")
+                        askTxn = true
+                    }
                 }
                 await load()
             } catch {
                 await MainActor.run {
                     busy = ""
                     popup = Popup(title: "没有恢复", body: errorText(error))
+                }
+            }
+        }
+    }
+
+    /// 给恢复事务收尾：确认保留或立刻撤销。
+    /// 超时回滚已经发生时这里也会失败，如实报，不假装成功。
+    private func postTxn(_ path: String, _ okTitle: String, _ okBody: String) {
+        let token = txnToken
+        txnToken = ""
+        guard !token.isEmpty else { return }
+        Task {
+            do {
+                let r = try await Api.post(path, ["token": token])
+                await MainActor.run {
+                    if r.bool("ok") {
+                        popup = Popup(title: okTitle, body: okBody)
+                    } else {
+                        popup = Popup(title: "没有生效",
+                                      body: r.str("error", "路由器没有接受这次操作"))
+                    }
+                }
+                await load()
+            } catch {
+                await MainActor.run {
+                    popup = Popup(title: "没有生效", body: errorText(error))
                 }
             }
         }

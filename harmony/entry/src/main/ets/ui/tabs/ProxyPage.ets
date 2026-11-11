@@ -94,6 +94,8 @@ interface PkgTask {
   channel: string;
   got: number;
   total: number;
+  /** 非空表示 Agent 停下来等用户确认（当前只有 hosts_fix 一种） */
+  waiting: string;
   err: InstallErr;
 }
 
@@ -204,9 +206,11 @@ export struct ProxyPage {
   @Local pendingName: string = '';
   @Local pkgTask: PkgTask = {
     running: false, done: false, ok: false, pct: 0, step: '', target: '',
-    source: '', name: '', channel: '', got: 0, total: 0,
+    source: '', name: '', channel: '', got: 0, total: 0, waiting: '',
     err: { code: '', title: '', detail: '', suggest: [] }
   };
+  /** 「改 hosts 加速」确认框是否已经弹过（Agent 侧最多等 5 分钟，只问一次） */
+  private hostsAsked: boolean = false;
 
   private timer: number = -1;
   private installTimer: number = -1;
@@ -424,6 +428,7 @@ export struct ProxyPage {
       channel: j.str('channel', ''),
       got: j.num('got', 0),
       total: j.num('total', 0),
+      waiting: j.str('waiting', ''),
       err: {
         code: e.str('error_code', ''),
         title: e.str('error_title', ''),
@@ -648,6 +653,8 @@ export struct ProxyPage {
     }
     this.pkgConfirm = '';
     this.pkgMsg = '';
+    // 每次新装都允许再问一次「要不要改 hosts」
+    this.hostsAsked = false;
     const body: Record<string, Object> = {
       'target': target, 'source': this.pendingSource,
       'name': this.pendingName, 'confirm': 'install'
@@ -688,6 +695,13 @@ export struct ProxyPage {
     }
     this.applyInstall(r.data);
 
+    // 所有下载通道都失败时 Agent 会停下来等用户决定要不要改 hosts。
+    // 不接这一步，进度会一直停着，直到 5 分钟超时才报错
+    if (this.pkgTask.waiting === 'hosts_fix' && !this.hostsAsked) {
+      this.hostsAsked = true;
+      this.askHosts();
+    }
+
     // 两条任务线的失败共用一个弹窗；同一时刻只弹一次
     if (!this.showSheet) {
       if (this.inst.err.code.length > 0) {
@@ -716,6 +730,79 @@ export struct ProxyPage {
         this.toast = '装好了 · 导入订阅后再启动';
       }
     }
+  }
+
+  /** GitHub 所有通道都失败：问用户要不要让 Agent 改 hosts 后重试 */
+  private askHosts(): void {
+    this.getUIContext().showAlertDialog({
+      title: 'GitHub 下载失败',
+      message: '所有加速通道都连不上。是否修改 hosts 后重试？',
+      primaryButton: {
+        value: '修改并重试',
+        fontColor: Pal.primary(),
+        action: () => {
+          this.postPkgConfirm('yes');
+        }
+      },
+      secondaryButton: {
+        value: '取消',
+        fontColor: Pal.textSecondary(),
+        action: () => {
+          this.postPkgConfirm('no');
+        }
+      }
+    });
+  }
+
+  /** 回应 Agent 的等待：yes 改 hosts 后重试，no 中止安装 */
+  private async postPkgConfirm(choice: string): Promise<void> {
+    const body: Record<string, Object> = { 'choice': choice };
+    const r: ApiResult = await Api.post(this.ctx(), '/api/v1/proxy/pkg/confirm', body);
+    if (!r.ok) {
+      this.toast = r.error;
+    }
+  }
+
+  /** 已安装的后端 —— 卸载入口只列这些 */
+  private installedList(): Backend[] {
+    return this.backends.filter((b: Backend) => b.installed);
+  }
+
+  private askUninstall(id: string, label: string): void {
+    this.getUIContext().showAlertDialog({
+      title: '卸载 ' + label + '？',
+      message: '会删掉插件本体。实测 OpenClash 的包会连配置和订阅一起清掉，'
+        + '重装后要重新粘一次订阅地址。',
+      primaryButton: {
+        value: '卸载',
+        fontColor: Pal.danger(),
+        action: () => {
+          this.doUninstall(id, label);
+        }
+      },
+      secondaryButton: {
+        value: '取消',
+        fontColor: Pal.textSecondary(),
+        action: () => {
+        }
+      }
+    });
+  }
+
+  private async doUninstall(id: string, label: string): Promise<void> {
+    this.toast = '正在卸载 ' + label + '…';
+    const body: Record<string, Object> = { 'target': id, 'confirm': 'remove' };
+    const r: ApiResult = await Api.post(this.ctx(), '/api/v1/proxy/uninstall', body);
+    if (!r.ok) {
+      this.toast = '卸载失败：' + r.error;
+      return;
+    }
+    if (!r.data.bool('ok', false)) {
+      this.toast = '卸载失败：' + r.data.str('error', '看日志确认');
+      return;
+    }
+    this.toast = label + ' 已卸载';
+    await this.load(true);
   }
 
   /** 重进页面时接上还在跑的任务（任务在 Agent 侧，杀 App 也不中断） */
@@ -1768,7 +1855,35 @@ export struct ProxyPage {
             this.pkgProgress();
           }
 
-          // ---- 3. 仓库下载
+          // ---- 3. 已安装：只能装不能卸的界面是残的
+          if (this.installedList().length > 0) {
+            Text('已安装')
+              .fontSize(T.F_SUB)
+              .fontColor($r('app.color.text_secondary'))
+              .width('100%')
+              .margin({ top: T.GAP, bottom: 2 });
+
+            ForEach(this.installedList(), (b: Backend) => {
+              Row() {
+                Text(b.label)
+                  .fontSize(T.F_SUB)
+                  .fontColor($r('app.color.text_primary'))
+                  .layoutWeight(1);
+                Text('卸载')
+                  .fontSize(T.F_TINY)
+                  .fontColor($r('app.color.danger'))
+                  .padding({ left: 12, top: 6, bottom: 6 })
+                  .onClick(() => {
+                    this.askUninstall(b.id, b.label);
+                  });
+              }
+              .width('100%')
+              .padding({ top: 4, bottom: 4 })
+              .alignItems(VerticalAlign.Center);
+            }, (b: Backend) => b.id);
+          }
+
+          // ---- 4. 仓库下载
           Row() {
             Text('从仓库下载')
               .fontSize(T.F_SUB)

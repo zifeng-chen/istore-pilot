@@ -85,6 +85,8 @@ export struct DevicesPage {
   /** 从「设备」一级页进来时预设的筛选：0 全部 / 1 在线 / 2 离线 */
   @Param presetFilter: number = 0;
   @Local filter: number = 0;
+  /** 搜索关键词：名称 / IP / MAC / 厂商，不区分大小写 */
+  @Local keyword: string = '';
 
   @Local ui: UIState = UI;
   @Local tab: number = UI.tab;
@@ -237,6 +239,19 @@ export struct DevicesPage {
     this.blockedCount = blocked;
   }
 
+  /** 搜索命中：名称 / IP / MAC / 厂商，不区分大小写 */
+  private hit(list: DevRow[]): DevRow[] {
+    const k: string = this.keyword.trim().toLowerCase();
+    if (k.length === 0) {
+      return list;
+    }
+    return list.filter((d: DevRow) =>
+      d.name.toLowerCase().indexOf(k) >= 0
+        || d.ip.toLowerCase().indexOf(k) >= 0
+        || d.mac.toLowerCase().indexOf(k) >= 0
+        || d.vendor.toLowerCase().indexOf(k) >= 0);
+  }
+
   build() {
     Scroll() {
       Column() {
@@ -254,6 +269,20 @@ export struct DevicesPage {
         .alignItems(VerticalAlign.Bottom)
         .padding({ bottom: 4 });
 
+
+        // 搜索：设备多的时候靠滚动找太慢，安卓/iOS 都有，这边补齐
+        TextInput({ placeholder: '搜索名称、IP、MAC 或厂商', text: this.keyword })
+          .height(38)
+          .fontSize(T.F_SUB)
+          .placeholderFont({ size: T.F_SUB })
+          .backgroundColor($r('app.color.surface_sunken'))
+          .borderRadius(T.R_INNER)
+          .padding({ left: 12, right: 12 })
+          .width('100%')
+          .margin({ bottom: 10 })
+          .onChange((v: string) => {
+            this.keyword = v;
+          });
 
         Row({ space: 8 }) {
           ForEach([0, 1, 2], (v: number) => {
@@ -341,7 +370,7 @@ export struct DevicesPage {
         .margin({ top: topGap, bottom: 6, left: 4 });
 
       GroupBox() {
-        ForEach(this.online, (d: DevRow, i: number) => {
+        ForEach(this.hit(this.online), (d: DevRow, i: number) => {
           this.row(d, i);
         }, (d: DevRow) => this.rowKey('on', d));
       }
@@ -358,7 +387,7 @@ export struct DevicesPage {
         .margin({ top: topGap, bottom: 6, left: 4 });
 
       GroupBox() {
-        ForEach(this.offline, (d: DevRow, i: number) => {
+        ForEach(this.hit(this.offline), (d: DevRow, i: number) => {
           this.row(d, i);
         }, (d: DevRow) => this.rowKey('off', d));
       }

@@ -43,6 +43,20 @@
 
 ## 三、差异清单
 
+### 修复记录（2026-11-11）
+
+| # | 状态 | 做法 |
+|---|---|---|
+| D1 | ✅ 已修 | 三端都在「恢复备份」成功后就地弹确认框（确认保留 / 撤销改动），把 agent 返回的 `token` 带回去调 `/net/confirm` 或 `/net/rollback`。Android `BackupActivity.postNetTxn`、iOS `BackupsView.postTxn`、鸿蒙 `BackupsPage.postTxn` |
+| D2 | ✅ 已修 | iOS `ProxyView` 与鸿蒙 `ProxyPage` 补上 `pkg.waiting == "hosts_fix"` 的检测与确认框，接 `/proxy/pkg/confirm`（yes/no），每次新装重置一次 |
+| D3 | ✅ 已修 | iOS 插件管理 Sheet 加「已安装」段（点击确认后卸载）；鸿蒙同位置加「已安装」+ 卸载按钮，接 `/proxy/uninstall` |
+| D4 | ✅ 已修 | 鸿蒙 `DevicesPage` 加搜索框（名称/IP/MAC/厂商，不区分大小写），列表走 `hit()` 过滤 |
+| D5 | ❌ 撤销 | **原判断有误**：iOS 与鸿蒙并不缺这个标记。agent 把随机地址的 `vendor` 直接填成 `"随机 MAC"`，两端都是原样展示 vendor，效果与 Android 一致。之前用关键词统计得到「缺失」是假阳性 |
+| D6 | ⏸ 保留 | 硬件页形态差异属设计选择，功能等价（`/system/hardware` 三端都调）。鸿蒙内嵌为设置页卡片，少一次跳转。要统一成独立页需新建页面与路由，收益不明，暂不动 |
+| D7 | ⏸ 保留 | iOS/鸿蒙靠 3 秒轮询自动刷新，没有下拉手势。补 `.refreshable` 收益有限且要逐页改，暂不动 |
+| D8 | ⏸ 待定 | `system/uploads` 是「列出路由器上已有的升级包」，属**新增功能**而非修补（Android/鸿蒙现在只能现传）。要做需在固件升级区块加一个选择列表 |
+| D9 | ⏸ 待定 | 改 LAN 网段（`/net/lan`）三端都没有入口，属**新功能**且改错会断网。是否提供需要产品决策，不擅自加 |
+
 ### D1【严重】恢复配置备份后，Android / iOS 无法确认，90 秒后被自动回滚
 
 **证据**

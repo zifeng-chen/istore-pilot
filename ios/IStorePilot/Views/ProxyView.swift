@@ -49,6 +49,13 @@ struct ProxyView: View {
     @State private var askName = ""
     @State private var askSource = "github"
     @State private var showAsk = false
+    /// 安装线程停在「改 hosts 等确认」时弹一次。Agent 侧最多等 5 分钟，
+    /// 不弹框用户只会看到进度条不动，最后报超时
+    /// 「改 hosts」确认框是否已弹过（Agent 侧最多等 5 分钟）
+    @State private var askHosts = false
+    @State private var hostsAsked = false
+    /// 待卸载的后端。只能装不能卸的界面是残的
+    @State private var uninstallTarget = ""
     /// 待停止的后端。运行中的行点一下就能停 —— 只能启动不能停止的界面是残的
     @State private var stopTarget = ""
     /// 「配置与节点」卡点名的后端。
@@ -183,6 +190,27 @@ struct ProxyView: View {
                 Text("停掉后所有流量走直连，已建立的连接会断一下。"
                      + "配置和订阅都留着，随时能再启动。")
             }
+            .alert("GitHub 下载失败", isPresented: $askHosts) {
+                Button("取消", role: .cancel) { postPkgConfirm("no") }
+                Button("修改并重试") { postPkgConfirm("yes") }
+            } message: {
+                Text("所有加速通道都连不上。是否修改 hosts 后重试？")
+            }
+            .alert("卸载 \(labelOf(uninstallTarget))？",
+                   isPresented: Binding(
+                    get: { !uninstallTarget.isEmpty },
+                    set: { if !$0 { uninstallTarget = "" } }
+                   )) {
+                Button("取消", role: .cancel) { uninstallTarget = "" }
+                Button("卸载", role: .destructive) {
+                    let id = uninstallTarget
+                    uninstallTarget = ""
+                    Task { await doUninstall(id) }
+                }
+            } message: {
+                Text("会删掉插件本体。实测 OpenClash 的包会连配置和订阅一起清掉，"
+                     + "重装后要重新粘一次订阅地址。")
+            }
         }
     }
 
@@ -253,6 +281,25 @@ struct ProxyView: View {
                     Text("手机里的安装包")
                 } footer: {
                     Text("选 .run / .ipk。这条路完全不依赖路由器能不能上外网。")
+                }
+
+                if !installedIDs.isEmpty {
+                    Section {
+                        ForEach(installedIDs, id: \.self) { id in
+                            Button(role: .destructive) {
+                                uninstallTarget = id
+                            } label: {
+                                Text("卸载 " + labelOf(id))
+                                    .font(.system(size: 14.5))
+                            }
+                            .disabled(pkgBusy)
+                        }
+                    } header: {
+                        Text("已安装")
+                    } footer: {
+                        Text("会删掉插件本体。OpenClash 的包会连配置和订阅一起清掉，"
+                             + "重装后要重新粘一次订阅地址。")
+                    }
                 }
 
                 Section {
@@ -1044,6 +1091,8 @@ struct ProxyView: View {
     }
 
     private func doPkgInstall() async {
+        // 每次新装都允许再问一次「要不要改 hosts」
+        await MainActor.run { hostsAsked = false }
         let body: J = [
             "target": askTarget, "source": askSource,
             "name": askName, "confirm": "install",
@@ -1070,6 +1119,15 @@ struct ProxyView: View {
                 continue
             }
             await MainActor.run { pkgTask = p }
+            // 所有下载通道都失败时，Agent 会停下来等用户决定要不要改 hosts。
+            // 不接这一步，进度条会一直停着直到 5 分钟超时
+            if p.str("waiting") == "hosts_fix", !hostsAsked {
+                await MainActor.run {
+                    hostsAsked = true
+                    askHosts = true
+                }
+                continue
+            }
             if p.bool("running") {
                 continue
             }
@@ -1085,6 +1143,22 @@ struct ProxyView: View {
             await load()
             return
         }
+    }
+
+    /// 回应 Agent 的「改 hosts 等确认」：yes 继续改 hosts 后重试，no 中止安装
+    private func postPkgConfirm(_ choice: String) {
+        Task {
+            _ = try? await Api.post("/api/v1/proxy/pkg/confirm", ["choice": choice])
+        }
+    }
+
+    /// 卸载代理插件。走慢接口：要在路由器上跑包管理器，几十秒是正常的
+    private func doUninstall(_ id: String) async {
+        await MainActor.run { pkgBusy = true }
+        _ = try? await Api.post("/api/v1/proxy/uninstall",
+                                ["target": id, "confirm": "remove"], slow: true)
+        await MainActor.run { pkgBusy = false }
+        await load()
     }
 
     private func load() async {
