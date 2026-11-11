@@ -64,21 +64,21 @@ grep DISTRIB_RELEASE /etc/openwrt_release
 
 ```sh
 # 方式 A：.run（推荐，两种系统都能用）—— 把文件传到路由器后执行
-sh istore-pilot_0.3.0-1_x86_64.run --check    # 先只检查环境与架构，不改任何文件
-sh istore-pilot_0.3.0-1_x86_64.run            # 安装或升级，保留现有配置
+sh istore-pilot_0.3.1-1_x86_64.run --check    # 先只检查环境与架构，不改任何文件
+sh istore-pilot_0.3.1-1_x86_64.run            # 安装或升级，保留现有配置
 
 # 方式 B：ipk（仅 iStoreOS 24.10 及更早）
 opkg update && opkg install python3
-opkg install luci-app-istore-agent_0.3.0-1_all.ipk
+opkg install luci-app-istore-agent_0.3.1-1_all.ipk
 ```
 
 `.run` 的其它用法：
 
 ```sh
-sh istore-pilot_0.3.0-1.run --uninstall   # 卸载程序，保留密码与配置
-sh istore-pilot_0.3.0-1.run --purge       # 卸载并清除全部配置
-sh istore-pilot_0.3.0-1.run --force       # 已用 opkg/apk 装过时，改由本包接管
-sh istore-pilot_0.3.0-1.run --no-deps     # 不自动装依赖（离线或已手工备齐）
+sh istore-pilot_0.3.1-1.run --uninstall   # 卸载程序，保留密码与配置
+sh istore-pilot_0.3.1-1.run --purge       # 卸载并清除全部配置
+sh istore-pilot_0.3.1-1.run --force       # 已用 opkg/apk 装过时，改由本包接管
+sh istore-pilot_0.3.1-1.run --no-deps     # 不自动装依赖（离线或已手工备齐）
 ```
 
 ### 3. 装完打开
@@ -90,7 +90,7 @@ cat /etc/istore-agent/INITIAL_PASSWORD
 ```
 
 Android：装 APK，或者直接在装好插件的路由器上下载
-`http://<路由器IP>/istore-agent/istoreos-0.3.0.apk`（插件自带这个文件）。
+`http://<路由器IP>/istore-agent/istoreos-0.3.1.apk`（插件自带这个文件）。
 
 > `.run` **不会改动任何网络、防火墙、DHCP、DNS 配置**，装的过程中现有网络不受影响。
 > 已有 `/etc/config/istore-agent` 时一律保留，不会把 `bind` 覆盖成 `0.0.0.0`。
