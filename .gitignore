@@ -1,5 +1,7 @@
 # ================= 构建产物 =================
 dist/
+# 顶层的 build/ 是本地加工产物（如上架截图的不同尺寸版本），不是源码
+build/
 android/app/build/
 android/build/
 android/.gradle/
