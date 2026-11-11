@@ -465,22 +465,12 @@ struct ProxyView: View {
             }
         } label: {
             HStack(spacing: 12) {
+                // 图标不再垫薄荷色实心底：深绿 hero 上白的才最清楚
                 Image(systemName: "power")
                     .font(.system(size: 13, weight: on ? .semibold : .medium))
-                    .foregroundStyle(on ? C.heroInk : C.heroFg.opacity(0.55))
-                    .frame(width: 30, height: 30)
-                    .background {
-                        if on {
-                            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                .fill(C.heroOn)
-                        } else {
-                            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                .fill(C.heroFg.opacity(0.09))
-                        }
-                    }
+                    .foregroundStyle(on ? C.heroFg : C.heroFg.opacity(0.55))
                 VStack(alignment: .leading, spacing: 3) {
-                    // 运行中的那个要一眼认出来：加粗 + 放大半档 + 满白。
-                    // 只靠右侧胶囊不够，两个名字并排时视线先落在字上
+                    // 运行中的那个要一眼认出来：加粗 + 放大半档 + 满白
                     Text(name)
                         .font(.system(size: on ? 16 : 15, weight: on ? .bold : .medium))
                         .foregroundStyle(on ? C.heroFg : C.heroFg.opacity(0.55))
@@ -491,17 +481,19 @@ struct ProxyView: View {
                     }
                 }
                 Spacer(minLength: 6)
-                heroPill(on ? "运行中" : (installed ? "未运行" : "未安装"), on: on)
+                // 「运行中」也走白色：原来实心薄荷底 + 深色字，和白字名字并排
+                // 像两个不同层级的组件
+                Text(on ? "运行中" : (installed ? "未运行" : "未安装"))
+                    .font(.system(size: 11, weight: on ? .semibold : .medium))
+                    .foregroundStyle(on ? C.heroFg : C.heroFg.opacity(0.6))
+                    .padding(.horizontal, 9).padding(.vertical, 3.5)
+                    .background {
+                        Capsule().fill(Color.white.opacity(on ? 0.20 : 0.10))
+                    }
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 10)
-            // 正在跑的那个垫一层浅底：光靠文字深浅在深绿渐变上不够看
-            .background {
-                if on {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(C.heroFg.opacity(0.10))
-                }
-            }
+            // 不再给整行垫白底：那层 10% 的白把白字压灰了，正是「看不清」的原因
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

@@ -1125,101 +1125,112 @@ export struct ProxyPage {
   }
 
   build() {
-    Refresh({ refreshing: $$this.pulling }) {
-      Scroll() {
-        Column() {
-          Row() {
-            Text('代理')
-              .fontSize(T.F_TITLE)
-              .fontWeight(FontWeight.Medium)
-              .fontColor($r('app.color.text_primary'))
-              .layoutWeight(1);
-            // 空态时后端都没装，nodeCount 还留着上一轮的缓存值，别显示
-            Text(!this.noneInstalled() && this.nodeCount > 0
-              ? this.nodeCount + ' 个节点'
-              : '')
-              .fontSize(T.F_SUB)
-              .fontColor($r('app.color.text_secondary'));
-          }
-          .width('100%')
-          .alignItems(VerticalAlign.Bottom)
-          .padding({ bottom: 12 });
-
-          if (this.noneInstalled()) {
-            // 两个都没装：整页换成「教你装」。摆两行未安装的空卡片对用户没信息量，
-            // 下面的运行模式、节点分组更是死的
-            this.installGuide();
-          } else if (this.rail()) {
-            // 平板：左边「走哪条线」（后端 + 模式），右边「能选哪些线」（节点分组）
-            Row({ space: Bp.gap(this.winW) }) {
-              Column() {
-                this.backendCard();
-                this.modeCard();
-                this.configCard();
-                this.subsEntry();
-              }
-              .layoutWeight(1)
-              .alignItems(HorizontalAlign.Start);
-
-              Column() {
-                this.groupList();
-              }
-              .layoutWeight(1)
-              .alignItems(HorizontalAlign.Start);
-            }
-            .width('100%')
-            .alignItems(VerticalAlign.Top);
-          } else {
-            Column() {
-              this.backendCard();
-              // 「运行模式」切的是「正在跑的那个后端」的流量走向，没跑就没得切。
-              // 摆出来只会让人以为自己在挑模式，其实点下去空转
-              if (this.anyRunning()) {
-                this.modeCard();
-              }
-              // 配置文件只有 OpenClash 有；这张卡跟着「当前管哪个后端」走
-              if (this.comboBackend() === 'openclash') {
-                this.configCard();
-              }
-              this.subsEntry();
-              this.groupList();
-            }
-            .width('100%');
-          }
-
-          // 安装包入口放在最后：空态时是「源里没有就自己传」，已装时是「重装/升级」
-          this.pkgEntry();
-
-          Row().width('100%').height(24);
-        }
-        .width('100%')
-        .constraintSize({ maxWidth: Bp.CONTENT_MAX })
-        .padding({
-          left: this.rail() ? 20 : T.PAD,
-          right: this.rail() ? 20 : T.PAD,
-          top: 8
-        });
+    Column() {
+      // 大标题固定在滚动区外
+      Row() {
+        Text('代理')
+          .fontSize(T.F_TITLE)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'))
+          .layoutWeight(1);
+        // 空态时后端都没装，nodeCount 还留着上一轮的缓存值，别显示
+        Text(!this.noneInstalled() && this.nodeCount > 0
+          ? this.nodeCount + ' 个节点'
+          : '')
+          .fontSize(T.F_SUB)
+          .fontColor($r('app.color.text_secondary'));
       }
       .width('100%')
-      .height('100%')
-      .scrollBar(BarState.Off)
-      .edgeEffect(EdgeEffect.Spring)
-      .backgroundColor($r('app.color.app_bg'))
-      .align(Alignment.Top)
-      .bindSheet($$this.showGroup, this.nodeSheet(), {
-        height: 560,
-        dragBar: true,
-        backgroundColor: $r('app.color.app_bg'),
-        onDisappear: () => {
-          this.showGroup = false;
+      .alignItems(VerticalAlign.Bottom)
+      .constraintSize({ maxWidth: Bp.CONTENT_MAX })
+      .padding({
+        left: this.rail() ? 20 : T.PAD,
+        right: this.rail() ? 20 : T.PAD,
+        top: 8,
+        bottom: 8
+      });
+
+      Refresh({ refreshing: $$this.pulling }) {
+        Scroll() {
+          Column() {
+            if (this.noneInstalled()) {
+              // 两个都没装：整页换成「教你装」。摆两行未安装的空卡片对用户没信息量，
+              // 下面的运行模式、节点分组更是死的
+              this.installGuide();
+            } else if (this.rail()) {
+              // 平板：左边「走哪条线」（后端 + 模式），右边「能选哪些线」（节点分组）
+              Row({ space: Bp.gap(this.winW) }) {
+                Column() {
+                  this.backendCard();
+                  this.modeCard();
+                  this.configCard();
+                  this.subsEntry();
+                }
+                .layoutWeight(1)
+                .alignItems(HorizontalAlign.Start);
+
+                Column() {
+                  this.groupList();
+                }
+                .layoutWeight(1)
+                .alignItems(HorizontalAlign.Start);
+              }
+              .width('100%')
+              .alignItems(VerticalAlign.Top);
+            } else {
+              Column() {
+                this.backendCard();
+                // 「运行模式」切的是「正在跑的那个后端」的流量走向，没跑就没得切。
+                // 摆出来只会让人以为自己在挑模式，其实点下去空转
+                if (this.anyRunning()) {
+                  this.modeCard();
+                }
+                // 配置文件只有 OpenClash 有；这张卡跟着「当前管哪个后端」走
+                if (this.comboBackend() === 'openclash') {
+                  this.configCard();
+                }
+                this.subsEntry();
+                this.groupList();
+              }
+              .width('100%');
+            }
+
+            // 安装包入口放在最后：空态时是「源里没有就自己传」，已装时是「重装/升级」
+            this.pkgEntry();
+
+            Row().width('100%').height(24);
+          }
+          .width('100%')
+          .constraintSize({ maxWidth: Bp.CONTENT_MAX })
+          .padding({
+            left: this.rail() ? 20 : T.PAD,
+            right: this.rail() ? 20 : T.PAD,
+            top: 2
+          });
         }
+        .width('100%')
+        .height('100%')
+        .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.Spring)
+        .backgroundColor($r('app.color.app_bg'))
+        .align(Alignment.Top);
+      }
+      .layoutWeight(1)
+      .width('100%')
+      .onRefreshing(() => {
+        this.pull();
       });
     }
     .width('100%')
     .height('100%')
     .backgroundColor($r('app.color.app_bg'))
-    .onRefreshing(() => {
-      this.pull();
+    .bindSheet($$this.showGroup, this.nodeSheet(), {
+      height: 560,
+      dragBar: true,
+      backgroundColor: $r('app.color.app_bg'),
+      onDisappear: () => {
+        this.showGroup = false;
+      }
     });
   }
 
@@ -1517,62 +1528,121 @@ export struct ProxyPage {
     .width('100%');
   }
 
+  /**
+   * 顶部 hero 卡：和 iOS / Android 的「代理」页同一套。
+   *
+   * 原来这里是普通白卡 + 独立「运行模式」卡，另两端却是一张深绿 hero 把
+   * 「谁在跑、跑的哪个配置、几个节点、两个后端怎么切」全装进去 ——
+   * 摆在一排白卡里既看不出来重点是它，颜色也和另两端对不上。
+   */
   @Builder
   backendCard() {
-    Card() {
-      CardTitle({
-        glyph: Glyph.POWER,
-        title: '代理后端',
-        sub: this.active === 'none' ? '当前没有代理在运行' : '当前生效：' + this.activeLabel()
-      });
+    Column() {
+      // ① 状态行：点 + 一句话 + 右侧胶囊
+      Row() {
+        Row()
+          .width(7)
+          .height(7)
+          .borderRadius(4)
+          .backgroundColor(this.anyRunning() ? Pal.heroOn() : Pal.heroOff())
+          .margin({ right: 7 });
+        Text(this.anyRunning() ? '运行中' : '都没在运行')
+          .fontSize(12.5)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Pal.heroFg());
+        Blank();
+        Text(this.anyRunning()
+          ? this.activeLabel()
+          : this.installedCount().toString() + ' 个已安装')
+          .fontSize(T.F_TINY)
+          .fontColor(Pal.heroFgSoft())
+          .padding({ left: 9, right: 9, top: 3, bottom: 3 })
+          .borderRadius(99)
+          .backgroundColor('#29FFFFFF');
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center);
+
+      // ② 大标题：运行中显示当前配置名，没跑写「未启用」
+      Text(this.heroTitle())
+        .fontSize(26)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(Pal.heroFg())
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .width('100%')
+        .margin({ top: 10 });
+
+      // ③ 说明行
+      Text(this.heroSub())
+        .fontSize(T.F_SUB)
+        .fontColor(Pal.heroFgSoft())
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .width('100%')
+        .margin({ top: 4 });
+
+      // ④ 后端列表
+      Text('代理后端 · 点一行切换')
+        .fontSize(11)
+        .fontColor(Pal.heroFgSoft())
+        .width('100%')
+        .margin({ top: 16, bottom: 2 });
+
       ForEach(this.backends, (b: Backend, i: number) => {
         Column() {
           if (i > 0) {
-            Hairline({ indent: 0 });
+            // hero 是深绿底，普通的 divider 色在上面看不见
+            Row()
+              .width('100%')
+              .height(0.7)
+              .backgroundColor(Pal.heroFg())
+              .opacity(0.16)
+              .margin({ top: 2 });
           }
-          Row() {
+          Row({ space: 9 }) {
+            GlyphIcon({
+              kind: Glyph.POWER,
+              color: b.running ? Pal.heroFg() : Pal.alpha(Pal.heroFg(), 0.5),
+              side: 16,
+              lineWidth: 2
+            });
+
             Column() {
-              // 运行中的那个要一眼认出来：加粗 + 放大一档 + 主色。
-              // 只靠右侧「运行中」胶囊不够，两个名字并排时视线先落在字上
+              // 运行中的那个要一眼认出来：加粗 + 满白；没跑的半透明白
               Text(b.label)
                 .fontSize(b.running ? T.F_H2 + 1 : T.F_H2)
-                .fontWeight(b.running ? FontWeight.Bold : FontWeight.Normal)
-                .fontColor(b.running
-                  ? $r('app.color.primary')
-                  : $r('app.color.text_primary'));
-              // 未安装时只写「未安装」：之前无条件拼 engine+nodes，
-              // Passwall 的 engine 是硬编码 "Xray"，于是胶囊说未安装、
-              // 副标题却写着「Xray · 0 节点」，自相矛盾。
-              // 已安装时 engine 可能为空（uci 没读到），也要避免拼出「 · N 个节点」
+                .fontWeight(b.running ? FontWeight.Bold : FontWeight.Medium)
+                .fontColor(b.running ? Pal.heroFg() : Pal.alpha(Pal.heroFg(), 0.55));
               Text(b.installed
                 ? (b.engine.length > 0 ? b.engine + ' · ' : '') + b.nodes + ' 个节点'
                 : '未安装')
                 .fontSize(T.F_TINY)
-                .fontColor($r('app.color.text_secondary'))
-                .margin({ top: 2 });
+                .fontColor(Pal.alpha(Pal.heroFg(), b.running ? 0.72 : 0.45))
+                .margin({ top: 3 });
             }
             .alignItems(HorizontalAlign.Start)
-            .layoutWeight(1);
+            .layoutWeight(1)
+            .margin({ left: 10 });
 
-            if (!b.installed) {
-              Pill({ text: '未安装', tone: Pal.textSecondary() });
-            } else if (b.running) {
-              Pill({ text: '运行中', tone: Pal.primary() });
-            } else {
-              Pill({ text: '未运行', tone: Pal.textSecondary() });
-            }
+            // 状态胶囊：一律白字，靠透明度区分（深绿底上再加彩色底反而是噪音）
+            Text(!b.installed ? '未安装' : (b.running ? '运行中' : '未运行'))
+              .fontSize(11)
+              .fontWeight(b.running ? FontWeight.Medium : FontWeight.Normal)
+              .fontColor(b.running ? Pal.heroFg() : Pal.alpha(Pal.heroFg(), 0.6))
+              .padding({ left: 9, right: 9, top: 3, bottom: 3 })
+              .borderRadius(99)
+              .backgroundColor(b.running ? '#33FFFFFF' : '#1AFFFFFF');
 
             if (b.installed) {
-              Text(this.busyBackend === b.id ? '处理中…'
-                : (b.running ? '停止' : '启动'))
+              Text(this.busyBackend === b.id ? '处理中…' : (b.running ? '停止' : '启动'))
                 .fontSize(T.F_SUB)
-                .fontColor(b.running ? $r('app.color.danger') : $r('app.color.primary'))
-                .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                .fontWeight(FontWeight.Medium)
+                .fontColor(Pal.heroFg())
+                .padding({ left: 10, right: 10, top: 3, bottom: 3 })
                 .borderRadius(99)
-                .backgroundColor(b.running
-                  ? Pal.alpha(Pal.danger(), 0.12)
-                  : $r('app.color.accent_soft'))
-                .margin({ left: 8 })
+                .backgroundColor('#29FFFFFF')
+                .margin({ left: 6 })
                 .onClick(() => {
                   this.toggleBackend(b.id, !b.running);
                 });
@@ -1580,11 +1650,24 @@ export struct ProxyPage {
           }
           .width('100%')
           .padding({ top: 10, bottom: 10 })
-          .alignItems(VerticalAlign.Center);
+          .alignItems(VerticalAlign.Center)
+          .onClick(() => {
+            if (b.installed) {
+              this.toggleBackend(b.id, !b.running);
+            }
+          });
         }
         .width('100%');
       }, (b: Backend) => b.id + '|' + (b.running ? '1' : '0') + '|' + b.nodes);
     }
+    .width('100%')
+    .padding({ left: 20, right: 20, top: 18, bottom: 14 })
+    .borderRadius(T.R_CARD)
+    .linearGradient({
+      angle: 135,
+      colors: [[Pal.heroFrom(), 0], [Pal.heroTo(), 1]]
+    })
+    .margin({ bottom: this.rail() ? Bp.gap(this.winW) : T.GAP });
   }
 
   @Builder
@@ -2426,6 +2509,70 @@ export struct ProxyPage {
       }
     }
     return this.active;
+  }
+
+  private installedCount(): number {
+    let n: number = 0;
+    for (let i = 0; i < this.backends.length; i++) {
+      if (this.backends[i].installed) {
+        n++;
+      }
+    }
+    return n;
+  }
+
+  /** hero 大标题：运行中显示当前配置名（去掉目录和 .yaml），没跑写「未启用」 */
+  private heroTitle(): string {
+    if (!this.anyRunning()) {
+      return '未启用';
+    }
+    const p: string = this.currentPath;
+    if (p.length === 0) {
+      return this.activeLabel();
+    }
+    const seg: string[] = p.split('/');
+    let name: string = seg[seg.length - 1];
+    if (name.endsWith('.yaml')) {
+      name = name.substring(0, name.length - 5);
+    }
+    return name.length > 0 ? name : this.activeLabel();
+  }
+
+  /** hero 说明行：引擎 · 节点数 · 模式；没跑时改成一句引导 */
+  private heroSub(): string {
+    if (!this.anyRunning()) {
+      return '点上面任意一行启用；启用后这里显示当前出口';
+    }
+    const parts: string[] = [];
+    for (let i = 0; i < this.backends.length; i++) {
+      if (this.backends[i].id === this.active && this.backends[i].engine.length > 0) {
+        parts.push(this.backends[i].engine);
+      }
+    }
+    if (this.nodeCount > 0) {
+      parts.push(this.nodeCount.toString() + ' 个节点可用');
+    }
+    const ml: string = this.modeLabel();
+    if (ml.length > 0) {
+      parts.push(ml);
+    }
+    return parts.length > 0 ? parts.join('　·　') : '正在读取…';
+  }
+
+  private modeLabel(): string {
+    if (this.mode === 'rule') {
+      return '规则';
+    }
+    if (this.mode === 'global') {
+      return '全局';
+    }
+    if (this.mode === 'proxy') {
+      return '代理';
+    }
+    if (this.mode === 'direct' || this.mode === 'disable') {
+      return '直连';
+    }
+    return '';
   }
 
   @Builder

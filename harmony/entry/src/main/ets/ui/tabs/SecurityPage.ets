@@ -626,7 +626,8 @@ export struct SecurityPage {
       }
     }
     .width('100%')
-    .margin({ top: 0, bottom: T.GAP })
+    // 间距交给外层 Column({ space: T.GAP })。以前这里自己又加了 bottom: T.GAP，
+    // 结果「应用流量」卡上下的空档是别处的两倍 —— 设备页间距看着不一样就是这个
     .onClick(() => {
       this.openSub(3, 0);
     });
@@ -1144,77 +1145,81 @@ export struct SecurityPage {
       .transition(TransitionEffect.OPACITY
         .combine(TransitionEffect.translate({ x: 32 })))
     } else {
-      Refresh({ refreshing: $$this.pulling }) {
-        Scroll() {
-          Column() {
-            Row() {
-              Text('设备')
-                .fontSize(T.F_TITLE)
-                .fontWeight(FontWeight.Medium)
-                .fontColor($r('app.color.text_primary'))
-                .layoutWeight(1);
-              Text(this.neverLoaded() ? '未连接' : this.online + ' 在线 / ' + this.total + ' 台')
-                .fontSize(T.F_TINY)
-                .fontColor($r('app.color.text_secondary'));
-            }
-            .width('100%')
-            .alignItems(VerticalAlign.Bottom)
-            .padding({ bottom: 10 });
+      Column() {
+        // 大标题固定在滚动区外，跟着列表滚走的话划到下面就不知道在哪一页了
+        Row() {
+          Text('设备')
+            .fontSize(T.F_TITLE)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.text_primary'))
+            .layoutWeight(1);
+          Text(this.neverLoaded() ? '未连接' : this.online + ' 在线 / ' + this.total + ' 台')
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_secondary'));
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Bottom)
+        .padding({ left: T.PAD, right: T.PAD, top: 8, bottom: 6 });
 
-            if (this.err.length > 0 && this.total === 0) {
-              Text('读取失败：' + this.err)
-                .fontSize(T.F_SUB)
-                .fontColor($r('app.color.danger'))
+        Refresh({ refreshing: $$this.pulling }) {
+          Scroll() {
+            Column() {
+              if (this.err.length > 0 && this.total === 0) {
+                Text('读取失败：' + this.err)
+                  .fontSize(T.F_SUB)
+                  .fontColor($r('app.color.danger'))
+                  .width('100%')
+                  .margin({ bottom: 10 });
+              }
+
+              if (this.rail()) {
+                Row({ space: T.GAP }) {
+                  Column({ space: T.GAP }) {
+                    this.heroCard();
+                    this.deviceCard();
+                  }
+                  .layoutWeight(1)
+                  .alignItems(HorizontalAlign.Start);
+
+                  Column({ space: T.GAP }) {
+                    this.appsCard();
+                    this.adCard();
+                  }
+                  .layoutWeight(1)
+                  .alignItems(HorizontalAlign.Start);
+                }
                 .width('100%')
-                .margin({ bottom: 10 });
-            }
-
-            if (this.rail()) {
-              Row({ space: T.GAP }) {
+                .alignItems(VerticalAlign.Top);
+              } else {
                 Column({ space: T.GAP }) {
                   this.heroCard();
                   this.deviceCard();
-                }
-                .layoutWeight(1)
-                .alignItems(HorizontalAlign.Start);
-
-                Column({ space: T.GAP }) {
                   this.appsCard();
                   this.adCard();
                 }
-                .layoutWeight(1)
-                .alignItems(HorizontalAlign.Start);
+                .width('100%');
               }
-              .width('100%')
-              .alignItems(VerticalAlign.Top);
-            } else {
-              Column({ space: T.GAP }) {
-                this.heroCard();
-                this.deviceCard();
-                this.appsCard();
-                this.adCard();
-              }
-              .width('100%');
-            }
 
-            Row().width('100%').height(24);
+              Row().width('100%').height(24);
+            }
+            .width('100%')
+            .padding({ left: T.PAD, right: T.PAD, top: 4 });
           }
           .width('100%')
-          .padding({ left: T.PAD, right: T.PAD, top: 8 });
+          .height('100%')
+          .scrollBar(BarState.Off)
+          .edgeEffect(EdgeEffect.Spring)
+          .align(Alignment.Top);
         }
+        .layoutWeight(1)
         .width('100%')
-        .height('100%')
-        .scrollBar(BarState.Off)
-        .edgeEffect(EdgeEffect.Spring)
-        .backgroundColor($r('app.color.app_bg'))
-        .align(Alignment.Top);
+        .onRefreshing(() => {
+          this.pull();
+        });
       }
       .width('100%')
       .height('100%')
-      .backgroundColor($r('app.color.app_bg'))
-      .onRefreshing(() => {
-        this.pull();
-      });
+      .backgroundColor($r('app.color.app_bg'));
     }
   }
 }

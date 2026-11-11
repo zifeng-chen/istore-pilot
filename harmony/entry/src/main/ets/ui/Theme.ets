@@ -146,6 +146,22 @@ export class Pal {
   static heroStroke(): string {
     return Pal.of($r('app.color.hero_stroke'), '#24FFFFFF');
   }
+  /** hero 深绿底上的主文字：一直是白色，深浅色主题都成立 */
+  static heroFg(): string {
+    return Pal.of($r('app.color.hero_fg'), '#FFFFFF');
+  }
+  /** hero 上的次要文字 */
+  static heroFgSoft(): string {
+    return Pal.of($r('app.color.hero_fg_soft'), '#D9FFFFFF');
+  }
+  /** hero 上的「在线 / 运行中」强调色（薄荷） */
+  static heroOn(): string {
+    return '#5FE7C4';
+  }
+  /** hero 上的「离线 / 未运行」强调色（珊瑚） */
+  static heroOff(): string {
+    return '#FF7A6B';
+  }
 
   static iconOff(): string {
     return Pal.of($r('app.color.icon_off'), '#59635F');

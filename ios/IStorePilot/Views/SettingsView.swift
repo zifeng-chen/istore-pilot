@@ -60,7 +60,6 @@ struct SettingsView: View {
                         uploadCard
                         powerCard
                         securityCard
-                        actionCard
                         aboutCard
                     }
                     Color.clear.barBottomGap()
@@ -215,27 +214,6 @@ struct SettingsView: View {
     }
 
     /// 操作卡片：退出 / 清缓存 / 主题，收在页面底部
-    private var actionCard: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 0) {
-                CardHead(icon: "slider.horizontal.3", title: "操作", sub: "登录、缓存与主题")
-                row(icon: "rectangle.portrait.and.arrow.right", title: "退出登录",
-                    note: "清除凭证并返回登录页") {
-                    Api.onAuthFail?()
-                    app.signOut()
-                }
-                Hairline(inset: 62)
-                row(icon: "trash", title: "清缓存",
-                    note: "只清手机上的快照，不动路由器") {
-                    SnapCache.shared.clear()
-                    popup = Popup(title: "已清除", body: "下次进入各页面会重新从路由器读取。")
-                }
-                Hairline(inset: 62)
-                themeRow
-            }
-        }
-    }
-
     /// 主题行：Menu 形式，展开选深浅色
     private var themeRow: some View {
         Menu {
@@ -322,11 +300,6 @@ struct SettingsView: View {
                 row(icon: "wifi", title: "宽带详情与配置",
                     note: "改接入方式、账号密码、静态 IP") {
                     goWan = true
-                }
-                Hairline(inset: 62)
-                row(icon: "cpu", title: "硬件详情",
-                    note: "CPU、内存条、硬盘、网卡、PCI") {
-                    goHardware = true
                 }
             }
         }
@@ -526,30 +499,50 @@ struct SettingsView: View {
 
     // MARK: - 关于
 
+    /// 关于 + 操作合成一张卡（与鸿蒙 0.3.3 起一致）：
+    /// 上半是「这是什么 App」，下半是真正要点的三行。
+    /// 分成两张时「关于」只有图标和三行字，自己占一张卡很空。
     private var aboutCard: some View {
         Card {
-            VStack(spacing: 12) {
-                Image("AppIconLarge")
-                    .resizable()
-                    .frame(width: 64, height: 64)
-                    .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
-
-                VStack(spacing: 3) {
-                    Text("iStore Pilot")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(C.textPrimary)
-                    Text("版本 \(appVersion)")
-                        .font(F.tiny)
-                        .foregroundStyle(C.textSecondary)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 13) {
+                    Image("AppIconLarge")
+                        .resizable()
+                        .frame(width: 52, height: 52)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("iStore Pilot")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(C.textPrimary)
+                        Text("版本 \(appVersion)")
+                            .font(F.tiny)
+                            .foregroundStyle(C.textSecondary)
+                    }
+                    Spacer(minLength: 0)
                 }
+                .padding(.bottom, 10)
 
                 Text("iStoreOS 路由器的手机管理端。看状态、管设备、切节点、拦广告，都能在手机上完成。")
                     .font(F.tiny)
                     .foregroundStyle(C.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 8)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.bottom, 8)
+
+                Hairline(inset: 0)
+                themeRow
+                Hairline(inset: 62)
+                row(icon: "trash", title: "清缓存",
+                    note: "只清手机上的快照，不动路由器") {
+                    SnapCache.shared.clear()
+                    popup = Popup(title: "已清除", body: "下次进入各页面会重新从路由器读取。")
+                }
+                Hairline(inset: 62)
+                row(icon: "rectangle.portrait.and.arrow.right", title: "退出登录",
+                    note: "清除凭证并返回登录页") {
+                    Api.onAuthFail?()
+                    app.signOut()
+                }
             }
-            .frame(maxWidth: .infinity)
         }
     }
 

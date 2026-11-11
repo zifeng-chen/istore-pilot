@@ -271,37 +271,26 @@ public class SettingsFragment extends BaseFragment {
         security.addView(note);
         root.addView(security);
 
-        // ---------------------------------------------------------------- 操作
-        // 退出 / 清缓存 / 主题：都是低频操作，单独一张卡
-        Ui.Card act = Ui.card(c);
-        Ui.cardPadding(act, 11);
-        Ui.cardTitle(c, act, com.izifeng.www.istorepilot.widget.Glyph.LIST,
-                "操作", "登录、缓存与主题");
-        Ui.settingRow(c, act, com.izifeng.www.istorepilot.widget.Glyph.LOGOUT,
-                "退出登录", "清除凭证并返回登录页", "", true, false, this::relogin);
-        Ui.settingRow(c, act, com.izifeng.www.istorepilot.widget.Glyph.TRASH,
-                "清缓存", "只清手机上的快照，不动路由器", "", false, false, this::clearCache);
-        tvTheme = Ui.settingRow(c, act, com.izifeng.www.istorepilot.widget.Glyph.MOON,
-                "主题", "跟随系统或固定深浅色", Theme.name(c), false, false, this::pickTheme);
-        root.addView(act);
-
-        // ---------------------------------------------------------------- 关于
-        // 只放四样：图标、名称、版本、一句话介绍。剩下的（界面实现、数据来源）
-        // 属于开发细节，用户不需要在「关于」里读文档
+        // ---------------------------------------------------------------- 关于 + 操作
+        // 合成一张卡（与鸿蒙 0.3.3 / iOS 对齐）：上面是「这是什么 App」，
+        // 下面是真正要点的三行。分成两张时「关于」只有图标和几行字，自己占一张卡很空。
         Ui.Card about = Ui.card(c);
+        Ui.cardPadding(about, 11);
+
         LinearLayout aboutHead = Ui.row(c);
         aboutHead.setGravity(Gravity.CENTER_VERTICAL);
+        aboutHead.setPadding(Ui.dp(c, 16), 0, Ui.dp(c, 16), 0);
 
         android.widget.ImageView icon = new android.widget.ImageView(c);
         icon.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
         icon.setImageResource(R.mipmap.ic_launcher);
         LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(
-                Ui.dp(c, 56), Ui.dp(c, 56));
-        ilp.rightMargin = Ui.dp(c, 14);
+                Ui.dp(c, 52), Ui.dp(c, 52));
+        ilp.rightMargin = Ui.dp(c, 13);
         aboutHead.addView(icon, ilp);
 
         LinearLayout aboutCol = Ui.column(c);
-        TextView aboutName = Ui.text(c, "iStore Pilot", 19f, R.color.text_primary);
+        TextView aboutName = Ui.text(c, "iStore Pilot", 18f, R.color.text_primary);
         aboutName.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         aboutName.setIncludeFontPadding(false);
         aboutCol.addView(aboutName);
@@ -315,10 +304,17 @@ public class SettingsFragment extends BaseFragment {
         TextView tip = Ui.text(c,
                 "iStoreOS 路由器的随身管理台：状态、设备、代理、拦截、硬件，"
                         + "一处看完，不用再开浏览器后台。",
-                12.5f, R.color.text_secondary);
+                11.5f, R.color.text_secondary);
         tip.setLineSpacing(Ui.dp(c, 3), 1f);
-        tip.setPadding(0, Ui.dp(c, 14), 0, 0);
+        tip.setPadding(Ui.dp(c, 16), Ui.dp(c, 10), Ui.dp(c, 16), Ui.dp(c, 14));
         about.addView(tip);
+
+        tvTheme = Ui.settingRow(c, about, com.izifeng.www.istorepilot.widget.Glyph.MOON,
+                "主题", "跟随系统或固定深浅色", Theme.name(c), true, false, this::pickTheme);
+        Ui.settingRow(c, about, com.izifeng.www.istorepilot.widget.Glyph.TRASH,
+                "清缓存", "只清手机上的快照，不动路由器", "", false, false, this::clearCache);
+        Ui.settingRow(c, about, com.izifeng.www.istorepilot.widget.Glyph.LOGOUT,
+                "退出登录", "清除凭证并返回登录页", "", false, false, this::relogin);
         root.addView(about);
     }
 

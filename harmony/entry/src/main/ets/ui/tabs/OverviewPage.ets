@@ -443,69 +443,76 @@ export struct OverviewPage {
   }
 
   build() {
-    Refresh({ refreshing: $$this.pulling }) {
-      Scroll() {
-        Column() {
-          Text('概览')
-            .fontSize(T.F_TITLE)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.text_primary'))
-            .width('100%')
-            .margin({ bottom: 10 });
-
-          if (this.rail()) {
-            Row({ space: Bp.gap(this.winW) }) {
-              Column() {
-                this.heroCard();
-              }
-              .layoutWeight(1)
-              .alignItems(HorizontalAlign.Start);
-
-              Column() {
-                this.ringCard();
-                this.wanCard();
-                this.portCard();
-                this.machineCard();
-              }
-              .layoutWeight(1)
-              .alignItems(HorizontalAlign.Start);
-            }
-            .width('100%')
-            .alignItems(VerticalAlign.Top);
-          } else {
-            Column() {
-              this.heroCard();
-              this.ringCard();
-              this.wanCard();
-              this.portCard();
-              this.machineCard();
-            }
-            .width('100%');
-          }
-
-          Row().width('100%').height(24);
-        }
+    Column() {
+      // 大标题固定在滚动区外：跟着列表一起滚走的话，划到下面就没有「这是哪一页」了
+      Text('概览')
+        .fontSize(T.F_TITLE)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.text_primary'))
         .width('100%')
-        .alignItems(HorizontalAlign.Center)
         .padding({
           left: this.rail() ? 20 : T.PAD,
           right: this.rail() ? 20 : T.PAD,
-          top: 8
+          top: 8,
+          bottom: 10
         });
+
+      Refresh({ refreshing: $$this.pulling }) {
+        Scroll() {
+          Column() {
+            if (this.rail()) {
+              Row({ space: Bp.gap(this.winW) }) {
+                Column() {
+                  this.heroCard();
+                }
+                .layoutWeight(1)
+                .alignItems(HorizontalAlign.Start);
+
+                Column() {
+                  this.ringCard();
+                  this.wanCard();
+                  this.portCard();
+                }
+                .layoutWeight(1)
+                .alignItems(HorizontalAlign.Start);
+              }
+              .width('100%')
+              .alignItems(VerticalAlign.Top);
+            } else {
+              Column() {
+                this.heroCard();
+                this.ringCard();
+                this.wanCard();
+                this.portCard();
+              }
+              .width('100%');
+            }
+
+            Row().width('100%').height(24);
+          }
+          .width('100%')
+          .alignItems(HorizontalAlign.Center)
+          .padding({
+            left: this.rail() ? 20 : T.PAD,
+            right: this.rail() ? 20 : T.PAD,
+            top: 2
+          });
+        }
+        .width('100%')
+        .height('100%')
+        .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.Spring)
+        .align(Alignment.Top);
       }
+      .layoutWeight(1)
       .width('100%')
-      .height('100%')
-      .scrollBar(BarState.Off)
-      .edgeEffect(EdgeEffect.Spring)
-      .backgroundColor($r('app.color.app_bg'))
-      .align(Alignment.Top);
+      .onRefreshing(() => {
+        this.pull();
+      });
     }
     .width('100%')
     .height('100%')
-    .backgroundColor($r('app.color.app_bg'))
-    .onRefreshing(() => {
-      this.pull();
-    });
+    .backgroundColor($r('app.color.app_bg'));
   }
 
   // ================================================================ 卡片
@@ -757,20 +764,8 @@ export struct OverviewPage {
     }
   }
 
-  /** 机器卡：型号 / 系统 / 内核 / 在线时长，纯只读信息，不放入口 */
-  @Builder
-  machineCard() {
-    Card({ gapTop: 0, gapBottom: 0 }) {
-      CardHeader({ title: '机器', sub: '' });
-      Kv({ label: '型号', value: Fmt.orDash(this.model), valueSize: 0, accent: false });
-      Hairline({ indent: 0 });
-      Kv({ label: '系统', value: 'iStoreOS ' + Fmt.orDash(this.osVersion), valueSize: 0, accent: false });
-      Hairline({ indent: 0 });
-      Kv({ label: '内核', value: Fmt.orDash(this.kernel), valueSize: 0, accent: false });
-      Hairline({ indent: 0 });
-      Kv({ label: '在线时长', value: this.uptime, valueSize: 0, accent: false });
-    }
-  }
+  /** 机器信息不再单独占一张卡：型号/系统/内核在顶部 hero 里已经有一行了，
+   *  再摆一张只读卡只是把页面拉长 */
 
 }
 

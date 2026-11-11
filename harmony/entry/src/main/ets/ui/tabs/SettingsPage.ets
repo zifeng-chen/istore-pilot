@@ -255,76 +255,83 @@ export struct SettingsPage {
         .combine(TransitionEffect.translate({ x: 32 })));
     } else {
       Stack({ alignContent: Alignment.Bottom }) {
-        Refresh({ refreshing: $$this.pulling }) {
-          Scroll() {
-            Column() {
-              // 安卓四个页签都有大标题（BaseFragment 的 title()），这里原来没有，
-              // 进去直接是一张绿卡，和另外三页不是一套
-              Text('设置')
-                .fontSize(T.F_TITLE)
-                .fontWeight(FontWeight.Medium)
-                .fontColor($r('app.color.text_primary'))
-                .width('100%')
-                .margin({ bottom: 10 });
+        Column() {
+          // 大标题固定在滚动区外，不跟着内容滚走
+          Text('设置')
+            .fontSize(T.F_TITLE)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.text_primary'))
+            .width('100%')
+            .padding({
+              left: this.rail() ? 20 : T.PAD,
+              right: this.rail() ? 20 : T.PAD,
+              top: 8,
+              bottom: 10
+            });
 
-              if (this.rail()) {
-                // 平板：左「我是谁 / 连到哪」，右「怎么用 / 怎么改」
-                Row({ space: Bp.gap(this.winW) }) {
+          Refresh({ refreshing: $$this.pulling }) {
+            Scroll() {
+              Column() {
+                if (this.rail()) {
+                  // 平板：左「我是谁 / 连到哪」，右「怎么用 / 怎么改」
+                  Row({ space: Bp.gap(this.winW) }) {
+                    Column() {
+                      this.heroCard();
+                      this.netCard();
+                    }
+                    .layoutWeight(1)
+                    .alignItems(HorizontalAlign.Start);
+
+                    Column() {
+                      this.systemCard();
+                      this.powerCard();
+                      this.hardwareCard();
+                      this.securityCard();
+                      this.aboutCard();
+                    }
+                    .layoutWeight(1)
+                    .alignItems(HorizontalAlign.Start);
+                  }
+                  .width('100%')
+                  .alignItems(VerticalAlign.Top);
+                } else {
                   Column() {
                     this.heroCard();
                     this.netCard();
-                  }
-                  .layoutWeight(1)
-                  .alignItems(HorizontalAlign.Start);
-
-                  Column() {
                     this.systemCard();
                     this.powerCard();
                     this.hardwareCard();
                     this.securityCard();
                     this.aboutCard();
                   }
-                  .layoutWeight(1)
-                  .alignItems(HorizontalAlign.Start);
+                  .width('100%');
                 }
-                .width('100%')
-                .alignItems(VerticalAlign.Top);
-              } else {
-                Column() {
-                  this.heroCard();
-                  this.netCard();
-                  this.systemCard();
-                  this.powerCard();
-                  this.hardwareCard();
-                  this.securityCard();
-                  this.aboutCard();
-                }
-                .width('100%');
-              }
 
-              Row().width('100%').height(24);
+                Row().width('100%').height(24);
+              }
+              .width('100%')
+              .alignItems(HorizontalAlign.Center)
+              .padding({
+                left: this.rail() ? 20 : T.PAD,
+                right: this.rail() ? 20 : T.PAD,
+                top: 2
+              });
             }
             .width('100%')
-            .alignItems(HorizontalAlign.Center)
-            .padding({
-              left: this.rail() ? 20 : T.PAD,
-              right: this.rail() ? 20 : T.PAD,
-              top: 8
-            });
+            .height('100%')
+            .scrollBar(BarState.Off)
+            .edgeEffect(EdgeEffect.Spring)
+            .align(Alignment.Top);
           }
+          .layoutWeight(1)
           .width('100%')
-          .height('100%')
-          .scrollBar(BarState.Off)
-          .edgeEffect(EdgeEffect.Spring)
-          .backgroundColor($r('app.color.app_bg'))
-          .align(Alignment.Top);
+          .onRefreshing(() => {
+            this.pull();
+          });
         }
         .width('100%')
         .height('100%')
-        .backgroundColor($r('app.color.app_bg'))
-        .onRefreshing(() => {
-          this.pull();
-        });
+        .backgroundColor($r('app.color.app_bg'));
 
       if (this.toast.length > 0) {
         Text(this.toast)
@@ -841,25 +848,12 @@ export struct SettingsPage {
       Hairline({ indent: 16 });
 
       SettingRow({
-        glyph: Glyph.GLOBE,
-        title: '服务器地址',
-        subtitle: '改地址不会清掉登录状态',
-        value: this.hostText(),
-        valueSize: 12,
-        first: true,
-        danger: false,
-        arrow: true,
-        onTap: () => {
-          this.pickBase();
-        }
-      });
-      SettingRow({
         glyph: Glyph.MOON,
         title: '主题',
         subtitle: '跟随系统或固定深浅色',
         value: this.themeName,
         valueSize: 0,
-        first: false,
+        first: true,
         danger: false,
         arrow: true,
         onTap: () => {
