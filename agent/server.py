@@ -12,14 +12,24 @@ import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import (adblock, apps, auth, cfgbak, clash, devices, hardware, lanedit, luci,
-               mask, netapply, netcfg, power, proxy, subscriptions, sysinfo, system)
+from . import (adblock, apps, auth, cfgbak, clash, demo as demo_mod, devices,
+               hardware, lanedit, luci, mask, netapply, netcfg, power, proxy,
+               subscriptions, sysinfo, system)
 from .config import get as cfg, load as load_cfg, save as save_cfg
 
 START_TS = time.time()
 
 # Agent 自身版本：随 ipk 一起发版，硬件详情页与「关于」都会显示
 VERSION = "0.3.0"
+
+# ---------------------------------------------------------------- 演示实例
+#
+# 应用商店审核要用：审核员没有路由器，云端跑一份只读快照给他点。
+# --record 在真机上录，--demo 在云端回放；两条都不影响正常模式（默认全关）。
+_DEMO: demo_mod.Store | None = None
+_REPLAY = False
+_RECORD = False
+_DEMO_PWD = ""
 
 _cache_lock = threading.Lock()
 _cache: dict[str, tuple[float, object]] = {}
@@ -145,6 +155,13 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(head + body)
 
     def _json(self, data, code: int = 200):
+        # 录制模式：只收 200 的 GET 响应，错误响应不落盘（回放时也不该复现错误）
+        key = getattr(self, "_demo_key", None)
+        if key and code == 200 and _DEMO is not None:
+            try:
+                _DEMO.save(key[0], key[1], data)
+            except OSError as exc:
+                _log("演示录制 %s 失败: %r" % (key[0], exc))
         self._send(code, json.dumps(data, ensure_ascii=False).encode("utf-8"))
 
     def _error(self, code: int, message: str):
@@ -375,6 +392,17 @@ class Handler(BaseHTTPRequestHandler):
             if not self._authed():
                 self._error(401, "unauthorized")
                 return
+            if _REPLAY:
+                # 只读回放：录到什么给什么。没录到就明说，不要静默返回空数组 ——
+                # 那样界面会显示「暂无设备」，审核员会以为功能坏了
+                data = _DEMO.load(path, query) if _DEMO else None
+                if data is None:
+                    self._json({"ok": False, "demo": True,
+                                "error": "这个接口在演示快照里没有录制到"}, 503)
+                    return
+                self._json(data)
+                return
+            self._demo_key = (path, query) if (_RECORD and _DEMO) else None
             self._api_get(path, query)
             return
 
@@ -387,6 +415,7 @@ class Handler(BaseHTTPRequestHandler):
         self._error(404, "not found")
 
     def do_POST(self):
+        self._demo_key = None
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
 
@@ -400,7 +429,8 @@ class Handler(BaseHTTPRequestHandler):
                 # 「口令错了」要改口令，「被退避了」只能等，混在一句话里会误导
                 self._error(429, "尝试过于频繁，请 %d 秒后再试" % wait)
                 return
-            if not auth.verify_password(pwd, remote):
+            ok = pwd == _DEMO_PWD if _REPLAY else auth.verify_password(pwd, remote)
+            if not ok:
                 self._error(403, "密码错误")
                 return
             self._json({"ok": True, **auth.issue_token()})
@@ -416,6 +446,14 @@ class Handler(BaseHTTPRequestHandler):
             return
         if not self._authed():
             self._error(401, "unauthorized")
+            return
+
+        # 演示实例只读：写操作在进业务代码之前就挡掉。
+        # 审核员点「禁止设备上网」「重启路由器」不能真作用于任何环境；
+        # 也不读请求体（上传安装包可能是几十 MB 的流）
+        if _REPLAY:
+            self._json({"ok": False, "demo": True,
+                        "error": "演示环境只读，这里不会真的改动路由器"}, 501)
             return
 
         # ---- 上传安装包：必须在 _body() 之前处理，否则请求体被当成 JSON 读走
@@ -956,29 +994,44 @@ def _watch_bind(httpd, host: str) -> None:
         return
 
 
-def serve():
+def serve(record: bool = False, demo: bool = False, demo_dir: str = "") -> None:
+    global _DEMO, _REPLAY, _RECORD, _DEMO_PWD
+
+    if demo or record:
+        root = (demo_dir or os.environ.get("ISTORE_DEMO_DIR")
+                or os.path.join(os.path.dirname(os.path.abspath(__file__)), "demo"))
+        _DEMO = demo_mod.Store(root)
+        _REPLAY = bool(demo)
+        _RECORD = bool(record) and not demo
+        # 演示口令固定，不走 config.json 的用户口令 —— 审核材料里要写明文
+        _DEMO_PWD = os.environ.get("ISTORE_DEMO_PASSWORD", "istore-demo-2026")
+        print("[istore-agent] %s模式，数据目录 %s" % (
+            "回放" if _REPLAY else "录制", root), flush=True)
+
     conf = load_cfg()
     # 环境变量优先：ipk 的 init 脚本从 uci 读端口和绑定地址，
     # 这样在 LuCI 里改完重启服务就能生效，不用去动 config.json
     want = os.environ.get("ISTORE_AGENT_HOST") or conf["listen"]["host"]
     port = int(os.environ.get("ISTORE_AGENT_PORT") or conf["listen"]["port"])
 
-    # 预热应用流量采样：先把基线打上，首个请求就能有速率而不是一堆 0
-    try:
-        apps.snapshot()
-    except Exception:
-        pass
-    # 上次改完配置没确认就重启了：清掉残留状态，否则界面永远显示「等待确认」
-    try:
-        netapply.boot_check()
-    except Exception:
-        pass
-    # DNS 兜底巡检：接管后 AGH 起不来时，把 53 还给 dnsmasq。
-    # 放在开机这里起，而不是等 App 来读状态 —— 断网时 App 恰恰是最晚知道的
-    try:
-        adblock.ensure_watchdog()
-    except Exception:
-        pass
+    # 回放模式不碰真实系统：云端既没有 ubus，也不该有看门狗
+    if not _REPLAY:
+        # 预热应用流量采样：先把基线打上，首个请求就能有速率而不是一堆 0
+        try:
+            apps.snapshot()
+        except Exception:
+            pass
+        # 上次改完配置没确认就重启了：清掉残留状态，否则界面永远显示「等待确认」
+        try:
+            netapply.boot_check()
+        except Exception:
+            pass
+        # DNS 兜底巡检：接管后 AGH 起不来时，把 53 还给 dnsmasq。
+        # 放在开机这里起，而不是等 App 来读状态 —— 断网时 App 恰恰是最晚知道的
+        try:
+            adblock.ensure_watchdog()
+        except Exception:
+            pass
 
     # 主循环：正常只跑一圈；只有当绑定地址失效（改了 LAN）时才会重绑。
     # 首圈等 10 秒：开机/重启时网卡可能还没配好地址。
