@@ -93,5 +93,19 @@
             android:textColor="@color/text_secondary"
             android:textSize="12sp" />
 
+        <!-- 第一次用的人卡在「路由器上还得先装东西」，入口放这里才有用 -->
+        <TextView
+            android:id="@+id/help"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="?attr/selectableItemBackground"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:paddingEnd="8dp"
+            android:text="使用帮助：怎么装 Agent、怎么连上 →"
+            android:textColor="@color/primary"
+            android:textSize="13sp" />
+
     </LinearLayout>
 </ScrollView>

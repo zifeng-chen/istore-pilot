@@ -21,6 +21,7 @@
 		FA41263880C8D68C9F584FD9 /* DeviceDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9161FB931DFC415882CD59B9 /* DeviceDetailView.swift */; };
 		8326BC4E76E5A7A588F1F19D /* DevicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A83ABDDD7AF702729432E5A4 /* DevicesView.swift */; };
 		A4DCFDEA21DE759A061DF4B8 /* HardwareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E72FF4A6E354ECDC83F63E6A /* HardwareView.swift */; };
+		F17E8C0792BC6BD2BDEE3E0C /* HelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65167862BC0CF1E30A0E77EE /* HelpView.swift */; };
 		0331A1C96AD6B358A06DED5D /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6E05E9FB97BD3EB0D7192D6 /* LoginView.swift */; };
 		DB24197F85DADFE5927B9A02 /* OverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88B20C7E3C7E4C3456BDCE8F /* OverviewView.swift */; };
 		A8A541E12BA0BA9560A2C9DF /* PortGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FA654E1DF675A1C07D45599 /* PortGrid.swift */; };
@@ -51,6 +52,7 @@
 		9161FB931DFC415882CD59B9 /* DeviceDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceDetailView.swift; sourceTree = "<group>"; };
 		A83ABDDD7AF702729432E5A4 /* DevicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevicesView.swift; sourceTree = "<group>"; };
 		E72FF4A6E354ECDC83F63E6A /* HardwareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardwareView.swift; sourceTree = "<group>"; };
+		65167862BC0CF1E30A0E77EE /* HelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpView.swift; sourceTree = "<group>"; };
 		A6E05E9FB97BD3EB0D7192D6 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		88B20C7E3C7E4C3456BDCE8F /* OverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewView.swift; sourceTree = "<group>"; };
 		2FA654E1DF675A1C07D45599 /* PortGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortGrid.swift; sourceTree = "<group>"; };
@@ -138,6 +140,7 @@
 				9161FB931DFC415882CD59B9 /* DeviceDetailView.swift */,
 				A83ABDDD7AF702729432E5A4 /* DevicesView.swift */,
 				E72FF4A6E354ECDC83F63E6A /* HardwareView.swift */,
+				65167862BC0CF1E30A0E77EE /* HelpView.swift */,
 				A6E05E9FB97BD3EB0D7192D6 /* LoginView.swift */,
 				88B20C7E3C7E4C3456BDCE8F /* OverviewView.swift */,
 				2FA654E1DF675A1C07D45599 /* PortGrid.swift */,
@@ -237,6 +240,7 @@
 				FA41263880C8D68C9F584FD9 /* DeviceDetailView.swift in Sources */,
 				8326BC4E76E5A7A588F1F19D /* DevicesView.swift in Sources */,
 				A4DCFDEA21DE759A061DF4B8 /* HardwareView.swift in Sources */,
+				F17E8C0792BC6BD2BDEE3E0C /* HelpView.swift in Sources */,
 				0331A1C96AD6B358A06DED5D /* LoginView.swift in Sources */,
 				DB24197F85DADFE5927B9A02 /* OverviewView.swift in Sources */,
 				A8A541E12BA0BA9560A2C9DF /* PortGrid.swift in Sources */,
@@ -314,7 +318,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 35;
+				CURRENT_PROJECT_VERSION = 36;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = IStorePilot/Info.plist;
@@ -322,7 +326,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = "0.3.1";
+				MARKETING_VERSION = "0.3.2";
 				PRODUCT_BUNDLE_IDENTIFIER = com.izifeng.www.istorepilot;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -337,7 +341,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 35;
+				CURRENT_PROJECT_VERSION = 36;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = IStorePilot/Info.plist;
@@ -345,7 +349,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = "0.3.1";
+				MARKETING_VERSION = "0.3.2";
 				PRODUCT_BUNDLE_IDENTIFIER = com.izifeng.www.istorepilot;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

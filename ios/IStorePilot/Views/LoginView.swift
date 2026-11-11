@@ -19,6 +19,7 @@ struct LoginView: View {
     @State private var busy = false
     @State private var err = ""
     @State private var okTip = ""
+    @State private var showHelp = false
 
     var body: some View {
         ZStack {
@@ -44,12 +45,27 @@ struct LoginView: View {
 
                     SubmitButton(form: form, busy: busy, action: { submit() })
 
-                    Button(action: probe) {
-                        Text("先测一下地址通不通")
+                    HStack(spacing: 9) {
+                        Button(action: probe) {
+                            Text("先测一下地址通不通")
+                                .font(F.caption)
+                                .foregroundStyle(C.primary)
+                        }
+                        .disabled(busy)
+
+                        Text("·")
                             .font(F.caption)
-                            .foregroundStyle(C.primary)
+                            .foregroundStyle(C.textTertiary)
+
+                        // 第一次用的人卡在「路由器上还得先装东西」，帮助放在这里才有用
+                        Button {
+                            showHelp = true
+                        } label: {
+                            Text("使用帮助")
+                                .font(F.caption)
+                                .foregroundStyle(C.primary)
+                        }
                     }
-                    .disabled(busy)
 
                     Text("地址只写 \(Session.defaultHost) 也行，http:// 会自己补。\n口令与路由器后台、SSH 是同一个。")
                         .font(F.tiny)
@@ -73,6 +89,7 @@ struct LoginView: View {
             if !p.isEmpty && !busy { submit(p) }
             #endif
         }
+        .sheet(isPresented: $showHelp) { HelpView() }
     }
 
     private func tip(_ text: String, color: Color, icon: String) -> some View {

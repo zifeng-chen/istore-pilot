@@ -2,6 +2,7 @@
   "src": [
     "pages/Index",
     "pages/LoginPage",
+    "pages/HelpPage",
     "pages/NetSettingsPage",
     "pages/WebPage",
     "pages/DeviceDetailPage",

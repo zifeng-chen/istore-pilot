@@ -202,6 +202,17 @@ struct LoginPage {
           }
           .width('100%')
           .margin({ top: 24 });
+
+          // 第一次用的人卡在「路由器上还得先装东西」，入口放这里才有用
+          Text('使用帮助：怎么装 Agent、怎么连上 →')
+            .fontSize(T.F_SUB)
+            .fontColor($r('app.color.primary'))
+            .width('100%')
+            .textAlign(TextAlign.Center)
+            .margin({ top: 16 })
+            .onClick(() => {
+              router.pushUrl({ url: 'pages/HelpPage' });
+            });
         }
         .padding(20)
         .backgroundColor($r('app.color.surface'))

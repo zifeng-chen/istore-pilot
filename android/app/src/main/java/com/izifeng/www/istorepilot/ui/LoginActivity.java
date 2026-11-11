@@ -47,6 +47,8 @@ public class LoginActivity extends BaseActivity {
         host.setSelection(host.getText() == null ? 0 : host.getText().length());
 
         btn.setOnClickListener(v -> submit());
+        findViewById(R.id.help).setOnClickListener(v ->
+                startActivity(new Intent(LoginActivity.this, HelpActivity.class)));
         pwd.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_DONE
                     || (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER)) {

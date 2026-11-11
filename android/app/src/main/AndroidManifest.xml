@@ -24,6 +24,12 @@
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize" />
 
         <activity
+            android:name=".ui.HelpActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize" />
+
+        <activity
             android:name=".DeviceDetailActivity"
             android:exported="false"
             android:screenOrientation="portrait"
