@@ -26,8 +26,8 @@ keystore.properties
 .env
 harmony/.env
 harmony/.certs/
-# AGC 服务账号私钥（控制台下载，命名通常是 xxx_private.json）
-*_private.json
+# AGC 服务账号私钥（控制台下载，命名通常是 xxxprivate.json 或 xxx_private.json）
+*private.json
 # 签名产物：Profile 里有设备白名单与开发者标识，证书链同理
 *.p7b
 *.cer
