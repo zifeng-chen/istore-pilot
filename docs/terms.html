@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>iStore Pilot 用户协议</title>
+<style>
+  :root { --fg:#1f2329; --muted:#5b6470; --line:#e5e8ec; --accent:#0a7d5c; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0; background: #f6f7f8; color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.75; font-size: 16px;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 40px 24px 80px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 40px 36px; }
+  h1 { font-size: 26px; margin: 0 0 8px; }
+  .meta { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+  .meta span { display: inline-block; margin-right: 16px; }
+  .lead { background: #f0faf6; border-left: 3px solid var(--accent); padding: 14px 18px; border-radius: 8px; margin: 20px 0 28px; }
+  h2 { font-size: 19px; margin: 34px 0 12px; padding-top: 10px; }
+  ul { padding-left: 22px; }
+  li { margin: 6px 0; }
+  blockquote { color: var(--muted); border-left: 3px solid var(--line); margin: 16px 0; padding-left: 16px; }
+  a { color: var(--accent); }
+  hr { border: none; border-top: 1px solid var(--line); margin: 32px 0; }
+  .footer { color: var(--muted); font-size: 13px; margin-top: 32px; }
+  code { background: #f0f1f3; padding: 1px 6px; border-radius: 4px; font-size: 14px; }
+  @media (max-width: 560px) {
+    .wrap { padding: 16px 12px 60px; }
+    .card { padding: 28px 20px; border-radius: 10px; }
+    h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>iStore Pilot 用户协议</h1>
+    <div class="meta">
+      <span>生效日期：2026 年 11 月 11 日</span>
+      <span>适用版本：0.3.0 及以后</span>
+      <span>开发者：chaof（个人开发者）</span>
+    </div>
+
+    <div class="lead">
+      本协议是你与 iStore Pilot（以下简称「本应用」）开发者之间就使用本应用达成的约定。<br>
+      <strong>请在使用前仔细阅读。你开始使用本应用，即视为已阅读并同意本协议全部内容。</strong>
+    </div>
+
+    <h2>一、本应用是什么</h2>
+    <p>本应用是 <strong>iStoreOS / OpenWrt 路由器的第三方管理客户端</strong>。它本身不具备联网服务端，
+    必须配合安装在你自己路由器上的 <strong>iStore Agent</strong> 组件使用。你需要在应用内填写
+    路由器的地址与登录口令，应用才能读取状态、下发设置。</p>
+    <p>本应用<strong>不是</strong> iStoreOS、OpenWrt 或其所属组织的官方产品，与上述组织无隶属或代理关系。
+    相关名称仅用于说明本应用的兼容范围。</p>
+
+    <h2>二、使用前提</h2>
+    <ul>
+      <li>你需要自行准备并维护一台可运行 iStoreOS / OpenWrt 的路由器，并在其上完成 iStore Agent 的安装与配置</li>
+      <li>你需要自行保证手机与路由器之间的网络可达（同一局域网，或你自行配置的远程访问方式）</li>
+      <li>你需要妥善保管路由器登录口令与 App 登录口令，因口令泄露造成的后果由你自行承担</li>
+    </ul>
+
+    <h2>三、你可以做什么</h2>
+    <p>在遵守本协议与适用法律法规的前提下，你可以：</p>
+    <ul>
+      <li>在自己的设备上安装、使用本应用，管理你自己的路由器</li>
+      <li>按项目开源许可（MIT）的条款获取、修改、分发本应用的源代码</li>
+      <li>通过项目仓库的问题反馈渠道提出建议或报告缺陷</li>
+    </ul>
+
+    <h2>四、你不应做什么</h2>
+    <ul>
+      <li>不得使用本应用管理<strong>你无权管理</strong>的路由器或网络设备</li>
+      <li>不得利用本应用从事任何违反法律法规、侵害他人合法权益的活动</li>
+      <li>不得对本应用进行反向工程后用于商业分发（开源许可另有约定的除外）</li>
+      <li>不得删除或遮蔽本应用中的版权声明与许可声明</li>
+    </ul>
+
+    <h2>五、风险提示</h2>
+    <blockquote>
+      本应用会向你的路由器下发配置变更（修改口令、调整网络参数、启停代理与拦截服务等）。
+      这类操作<strong>可能导致路由器重启、断网、局域网内其他设备暂时失联</strong>。
+      请在操作前确认你了解该操作的影响，并确保自己能够通过物理接触或其他方式恢复设备。
+    </blockquote>
+    <ul>
+      <li>本应用与路由器之间的通信<strong>默认为 HTTP 明文</strong>。若你在不可信网络中远程访问，
+        请自行在路由器侧配置 HTTPS 反向代理或使用 VPN。应用内对此也有相应提示。</li>
+      <li>本应用展示的所有数据均来自你自己的路由器，其准确性取决于路由器侧的采集结果，
+        开发者不对数据的完整性、实时性作出保证。</li>
+      <li>代理、DNS、拦截类功能的实际效果取决于第三方软件与你的网络环境，
+        开发者不对其可用性、速度或合规性作出承诺。</li>
+    </ul>
+
+    <h2>六、个人信息</h2>
+    <p>本应用<strong>不收集、不上传、不共享</strong>你的任何个人信息。详细说明见
+    <a href="https://cdn.jsdelivr.net/gh/zifeng-chen/istore-pilot@main/docs/privacy.html">《iStore Pilot 隐私政策》</a>。</p>
+
+    <h2>七、知识产权</h2>
+    <p>本应用的源代码以 MIT 许可开源，著作权归开发者所有。应用名称、图标等标识不随源代码许可一并授予。
+    你基于本应用源代码产生的衍生作品，应保留原始版权声明与许可声明。</p>
+    <p>本应用内涉及的第三方名称、商标归其各自权利人所有。</p>
+
+    <h2>八、免责与责任限制</h2>
+    <p>本应用按「现状」提供，不附带任何明示或默示的担保。在适用法律允许的最大范围内，
+    开发者不对因使用或无法使用本应用而产生的任何直接或间接损失承担责任，
+    包括但不限于：网络中断、设备故障、配置错误、数据丢失、第三方服务不可用。</p>
+    <p>若你所在地区的法律不允许排除上述部分责任，则相应条款在该地区范围内不适用。</p>
+
+    <h2>九、服务变更与终止</h2>
+    <p>开发者可能在不另行通知的情况下更新、调整或停止本应用的某个功能。开源项目亦可能因维护者精力
+    而放缓更新节奏。你可随时卸载本应用以终止使用。</p>
+
+    <h2>十、协议变更</h2>
+    <p>本协议如有变更，会更新本页面并修改顶部「生效日期」。变更后你继续使用本应用，
+    即视为接受变更后的协议。若你不同意变更内容，请停止使用并卸载本应用。</p>
+
+    <h2>十一、适用法律</h2>
+    <p>本协议适用中华人民共和国法律（不含冲突法规则）。因本协议产生的争议，
+    双方应友好协商解决；协商不成的，提交开发者所在地有管辖权的人民法院。</p>
+
+    <h2>十二、联系方式</h2>
+    <ul>
+      <li>问题反馈：<a href="https://github.com/zifeng-chen/istore-pilot/issues">https://github.com/zifeng-chen/istore-pilot/issues</a></li>
+      <li>项目主页：<a href="https://github.com/zifeng-chen/istore-pilot">https://github.com/zifeng-chen/istore-pilot</a></li>
+    </ul>
+
+    <hr>
+    <div class="footer">
+      本文档随 iStore Pilot 仓库发布，以本页面内容为准。
+    </div>
+  </div>
+</div>
+</body>
+</html>
