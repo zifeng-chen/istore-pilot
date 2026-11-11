@@ -8,9 +8,9 @@
 
 | 环节 | 状态 | 缺什么 |
 |---|---|---|
-| 能编译 | ✅ `hvigorw assembleHap` 出 `.hap`（2.85 MB，buildMode=release） | — |
+| 能编译 | ✅ `hvigorw assembleHap` 出 `.hap`（约 3.1 MB，buildMode=release） | — |
 | 能装真机 | ✅ 调试证书签名有效，设备白名单 2 台，有效期到 2027-11-03 | — |
-| **能上架** | ❌ | 发布证书（type=2）、`.app` 包、AGC 凭证、审核材料 |
+| **能上架** | ✅ 发布证书（type=2）+ `.app` + 邀请测试提审已打通（0.3.0、0.3.2 都提过） | 正式上架还差应用分类/公开测试材料 |
 
 一句话：**代码侧没阻碍，差的全是证书 + 材料 + 账号。**
 
@@ -36,7 +36,7 @@
 | 签名要求 | 调试证书（type=1）够用 | **必须发布证书（type=2）** |
 
 **坑**：AGC 只收 `.app`。直接传 `.hap` 会被拒；改后缀更不行。
-本项目现在只有 `.hap`，所以「上传」这一步还没开始。
+`.app` 用 `assembleApp` 出（见 §5），Mac 上的构建脚本已按发布签名配置好。
 
 ## 2. 两个官方 skill 已经装好
 
@@ -171,6 +171,79 @@ $CLI publish submit -a "$APPID" --remark "0.1.7 首个鸿蒙版本"
 ```
 
 上传后 AGC 会跑编译/解析（`publish compile-status` 查），通过后才能提审。
+
+### 6.1 邀请测试（AppTest）发新版本 —— 实测可跑通的全套命令
+
+每个新版本都要**新建一个测试版本**（旧版本提审后不能再换包）。
+下面这一串按顺序跑，参数是 0.3.2 那次实测出来的：
+
+```bash
+cd harmony                      # CLI 只读当前目录的 .env
+CLI="node ~/.workbuddy/skills/hmos-connect-api-cli-skill/scripts/connect-api-cli.js"
+APPID=…; GROUP=…                # 测试组 id，`test group-list` 里拿
+
+# ① 传包（-r 6 = 测试分发；bound:false 是正常的，包要另外挂到版本上）
+$CLI upload file -a $APPID -f ../dist/istoreos-<版本>.app -r 6
+#   → 记下 objectId
+
+# ② 建测试版本
+$CLI test version-create -a $APPID --test-type 3 --test-desc "<50 字以内>" -r 6
+#   → versionId
+
+# ③ 把包挂到版本上
+$CLI test pkg-add -a $APPID --file-name istoreos-<版本>.app \
+      --object-id "<objectId>" --distribute-mode 1
+#   → pkgVersion（就是后面要的 pkgId）
+
+# ④ 填元数据（body 见下）
+$CLI test version-update -a $APPID --body ../build/testver.json
+
+# ⑤ 等包检通过，再提审
+$CLI publish compile-status -a $APPID --pkg-ids <pkgId>   # successStatus 变 0 才能提
+$CLI test version-submit -a $APPID -v <versionId>
+```
+
+`version-update` 的 body（字段被报错逐个逼出来的，照抄即可）：
+
+```json
+{
+  "versionId": "<版本 id>",
+  "pkgId": "<pkgId>",
+  "languages": [{
+    "language": "zh-CN",
+    "appName": "iStore Pilot",
+    "appDesc": "≥2 个字，否则报 Description is necessary",
+    "newFeatures": "本次更新",
+    "deviceMaterials": [
+      {"deviceType": 4,  "appIcon": "<图标 objectId>"},
+      {"deviceType": 19, "appIcon": "<图标 objectId>"}
+    ]
+  }],
+  "extInfo": {"privacyPolicy": "https://…（必须是能打开的 https）"},
+  "openTestInfo": {
+    "startTime": <ms>, "endTime": <ms>,
+    "testTaskInfo": {
+      "displayArea": "1",
+      "startTime": <ms>, "endTime": <ms>,
+      "groupInfos": [{"groupId": "<GROUP>", "bind": 1}]
+    }
+  }
+}
+```
+
+三个只在踩过之后才知道的点：
+
+1. **`startTime` / `endTime` 必须放在 `openTestInfo` 顶层**，只塞进 `testTaskInfo`
+   会报 `openTestInfo.startTime: must not be null`（两层都写最稳）。
+2. **`compile-status` 的 `successStatus`：`1` = 检查中，`0` = 通过。**
+   刚上传就提审会报 `app package check from cfs not approved` —— 不是包坏了，
+   等几分钟重查，变成 0 再提即可（实测约 4 分钟）。
+3. **`deviceMaterials[].appIcon` 每个设备档都要带**，图标先 `upload file --no-bind`
+   拿 objectId；`appDesc` 为空会报 `Description is necessary`。
+
+提审成功后 `publish version-list` 里该版本 `state` 从 7 变 **12**（已提审）。
+邀请码与测试组是**组级**的，跨版本复用；分享链接是**版本级**的（换版本要在
+AGC 网页复制新链接），`test public-link-*` 这组接口对本应用无权限。
 
 ## 7. AGC 上架 13 步里，哪些能自动
 
