@@ -38,6 +38,15 @@ struct LoginPage {
     this.measureSafeTop(ctx);
   }
 
+  onPageShow(): void {
+    // 每次显示（含从帮助页返回）都校准一次：状态栏图标色是按窗口设的，
+    // 不会随页面切换自动复原，上一页留下的颜色会带过来
+    const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    if (ctx) {
+      SystemBar.sync(ctx);
+    }
+  }
+
   private measureSafeTop(ctx: common.UIAbilityContext): void {
     window.getLastWindow(ctx).then((win: window.Window) => {
       const sys = win.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM);
@@ -154,6 +163,8 @@ struct LoginPage {
             .borderRadius(T.R_INNER)
             .backgroundColor($r('app.color.surface_sunken'))
             .fontSize(T.F_BODY)
+            .fontColor($r('app.color.text_primary'))
+            .placeholderColor($r('app.color.text_tertiary'))
             .onChange((v: string) => {
               this.host = v;
               this.err = '';
@@ -172,6 +183,8 @@ struct LoginPage {
             .borderRadius(T.R_INNER)
             .backgroundColor($r('app.color.surface_sunken'))
             .fontSize(T.F_BODY)
+            .fontColor($r('app.color.text_primary'))
+            .placeholderColor($r('app.color.text_tertiary'))
             .enterKeyType(EnterKeyType.Go)
             .onChange((v: string) => {
               this.password = v;

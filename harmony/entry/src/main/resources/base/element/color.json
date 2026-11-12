@@ -22,7 +22,7 @@
     },
     {
       "name": "primary",
-      "value": "#00A87E"
+      "value": "#00805E"
     },
     {
       "name": "primary_dim",
@@ -74,11 +74,11 @@
     },
     {
       "name": "warn",
-      "value": "#FF9500"
+      "value": "#B45309"
     },
     {
       "name": "ok",
-      "value": "#34C759"
+      "value": "#1E8E3E"
     },
     {
       "name": "text_primary",
@@ -90,7 +90,7 @@
     },
     {
       "name": "text_tertiary",
-      "value": "#C7C7CC"
+      "value": "#7E8883"
     },
     {
       "name": "divider",
