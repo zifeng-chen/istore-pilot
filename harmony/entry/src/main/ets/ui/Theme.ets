@@ -101,7 +101,7 @@ export class Pal {
   }
 
   static primary(): string {
-    return Pal.of($r('app.color.primary'), '#00A87E');
+    return Pal.of($r('app.color.primary'), '#00805E');
   }
 
   static primaryDim(): string {
@@ -121,7 +121,7 @@ export class Pal {
   }
 
   static textTertiary(): string {
-    return Pal.of($r('app.color.text_tertiary'), '#C7C7CC');
+    return Pal.of($r('app.color.text_tertiary'), '#7E8883');
   }
 
   static danger(): string {
@@ -129,11 +129,11 @@ export class Pal {
   }
 
   static warn(): string {
-    return Pal.of($r('app.color.warn'), '#FF9500');
+    return Pal.of($r('app.color.warn'), '#B45309');
   }
 
   static ok(): string {
-    return Pal.of($r('app.color.ok'), '#34C759');
+    return Pal.of($r('app.color.ok'), '#1E8E3E');
   }
 
   static heroFrom(): string {

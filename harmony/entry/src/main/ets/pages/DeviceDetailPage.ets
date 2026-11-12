@@ -102,8 +102,8 @@ struct DeviceDetailPage {
         Text('‹')
           .fontSize(26)
           .fontColor($r('app.color.primary'))
-          .width(34)
-          .height(34)
+          .width(44)
+          .height(44)
           .textAlign(TextAlign.Center)
           .onClick(() => {
             router.back();
@@ -122,7 +122,7 @@ struct DeviceDetailPage {
             : $r('app.color.text_tertiary'));
       }
       .width('100%')
-      .padding({ left: 8, right: T.PAD, top: 6, bottom: 4 })
+      .padding({ left: 3, right: T.PAD, top: 6, bottom: 4 })
       .alignItems(VerticalAlign.Center);
 
       if (this.loading) {

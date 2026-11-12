@@ -123,7 +123,7 @@ export struct SideNav {
             ? $r('app.color.primary')
             : $r('app.color.text_primary'));
         Text(item.hint)
-          .fontSize(10)
+          .fontSize(10.5)
           .fontColor($r('app.color.text_secondary'))
           .margin({ top: 1 });
       }

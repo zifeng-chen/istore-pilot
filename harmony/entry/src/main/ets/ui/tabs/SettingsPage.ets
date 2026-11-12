@@ -989,12 +989,16 @@ export struct SettingsPage {
             .fontColor($r('app.color.text_primary'))
             .layoutWeight(1);
           Stack() {
-            GlyphIcon({ kind: Glyph.CLOSE, color: Pal.textSecondary(), side: 14, lineWidth: 2.1 });
+            Stack() {
+              GlyphIcon({ kind: Glyph.CLOSE, color: Pal.textSecondary(), side: 14, lineWidth: 2.1 });
+            }
+            .width(30)
+            .height(30)
+            .borderRadius(15)
+            .backgroundColor($r('app.color.surface_hi'));
           }
-          .width(30)
-          .height(30)
-          .borderRadius(15)
-          .backgroundColor($r('app.color.surface_hi'))
+          .width(44)
+          .height(44)
           .onClick(() => {
             this.closeSheet();
           });

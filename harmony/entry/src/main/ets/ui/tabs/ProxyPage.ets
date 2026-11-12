@@ -1872,12 +1872,16 @@ export struct ProxyPage {
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis });
       Stack() {
-        GlyphIcon({ kind: Glyph.CLOSE, color: Pal.textSecondary(), side: 14, lineWidth: 2.1 });
+        Stack() {
+          GlyphIcon({ kind: Glyph.CLOSE, color: Pal.textSecondary(), side: 14, lineWidth: 2.1 });
+        }
+        .width(30)
+        .height(30)
+        .borderRadius(15)
+        .backgroundColor($r('app.color.surface_hi'));
       }
-      .width(30)
-      .height(30)
-      .borderRadius(15)
-      .backgroundColor($r('app.color.surface_hi'))
+      .width(44)
+      .height(44)
       .onClick(() => {
         this.showGroup = false;
         this.showPkg = false;
@@ -2039,12 +2043,16 @@ export struct ProxyPage {
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1);
         Stack() {
-          GlyphIcon({ kind: Glyph.CLOSE, color: Pal.textSecondary(), side: 14, lineWidth: 2.1 });
+          Stack() {
+            GlyphIcon({ kind: Glyph.CLOSE, color: Pal.textSecondary(), side: 14, lineWidth: 2.1 });
+          }
+          .width(30)
+          .height(30)
+          .borderRadius(15)
+          .backgroundColor($r('app.color.surface_hi'));
         }
-        .width(30)
-        .height(30)
-        .borderRadius(15)
-        .backgroundColor($r('app.color.surface_hi'))
+        .width(44)
+        .height(44)
         .onClick(() => {
           this.showPkg = false;
         });
@@ -2470,7 +2478,7 @@ export struct ProxyPage {
     Column() {
       Row({ space: 6 }) {
         Text(this.groupType(g.type))
-          .fontSize(10)
+          .fontSize(10.5)
           .fontColor($r('app.color.text_secondary'))
           .padding({ left: 6, right: 6, top: 2.5, bottom: 2.5 })
           .borderRadius(99)
@@ -2508,7 +2516,7 @@ export struct ProxyPage {
 
       Row() {
         Text(g.members.length + ' 个节点')
-          .fontSize(10)
+          .fontSize(10.5)
           .fontColor($r('app.color.text_tertiary'))
           .fontFeature("\"tnum\" on");
       }
@@ -2564,12 +2572,16 @@ export struct ProxyPage {
             }
           });
         Stack() {
-          GlyphIcon({ kind: Glyph.CLOSE, color: Pal.textSecondary(), side: 14, lineWidth: 2.1 });
+          Stack() {
+            GlyphIcon({ kind: Glyph.CLOSE, color: Pal.textSecondary(), side: 14, lineWidth: 2.1 });
+          }
+          .width(30)
+          .height(30)
+          .borderRadius(15)
+          .backgroundColor($r('app.color.surface_hi'));
         }
-        .width(30)
-        .height(30)
-        .borderRadius(15)
-        .backgroundColor($r('app.color.surface_hi'))
+        .width(44)
+        .height(44)
         .onClick(() => {
           this.showGroup = false;
         });

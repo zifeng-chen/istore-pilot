@@ -430,7 +430,7 @@ export struct DevicesPage {
         // 接入方式徽标（5G / 2.4G / LAN）替掉原来的首字方块：
         // 一排方块看不出「插线还是无线、连的哪个频段」，而那才是用户想知道的
         Text(d.badge)
-          .fontSize(9)
+          .fontSize(10.5)
           .fontWeight(FontWeight.Medium)
           .fontColor(this.badgeColor(d))
           .textAlign(TextAlign.Center)
@@ -657,7 +657,7 @@ export struct DevicesPage {
         // 角标 = 「点得进去」：方形卡放不下整行 chevron，右上角一枚小箭头就够
         if (d.blocked) {
           Text('禁')
-            .fontSize(9)
+            .fontSize(10.5)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.danger'))
             .textAlign(TextAlign.Center)
@@ -682,14 +682,14 @@ export struct DevicesPage {
       .width('100%');
 
       Text(d.meta)
-        .fontSize(10)
+        .fontSize(10.5)
         .fontColor(d.online ? $r('app.color.text_secondary') : $r('app.color.text_tertiary'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .margin({ top: 2 });
 
       Text(d.badge)
-        .fontSize(9.5)
+        .fontSize(10.5)
         .fontWeight(FontWeight.Medium)
         .fontColor(this.badgeColor(d))
         .padding({ left: 5, right: 5, top: 1.5, bottom: 1.5 })
@@ -707,7 +707,7 @@ export struct DevicesPage {
         .fontFeature("\"tnum\" on")
         .maxLines(1);
       Text('共 ' + d.total)
-        .fontSize(10)
+        .fontSize(10.5)
         .fontColor($r('app.color.text_tertiary'))
         .fontFeature("\"tnum\" on")
         .maxLines(1)

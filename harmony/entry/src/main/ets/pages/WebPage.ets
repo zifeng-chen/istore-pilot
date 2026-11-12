@@ -194,8 +194,8 @@ struct WebPage {
           GlyphIcon({ kind: Glyph.CHEVRON_LEFT, color: Pal.textPrimary(),
             side: 19, lineWidth: 2.2 });
         }
-        .width(34)
-        .height(34)
+        .width(44)
+        .height(44)
         .alignContent(Alignment.Center)
         .onClick(() => this.close());
         Column({ space: 2 }) {

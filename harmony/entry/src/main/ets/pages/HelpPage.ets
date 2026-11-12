@@ -31,8 +31,8 @@ struct HelpPage {
             spin: 180
           });
         }
-        .width(38)
-        .height(34)
+        .width(44)
+        .height(44)
         .justifyContent(FlexAlign.Center)
         .onClick(() => {
           router.back();

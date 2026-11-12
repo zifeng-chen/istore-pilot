@@ -595,7 +595,7 @@ export struct ShieldPage {
                 .textAlign(TextAlign.End);
               if (it.blocked) {
                 Text('拦')
-                  .fontSize(9.5)
+                  .fontSize(10.5)
                   .fontColor($r('app.color.danger'))
                   .padding({ left: 5, right: 5, top: 1, bottom: 1 })
                   .borderRadius(5)
