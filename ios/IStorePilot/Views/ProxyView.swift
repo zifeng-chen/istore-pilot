@@ -430,24 +430,6 @@ struct ProxyView: View {
         }
     }
 
-    /// hero 深色底上的小胶囊。
-    ///
-    /// 「运行中」用实心薄荷色 + 深色字，未运行只是描边 —— 原来两者都是
-    /// 一层半透明白，两个后端的名字又都压到 62% 灰，扫一眼分不出谁在跑。
-    private func heroPill(_ text: String, on: Bool) -> some View {
-        Text(text)
-            .font(.system(size: 11, weight: on ? .semibold : .medium))
-            .foregroundStyle(on ? C.heroInk : C.heroFg.opacity(0.72))
-            .padding(.horizontal, 10).padding(.vertical, 3.5)
-            .background {
-                if on {
-                    Capsule().fill(C.heroOn)
-                } else {
-                    Capsule().strokeBorder(C.heroFg.opacity(0.28), lineWidth: 0.9)
-                }
-            }
-    }
-
     private func backendRow(_ b: J) -> some View {
         let on = b.bool("running")
         let installed = b.bool("installed")

@@ -918,11 +918,6 @@ export struct SettingsPage {
     this.openSheet(SHEET_THEME);
   }
 
-  private pickBase(): void {
-    this.f1 = this.hostText();
-    this.openSheet(SHEET_BASE);
-  }
-
   // ================================================================ 弹层
 
   private openSheet(kind: string): void {
