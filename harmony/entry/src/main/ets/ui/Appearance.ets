@@ -1,5 +1,6 @@
 import { common, ConfigurationConstant } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
+import { SystemBar } from '../core/SystemBar';
 import { Pal } from './Theme';
 
 const PREF_NAME: string = 'istore_ui';
@@ -67,6 +68,12 @@ export class Appearance {
     }
     // colorMode 变化是异步广播的，先把自绘颜色缓存清掉，避免出现半新半旧
     Pal.refresh();
+    // 沉浸式下系统栏图标色不会跟着 colorMode 自动变，切完主题补刷一次。
+    // 这里用「用户选的值」而不是 ctx.config.colorMode —— 后者要等广播才更新
+    const dark: boolean = Appearance.mode === 2
+      ? true
+      : (Appearance.mode === 1 ? false : SystemBar.isDark(ctx));
+    SystemBar.sync(ctx, dark);
   }
 
   private static async ready(ctx: common.Context): Promise<preferences.Preferences> {

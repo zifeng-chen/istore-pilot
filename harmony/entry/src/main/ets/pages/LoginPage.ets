@@ -1,9 +1,10 @@
 import { common } from '@kit.AbilityKit';
-import { router } from '@kit.ArkUI';
+import { display, router, window } from '@kit.ArkUI';
 import { Api, ApiResult } from '../api/Api';
 import { Session } from '../core/Session';
 import { Snap } from '../core/Snap';
 import { UI } from '../core/UIState';
+import { SystemBar } from '../core/SystemBar';
 import { Pal, T } from '../ui/Theme';
 import { LineIcon } from '../ui/Comp';
 import { Ico } from '../ui/comp/Icons';
@@ -22,6 +23,9 @@ struct LoginPage {
 
   aboutToAppear(): void {
     const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    // 登录页是浅色底。从启动页（深绿底、白图标）跳过来时，状态栏图标还是白的，
+    // 白压白看不见 —— 这里按当前色彩模式再校准一次
+    SystemBar.sync(ctx);
     Session.init(ctx).then(() => {
       // 上次填过的地址要带出来，省得每次重输 IP
       if (Session.base().length > 0) {
@@ -29,6 +33,22 @@ struct LoginPage {
       }
     });
     this.safeTop = UI.safeTop;
+    // 再从窗口量一次：冷启动直接进登录页时，Index 的 measureSafeArea 还没跑过，
+    // UI.safeTop 可能是 0 / 旧值 —— 那样标题会钻到状态栏底下
+    this.measureSafeTop(ctx);
+  }
+
+  private measureSafeTop(ctx: common.UIAbilityContext): void {
+    window.getLastWindow(ctx).then((win: window.Window) => {
+      const sys = win.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM);
+      const d: number = display.getDefaultDisplaySync().densityPixels;
+      if (d > 0 && sys.topRect.height > 0) {
+        const vp: number = sys.topRect.height / d;
+        this.safeTop = vp;
+        UI.safeTop = vp;
+      }
+    }).catch(() => {
+    });
   }
 
   private async doLogin(): Promise<void> {

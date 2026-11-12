@@ -1,9 +1,10 @@
 import { common } from '@kit.AbilityKit';
-import { router, window } from '@kit.ArkUI';
+import { display, router, window } from '@kit.ArkUI';
 import { Api, ApiResult } from '../api/Api';
 import { Session } from '../core/Session';
 import { Shell } from '../core/Shell';
 import { UI, UIState } from '../core/UIState';
+import { SystemBar } from '../core/SystemBar';
 import { Pal, T } from '../ui/Theme';
 import { Appearance } from '../ui/Appearance';
 import { Bp } from '../ui/Breakpoint';
@@ -66,7 +67,7 @@ struct Index {
     // 深浅色要在第一帧之前定下来，否则会先闪一下系统色再跳到用户选的
     await Appearance.init(ctx);
     // 启动页是深绿底：状态栏/导航条图标得转白，否则深底上根本看不见
-    this.tintSystemBars('#FFFFFF');
+    this.tintSystemBars(true);
 
     // 入场：图标放大淡入，名字晚 120ms、标语晚 220ms
     animateTo({ duration: 420, curve: Curve.EaseOut }, () => {
@@ -87,6 +88,9 @@ struct Index {
       // 没登录：不等人，走完进度交给登录页
       await this.step(1, 520, '准备就绪');
       await this.holdMin(started);
+      // 登录页是浅色底：跳转前把状态栏图标切回深色，否则启动页的白图标
+      // 会一路带到登录页，白压白看不见（上架检测报的就是这个）
+      SystemBar.sync(ctx);
       router.replaceUrl({ url: 'pages/LoginPage' });
       return;
     }
@@ -100,7 +104,7 @@ struct Index {
     await this.holdMin(started);
     this.splash = false;
     // 退出启动页：状态栏图标跟着当前主题走
-    this.tintSystemBars(Appearance.current() === 2 ? '#FFFFFF' : '#000000');
+    SystemBar.sync(ctx);
 
     await this.measureSafeArea(ctx);
     // 各页签靠这个值决定自己要不要轮询：切走的页面立刻停定时器
@@ -144,16 +148,10 @@ struct Index {
     return r !== null && r.ok;
   }
 
-  /** 状态栏 / 导航条图标颜色 */
-  private tintSystemBars(color: string): void {
+  /** 状态栏 / 导航条图标颜色。统一走 SystemBar，别在每个页面各写一套 */
+  private tintSystemBars(dark: boolean): void {
     const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
-    window.getLastWindow(ctx).then((win: window.Window) => {
-      win.setWindowSystemBarProperties({
-        statusBarContentColor: color,
-        navigationBarContentColor: color
-      });
-    }).catch(() => {
-    });
+    SystemBar.sync(ctx, dark);
   }
 
   /** 侧栏顶部要显示机型名，单独取一次，取不到就用默认名 */
@@ -179,10 +177,19 @@ struct Index {
       const win = await window.getLastWindow(ctx);
       const sys = win.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM);
       const indicator = win.getWindowAvoidArea(window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR);
-      UI.safeTop = px2vp(sys.topRect.height);
-      this.safeBottom = px2vp(indicator.bottomRect.height);
+      // 用屏幕密度自己换算，不依赖 px2vp（它在部分上下文里已废弃/不可用）
+      const d: number = display.getDefaultDisplaySync().densityPixels;
+      if (d > 0) {
+        UI.safeTop = sys.topRect.height / d;
+        // 横屏时状态栏与挖孔在侧边，只让顶部不够
+        UI.safeLeft = sys.leftRect.width / d;
+        UI.safeRight = sys.rightRect.width / d;
+        this.safeBottom = indicator.bottomRect.height / d;
+      }
     } catch (e) {
       UI.safeTop = 0;
+      UI.safeLeft = 0;
+      UI.safeRight = 0;
       this.safeBottom = 0;
     }
   }
@@ -216,7 +223,7 @@ struct Index {
             }
             .width(Bp.RAIL_W)
             .height('100%')
-            .padding({ top: this.ui.safeTop });
+            .padding({ top: this.ui.safeTop, left: this.ui.safeLeft });
 
             // 内容区
             Column() {
@@ -383,7 +390,12 @@ struct Index {
     .height('100%')
     // 顶上让出状态栏，底下让出导航条：这个 App 是全屏窗口
     // （EntryAbility 里 setWindowLayoutFullScreen），不让出来内容会钻到系统栏底下。
-    .padding({ top: this.ui.safeTop, bottom: this.bottomPad() });
+    .padding({
+      top: this.ui.safeTop,
+      bottom: this.bottomPad(),
+      left: this.ui.safeLeft,
+      right: this.ui.safeRight
+    });
   }
 
   /**

@@ -24,6 +24,9 @@ export class UIState {
   @Trace winW: number = 360;
   /** 状态栏安全区（vp），全屏窗口下页面自己让出顶部 */
   @Trace safeTop: number = 0;
+  /** 横屏 / 挖孔屏时状态栏可能在侧边，左右安全区跟着让 */
+  @Trace safeLeft: number = 0;
+  @Trace safeRight: number = 0;
   /** 强制登录信号：令牌失效时 EntryAbility 置时间戳，Index 跳登录页 */
   @Trace forceLogin: number = 0;
   /** 页内二级页标题；空串 = 停在一级页（见 core/Shell.ets） */
