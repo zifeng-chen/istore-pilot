@@ -160,7 +160,13 @@ export struct HardwarePage {
     .width('100%');
   }
 
-  /** 顶部：谁、什么系统、什么架构 + 三个一眼要看的数 */
+  /**
+   * 顶部概览。
+   *
+   * 原来是三列（CPU / 内存 / 运行），在 6.8 寸这种窄长屏上每列只有 110vp，
+   * 「5 核 6 线程」「16 天 3 小时」全被省略号吃掉 —— 截图上那两个「…」就是这么来的。
+   * 现在改成两列（核心/线程、内存），运行时长挪到标题右边，一行放得下。
+   */
   @Builder
   heroCard() {
     Column() {
@@ -172,19 +178,20 @@ export struct HardwarePage {
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .layoutWeight(1);
-        Text(this.hw.obj('system').str('distro', '') + ' '
-          + this.hw.obj('system').str('version', ''))
-          .fontSize(T.F_TINY)
-          .fontColor($r('app.color.hero_fg_soft'))
+        Text('已运行 ' + this.upText)
+          .fontSize(10.5)
+          .fontColor($r('app.color.hero_fg'))
           .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .constraintSize({ maxWidth: '45%' })
+          .padding({ left: 9, right: 9, top: 3, bottom: 3 })
+          .borderRadius(99)
+          .backgroundColor('#29FFFFFF')
           .margin({ left: 8 });
       }
       .width('100%')
       .alignItems(VerticalAlign.Center);
 
-      Text(this.hw.obj('system').str('target', '—') + '　·　内核 '
+      Text(this.hw.obj('system').str('distro', 'iStoreOS') + ' '
+        + this.hw.obj('system').str('version', '') + '　·　内核 '
         + this.hw.obj('system').str('kernel', '—') + '　·　'
         + this.hw.obj('system').str('arch', '—'))
         .fontSize(T.F_TINY)
@@ -192,23 +199,22 @@ export struct HardwarePage {
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .width('100%')
-        .margin({ top: 5 });
+        .margin({ top: 6 });
 
       Row()
         .width('100%')
         .height(0.7)
         .backgroundColor($r('app.color.hero_fg'))
         .opacity(0.18)
-        .margin({ top: 10, bottom: 12 });
+        .margin({ top: 12, bottom: 12 });
 
-      Row() {
+      Row({ space: 14 }) {
         HeroStat({
-          label: 'CPU',
-          value: this.hw.obj('cpu').num('cores', 0) + ' 核 '
-            + this.hw.obj('cpu').num('threads', 0) + ' 线程'
+          label: '核心 / 线程',
+          value: this.hw.obj('cpu').num('cores', 0) + ' / '
+            + this.hw.obj('cpu').num('threads', 0)
         });
         HeroStat({ label: '内存', value: Fmt.bytes(this.hw.obj('memory').num('total', 0)) });
-        HeroStat({ label: '运行', value: this.upText });
       }
       .width('100%');
     }
@@ -237,7 +243,17 @@ export struct HardwarePage {
         .width('100%')
         .alignItems(VerticalAlign.Center);
 
-        Kv({ label: '型号', value: Fmt.orDash(this.hw.obj('cpu').str('model', '')) });
+        // 型号独占一行：它是这一卡里最长也最该被看清的东西，
+        // 塞进 Kv 的右侧值列会被挤成两行、还贴到卡片边
+        Text(Fmt.orDash(this.hw.obj('cpu').str('model', '')))
+          .fontSize(T.F_BODY)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'))
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .width('100%')
+          .margin({ top: 8, bottom: 8 });
+
         Hairline({ indent: 0 });
         Kv({
           label: '核心 / 线程',

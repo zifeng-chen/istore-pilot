@@ -22,6 +22,7 @@ const SHEET_BASE: string = 'base';
 const SHEET_PWD_APP: string = 'pwdApp';
 const SHEET_PWD_ROOT: string = 'pwdRoot';
 const SHEET_INFO: string = 'info';
+const SHEET_ADDR: string = 'addr';
 
 /**
  * 设置页。
@@ -62,6 +63,8 @@ export struct SettingsPage {
 
   @Local sheet: string = '';
   @Local sheetTitle: string = '';
+  /** 地址弹窗里要显示的完整值（IPv6 有 39 个字符，行里放不下） */
+  @Local addrValue: string = '';
   @Local infoTitle: string = '';
   @Local infoBody: string = '';
   @Local f1: string = '';
@@ -453,33 +456,48 @@ export struct SettingsPage {
   }
 
   /**
-   * 长地址在行里只能显示一半（IPv6 有 39 个字符），所以点一下弹出来看全的，
-   * 顺手给个「复制」——想粘到浏览器或 DDNS 设置里时不用手抄。
+   * 长地址在行里只能显示一半（IPv6 有 39 个字符），点一下弹出来看全的，
+   * 顺手给个「复制」。
+   *
+   * 之前用 showAlertDialog：它的 message 区域限高，三四十个字符的 IPv6
+   * 会被折成两三行、尾部还要滚动才能看全 —— 用户以为「只显示了一部分」。
+   * 改成页内 sheet，文本自动换行 + 长按也可选中。
    */
   private showAddr(title: string, value: string): void {
     if (value.length === 0 || value === '—') {
       this.flash(title + '还没读到');
       return;
     }
-    this.getUIContext().showAlertDialog({
-      title: title,
-      message: value,
-      primaryButton: {
-        value: '复制',
-        action: () => {
-          const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, value);
-          pasteboard.getSystemPasteboard().setData(data).then(() => {
-            this.flash('已复制');
-          }).catch(() => {
-            this.flash('复制失败');
-          });
-        }
-      },
-      secondaryButton: {
-        value: '关闭',
-        action: () => {
-        }
-      }
+    this.addrValue = value;
+    this.openSheet(SHEET_ADDR);
+    this.sheetTitle = title;
+  }
+
+  @Builder
+  addrBody() {
+    Column() {
+      Text(this.addrValue)
+        .fontSize(15)
+        .lineHeight(22)
+        .fontColor($r('app.color.text_primary'))
+        .fontFeature("\"tnum\" on")
+        .width('100%')
+        .copyOption(CopyOptions.LocalDevice);
+    }
+    .width('100%')
+    .margin({ top: 14 })
+    .padding(14)
+    .borderRadius(13)
+    .backgroundColor($r('app.color.surface_hi'));
+  }
+
+  private copyAddr(): void {
+    const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, this.addrValue);
+    pasteboard.getSystemPasteboard().setData(data).then(() => {
+      this.closeSheet();
+      this.flash('已复制');
+    }).catch(() => {
+      this.flash('复制失败');
     });
   }
 
@@ -548,7 +566,9 @@ export struct SettingsPage {
 
   @Builder
   powerCard() {
-    Card({ gapTop: T.GAP }) {
+    // 只留 gapBottom：原来写的是 gapTop，结果上面和「系统维护」叠成两份间距、
+    // 下面和「设备信息」一点空隙都没有
+    Card({ gapBottom: T.GAP }) {
       Column() {
         CardTitle({ glyph: Glyph.POWER, title: '电源', sub: '重启与关机都会短暂断网' });
         this.powerRow(Glyph.REFRESH, '重启网络服务', '只重拨 WAN，局域网不掉线', 'restart_network');
@@ -934,6 +954,8 @@ export struct SettingsPage {
       this.sheetTitle = '修改 App 登录密码';
     } else if (kind === SHEET_PWD_ROOT) {
       this.sheetTitle = '修改路由器密码';
+    } else if (kind === SHEET_ADDR) {
+      this.sheetTitle = '完整地址';
     } else {
       this.sheetTitle = this.infoTitle;
     }
@@ -984,6 +1006,8 @@ export struct SettingsPage {
           this.themeBody();
         } else if (this.sheet === SHEET_BASE) {
           this.baseBody();
+        } else if (this.sheet === SHEET_ADDR) {
+          this.addrBody();
         } else if (this.sheet === SHEET_PWD_APP || this.sheet === SHEET_PWD_ROOT) {
           this.pwdBody();
         } else {
@@ -1004,6 +1028,34 @@ export struct SettingsPage {
             .onClick(() => {
               this.closeSheet();
             });
+        } else if (this.sheet === SHEET_ADDR) {
+          Row({ space: 10 }) {
+            Button('关闭')
+              .type(ButtonType.Normal)
+              .borderRadius(14)
+              .height(44)
+              .layoutWeight(1)
+              .fontSize(15)
+              .fontColor($r('app.color.text_primary'))
+              .backgroundColor($r('app.color.surface_hi'))
+              .onClick(() => {
+                this.closeSheet();
+              });
+            Button('复制')
+              .type(ButtonType.Normal)
+              .borderRadius(14)
+              .height(44)
+              .layoutWeight(1)
+              .fontSize(15)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.on_primary'))
+              .backgroundColor($r('app.color.primary'))
+              .onClick(() => {
+                this.copyAddr();
+              });
+          }
+          .width('100%')
+          .margin({ top: 18 });
         } else {
           Row({ space: 10 }) {
             Button('取消')

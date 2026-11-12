@@ -149,6 +149,8 @@ export struct ProxyPage {
   /** 弹窗里正在看的分组下标，-1 表示没打开 */
   @Local openIdx: number = -1;
   @Local showGroup: boolean = false;
+  /** 配置文件选择弹层：十几个配置全铺在页面上会把节点列表挤到三屏以外 */
+  @Local showConfig: boolean = false;
   @Local busy: string = '';
   /** 正在测速的分组名，空串表示空闲 */
   @Local testingGroup: string = '';
@@ -1227,9 +1229,20 @@ export struct ProxyPage {
     .bindSheet($$this.showGroup, this.nodeSheet(), {
       height: 560,
       dragBar: true,
+      // 系统自带的关闭叉会和我们标题栏里那个圆形关闭叠在一起
+      showClose: false,
       backgroundColor: $r('app.color.app_bg'),
       onDisappear: () => {
         this.showGroup = false;
+      }
+    })
+    .bindSheet($$this.showConfig, this.configSheet(), {
+      height: 520,
+      dragBar: true,
+      showClose: false,
+      backgroundColor: $r('app.color.app_bg'),
+      onDisappear: () => {
+        this.showConfig = false;
       }
     });
   }
@@ -1672,7 +1685,7 @@ export struct ProxyPage {
 
   @Builder
   modeCard() {
-    Card({ gapTop: T.GAP }) {
+    Card({ gapBottom: T.GAP }) {
       CardTitle({ glyph: Glyph.BOLT, title: '运行模式', sub: '改完立即生效' });
       // 分段控件必须有「槽」：选中项原来用纯白做底，而卡片也是白的，
       // 三个选项看起来一模一样，根本看不出当前是规则还是全局
@@ -1695,73 +1708,190 @@ export struct ProxyPage {
     }
   }
 
+  /**
+   * 配置文件只露当前一个。
+   *
+   * 之前把 configs 全铺在页面上：一台路由器里存了十几个配置时，
+   * 「节点分组」会被挤到三四屏以外，而常用的永远是正在跑的那个。
+   * 现在点一下弹层选，列表和节点分组用同一套行样式。
+   */
   @Builder
   configCard() {
-    Card({ gapTop: T.GAP }) {
+    Card({ gapBottom: T.GAP }) {
       Column() {
         CardTitle({
           glyph: Glyph.BOX,
           title: '配置文件',
-          sub: this.configs.length > 0
-            ? ('共 ' + this.configs.length + ' 个，点一个切换')
-            : '切换会重启内核、断网十几秒'
+          sub: this.configs.length > 1
+            ? ('共 ' + this.configs.length + ' 个 · 切换会重启内核')
+            : '当前使用的配置'
         });
-        ForEach(this.configs, (c: ConfigItem, i: number) => {
-          Row({ space: 8 }) {
-            Row()
-              .width(6)
-              .height(6)
-              .borderRadius(3)
-              .backgroundColor(c.current
-                ? $r('app.color.primary')
-                : $r('app.color.text_tertiary'))
-              .margin({ top: 6 });
-            Column() {
-              Text(c.name)
-                .fontSize(T.F_BODY)
-                .fontColor(c.current
-                  ? $r('app.color.primary')
-                  : $r('app.color.text_primary'))
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis });
-              Text(this.fmtSize(c.size))
-                .fontSize(T.F_TINY)
-                .fontColor($r('app.color.text_tertiary'))
-                .fontFeature("\"tnum\" on")
-                .margin({ top: 2 });
-            }
-            .alignItems(HorizontalAlign.Start)
-            .layoutWeight(1);
+        Row({ space: 10 }) {
+          Column() {
+            Text(this.currentConfigName())
+              .fontSize(T.F_BODY)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.text_primary'))
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis });
+            Text(this.configs.length > 1 ? '当前使用 · 点一下切换' : '当前使用')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_secondary'))
+              .margin({ top: 3 });
+          }
+          .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1);
 
-            if (c.current) {
-              Text('使用中')
-                .fontSize(T.F_TINY)
-                .fontColor($r('app.color.primary'))
-                .padding({ left: 8, right: 8, top: 2, bottom: 2 })
-                .borderRadius(99)
-                .backgroundColor($r('app.color.accent_soft'));
-            }
+          if (this.configs.length > 1) {
+            Text('切换')
+              .fontSize(T.F_SUB)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.primary'))
+              .padding({ left: 12, right: 12, top: 5, bottom: 5 })
+              .borderRadius(99)
+              .backgroundColor($r('app.color.accent_soft'));
           }
-          .width('100%')
-          .alignItems(VerticalAlign.Top)
-          .padding({ top: 9, bottom: 9 })
-          .onClick(() => {
-            if (!c.current) {
-              this.switchConfig(c.path);
-            }
-          });
-          if (i < this.configs.length - 1) {
-            Hairline({ indent: 14 });
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Center)
+        .padding({ top: 10, bottom: 2 })
+        .onClick(() => {
+          if (this.configs.length > 1) {
+            this.showConfig = true;
           }
-        }, (c: ConfigItem) => c.path + (c.current ? '1' : '0'));
+        });
       }
       .width('100%');
     }
   }
 
+  private currentConfigName(): string {
+    for (let i = 0; i < this.configs.length; i++) {
+      if (this.configs[i].current) {
+        return this.configs[i].name;
+      }
+    }
+    const t: string = this.heroTitle();
+    return t === '未启用' ? '未选择' : t;
+  }
+
+  /** 配置文件选择弹层：行样式与节点列表一致（白底、单选打勾） */
+  @Builder
+  configSheet() {
+    Column() {
+      this.sheetHeader('选择配置文件');
+
+      Scroll() {
+        Column() {
+          ForEach(this.configs, (c: ConfigItem, i: number) => {
+            Column() {
+              if (i > 0) {
+                Hairline({ indent: 0 });
+              }
+              Row({ space: 10 }) {
+                Column() {
+                  Text(c.name)
+                    .fontSize(T.F_BODY)
+                    .fontWeight(c.current ? FontWeight.Medium : FontWeight.Normal)
+                    .fontColor(c.current
+                      ? $r('app.color.primary')
+                      : $r('app.color.text_primary'))
+                    .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis });
+                  Text(this.fmtSize(c.size) + (c.current ? ' · 使用中' : ''))
+                    .fontSize(T.F_TINY)
+                    .fontColor(c.current
+                      ? $r('app.color.primary')
+                      : $r('app.color.text_secondary'))
+                    .fontFeature("\"tnum\" on")
+                    .margin({ top: 3 });
+                }
+                .alignItems(HorizontalAlign.Start)
+                .layoutWeight(1);
+
+                if (c.current) {
+                  GlyphIcon({
+                    kind: Glyph.CHECK,
+                    color: Pal.primary(),
+                    side: 17,
+                    lineWidth: 2.2
+                  });
+                }
+              }
+              .width('100%')
+              .padding({ left: 14, right: 14, top: 12, bottom: 12 })
+              .alignItems(VerticalAlign.Center)
+              .onClick(() => {
+                this.showConfig = false;
+                if (!c.current) {
+                  this.switchConfig(c.path);
+                }
+              });
+            }
+            .width('100%');
+          }, (c: ConfigItem) => c.path + (c.current ? '1' : '0'));
+        }
+        .width('100%')
+        .backgroundColor($r('app.color.surface'))
+        .borderRadius(T.R_CARD)
+        .border({ width: 0.7, color: $r('app.color.glass_stroke') });
+      }
+      .layoutWeight(1)
+      .width('100%')
+      .align(Alignment.Top)
+      .scrollBar(BarState.Off);
+
+      Button('取消')
+        .type(ButtonType.Normal)
+        .borderRadius(14)
+        .height(44)
+        .width('100%')
+        .fontSize(15)
+        .fontColor($r('app.color.text_primary'))
+        .backgroundColor($r('app.color.surface_hi'))
+        .margin({ top: 14 })
+        .onClick(() => {
+          this.showConfig = false;
+        });
+    }
+    .width('100%')
+    .height('100%')
+    .padding({ left: 16, right: 16, top: 0, bottom: 20 })
+    .backgroundColor($r('app.color.app_bg'));
+  }
+
+  /** 弹层通用标题栏：标题 + 右侧圆形关闭。三个 sheet 共用，避免各写一套 */
+  @Builder
+  sheetHeader(title: string) {
+    Row() {
+      Text(title)
+        .fontSize(T.F_H1)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.text_primary'))
+        .layoutWeight(1)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis });
+      Stack() {
+        GlyphIcon({ kind: Glyph.CLOSE, color: Pal.textSecondary(), side: 14, lineWidth: 2.1 });
+      }
+      .width(30)
+      .height(30)
+      .borderRadius(15)
+      .backgroundColor($r('app.color.surface_hi'))
+      .onClick(() => {
+        this.showGroup = false;
+        this.showPkg = false;
+        this.showConfig = false;
+      });
+    }
+    .width('100%')
+    .padding({ left: 16, right: 16, top: 8, bottom: 12 })
+    .alignItems(VerticalAlign.Center);
+  }
+
   @Builder
   subsEntry() {
-    Card({ gapTop: T.GAP }) {
+    Card({ gapBottom: T.GAP }) {
       Column() {
         // 两个都装着就得点名管哪个：订阅、节点、配置文件全是各一套，
         // 不点名只能默默按某一个展示，用户以为在配另一个
@@ -1848,7 +1978,7 @@ export struct ProxyPage {
   @Builder
   pkgEntry() {
     Column() {
-      Card({ gapTop: T.GAP }) {
+      Card({ gapBottom: T.GAP }) {
         Row() {
           Row() {
             GlyphIcon({ kind: Glyph.UPLOAD, color: Pal.primary(), side: 18, lineWidth: 1.9 });
@@ -1908,36 +2038,60 @@ export struct ProxyPage {
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1);
-        Text('关闭')
-          .fontSize(T.F_SUB)
-          .fontColor($r('app.color.text_secondary'))
-          .padding({ left: 8, top: 4, bottom: 4 })
-          .onClick(() => {
-            this.showPkg = false;
-          });
+        Stack() {
+          GlyphIcon({ kind: Glyph.CLOSE, color: Pal.textSecondary(), side: 14, lineWidth: 2.1 });
+        }
+        .width(30)
+        .height(30)
+        .borderRadius(15)
+        .backgroundColor($r('app.color.surface_hi'))
+        .onClick(() => {
+          this.showPkg = false;
+        });
       }
       .width('100%')
-      .alignItems(VerticalAlign.Top)
+      .alignItems(VerticalAlign.Center)
       .padding({ bottom: 14 });
 
       Scroll() {
         Column() {
-          // ---- 1. 本地文件：不依赖路由器能不能上外网
-          Column() {
-            Text(this.uploading ? '正在上传 ' + this.uploadName : '从本地文件安装')
-              .fontSize(T.F_H2)
-              .fontWeight(FontWeight.Medium)
-              .fontColor($r('app.color.on_primary'));
-            Text(this.uploading ? '传完会自动问你要不要装' : '选 .run / .ipk，手机里有包就能装')
-              .fontSize(T.F_TINY)
-              .fontColor($r('app.color.on_primary'))
-              .opacity(0.82)
-              .margin({ top: 3 });
+          // ---- 1. 本地文件：不依赖路由器能不能上外网。
+          // 原来是整块主色底的大按钮，和页面里其它入口（白卡 + 图标 + 箭头）不是一路；
+          // 这里改成同样的卡片行，主色只留给图标底
+          Row({ space: 12 }) {
+            Stack() {
+              GlyphIcon({ kind: Glyph.UPLOAD, color: Pal.primary(), side: 17, lineWidth: 1.9 });
+            }
+            .width(32)
+            .height(32)
+            .borderRadius(10)
+            .backgroundColor($r('app.color.accent_soft'))
+            .alignContent(Alignment.Center);
+
+            Column() {
+              Text(this.uploading ? '正在上传 ' + this.uploadName : '从本地文件安装')
+                .fontSize(T.F_BODY)
+                .fontWeight(FontWeight.Medium)
+                .fontColor($r('app.color.text_primary'))
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis });
+              Text(this.uploading ? '传完会自动问你要不要装' : '选 .run / .ipk，手机里有包就能装')
+                .fontSize(T.F_TINY)
+                .fontColor($r('app.color.text_secondary'))
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .margin({ top: 3 });
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1);
+
+            GlyphIcon({ kind: Glyph.CHEVRON, color: Pal.textTertiary(), side: 14, lineWidth: 1.9 });
           }
           .width('100%')
-          .padding({ top: 15, bottom: 15 })
-          .backgroundColor($r('app.color.primary'))
+          .padding({ left: 14, right: 14, top: 13, bottom: 13 })
           .borderRadius(T.R_CARD)
+          .backgroundColor($r('app.color.surface'))
+          .border({ width: 0.7, color: $r('app.color.glass_stroke') })
           .opacity(this.uploading ? 0.6 : 1)
           .onClick(() => {
             if (!this.uploading) {
@@ -2236,7 +2390,7 @@ export struct ProxyPage {
     } else if (this.loaded) {
       // 这里原来一律写「没有正在运行的代理后端」，可上面的卡片明明显示「运行中 ·
       // 63 节点」—— 自相矛盾。分成两种：后端在跑但分组没读到，和后端确实没跑。
-      Card({ gapTop: this.rail() ? 0 : T.GAP }) {
+      Card({ gapBottom: T.GAP }) {
         // 服务端会说明为什么空着（OpenClash 停着时就是「启动后才看得到」），
         // 直接用它，别在这儿另编一句
         Text(this.groupsErr.length > 0
@@ -2366,8 +2520,11 @@ export struct ProxyPage {
     .alignItems(HorizontalAlign.Start)
     .padding(12)
     .borderRadius(14)
-    .backgroundColor($r('app.color.surface_sunken'))
-    .border({ width: 0.5, color: $r('app.color.divider') })
+    // 原来用 surface_sunken(#F4F9F6)，和页面底色 app_bg(#F2F6F4) 几乎同色，
+    // 看着就只剩一圈边框。改成和别的卡片一样用 surface + 浅阴影
+    .backgroundColor($r('app.color.surface'))
+    .border({ width: 0.7, color: $r('app.color.glass_stroke') })
+    .shadow({ radius: 8, color: '#0D000000', offsetX: 0, offsetY: 2 })
     .onClick(() => {
       if (idx >= 0) {
         this.openIdx = idx;
@@ -2380,6 +2537,9 @@ export struct ProxyPage {
   @Builder
   nodeSheet() {
     Column() {
+      // 标题栏与 configSheet 同一套：标题占满 + 测速胶囊 + 圆形关闭。
+      // 原来「关闭」是右边缘的一行文字，正好压在 bindSheet 自带的系统关闭图标上，
+      // 屏幕上看着是两个「关闭」叠着 —— 现在系统那个已关掉（showClose: false）
       Row({ space: 8 }) {
         Text(this.openIdx >= 0 && this.openIdx < this.groups.length
           ? this.groups[this.openIdx].name
@@ -2403,81 +2563,100 @@ export struct ProxyPage {
               this.testGroup(this.groups[this.openIdx].name);
             }
           });
-        Text('关闭')
-          .fontSize(T.F_SUB)
-          .fontColor($r('app.color.text_secondary'))
-          .padding({ left: 8, right: 2, top: 4, bottom: 4 })
-          .onClick(() => {
-            this.showGroup = false;
-          });
+        Stack() {
+          GlyphIcon({ kind: Glyph.CLOSE, color: Pal.textSecondary(), side: 14, lineWidth: 2.1 });
+        }
+        .width(30)
+        .height(30)
+        .borderRadius(15)
+        .backgroundColor($r('app.color.surface_hi'))
+        .onClick(() => {
+          this.showGroup = false;
+        });
       }
       .width('100%')
-      .padding({ left: 18, right: 18, top: 16, bottom: 10 });
+      .padding({ left: 16, right: 16, top: 8, bottom: 12 })
+      .alignItems(VerticalAlign.Center);
 
       if (this.openIdx >= 0 && this.openIdx < this.groups.length) {
         Scroll() {
           Column() {
-            GroupBox() {
-              ForEach(this.groups[this.openIdx].members, (m: NodeItem) => {
-                Row({ space: 10 }) {
-                  Stack() {
-                    Circle()
-                      .width(15)
-                      .height(15)
-                      .fill(Color.Transparent)
-                      .stroke(m.name === this.groups[this.openIdx].now
-                        ? $r('app.color.primary')
-                        : $r('app.color.text_tertiary'))
-                      .strokeWidth(1.4);
-                    if (m.name === this.groups[this.openIdx].now) {
-                      Circle()
-                        .width(7)
-                        .height(7)
-                        .fill($r('app.color.primary'));
+            // 左右留 16：GroupBox 自己不能链式写 margin（自定义组件），套一层
+            Column() {
+              GroupBox() {
+                ForEach(this.groups[this.openIdx].members, (m: NodeItem, i: number) => {
+                  Column() {
+                    if (i > 0) {
+                      Hairline({ indent: 16 });
                     }
-                  }
-                  .width(15)
-                  .height(15);
+                    Row({ space: 10 }) {
+                      Stack() {
+                        Circle()
+                          .width(16)
+                          .height(16)
+                          .fill(Color.Transparent)
+                          .stroke(m.name === this.groups[this.openIdx].now
+                            ? $r('app.color.primary')
+                            : $r('app.color.text_tertiary'))
+                          .strokeWidth(1.4);
+                        if (m.name === this.groups[this.openIdx].now) {
+                          Circle()
+                            .width(8)
+                            .height(8)
+                            .fill($r('app.color.primary'));
+                        }
+                      }
+                      .width(16)
+                      .height(16);
 
-                  Text(m.name)
-                    .fontSize(T.F_BODY)
-                    .fontColor(m.name === this.groups[this.openIdx].now
-                      ? $r('app.color.primary')
-                      : $r('app.color.text_primary'))
-                    .maxLines(1)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
-                    .layoutWeight(1);
+                      Text(m.name)
+                        .fontSize(T.F_BODY)
+                        .fontWeight(m.name === this.groups[this.openIdx].now
+                          ? FontWeight.Medium
+                          : FontWeight.Normal)
+                        .fontColor(m.name === this.groups[this.openIdx].now
+                          ? $r('app.color.primary')
+                          : $r('app.color.text_primary'))
+                        .maxLines(1)
+                        .textOverflow({ overflow: TextOverflow.Ellipsis })
+                        .layoutWeight(1);
 
-                  if (this.busy === this.groups[this.openIdx].name + '/' + m.name) {
-                    Text('切换中…')
-                      .fontSize(T.F_TINY)
-                      .fontColor($r('app.color.text_secondary'));
-                  } else if (m.delay > 0) {
-                    Text(m.delay + 'ms')
-                      .fontSize(T.F_TINY)
-                      .fontColor(this.delayHex(m.delay))
-                      .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-                      .borderRadius(99)
-                      .backgroundColor(Comp.alpha(this.delayHex(m.delay), 0.16))
-                      .fontFeature("\"tnum\" on");
-                  } else if (m.name === this.groups[this.openIdx].now) {
-                    Text('使用中')
-                      .fontSize(T.F_TINY)
-                      .fontColor($r('app.color.primary'));
-                  } else {
-                    Text('—')
-                      .fontSize(T.F_TINY)
-                      .fontColor($r('app.color.text_tertiary'));
+                      if (this.busy === this.groups[this.openIdx].name + '/' + m.name) {
+                        Text('切换中…')
+                          .fontSize(T.F_TINY)
+                          .fontColor($r('app.color.text_secondary'));
+                      } else if (m.delay > 0) {
+                        Text(m.delay + 'ms')
+                          .fontSize(T.F_TINY)
+                          .fontColor(this.delayHex(m.delay))
+                          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                          .borderRadius(99)
+                          .backgroundColor(Comp.alpha(this.delayHex(m.delay), 0.16))
+                          .fontFeature("\"tnum\" on");
+                      } else if (m.name === this.groups[this.openIdx].now) {
+                        Text('使用中')
+                          .fontSize(T.F_TINY)
+                          .fontColor($r('app.color.primary'));
+                      } else {
+                        Text('—')
+                          .fontSize(T.F_TINY)
+                          .fontColor($r('app.color.text_tertiary'));
+                      }
+                    }
+                    .width('100%')
+                    .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+                    .alignItems(VerticalAlign.Center)
+                    .onClick(() => {
+                      this.pickNode(this.groups[this.openIdx].name, m.name);
+                    });
                   }
-                }
-                .width('100%')
-                .padding({ left: 16, right: 16, top: 10, bottom: 10 })
-                .alignItems(VerticalAlign.Center)
-                .onClick(() => {
-                  this.pickNode(this.groups[this.openIdx].name, m.name);
-                });
-              }, (m: NodeItem) => this.groups[this.openIdx].name + '/' + m.name + '|' + m.delay);
+                  .width('100%');
+                }, (m: NodeItem) => this.groups[this.openIdx].name + '/' + m.name + '|' + m.delay);
+              }
             }
+            .width('100%')
+            .padding({ left: 16, right: 16 });
+
             Row().height(24);
           }
           .width('100%');
