@@ -23,6 +23,9 @@ export struct PortTile {
   @Param hist: number[] = [];
   /** 平板两列时卡片更高，趋势线跟着长 */
   @Param sparkH: number = 0;
+  /** 点开看累计收发与 MAC —— 卡片标题一直写着「点开看」，之前根本没有这个动作 */
+  @Event onTap: () => void = () => {
+  };
 
   private settings: RenderingContextSettings = new RenderingContextSettings(true);
   private cv: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.settings);
@@ -238,6 +241,9 @@ export struct PortTile {
         ? Comp.alpha(this.role === 'wan' ? Pal.primary() : Pal.primaryDim(),
             this.role === 'wan' ? 0.55 : 0.26)
         : $r('app.color.glass_stroke')
+    })
+    .onClick(() => {
+      this.onTap();
     });
   }
 }

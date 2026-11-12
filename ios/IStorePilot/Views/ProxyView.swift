@@ -479,7 +479,8 @@ struct ProxyView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(!installed || on || busy)
+        // 不能用 .disabled()：SwiftUI 会把整行自动调暗（白字变灰），
+        // 正好把「运行中」那个最该看清的名字压成灰的。动作里已经拦了重复点击
     }
 
     // MARK: - 运行模式

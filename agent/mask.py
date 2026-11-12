@@ -1,7 +1,12 @@
-"""把「非本地 IP」脱敏。
+"""把「非本地 IP」脱敏（**默认关闭**）。
 
 为什么放在服务端：地址会出现在五处界面（概览、网络、宽带、设置、设备详情），
-每端各写一遍过滤，迟早漏一处 —— 而漏的那一次，泄漏的是一张要发出去的截图。
+每端各写一遍过滤，迟早漏一处。
+
+为什么默认关闭：这是用户自己的路由器、自己的手机，WAN 地址本来就要能看全 ——
+填 DDNS、做端口映射、跟运营商对线都要它。之前默认打码，界面上显示的是
+`100.*.*.34`，用户以为是 App 的 bug（v0.3.8 改掉）。要发截图时再打开：
+`config.json` 里 `"privacy": {"mask_public": true}`。
 
 规则：
 - 本地地址保留原样（RFC1918 192.168/10/172.16、IPv6 ULA、回环、链路本地）。
@@ -29,9 +34,19 @@ def is_local(a: ipaddress._BaseAddress) -> bool:
     return a.is_private
 
 
+def enabled() -> bool:
+    """要不要打码。默认 False —— 用户要看完整地址。"""
+    try:
+        from . import config
+        section = config.get("privacy") or {}
+        return bool(section.get("mask_public", False))
+    except Exception:
+        return False
+
+
 def ip(text: str) -> str:
     """单条地址脱敏。认不出来就原样返回（可能是域名、空串、"—"）。"""
-    if not text:
+    if not text or not enabled():
         return text
     raw = text.strip()
     addr, sep, plen = raw.partition("/")

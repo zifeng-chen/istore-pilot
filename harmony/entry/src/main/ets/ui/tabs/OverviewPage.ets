@@ -82,6 +82,9 @@ export struct OverviewPage {
   @Local winW: number = 360;
   /** 下拉刷新：Refresh 组件要求绑一个布尔，松手后由代码收回去 */
   @Local pulling: boolean = false;
+  /** 网口详情弹层：点某个口看累计收发与 MAC */
+  @Local showPort: boolean = false;
+  @Local portIdx: number = -1;
 
   @Local ui: UIState = UI;
   @Local tab: number = UI.tab;
@@ -512,7 +515,89 @@ export struct OverviewPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor($r('app.color.app_bg'));
+    .backgroundColor($r('app.color.app_bg'))
+    .bindSheet($$this.showPort, this.portSheet(), {
+      height: 420,
+      dragBar: true,
+      showClose: false,
+      backgroundColor: $r('app.color.app_bg'),
+      onDisappear: () => {
+        this.showPort = false;
+      }
+    });
+  }
+
+  /** 单个网口的详情：当前速率 + 累计收发 + MAC */
+  @Builder
+  portSheet() {
+    Column() {
+      Row() {
+        Column() {
+          Text(this.portIdx >= 0 && this.portIdx < this.ports.length
+            ? this.ports[this.portIdx].name : '网口')
+            .fontSize(T.F_H1)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.text_primary'));
+          Text(this.portIndexText())
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_secondary'))
+            .margin({ top: 3 });
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1);
+
+        Stack() {
+          Stack() {
+            GlyphIcon({ kind: Glyph.CLOSE, color: Pal.textSecondary(), side: 14, lineWidth: 2.1 });
+          }
+          .width(30)
+          .height(30)
+          .borderRadius(15)
+          .backgroundColor($r('app.color.surface_hi'));
+        }
+        .width(44)
+        .height(44)
+        .onClick(() => {
+          this.showPort = false;
+        });
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center);
+
+      if (this.portIdx >= 0 && this.portIdx < this.ports.length) {
+        Column() {
+          Kv({ label: '状态', value: this.ports[this.portIdx].up ? '已连接' : '未连接' });
+          Hairline({ indent: 0 });
+          Kv({ label: '协商速率', value: this.ports[this.portIdx].up
+            ? this.ports[this.portIdx].speedText : '—' });
+          Hairline({ indent: 0 });
+          Kv({ label: '当前下行', value: '↓ ' + this.ports[this.portIdx].rxText });
+          Hairline({ indent: 0 });
+          Kv({ label: '当前上行', value: '↑ ' + this.ports[this.portIdx].txText });
+          Hairline({ indent: 0 });
+          Kv({ label: '累计下行', value: Fmt.bytes(this.ports[this.portIdx].rxTotal) });
+          Hairline({ indent: 0 });
+          Kv({ label: '累计上行', value: Fmt.bytes(this.ports[this.portIdx].txTotal) });
+          Hairline({ indent: 0 });
+          Kv({ label: 'MAC', value: Fmt.orDash(this.ports[this.portIdx].mac) });
+        }
+        .width('100%')
+        .padding({ top: 14 });
+      }
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+    .padding({ left: 18, right: 18, top: 8 });
+  }
+
+  private portIndexText(): string {
+    if (this.portIdx < 0 || this.portIdx >= this.ports.length) {
+      return '';
+    }
+    const role: string = this.ports[this.portIdx].role;
+    const roleText: string = role === 'wan' ? 'WAN 口' : (role === 'lan' ? 'LAN 口' : '物理网口');
+    return roleText + ' · 第 ' + (this.portIdx + 1).toString() + ' / '
+      + this.ports.length.toString() + ' 个';
   }
 
   // ================================================================ 卡片
@@ -716,7 +801,14 @@ export struct OverviewPage {
   @Builder
   portCard() {
     Card({ gapTop: 0, gapBottom: this.rail() ? Bp.gap(this.winW) : T.GAP }) {
-      CardTitle({ glyph: Glyph.BOX, title: '网口', sub: '点开看累计收发' }) {
+      CardTitle({
+        glyph: Glyph.BOX,
+        title: '网口',
+        // 口数按路由器实际有的物理口来（不写死 4 口），点开某口能看累计收发与 MAC
+        sub: this.ports.length > 0
+          ? '共 ' + this.ports.length + ' 个物理网口 · 点开看累计收发'
+          : '没读到物理网口'
+      }) {
         Pill({
           text: this.ports.length === 0
             ? '—'
@@ -745,7 +837,11 @@ export struct OverviewPage {
                     txText: this.ports[this.portIndex(row, col)].txText,
                     totalText: Fmt.bytes(this.ports[this.portIndex(row, col)].rxTotal),
                     hist: this.ports[this.portIndex(row, col)].hist,
-                    sparkH: this.rail() ? 32 : 26
+                    sparkH: this.rail() ? 32 : 26,
+                    onTap: () => {
+                      this.portIdx = this.portIndex(row, col);
+                      this.showPort = true;
+                    }
                   });
                 }
                 .layoutWeight(1)

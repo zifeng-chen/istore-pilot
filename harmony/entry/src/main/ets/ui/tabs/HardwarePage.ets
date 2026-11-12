@@ -3,7 +3,7 @@ import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
 import { Fmt } from '../../util/Fmt';
 import { Pal, T } from '../Theme';
-import { Card, CardHeader, Hairline, HeroStat, Kv, Pill } from '../Comp';
+import { Card, Hairline, HeroStat, Pill } from '../Comp';
 
 /**
  * 硬件详情页。
@@ -65,14 +65,29 @@ export struct HardwarePage {
     this.upText = Fmt.uptime(sec);
   }
 
-  /** 主板 DMI 常是 BIOS 占位符（软路由通病），这时拿 CPU 型号当标题更有信息量 */
+  /**
+   * 大标题用 CPU 型号，不再用主机名。
+   *
+   * 绝大多数 iStoreOS 的主机名就是出厂默认的 "iStoreOS"，写在 hero 上等于
+   * 什么都没说；这一页是「看硬件」，最该第一眼看到的是这台机器装了什么 U。
+   */
   private title(): string {
-    const host: string = this.hw.obj('system').str('hostname', '');
-    if (host.length > 0) {
-      return host;
-    }
     const model: string = this.hw.obj('cpu').str('model', '');
-    return model.length > 0 ? model : 'iStoreOS';
+    if (model.length > 0) {
+      return model;
+    }
+    const host: string = this.hw.obj('system').str('hostname', '');
+    return host.length > 0 ? host : 'iStoreOS';
+  }
+
+  /** 所有磁盘容量之和，hero 里一格展示 */
+  private diskTotal(): string {
+    const list: J[] = this.hw.arr('disks');
+    let total: number = 0;
+    for (let i = 0; i < list.length; i++) {
+      total += list[i].num('size', 0);
+    }
+    return total > 0 ? Fmt.bytes(total) : '—';
   }
 
   private memPercent(): number {
@@ -161,20 +176,25 @@ export struct HardwarePage {
   }
 
   /**
-   * 顶部概览。
+   * 顶部概览：这是台什么机器 + 三个最该一眼看到的数。
    *
-   * 原来是三列（CPU / 内存 / 运行），在 6.8 寸这种窄长屏上每列只有 110vp，
-   * 「5 核 6 线程」「16 天 3 小时」全被省略号吃掉 —— 截图上那两个「…」就是这么来的。
-   * 现在改成两列（核心/线程、内存），运行时长挪到标题右边，一行放得下。
+   * 大标题给 CPU 型号（主机名多半是出厂的 iStoreOS，没有信息量），
+   * 下面一行是系统与内核，再下面三格：核心线程 / 内存 / 磁盘。
+   * 三格用 18fp 的值 + 短文案，360vp 宽的屏也放得下，不会再出现省略号。
    */
   @Builder
   heroCard() {
     Column() {
       Row() {
-        Text(this.title())
-          .fontSize(21)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.hero_fg'))
+        Row()
+          .width(6)
+          .height(6)
+          .borderRadius(3)
+          .backgroundColor($r('app.color.hero_fg'))
+          .margin({ right: 6 });
+        Text(this.hw.obj('system').str('hostname', 'iStoreOS'))
+          .fontSize(T.F_TINY)
+          .fontColor($r('app.color.hero_fg_soft'))
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .layoutWeight(1);
@@ -190,11 +210,20 @@ export struct HardwarePage {
       .width('100%')
       .alignItems(VerticalAlign.Center);
 
+      Text(this.title())
+        .fontSize(19)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.hero_fg'))
+        .maxLines(2)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .width('100%')
+        .margin({ top: 8 });
+
       Text(this.hw.obj('system').str('distro', 'iStoreOS') + ' '
         + this.hw.obj('system').str('version', '') + '　·　内核 '
         + this.hw.obj('system').str('kernel', '—') + '　·　'
         + this.hw.obj('system').str('arch', '—'))
-        .fontSize(T.F_TINY)
+        .fontSize(11)
         .fontColor($r('app.color.hero_fg_soft'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -208,13 +237,19 @@ export struct HardwarePage {
         .opacity(0.18)
         .margin({ top: 12, bottom: 12 });
 
-      Row({ space: 14 }) {
+      Row({ space: 12 }) {
         HeroStat({
           label: '核心 / 线程',
           value: this.hw.obj('cpu').num('cores', 0) + ' / '
-            + this.hw.obj('cpu').num('threads', 0)
+            + this.hw.obj('cpu').num('threads', 0),
+          valueSize: 18
         });
-        HeroStat({ label: '内存', value: Fmt.bytes(this.hw.obj('memory').num('total', 0)) });
+        HeroStat({
+          label: '内存',
+          value: Fmt.bytes(this.hw.obj('memory').num('total', 0)),
+          valueSize: 18
+        });
+        HeroStat({ label: '磁盘', value: this.diskTotal(), valueSize: 18 });
       }
       .width('100%');
     }
@@ -230,57 +265,103 @@ export struct HardwarePage {
     .margin({ bottom: T.GAP });
   }
 
+  /**
+   * 卡片标题行。
+   *
+   * 不能写成 `Row { CardHeader(); Text(右侧) }` —— CardHeader 自身是 width('100%')，
+   * 会把整行占满，右边那行字被挤出卡片边界（真机上 x86_64 只显示出 x86_6）。
+   * 这里自己拼一层：左边标题撑满，右侧信息限宽 + 省略。
+   */
+  @Builder
+  sectionHead(title: string, trailing: string) {
+    Row() {
+      Text(title)
+        .fontSize(T.F_H2)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.text_primary'))
+        .layoutWeight(1)
+        .maxLines(1);
+      if (trailing.length > 0) {
+        Text(trailing)
+          .fontSize(T.F_TINY)
+          .fontColor($r('app.color.text_secondary'))
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .constraintSize({ maxWidth: '48%' })
+          .flexShrink(0)
+          .margin({ left: 8 });
+      }
+    }
+    .width('100%')
+    .alignItems(VerticalAlign.Center)
+    .margin({ bottom: 10 });
+  }
+
+  /** 2×2 小格：处理器那卡用它，比四行 Kv 短一截，也更有「卡片感」 */
+  @Builder
+  cell(label: string, value: string) {
+    Column() {
+      Text(label)
+        .fontSize(11)
+        .fontColor($r('app.color.text_tertiary'))
+        .maxLines(1);
+      Text(value)
+        .fontSize(15)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.text_primary'))
+        .fontFeature("\"tnum\" on")
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .width('100%')
+        .margin({ top: 3 });
+    }
+    .layoutWeight(1)
+    .alignItems(HorizontalAlign.Start)
+    .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+    .borderRadius(12)
+    .backgroundColor($r('app.color.surface_sunken'));
+  }
+
   @Builder
   cpuCard() {
     Card({ gapBottom: T.GAP }) {
       Column() {
-        Row() {
-          CardHeader({ title: '处理器' });
-          Text(this.hw.obj('cpu').str('arch', ''))
-            .fontSize(T.F_TINY)
-            .fontColor($r('app.color.text_secondary'));
-        }
-        .width('100%')
-        .alignItems(VerticalAlign.Center);
+        this.sectionHead('处理器', this.hw.obj('cpu').str('arch', ''));
 
         // 型号独占一行：它是这一卡里最长也最该被看清的东西，
         // 塞进 Kv 的右侧值列会被挤成两行、还贴到卡片边
         Text(Fmt.orDash(this.hw.obj('cpu').str('model', '')))
-          .fontSize(T.F_BODY)
+          .fontSize(16)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .width('100%')
-          .margin({ top: 8, bottom: 8 });
+          .margin({ bottom: 12 });
 
-        Hairline({ indent: 0 });
-        Kv({
-          label: '核心 / 线程',
-          value: this.hw.obj('cpu').num('cores', 0) + ' / '
-            + this.hw.obj('cpu').num('threads', 0)
-        });
-        Hairline({ indent: 0 });
-        Kv({
-          label: '当前频率',
-          value: this.hw.obj('cpu').num('mhz', 0) > 0
-            ? this.hw.obj('cpu').num('mhz', 0).toString() + ' MHz' : '—'
-        });
-        Hairline({ indent: 0 });
-        Kv({
-          label: '频率范围',
-          value: this.hw.obj('cpu').num('min_mhz', 0).toString() + '–'
-            + this.hw.obj('cpu').num('max_mhz', 0).toString() + ' MHz'
-        });
-        Hairline({ indent: 0 });
-        Kv({ label: '缓存', value: Fmt.orDash(this.hw.obj('cpu').str('cache', '')) });
+        Row({ space: 8 }) {
+          this.cell('核心 / 线程', this.hw.obj('cpu').num('cores', 0) + ' / '
+            + this.hw.obj('cpu').num('threads', 0));
+          this.cell('当前频率', this.hw.obj('cpu').num('mhz', 0) > 0
+            ? this.hw.obj('cpu').num('mhz', 0).toString() + ' MHz' : '—');
+        }
+        .width('100%');
+
+        Row({ space: 8 }) {
+          this.cell('频率范围',
+            this.hw.obj('cpu').num('min_mhz', 0).toString() + '–'
+              + this.hw.obj('cpu').num('max_mhz', 0).toString() + ' MHz');
+          this.cell('缓存', Fmt.orDash(this.hw.obj('cpu').str('cache', '')));
+        }
+        .width('100%')
+        .margin({ top: 8 });
 
         Row({ space: 8 }) {
           this.flag('VT 虚拟化', this.hw.obj('cpu').bool('vt', false));
           this.flag('AES 指令集', this.hw.obj('cpu').bool('aes', false));
         }
         .width('100%')
-        .margin({ top: 8 });
+        .margin({ top: 10 });
       }
       .width('100%');
     }
@@ -307,44 +388,39 @@ export struct HardwarePage {
   memoryCard() {
     Card({ gapBottom: T.GAP }) {
       Column() {
-        Row() {
-          CardHeader({ title: '内存' });
-          Text(this.memPercent().toFixed(0) + '%')
-            .fontSize(T.F_SUB)
-            .fontColor($r('app.color.text_secondary'));
-        }
-        .width('100%')
-        .alignItems(VerticalAlign.Center);
+        this.sectionHead('内存', '已用 ' + this.memPercent().toFixed(0) + '%');
+
+        Text(Fmt.bytes(this.hw.obj('memory').num('used', 0)) + ' / '
+          + Fmt.bytes(this.hw.obj('memory').num('total', 0)))
+          .fontSize(15)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'))
+          .fontFeature("\"tnum\" on")
+          .width('100%');
 
         Stack({ alignContent: Alignment.Start }) {
           Row()
             .width('100%')
-            .height(6)
-            .borderRadius(3)
+            .height(8)
+            .borderRadius(4)
             .backgroundColor($r('app.color.track'));
           Row()
             .width(Math.max(1.5, this.memPercent()).toFixed(1) + '%')
-            .height(6)
-            .borderRadius(3)
+            .height(8)
+            .borderRadius(4)
             .backgroundColor(this.memPercent() > 85
               ? $r('app.color.danger')
               : $r('app.color.primary'));
         }
         .width('100%')
-        .height(6)
-        .margin({ top: 4 });
-
-        Text(Fmt.bytes(this.hw.obj('memory').num('used', 0)) + ' / '
-          + Fmt.bytes(this.hw.obj('memory').num('total', 0)))
-          .fontSize(T.F_TINY)
-          .fontColor($r('app.color.text_secondary'))
-          .margin({ top: 8 });
+        .height(8)
+        .margin({ top: 8 });
 
         if (this.hw.obj('memory').arr('modules').length === 0) {
           Text('读不到内存条信息（部分主板不提供 SMBIOS Type 17）')
             .fontSize(T.F_TINY)
             .fontColor($r('app.color.text_secondary'))
-            .margin({ top: 8 });
+            .margin({ top: 10 });
         } else {
           ForEach(this.hw.obj('memory').arr('modules'), (m: J) => {
             Hairline({ indent: 0 });
@@ -358,58 +434,53 @@ export struct HardwarePage {
 
   @Builder
   moduleRow(m: J) {
-    Row() {
-      Column() {
-        Row({ space: 6 }) {
-          Text(Fmt.orDash(m.str('size', '')))
-            .fontSize(T.F_BODY)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.text_primary'));
-          Text(m.str('type', '') + (m.num('speed', 0) > 0
-            ? ' ' + m.num('speed', 0).toString() : ''))
-            .fontSize(T.F_TINY)
-            .fontColor($r('app.color.text_secondary'));
-          Text(m.str('form', ''))
-            .fontSize(T.F_TINY)
-            .fontColor($r('app.color.text_secondary'));
-        }
-        .width('100%');
-
-        Text((m.str('vendor', '') + ' ' + m.str('part', '')).trim())
-          .fontSize(T.F_TINY)
+    Column() {
+      Row({ space: 8 }) {
+        Text(Fmt.orDash(m.str('size', '')))
+          .fontSize(15)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'));
+        Text((m.str('type', '') + (m.num('speed', 0) > 0
+          ? ' ' + m.num('speed', 0).toString() : '')
+          + (m.str('form', '').length > 0 ? ' · ' + m.str('form', '') : '')).trim())
+          .fontSize(10.5)
           .fontColor($r('app.color.text_secondary'))
+          .padding({ left: 7, right: 7, top: 2.5, bottom: 2.5 })
+          .borderRadius(99)
+          .backgroundColor($r('app.color.surface_sunken'))
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .width('100%')
-          .margin({ top: 3 });
-
-        Text(m.str('slot', ''))
-          .fontSize(T.F_TINY)
-          .fontColor($r('app.color.text_tertiary'))
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .width('100%')
-          .margin({ top: 2 });
+          .flexShrink(1);
       }
-      .alignItems(HorizontalAlign.Start)
-      .layoutWeight(1);
+      .width('100%')
+      .alignItems(VerticalAlign.Center);
+
+      Text((m.str('vendor', '') + ' ' + m.str('part', '')).trim())
+        .fontSize(12)
+        .fontColor($r('app.color.text_secondary'))
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .width('100%')
+        .margin({ top: 4 });
+
+      Text(m.str('slot', ''))
+        .fontSize(10.5)
+        .fontColor($r('app.color.text_tertiary'))
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .width('100%')
+        .margin({ top: 2 });
     }
     .width('100%')
-    .padding({ top: 9, bottom: 9 });
+    .alignItems(HorizontalAlign.Start)
+    .padding({ top: 10, bottom: 10 });
   }
 
   @Builder
   diskCard() {
     Card({ gapBottom: T.GAP }) {
       Column() {
-        Row() {
-          CardHeader({ title: '存储' });
-          Text(this.hw.arr('disks').length.toString() + ' 块')
-            .fontSize(T.F_TINY)
-            .fontColor($r('app.color.text_secondary'));
-        }
-        .width('100%')
-        .alignItems(VerticalAlign.Center);
+        this.sectionHead('存储', this.hw.arr('disks').length.toString() + ' 块');
 
         if (this.hw.arr('disks').length === 0) {
           Text('没有检测到磁盘')
@@ -466,15 +537,8 @@ export struct HardwarePage {
   nicCard() {
     Card({ gapBottom: T.GAP }) {
       Column() {
-        Row() {
-          CardHeader({ title: '网卡' });
-          Text(this.nicUpCount().toString() + '/' + this.hw.arr('nics').length.toString()
-            + ' 已连接')
-            .fontSize(T.F_TINY)
-            .fontColor($r('app.color.text_secondary'));
-        }
-        .width('100%')
-        .alignItems(VerticalAlign.Center);
+        this.sectionHead('网卡', this.nicUpCount().toString() + '/'
+          + this.hw.arr('nics').length.toString() + ' 已连接');
 
         if (this.hw.arr('nics').length === 0) {
           Text('没有检测到物理网卡')
@@ -553,7 +617,8 @@ export struct HardwarePage {
   thermalCard() {
     Card({ gapBottom: T.GAP }) {
       Column() {
-        CardHeader({ title: '温度' });
+        this.sectionHead('温度', this.hw.obj('sensors').num('cpu', 0) > 0
+          ? 'CPU ' + Fmt.temp(this.hw.obj('sensors').num('cpu', 0)) : '');
 
         Row({ space: 10 }) {
           this.tempBlock('CPU', this.hw.obj('sensors').num('cpu', 0));
@@ -621,14 +686,7 @@ export struct HardwarePage {
   pciCard() {
     Card({ gapBottom: T.GAP }) {
       Column() {
-        Row() {
-          CardHeader({ title: 'PCI 设备' });
-          Text(this.hw.arr('pci').length.toString() + ' 项')
-            .fontSize(T.F_TINY)
-            .fontColor($r('app.color.text_secondary'));
-        }
-        .width('100%')
-        .alignItems(VerticalAlign.Center);
+        this.sectionHead('PCI 设备', this.hw.arr('pci').length.toString() + ' 项');
 
         ForEach(this.hw.arr('pci'), (p: J) => {
           Hairline({ indent: 0 });

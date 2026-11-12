@@ -33,7 +33,7 @@ import com.izifeng.www.istorepilot.core.BaseActivity;
  * 否则用户以为这里能同时管两个。代理页本身只留一行入口，这里才是增删改的地方：
  * 右上角「添加」，列表点一行改成编辑/更新/删除。
  *
- * 订阅改的是 uci 里的 subscription 段，改完必须「更新节点」才会真正拉一次；
+ * 订阅改的是 uci 里的 subscription 段，改完必须「更新」才会真正拉一次；
  * 这条链路慢（要访问订阅服务器），所以每个动作都先给提示再发请求。
  */
 public class SubscriptionActivity extends BaseActivity {
@@ -44,6 +44,16 @@ public class SubscriptionActivity extends BaseActivity {
     private String backendId = "";
     /** 订阅刷新是异步的，60 秒后自动重拉一次列表看结果 */
     private final Handler handler = new Handler(Looper.getMainLooper());
+
+    // 最近一次「更新」的结果（时间 / 成败 / 耗时 / 日志尾部）
+    private LinearLayout logCard;
+    private TextView logState;
+    private TextView logLine;
+    private TextView logTail;
+    private LinearLayout logToggle;
+    private boolean logOpen = false;
+    private boolean logPolling = false;
+    private String logTailText = "";
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -86,7 +96,7 @@ public class SubscriptionActivity extends BaseActivity {
         root.setPadding(pad, Ui.dp(this, 8), pad, Ui.dp(this, 28));
 
         Ui.Card head = Ui.card(this);
-        LinearLayout headRow = Ui.header(head, "订阅地址", "改完点「更新节点」才会重新拉取");
+        LinearLayout headRow = Ui.header(head, "订阅地址", "改完点「更新」才会重新拉取");
         tvCount = Ui.value(this, "—");
         headRow.addView(tvCount);
 
@@ -98,6 +108,8 @@ public class SubscriptionActivity extends BaseActivity {
         tvEmpty.setVisibility(android.view.View.GONE);
         head.addView(tvEmpty, elp);
         root.addView(head);
+
+        root.addView(buildLogCard());
 
         Ui.Card list = Ui.card(this);
         Ui.header(list, "全部订阅", "");
@@ -117,6 +129,118 @@ public class SubscriptionActivity extends BaseActivity {
         setContentView(wrap);
 
         load();
+        loadLog();
+    }
+
+
+    // ---------------------------------------------------------------- 更新日志
+
+    /** 「最近更新」卡：时间 / 成败 / 耗时，日志可展开 —— 更新是后台跑的，不给结果等于黑箱 */
+    private LinearLayout buildLogCard() {
+        logCard = Ui.card(this);
+        LinearLayout headRow = Ui.header(logCard, "最近更新", "");
+        logState = Ui.text(this, "", 11f, R.color.text_secondary);
+        headRow.addView(logState);
+
+        logLine = Ui.text(this, "", 12.5f, R.color.text_secondary);
+        logLine.setLineSpacing(Ui.dp(this, 2), 1f);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = Ui.dp(this, 7);
+        logCard.addView(logLine, lp);
+
+        logToggle = Ui.row(this);
+        TextView tv = Ui.text(this, "查看日志", 12.5f, R.color.primary);
+        tv.setPadding(0, Ui.dp(this, 8), 0, 0);
+        tv.setOnClickListener(v -> {
+            logOpen = !logOpen;
+            applyLogTail();
+        });
+        logToggle.addView(tv);
+        logCard.addView(logToggle);
+
+        logTail = Ui.text(this, "", 10.5f, R.color.text_secondary);
+        logTail.setTypeface(android.graphics.Typeface.MONOSPACE);
+        logTail.setLineSpacing(Ui.dp(this, 2), 1f);
+        int p = Ui.dp(this, 10);
+        logTail.setPadding(p, p, p, p);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Ui.color(this, R.color.surface_sunken));
+        bg.setCornerRadius(Ui.dp(this, 10));
+        logTail.setBackground(bg);
+        LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        tlp.topMargin = Ui.dp(this, 6);
+        logCard.addView(logTail, tlp);
+
+        logCard.setVisibility(android.view.View.GONE);
+        return logCard;
+    }
+
+    private void applyLogTail() {
+        boolean has = !logTailText.isEmpty();
+        logTail.setVisibility(logOpen && has
+                ? android.view.View.VISIBLE : android.view.View.GONE);
+        logToggle.setVisibility(has ? android.view.View.VISIBLE : android.view.View.GONE);
+        if (logToggle.getChildCount() > 0) {
+            ((TextView) logToggle.getChildAt(0)).setText(logOpen ? "收起日志" : "查看日志");
+        }
+    }
+
+    private void loadLog() {
+        Api.getFresh(this, "/api/v1/proxy/subscriptions/log", new Cb() {
+            @Override
+            public void onData(JSONObject body, boolean fromCache) {
+                if (isFinishing()) {
+                    return;
+                }
+                JSONObject lg = body.optJSONObject("log");
+                if (lg == null || lg.optLong("started_at", 0) <= 0) {
+                    logCard.setVisibility(android.view.View.GONE);
+                    return;
+                }
+                renderLog(lg);
+                if (lg.optBoolean("running", false)) {
+                    scheduleLogPoll();
+                } else {
+                    logPolling = false;
+                }
+            }
+        });
+    }
+
+    private void scheduleLogPoll() {
+        if (logPolling) {
+            return;
+        }
+        logPolling = true;
+        handler.postDelayed(() -> {
+            logPolling = false;
+            loadLog();
+        }, 2000);
+    }
+
+    private void renderLog(JSONObject lg) {
+        boolean running = lg.optBoolean("running", false);
+        boolean ok = lg.optBoolean("ok", false);
+        int secs = lg.optInt("seconds", 0);
+        logTailText = lg.optString("tail", "");
+        logState.setText(running ? "进行中" : (ok ? "成功" : "失败"));
+        logState.setTextColor(Ui.color(this,
+                running || ok ? R.color.primary : R.color.danger));
+        logLine.setText(clock(lg.optLong("started_at", 0)) + " · "
+                + lg.optString("summary", "")
+                + (!running && secs > 0 ? "（" + secs + " 秒）" : ""));
+        logCard.setVisibility(android.view.View.VISIBLE);
+        applyLogTail();
+    }
+
+    private static String clock(long ts) {
+        if (ts <= 0) {
+            return "";
+        }
+        return new java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.getDefault())
+                .format(new java.util.Date(ts * 1000));
     }
 
     // ---------------------------------------------------------------- 数据
@@ -268,7 +392,7 @@ public class SubscriptionActivity extends BaseActivity {
         }
         Sheet.actions(this, item.optString("name", ""),
                 "订阅地址：\n" + item.optString("url", ""),
-                new String[]{"更新节点（约 1 分钟）", "修改名称 / 地址", "删除订阅"},
+                new String[]{"更新（约 1 分钟）", "修改名称 / 地址", "删除订阅"},
                 index -> {
                     if (index == 0) {
                         refreshSub(id);
@@ -282,7 +406,7 @@ public class SubscriptionActivity extends BaseActivity {
 
     private void addSub() {
         Sheet.input(this, "添加订阅",
-                "保存后点一次「更新节点」才会把节点拉进来。",
+                "保存后会自动更新一次，几十秒后节点就会出现。",
                 new String[]{"名称::新订阅", "订阅地址:粘贴订阅链接:"},
                 "添加", values -> {
                     String name = values[0].trim();
@@ -331,6 +455,29 @@ public class SubscriptionActivity extends BaseActivity {
         subAction("refresh", id, "", "", "正在拉取订阅，节点会重新生成…");
     }
 
+    /** 保存之后的自动更新：不弹二次提示，结果看「最近更新」卡 */
+    private void refreshQuietly() {
+        JSONObject body = new JSONObject();
+        try {
+            body.put("action", "refresh");
+            body.put("backend", backendId);
+        } catch (Exception e) {
+            return;
+        }
+        Api.postSlow(this, "/api/v1/proxy/subscriptions", body, new Cb() {
+            @Override
+            public void onData(JSONObject data, boolean fromCache) {
+                if (isFinishing()) {
+                    return;
+                }
+                logPolling = false;
+                loadLog();
+                scheduleLogPoll();
+                handler.postDelayed(SubscriptionActivity.this::load, 60000);
+            }
+        });
+    }
+
     /** 订阅的增删改走同一个接口，用 action 区分 */
     private void subAction(String action, String id, String name, String url, String hint) {
         JSONObject body = new JSONObject();
@@ -363,7 +510,14 @@ public class SubscriptionActivity extends BaseActivity {
                     // 刷新是异步的：接口立刻返回，配置要几十秒后才生成。
                     // 不说明白的话用户以为点空了，或者马上回去看配置发现没变
                     toast("已开始更新，约 20～60 秒后生成配置");
+                    logPolling = false;
+                    loadLog();
+                    scheduleLogPoll();
                     handler.postDelayed(SubscriptionActivity.this::load, 60000);
+                } else if ("add".equals(action) || "update".equals(action)) {
+                    // 保存后自动更新：新订阅不拉一次，节点列表还是空的
+                    toast("已保存，正在更新订阅…");
+                    refreshQuietly();
                 }
                 load();
             }

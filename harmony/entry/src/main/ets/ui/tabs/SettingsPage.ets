@@ -347,7 +347,11 @@ export struct SettingsPage {
           .hitTestBehavior(HitTestMode.None);
       }
 
-      if (this.sheet.length > 0) {
+      if (this.sheet === SHEET_ADDR) {
+        // 地址要「屏幕居中 + 一次看全」：底部弹层贴边、正文区还限高，
+        // 长地址在那种布局里永远像被截了一半
+        this.addrOverlay();
+      } else if (this.sheet.length > 0) {
         this.sheetOverlay();
       }
       }
@@ -471,24 +475,6 @@ export struct SettingsPage {
     this.addrValue = value;
     this.openSheet(SHEET_ADDR);
     this.sheetTitle = title;
-  }
-
-  @Builder
-  addrBody() {
-    Column() {
-      Text(this.addrValue)
-        .fontSize(15)
-        .lineHeight(22)
-        .fontColor($r('app.color.text_primary'))
-        .fontFeature("\"tnum\" on")
-        .width('100%')
-        .copyOption(CopyOptions.LocalDevice);
-    }
-    .width('100%')
-    .margin({ top: 14 })
-    .padding(14)
-    .borderRadius(13)
-    .backgroundColor($r('app.color.surface_hi'));
   }
 
   private copyAddr(): void {
@@ -970,6 +956,104 @@ export struct SettingsPage {
     this.sheet = '';
   }
 
+  /** 地址弹窗：屏幕正中，宽度固定，长地址整段换行显示 */
+  @Builder
+  addrOverlay() {
+    Stack({ alignContent: Alignment.Center }) {
+      Column()
+        .width('100%')
+        .height('100%')
+        .backgroundColor('#66000000')
+        .onClick(() => {
+          this.closeSheet();
+        });
+
+      Column() {
+        Row() {
+          Text(this.sheetTitle)
+            .fontSize(T.F_H2)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.text_primary'))
+            .layoutWeight(1)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis });
+          Stack() {
+            Stack() {
+              GlyphIcon({ kind: Glyph.CLOSE, color: Pal.textSecondary(), side: 14, lineWidth: 2.1 });
+            }
+            .width(30)
+            .height(30)
+            .borderRadius(15)
+            .backgroundColor($r('app.color.surface_hi'));
+          }
+          .width(44)
+          .height(44)
+          .onClick(() => {
+            this.closeSheet();
+          });
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Center);
+
+        Text(this.addrValue)
+          .fontSize(16)
+          .lineHeight(24)
+          .fontColor($r('app.color.text_primary'))
+          .fontFeature("\"tnum\" on")
+          .wordBreak(WordBreak.BREAK_ALL)
+          .width('100%')
+          .copyOption(CopyOptions.LocalDevice)
+          .margin({ top: 12 })
+          .padding(14)
+          .borderRadius(13)
+          .backgroundColor($r('app.color.surface_hi'));
+
+        Text('长按地址可以直接选中')
+          .fontSize(T.F_TINY)
+          .fontColor($r('app.color.text_tertiary'))
+          .width('100%')
+          .margin({ top: 8 });
+
+        Row({ space: 10 }) {
+          Button('关闭')
+            .type(ButtonType.Normal)
+            .borderRadius(14)
+            .height(44)
+            .layoutWeight(1)
+            .fontSize(15)
+            .fontColor($r('app.color.text_primary'))
+            .backgroundColor($r('app.color.surface_hi'))
+            .onClick(() => {
+              this.closeSheet();
+            });
+          Button('复制')
+            .type(ButtonType.Normal)
+            .borderRadius(14)
+            .height(44)
+            .layoutWeight(1)
+            .fontSize(15)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.on_primary'))
+            .backgroundColor($r('app.color.primary'))
+            .onClick(() => {
+              this.copyAddr();
+            });
+        }
+        .width('100%')
+        .margin({ top: 16 });
+      }
+      .width('86%')
+      .constraintSize({ maxWidth: 420 })
+      .alignItems(HorizontalAlign.Start)
+      .padding(18)
+      .borderRadius(20)
+      .backgroundColor($r('app.color.surface'))
+      .shadow({ radius: 24, color: '#33000000', offsetX: 0, offsetY: 8 });
+    }
+    .width('100%')
+    .height('100%');
+  }
+
   @Builder
   sheetOverlay() {
     Column() {
@@ -1010,8 +1094,6 @@ export struct SettingsPage {
           this.themeBody();
         } else if (this.sheet === SHEET_BASE) {
           this.baseBody();
-        } else if (this.sheet === SHEET_ADDR) {
-          this.addrBody();
         } else if (this.sheet === SHEET_PWD_APP || this.sheet === SHEET_PWD_ROOT) {
           this.pwdBody();
         } else {
@@ -1032,34 +1114,6 @@ export struct SettingsPage {
             .onClick(() => {
               this.closeSheet();
             });
-        } else if (this.sheet === SHEET_ADDR) {
-          Row({ space: 10 }) {
-            Button('关闭')
-              .type(ButtonType.Normal)
-              .borderRadius(14)
-              .height(44)
-              .layoutWeight(1)
-              .fontSize(15)
-              .fontColor($r('app.color.text_primary'))
-              .backgroundColor($r('app.color.surface_hi'))
-              .onClick(() => {
-                this.closeSheet();
-              });
-            Button('复制')
-              .type(ButtonType.Normal)
-              .borderRadius(14)
-              .height(44)
-              .layoutWeight(1)
-              .fontSize(15)
-              .fontWeight(FontWeight.Medium)
-              .fontColor($r('app.color.on_primary'))
-              .backgroundColor($r('app.color.primary'))
-              .onClick(() => {
-                this.copyAddr();
-              });
-          }
-          .width('100%')
-          .margin({ top: 18 });
         } else {
           Row({ space: 10 }) {
             Button('取消')

@@ -2,8 +2,8 @@
   "app": {
     "bundleName": "com.izifeng.www.istorepilot",
     "vendor": "chaof",
-    "versionCode": 41,
-    "versionName": "0.3.7",
+    "versionCode": 42,
+    "versionName": "0.3.8",
     "icon": "$media:app_icon",
     "label": "$string:app_name"
     // minAPIVersion / targetAPIVersion / apiReleaseType 故意不写：

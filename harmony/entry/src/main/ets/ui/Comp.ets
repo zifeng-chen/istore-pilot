@@ -244,6 +244,8 @@ export struct LineIcon {
 export struct HeroStat {
   @Param label: string = '';
   @Param value: string = '';
+  /** 三列并排时 21fp 放不下，调用方可以降一档 */
+  @Param valueSize: number = T.F_H1;
   build() {
     Column() {
       Text(this.label)
@@ -251,7 +253,7 @@ export struct HeroStat {
         .fontColor($r('app.color.hero_fg_soft'))
         .maxLines(1);
       Text(this.value)
-        .fontSize(T.F_H1)
+        .fontSize(this.valueSize)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.hero_fg'))
         .fontFeature("\"tnum\" on")

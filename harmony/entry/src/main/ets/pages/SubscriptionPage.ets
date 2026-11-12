@@ -3,8 +3,8 @@ import { promptAction, router } from '@kit.ArkUI';
 import { Api, ApiResult } from '../api/Api';
 import { J } from '../core/Json';
 import { UI } from '../core/UIState';
-import { T } from '../ui/Theme';
-import { Card, Hairline } from '../ui/Comp';
+import { Pal, T } from '../ui/Theme';
+import { Card, Comp, Hairline } from '../ui/Comp';
 
 interface SubItem {
   id: string;
@@ -44,6 +44,17 @@ struct SubscriptionPage {
   @State editBackend: string = 'openclash';
   @State nameDraft: string = '';
   @State urlDraft: string = '';
+  /** 最近一次「更新订阅」的结果。logHas=false 表示还没更新过 */
+  @State logHas: boolean = false;
+  @State logRunning: boolean = false;
+  @State logOk: boolean = false;
+  @State logSummary: string = '';
+  @State logAt: number = 0;
+  @State logSeconds: number = 0;
+  @State logTail: string = '';
+  /** 日志展开/收起 */
+  @State logOpen: boolean = false;
+  private pollId: number = -1;
 
   aboutToAppear(): void {
     this.safeTop = UI.safeTop;
@@ -52,6 +63,99 @@ struct SubscriptionPage {
       this.backend = p['backend'];
     }
     this.load();
+    this.loadLog();
+  }
+
+  aboutToDisappear(): void {
+    this.stopPoll();
+  }
+
+  private stopPoll(): void {
+    if (this.pollId >= 0) {
+      clearInterval(this.pollId);
+      this.pollId = -1;
+    }
+  }
+
+  /** 更新是后台任务，拉一次不够 —— 没跑完就每 2 秒再看一眼 */
+  private startPoll(): void {
+    this.stopPoll();
+    this.pollId = setInterval(() => {
+      this.loadLog();
+    }, 2000);
+  }
+
+  private async loadLog(): Promise<void> {
+    const r: ApiResult = await Api.get(this.ctx(), '/api/v1/proxy/subscriptions/log');
+    if (!r.ok) {
+      return;
+    }
+    const l: J = r.data.obj('log');
+    const at: number = l.num('started_at', 0);
+    this.logHas = at > 0;
+    this.logRunning = l.bool('running', false);
+    this.logOk = l.bool('ok', false);
+    this.logSummary = l.str('summary', '');
+    this.logAt = at;
+    this.logSeconds = l.num('seconds', 0);
+    this.logTail = l.str('tail', '');
+    if (!this.logRunning) {
+      this.stopPoll();
+    }
+  }
+
+  /** 触发一次更新：先把「正在更新」摆出来，再开始轮询结果 */
+  private async triggerUpdate(backend: string, sec: string): Promise<boolean> {
+    const body: Record<string, Object> = {
+      'action': 'refresh',
+      'backend': backend,
+      'id': sec,
+      'sec': sec
+    };
+    const r: ApiResult = await Api.post(this.ctx(), '/api/v1/proxy/subscriptions', body);
+    if (!r.ok) {
+      this.toast(r.error.length > 0 ? r.error : '更新失败');
+      return false;
+    }
+    this.logHas = true;
+    this.logRunning = true;
+    this.logOk = false;
+    this.logSummary = '正在更新…';
+    this.logAt = Math.floor(Date.now() / 1000);
+    this.logSeconds = 0;
+    this.logTail = '';
+    this.startPoll();
+    return true;
+  }
+
+  /** 日志只留尾部若干行，整段塞进去会把卡撑得很长 */
+  private logText(): string {
+    const lines: string[] = this.logTail.split('\n');
+    const start: number = Math.max(0, lines.length - 14);
+    return lines.slice(start).join('\n').trim();
+  }
+
+  private logStateText(): string {
+    if (this.logRunning) {
+      return '进行中';
+    }
+    return this.logOk ? '成功' : '失败';
+  }
+
+  private logTone(): string {
+    if (this.logRunning) {
+      return Pal.primary();
+    }
+    return this.logOk ? Pal.ok() : Pal.danger();
+  }
+
+  private clockText(ts: number): string {
+    const d: Date = new Date(ts * 1000);
+    const mm: string = (d.getMonth() + 1).toString().padStart(2, '0');
+    const dd: string = d.getDate().toString().padStart(2, '0');
+    const hh: string = d.getHours().toString().padStart(2, '0');
+    const mi: string = d.getMinutes().toString().padStart(2, '0');
+    return mm + '-' + dd + ' ' + hh + ':' + mi;
   }
 
   private ctx(): common.Context {
@@ -89,23 +193,32 @@ struct SubscriptionPage {
     promptAction.showToast({ message: s });
   }
 
-  /** 删除 / 刷新这类「对某一条」的动作 */
+  /** 删除这类「对某一条」的动作 */
   private async act(action: string, it: SubItem): Promise<void> {
     if (this.busy.length > 0) {
+      return;
+    }
+    if (action === 'refresh') {
+      // 更新走 triggerUpdate：它会把「正在更新」写进日志卡并开始轮询，
+      // 用户不用猜点了有没有反应
+      this.busy = it.id;
+      const ok: boolean = await this.triggerUpdate(it.backend, it.id);
+      this.busy = '';
+      if (ok) {
+        this.toast('已开始更新，进度看页面顶部「最近更新」');
+      }
       return;
     }
     this.busy = it.id;
     const body: Record<string, Object> = {
       'action': action,
       'backend': it.backend,
-      'id': it.id
+      'id': it.id,
+      'sec': it.id
     };
-    if (action === 'delete' || action === 'refresh') {
-      body['sec'] = it.id;
-    }
     const r: ApiResult = await Api.post(this.ctx(), '/api/v1/proxy/subscriptions', body);
     this.busy = '';
-    this.toast(r.ok ? (action === 'delete' ? '已删除' : '已提交') : (r.error.length > 0 ? r.error : '操作失败'));
+    this.toast(r.ok ? '已删除' : (r.error.length > 0 ? r.error : '操作失败'));
     await this.load();
   }
 
@@ -129,12 +242,17 @@ struct SubscriptionPage {
     }
     const r: ApiResult = await Api.post(this.ctx(), '/api/v1/proxy/subscriptions', body);
     this.busy = '';
-    this.toast(r.ok ? '已保存' : (r.error.length > 0 ? r.error : '保存失败'));
-    if (r.ok) {
-      this.editing = false;
-      this.editId = '';
-      await this.load();
+    if (!r.ok) {
+      this.toast(r.error.length > 0 ? r.error : '保存失败');
+      return;
     }
+    this.editing = false;
+    this.editId = '';
+    await this.load();
+    // 保存完自动拉一次：新加的订阅不更新就一个节点都没有，
+    // 用户会以为加失败了。结果在「最近更新」里能看
+    const ok: boolean = await this.triggerUpdate(this.editBackend, '');
+    this.toast(ok ? '已保存，正在更新订阅…' : '已保存，但更新没启动');
   }
 
   build() {
@@ -179,8 +297,8 @@ struct SubscriptionPage {
 
       Scroll() {
         Column() {
-          if (this.editing) {
-            this.editCard();
+          if (this.logHas) {
+            this.logCard();
           }
 
           if (this.loading) {
@@ -238,7 +356,7 @@ struct SubscriptionPage {
                       this.urlDraft = it.url;
                       this.editing = true;
                     });
-                    this.op(this.busy === it.id ? '处理中…' : '刷新', () => {
+                    this.op(this.busy === it.id ? '处理中…' : '更新', () => {
                       this.act('refresh', it);
                     });
                     this.op('删除', () => {
@@ -265,7 +383,72 @@ struct SubscriptionPage {
     .width('100%')
     .height('100%')
     .padding({ top: this.safeTop, left: UI.safeLeft, right: UI.safeRight })
-    .backgroundColor($r('app.color.app_bg'));
+    .backgroundColor($r('app.color.app_bg'))
+    // 添加/编辑做成弹层：原来是一张内联卡插在列表顶部，点「添加」页面往下跳一截，
+    // 看起来像换了个页面
+    .bindSheet($$this.editing, this.editSheet(), {
+      height: 430,
+      dragBar: true,
+      showClose: false,
+      backgroundColor: $r('app.color.app_bg'),
+      onDisappear: () => {
+        this.editing = false;
+      }
+    });
+  }
+
+  /** 最近一次更新的结果：时间、成败、耗时，日志可展开 */
+  @Builder
+  logCard() {
+    Card({ gapBottom: T.GAP }) {
+      Row() {
+        Text('最近更新')
+          .fontSize(T.F_H2)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'))
+          .layoutWeight(1);
+        Text(this.logStateText())
+          .fontSize(T.F_TINY)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(this.logTone())
+          .padding({ left: 9, right: 9, top: 3, bottom: 3 })
+          .borderRadius(99)
+          .backgroundColor(Comp.alpha(this.logTone(), 0.14));
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center);
+
+      Text(this.clockText(this.logAt) + ' · ' + this.logSummary
+        + (this.logSeconds > 0 && !this.logRunning
+          ? '（' + this.logSeconds.toString() + ' 秒）' : ''))
+        .fontSize(T.F_TINY)
+        .fontColor($r('app.color.text_secondary'))
+        .width('100%')
+        .margin({ top: 6 });
+
+      if (this.logTail.length > 0) {
+        Text(this.logOpen ? '收起日志' : '查看日志')
+          .fontSize(T.F_SUB)
+          .fontColor($r('app.color.primary'))
+          .padding({ top: 8, bottom: 4 })
+          .onClick(() => {
+            this.logOpen = !this.logOpen;
+          });
+      }
+
+      if (this.logOpen && this.logTail.length > 0) {
+        Text(this.logText())
+          .fontSize(10.5)
+          .lineHeight(16)
+          .fontColor($r('app.color.text_secondary'))
+          .fontFamily('monospace')
+          .wordBreak(WordBreak.BREAK_ALL)
+          .width('100%')
+          .padding(10)
+          .borderRadius(10)
+          .backgroundColor($r('app.color.surface_sunken'));
+      }
+    }
   }
 
   @Builder
@@ -280,8 +463,8 @@ struct SubscriptionPage {
   }
 
   @Builder
-  editCard() {
-    Card({ gapTop: 0 }) {
+  editSheet() {
+    Column() {
       Column() {
         Row() {
           Text(this.editId.length > 0 ? '编辑订阅' : '添加订阅')
@@ -292,12 +475,13 @@ struct SubscriptionPage {
           Text('取消')
             .fontSize(T.F_SUB)
             .fontColor($r('app.color.text_secondary'))
+            .padding({ left: 10, top: 4, bottom: 4 })
             .onClick(() => {
               this.editing = false;
             });
         }
         .width('100%')
-        .margin({ bottom: 12 });
+        .margin({ bottom: 14 });
 
         Text('名称')
           .fontSize(T.F_TINY)
@@ -346,5 +530,8 @@ struct SubscriptionPage {
       }
       .width('100%');
     }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+    .padding({ left: 18, right: 18, top: 4 });
   }
 }

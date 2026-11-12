@@ -28,6 +28,7 @@ import json
 import os
 import re
 import subprocess
+import time
 import urllib.parse
 
 from . import sysinfo
@@ -35,6 +36,14 @@ from . import sysinfo
 PKG = {"openclash": "openclash", "passwall": "passwall"}
 STYPE = {"openclash": "config_subscribe", "passwall": "subscribe_list"}
 LABEL = {"openclash": "OpenClash", "passwall": "Passwall"}
+
+# 「更新订阅」是后台任务，用户看不到跑没跑完、成没成功，只知道「点了没反应」。
+# 所以两边都写同一份状态到磁盘：开始写 running，脚本跑完由 _finish_log 落结果。
+DATA_DIR = "/etc/istore-agent/data"
+SUB_LOG = "/tmp/istore-sub-update.log"
+STATUS_JSON = os.path.join(DATA_DIR, "sub_update.json")
+# 脚本可能写得很啰嗦，只留尾部够定位问题
+_TAIL_CHARS = 4000
 
 # 主键只允许这两种形态：@type[3] 或 cfg0a1b2c，避免拼接进 shell
 _SEC_RE = re.compile(r"^(?:@[A-Za-z0-9_]+\[\d+\]|[A-Za-z0-9_\-]{1,64})$")
@@ -80,6 +89,84 @@ def _spawn(cmd: str, log: str) -> None:
                              close_fds=True)
     except OSError:
         pass
+
+
+def _read_status() -> dict:
+    try:
+        with open(STATUS_JSON, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data if isinstance(data, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _write_status(data: dict) -> None:
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        tmp = STATUS_JSON + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, ensure_ascii=False)
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, STATUS_JSON)
+    except OSError:
+        pass
+
+
+def _log_raw() -> str:
+    try:
+        with open(SUB_LOG, "r", encoding="utf-8", errors="replace") as fh:
+            return fh.read().replace("\r", "")
+    except OSError:
+        return ""
+
+
+def _log_tail() -> str:
+    """取更新脚本输出的尾部。脚本可能几 MB，只留最后一段。"""
+    # 退出码那行是我们自己塞进去的，别让它在界面日志里露出来
+    lines = [ln for ln in _log_raw().splitlines()
+             if not ln.strip().startswith("__EXIT__")]
+    return "\n".join(lines)[-_TAIL_CHARS:]
+
+
+_FAIL_HINTS = ("error", "fail", "失败", "错误", "timeout", "timed out", "refused")
+
+
+def _finish_log(started: float, backend: str = "") -> None:  # noqa: vulture 被后台命令调用
+    """脚本跑完时由后台命令回调：判定成功/失败并落盘。
+
+    退出码不可全信（OpenClash 的脚本失败也常返回 0），所以再看一眼日志尾部
+    有没有 error/fail 这类字样；两者都干净才算成功。
+    """
+    tail = _log_tail()
+    code = -1
+    # 退出码要从原始日志里找：_log_tail 会把它过滤掉（不显示给用户）
+    for line in _log_raw().splitlines():
+        line = line.strip()
+        if line.startswith("__EXIT__"):
+            try:
+                code = int(line[len("__EXIT__"):].strip() or "-1")
+            except ValueError:
+                code = -1
+    low = tail.lower()
+    bad = any(h in low for h in _FAIL_HINTS)
+    ok = code == 0 and not bad
+    if code == 0 and bad:
+        note = "脚本退出码 0，但日志里有失败字样"
+    elif ok:
+        note = "更新成功"
+    else:
+        note = "更新失败（退出码 %d）" % code if code >= 0 else "更新失败（脚本异常退出）"
+    _write_status({
+        "backend": backend or _read_status().get("backend", ""),
+        "running": False,
+        "ok": ok,
+        "exit_code": code,
+        "started_at": int(started),
+        "finished_at": int(time.time()),
+        "seconds": max(0, int(time.time() - started)),
+        "summary": note,
+        "tail": tail,
+    })
 
 
 def _show(pkg: str) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
@@ -376,11 +463,24 @@ def refresh(backend: str, sec: str = "") -> dict:
 
     _run(["uci", "commit", PKG[backend]])
 
+    # 先落一条 running，界面点完立刻能看到「正在更新」；
+    # 真正的结果由脚本退出后回调 _finish_log 写
+    started = int(time.time())
+    _write_status({
+        "backend": backend, "running": True, "ok": None,
+        "started_at": started, "finished_at": 0, "seconds": 0,
+        "summary": "正在更新…", "tail": "",
+    })
+    rec = ("cd /usr/lib/istore-agent && python3 -c "
+           "\"import sys;sys.path.insert(0,'/usr/lib/istore-agent');"
+           f"from agent import subscriptions as s;s._finish_log({started},'{backend}')\"")
+
     if backend == "openclash":
         script = "/usr/share/openclash/openclash.sh"
         if not os.path.exists(script):
             return _bad(backend, "找不到 " + script)
-        _spawn(f"{script} >/tmp/istore-sub-update.log 2>&1",
+        _spawn(f"{script} >{SUB_LOG} 2>&1; echo __EXIT__$? >>{SUB_LOG};"
+               f" {rec} >>{SUB_LOG} 2>&1",
                "/dev/null")
         return {
             "ok": True, "backend": backend, "async": True,
@@ -400,9 +500,11 @@ def refresh(backend: str, sec: str = "") -> dict:
     restore = ("cd /usr/lib/istore-agent && python3 -c "
                "\"import sys;sys.path.insert(0,'/usr/lib/istore-agent');"
                "from agent import subscriptions as s;s._pw_restore_selection()\"")
-    # Passwall 的订阅段是匿名的，脚本只认段名，所以只能整批更新
-    _spawn(f"lua {script} start all manual >/tmp/istore-sub-update.log 2>&1;"
-           f" {restore} >>/tmp/istore-sub-update.log 2>&1",
+    # Passwall 的订阅段是匿名的，脚本只认段名，所以只能整批更新。
+    # code=$? 必须在 restore 之前取，否则拿到的是恢复选中项的退出码
+    _spawn(f"lua {script} start all manual >{SUB_LOG} 2>&1; code=$?;"
+           f" {restore} >>{SUB_LOG} 2>&1; echo __EXIT__$code >>{SUB_LOG};"
+           f" {rec} >>{SUB_LOG} 2>&1",
            "/dev/null")
     return {
         "ok": True, "backend": backend, "async": True,
@@ -432,4 +534,6 @@ def dispatch(body: dict) -> dict:
         return delete(backend, sec)
     if action == "refresh":
         return refresh(backend, sec)
+    if action == "log":
+        return {"ok": True, "log": _read_status()}
     return {"ok": False, "error": f"未知操作: {action}"}

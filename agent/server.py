@@ -20,7 +20,7 @@ from .config import get as cfg, load as load_cfg, save as save_cfg
 START_TS = time.time()
 
 # Agent 自身版本：随 ipk 一起发版，硬件详情页与「关于」都会显示
-VERSION = "0.3.7"
+VERSION = "0.3.8"
 
 # ---------------------------------------------------------------- 演示实例
 #
@@ -782,6 +782,9 @@ class Handler(BaseHTTPRequestHandler):
             # ---- 订阅地址
             elif path == "/api/v1/proxy/subscriptions":
                 self._json(subscriptions.list_subs(query.get("backend", [""])[0]))
+            # 最近一次「更新订阅」的结果（跑没跑完、成没成功、日志尾部）
+            elif path == "/api/v1/proxy/subscriptions/log":
+                self._json(subscriptions.dispatch({"action": "log"}))
             # ---- OpenClash 配置文件（同一时刻只启用一个）
             elif path == "/api/v1/proxy/configs":
                 self._json(cached("proxy_configs", 6.0, proxy.configs))

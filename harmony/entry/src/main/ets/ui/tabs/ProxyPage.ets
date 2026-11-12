@@ -1135,12 +1135,6 @@ export struct ProxyPage {
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1);
-        // 空态时后端都没装，nodeCount 还留着上一轮的缓存值，别显示
-        Text(!this.noneInstalled() && this.nodeCount > 0
-          ? this.nodeCount + ' 个节点'
-          : '')
-          .fontSize(T.F_SUB)
-          .fontColor($r('app.color.text_secondary'));
       }
       .width('100%')
       .alignItems(VerticalAlign.Bottom)
@@ -1226,25 +1220,36 @@ export struct ProxyPage {
     .width('100%')
     .height('100%')
     .backgroundColor($r('app.color.app_bg'))
-    .bindSheet($$this.showGroup, this.nodeSheet(), {
-      height: 560,
+    // ★ 一个组件只能挂一个 bindSheet：之前 nodeSheet 和 configSheet 各挂了一个，
+    // 后挂的把前一个顶掉，点节点分组完全没反应。合并成一个，内容按状态分派
+    .bindSheet(this.sheetOpen(), this.anySheet(), {
+      height: this.showGroup ? 560 : 520,
       dragBar: true,
       // 系统自带的关闭叉会和我们标题栏里那个圆形关闭叠在一起
       showClose: false,
       backgroundColor: $r('app.color.app_bg'),
       onDisappear: () => {
         this.showGroup = false;
-      }
-    })
-    .bindSheet($$this.showConfig, this.configSheet(), {
-      height: 520,
-      dragBar: true,
-      showClose: false,
-      backgroundColor: $r('app.color.app_bg'),
-      onDisappear: () => {
         this.showConfig = false;
       }
     });
+  }
+
+  private sheetOpen(): boolean {
+    return this.showGroup || this.showConfig;
+  }
+
+  @Builder
+  anySheet() {
+    Column() {
+      if (this.showGroup) {
+        this.nodeSheet();
+      } else {
+        this.configSheet();
+      }
+    }
+    .width('100%')
+    .height('100%');
   }
 
   // ------------------------------------------------- 空态：装插件
@@ -1596,7 +1601,7 @@ export struct ProxyPage {
         .margin({ top: 4 });
 
       // ④ 后端列表
-      Text('代理后端 · 点一行切换')
+      Text('代理后端 · 用右侧按钮启停')
         .fontSize(11)
         .fontColor(Pal.heroFgSoft())
         .width('100%')
@@ -1663,12 +1668,7 @@ export struct ProxyPage {
           }
           .width('100%')
           .padding({ top: 10, bottom: 10 })
-          .alignItems(VerticalAlign.Center)
-          .onClick(() => {
-            if (b.installed) {
-              this.toggleBackend(b.id, !b.running);
-            }
-          });
+          .alignItems(VerticalAlign.Center);
         }
         .width('100%');
       }, (b: Backend) => b.id + '|' + (b.running ? '1' : '0') + '|' + b.nodes);
@@ -1981,15 +1981,19 @@ export struct ProxyPage {
   /** 安装包入口。空态和已装态都要有 —— 装不上时正好用本地上传兜底 */
   @Builder
   pkgEntry() {
+    // Card 是自定义组件，后面不能直接链 .bindSheet()，所以套一层 Column
     Column() {
       Card({ gapBottom: T.GAP }) {
-        Row() {
-          Row() {
-            GlyphIcon({ kind: Glyph.UPLOAD, color: Pal.primary(), side: 18, lineWidth: 1.9 });
-          }
-          .margin({ right: 10 });
+        CardTitle({
+          glyph: Glyph.UPLOAD,
+          title: '插件管理',
+          sub: '装、重装或升级 OpenClash / Passwall'
+        });
+        Row({ space: 10 }) {
           Column() {
-            Text('安装包')
+            Text(this.pkgTask.running
+              ? '正在安装'
+              : (this.uploading ? '正在上传' : '从本地文件或仓库安装'))
               .fontSize(T.F_BODY)
               .fontColor($r('app.color.text_primary'));
             Text(this.pkgSub())
@@ -2004,7 +2008,7 @@ export struct ProxyPage {
             .fontColor($r('app.color.text_tertiary'));
         }
         .width('100%')
-        .padding({ top: 4, bottom: 4 })
+        .padding({ top: 11, bottom: 2 })
         .alignItems(VerticalAlign.Center)
         .onClick(() => {
           this.openPkg();

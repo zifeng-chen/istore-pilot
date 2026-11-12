@@ -14,12 +14,19 @@ struct SubscriptionView: View {
     @State private var adding = false
     @State private var menuFor: J?            // 长按/点击行尾的操作菜单
     @State private var working = ""
+    /// 最近一次「更新订阅」的结果 + 是否展开日志
+    @State private var log: J?
+    @State private var logOpen = false
+    @State private var poll: Task<Void, Never>?
 
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ScrollView {
             VStack(spacing: 12) {
+                if let lg = log, lg.int("started_at") > 0 {
+                    logCard(lg)
+                }
                 if loading {
                     ListGroup {
                         ForEach(0..<3, id: \.self) { _ in
@@ -44,7 +51,7 @@ struct SubscriptionView: View {
                     Text(err).font(F.tiny).foregroundStyle(C.danger)
                 }
 
-                Text("订阅地址来自路由器上的 uci 配置，「更新节点」会让后端重新拉一遍订阅，需要几十秒。")
+                Text("订阅地址来自路由器上的 uci 配置，「更新」会让后端重新拉一遍订阅，需要几十秒。")
                     .font(F.tiny)
                     .foregroundStyle(C.textSecondary)
                     .padding(.horizontal, 4)
@@ -73,21 +80,25 @@ struct SubscriptionView: View {
                 }
             }
         }
-        .task { await load() }
+        .task {
+            await load()
+            await loadLog()
+        }
+        .onDisappear { poll?.cancel() }
         .sheet(isPresented: $adding) {
-            SubEditor(backend: backend, item: nil) { await load() }
+            SubEditor(backend: backend, item: nil) { await saved() }
         }
         .sheet(item: Binding(
             get: { editing.map { SBox(j: $0) } },
             set: { editing = $0?.j }
         )) { box in
-            SubEditor(backend: backend, item: box.j) { await load() }
+            SubEditor(backend: backend, item: box.j) { await saved() }
         }
         .confirmationDialog("订阅操作", isPresented: Binding(
             get: { menuFor != nil },
             set: { if !$0 { menuFor = nil } }
         ), presenting: menuFor) { it in
-            Button("更新节点") { act("refresh", it) }
+            Button("更新") { act("refresh", it) }
             Button("修改名称 / 地址") { editing = it; menuFor = nil }
             Button("删除订阅", role: .destructive) { act("delete", it) }
             Button("取消", role: .cancel) { menuFor = nil }
@@ -168,12 +179,110 @@ struct SubscriptionView: View {
         menuFor = nil
         working = it.str("id")
         Task {
+            if action == "refresh" {
+                await triggerUpdate(backend: it.str("backend"), sec: it.str("id"))
+                await MainActor.run { working = "" }
+                return
+            }
             var body: J = ["action": action, "backend": it.str("backend"), "id": it.str("id")]
-            if action == "delete" || action == "refresh" { body["sec"] = it.str("id") }
+            if action == "delete" { body["sec"] = it.str("id") }
             _ = try? await Api.post("/api/v1/proxy/subscriptions", body, slow: true)
             await load()
             await MainActor.run { working = "" }
         }
+    }
+
+    /// 保存成功（新增/编辑）后自动更新一次 —— 不然新订阅一个节点都没有，看着像加失败
+    private func saved() async {
+        await load()
+        await triggerUpdate(backend: backend, sec: "")
+    }
+
+    private func triggerUpdate(backend: String, sec: String) async {
+        var body: J = ["action": "refresh", "backend": backend, "id": sec, "sec": sec]
+        if backend.isEmpty { body["backend"] = "" }
+        if let _ = try? await Api.post("/api/v1/proxy/subscriptions", body, slow: true) {
+            await MainActor.run { logOpen = false }
+            await loadLog()
+            startPoll()
+        }
+    }
+
+    private func loadLog() async {
+        if let j = try? await Api.get("/api/v1/proxy/subscriptions/log") {
+            let lg = j.obj("log")
+            await MainActor.run { log = lg }
+            if lg?.bool("running") != true { poll?.cancel() }
+        }
+    }
+
+    /// 更新是后台任务，每 2 秒看一次，跑完就停
+    private func startPoll() {
+        poll?.cancel()
+        poll = Task {
+            for _ in 0..<60 {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                if Task.isCancelled { return }
+                await loadLog()
+                if log?.bool("running") != true { return }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func logCard(_ lg: J) -> some View {
+        let running = lg.bool("running")
+        let ok = lg.bool("ok")
+        let tone = running ? C.primary : (ok ? C.ok : C.danger)
+        let state = running ? "进行中" : (ok ? "成功" : "失败")
+        let secs = lg.int("seconds")
+        let tail = lg.str("tail")
+
+        Card {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("最近更新")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(C.textPrimary)
+                    Spacer()
+                    Text(state)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(tone)
+                        .padding(.horizontal, 9).padding(.vertical, 3)
+                        .background(tone.opacity(0.14))
+                        .clipShape(Capsule())
+                }
+                Text(Self.clock(lg.int("started_at")) + " · " + lg.str("summary")
+                     + (!running && secs > 0 ? "（\(secs) 秒）" : ""))
+                    .font(F.tiny)
+                    .foregroundStyle(C.textSecondary)
+
+                if !tail.isEmpty {
+                    Button(logOpen ? "收起日志" : "查看日志") {
+                        logOpen.toggle()
+                    }
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(C.primary)
+                }
+                if logOpen && !tail.isEmpty {
+                    Text(tail.split(separator: "\n").suffix(14).joined(separator: "\n"))
+                        .font(.system(size: 10.5, design: .monospaced))
+                        .foregroundStyle(C.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                        .background(C.surfaceSunken)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private static func clock(_ ts: Int) -> String {
+        guard ts > 0 else { return "" }
+        let f = DateFormatter()
+        f.dateFormat = "MM-dd HH:mm"
+        return f.string(from: Date(timeIntervalSince1970: TimeInterval(ts)))
     }
 }
 
