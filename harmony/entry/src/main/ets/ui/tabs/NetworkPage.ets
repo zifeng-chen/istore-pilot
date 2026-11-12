@@ -961,6 +961,11 @@ export struct NetworkPage {
     .width('100%')
     .height('100%')
     .backgroundColor($r('app.color.app_bg'))
-    .padding({ top: this.showBack ? this.ui.safeTop : 0 });
+    .padding({
+      top: this.showBack ? this.ui.safeTop : 0,
+      // 横屏时状态栏/挖孔在侧边，只让顶部不够
+      left: this.ui.safeLeft,
+      right: this.ui.safeRight
+    });
   }
 }

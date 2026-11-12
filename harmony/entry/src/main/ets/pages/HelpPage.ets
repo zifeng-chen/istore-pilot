@@ -68,7 +68,7 @@ struct HelpPage {
     .width('100%')
     .height('100%')
     .backgroundColor($r('app.color.app_bg'))
-    .padding({ top: this.safeTop });
+    .padding({ top: this.safeTop, left: UI.safeLeft, right: UI.safeRight });
   }
 
   // ---------------------------------------------------------------- 一、装 Agent

@@ -264,7 +264,7 @@ struct SubscriptionPage {
     }
     .width('100%')
     .height('100%')
-    .padding({ top: this.safeTop })
+    .padding({ top: this.safeTop, left: UI.safeLeft, right: UI.safeRight })
     .backgroundColor($r('app.color.app_bg'));
   }
 

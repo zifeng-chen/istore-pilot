@@ -43,7 +43,9 @@
 - 没有 ≥300vp 的固定宽度（折叠屏/小屏不会横向溢出）
 - `indexText` 无小于 3:1 的组合：`accent_soft` / `surface_hi` / `surface_sunken`
   上的文字都重算过
-- 四个一级页与所有二级页都让出了 `safeTop`，Index 另加了 `safeLeft/safeRight`
+- 四个一级页与所有二级页都让出了 `safeTop`
+- **横屏 / 折叠屏展开**：`safeLeft/safeRight` 除了页签区，也补到了登录页、设备详情、
+  订阅、帮助、内置网页、网络设置六个整页覆盖的路由页 —— 状态栏跑到侧边时不会压住内容
 
 ## 0.3.6 · 全局文字对比度提到 3:1 以上
 

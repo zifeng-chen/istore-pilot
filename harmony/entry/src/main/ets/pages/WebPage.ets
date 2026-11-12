@@ -219,7 +219,12 @@ struct WebPage {
           });
       }
       .width('100%')
-      .padding({ left: 8, right: 8, top: 8 + this.safeTop, bottom: 6 })
+      .padding({
+        left: 8 + UI.safeLeft,
+        right: 8 + UI.safeRight,
+        top: 8 + this.safeTop,
+        bottom: 6
+      })
       .alignItems(VerticalAlign.Center);
 
       // 细进度条：LuCI 是服务端渲染，跳一次 200-600ms，没有提示会以为点了没反应

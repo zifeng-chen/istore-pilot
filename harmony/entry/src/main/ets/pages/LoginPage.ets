@@ -147,7 +147,12 @@ struct LoginPage {
         }
         .alignItems(HorizontalAlign.Center)
         .width('100%')
-        .margin({ top: this.safeTop + 56, bottom: 36 });
+        .margin({
+          top: this.safeTop + 56,
+          bottom: 36,
+          left: UI.safeLeft,
+          right: UI.safeRight
+        });
 
         // 表单
         Column() {
