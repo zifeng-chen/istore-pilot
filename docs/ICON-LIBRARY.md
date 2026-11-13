@@ -95,7 +95,51 @@
 | 路由器网页端 | `GLOBE` | `SERVER_ADDRESS` |
 | 备份列表 | `BOX` | `BACKUP` |
 
-## 四、缺漏清单（图标库里没有、但界面确实用到）
+## 四、待补图标清单（给设计的需求）
+
+按「必须补 / 建议补 / 可选」三档。命名沿用库里的 kebab-case，
+补好后放进 `design/icons/icons/<分组>/` 再跑 `scripts/gen_icons.py` 即可，
+Android 侧不用改代码（常量名自动跟着文件名走）。
+
+### P0 · 必须补（现在是本地补的或语义明显不对）
+
+| 建议命名 | 用途 | 现在用什么 | 问题 |
+|---|---|---|---|
+| `close` | 弹层右上角 ×、关闭按钮 | **本地补两条线**（`gen_icons.py` 的 `EXTRA`） | 能用，但不是设计稿；线宽/端点靠手写，改一次要改代码 |
+| `settings` | 底部「设置」页签 | `network-settings`（齿轮 + 地球） | 齿轮上挂了个地球，和「网络设置」行完全同图，页签语义偏了 |
+
+### P1 · 建议补（现在用近义图标，能读但不够准）
+
+| 建议命名 | 用途 | 现在用什么 | 问题 |
+|---|---|---|---|
+| `subscription` | 代理页「订阅管理」 | `sync`（环形箭头） | 容易被读成「刷新 / 同步」，而它其实是「一组订阅地址」 |
+| `nodes` / `node-group` | 代理页「节点分组」卡、分组行 | `devices` / `latency` / `sync` | 四种分组类型（urltest / fallback / relay / 默认）只能借别的图，样式不统一 |
+| `wan` | 概览「宽带连接」、接入方式 | `broadband`（三道光弧 + 点） | **视觉上就是 Wi-Fi**，放在「宽带连接」卡上会让人以为在说无线 |
+| `bolt` | 运行模式 / 加速 | `toggle`（开关） | 「模式」用开关表达还行，但少了「加速」这层意思 |
+| `speed-test` | 测速入口 / 延迟测试 | `latency` | `latency` 是「信号+时延」，测速场景更想要仪表盘 |
+
+### P2 · 可选（现在没用，但后面大概率要）
+
+| 建议命名 | 用途 |
+|---|---|
+| `qrcode` | 扫码登录、分享配置 |
+| `share` | 导出配置 / 分享诊断 |
+| `history` | 历史记录（拦截、流量、拨号） |
+| `spark` / `pulse` | hero 卡里的「实时」状态点 |
+| `wifi` | 通用无线（现有 2.4G / 5G 两档，缺一个不分频段的） |
+
+### 反向：库里已有、我们还没接的（不用设计再画）
+
+`signal` `latency` `packet-loss` `download-speed` `upload-speed` `wifi-offline`
+`permission` `timeout` `empty` `sync` `eye` `eye-off` `lock` `unlock`
+`search` `copy` `edit` `add` `more` `download` `chevron-right` `chevron-down`
+`status-success` `status-warning` `status-error` `status-info` `status-loading`
+`status-online` `status-offline` `wired-connection` `wifi-2-4g` `wifi-5g`
+`login-user` `link` `server-address`
+
+---
+
+## 四之二、原始缺漏清单（第一轮核对时的记录）
 
 | 需要 | 现状 | 处理 |
 |---|---|---|
