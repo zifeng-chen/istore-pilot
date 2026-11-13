@@ -123,4 +123,64 @@ public final class Fmt {
         return v == null || v.isEmpty() ? "—" : v;
     }
 
+
+    /**
+     * 列表里显示用的脱敏地址：内网原样，公网 / CGNAT 打码。
+     *
+     * 只作用于「一眼扫过」的列表；点开的弹窗用原值 —— 用户要复制完整地址。
+     * IPv4: 100.76.60.71/32 → 100.*.*.71/32
+     * IPv6: 240e:3a0:5680:…/64 → 240e:3a0:…/64
+     */
+    public static String maskAddr(String v) {
+        if (v == null || v.isEmpty() || "—".equals(v)) {
+            return v == null ? "" : v;
+        }
+        int slash = v.indexOf('/');
+        String addr = slash >= 0 ? v.substring(0, slash) : v;
+        String suffix = slash >= 0 ? v.substring(slash) : "";
+
+        if (addr.indexOf(':') >= 0) {
+            String low = addr.toLowerCase(Locale.US);
+            if ("::1".equals(low) || low.startsWith("fe80")
+                    || low.startsWith("fc") || low.startsWith("fd")) {
+                return v;
+            }
+            String[] raw = addr.split(":");
+            StringBuilder sb = new StringBuilder();
+            int taken = 0;
+            for (String g : raw) {
+                if (g.isEmpty()) {
+                    continue;
+                }
+                if (taken > 0) {
+                    sb.append(':');
+                }
+                sb.append(g);
+                taken++;
+                if (taken == 2) {
+                    break;
+                }
+            }
+            return taken > 0 ? sb + ":…" + suffix : v;
+        }
+
+        String[] p = addr.split("\\.");
+        if (p.length != 4) {
+            return v;
+        }
+        try {
+            int a = Integer.parseInt(p[0]);
+            int b = Integer.parseInt(p[1]);
+            boolean local = a == 10 || a == 127
+                    || (a == 192 && b == 168)
+                    || (a == 172 && b >= 16 && b <= 31)
+                    || (a == 169 && b == 254);
+            if (local) {
+                return v;
+            }
+        } catch (NumberFormatException e) {
+            return v;
+        }
+        return p[0] + ".*.*." + p[3] + suffix;
+    }
 }

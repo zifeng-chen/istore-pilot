@@ -285,15 +285,16 @@ struct SettingsView: View {
                          value: wan.bool("up") ? "已连接" : "未连接",
                          valueColor: wan.bool("up") ? C.primary : C.danger)
                 Hairline(inset: 62)
-                plainRow(icon: "number", title: "IPv4", note: "运营商分配", value: v4,
+                plainRow(icon: "number", title: "IPv4", note: "运营商分配 · 点开看完整",
+                         value: Mask.addr(v4),
                          onTap: { showAddress("外网 IPv4", v4) })
                 Hairline(inset: 62)
-                plainRow(icon: "number", title: "IPv6", note: "外网入口",
-                         value: v6.isEmpty ? "—" : v6,
+                plainRow(icon: "number", title: "IPv6", note: "外网入口 · 点开看完整",
+                         value: v6.isEmpty ? "—" : Mask.addr(v6),
                          onTap: { showAddress("外网 IPv6", v6) })
                 Hairline(inset: 62)
                 plainRow(icon: "house", title: "内网网关", note: "设备默认走这个地址",
-                         value: lan.objs("ipv4").first?.str("address") ?? "—",
+                         value: Mask.addr(lan.objs("ipv4").first?.str("address") ?? "—"),
                          onTap: { showAddress("内网网关", lan.objs("ipv4").first?.str("address") ?? "") })
 
                 Hairline(inset: 62)

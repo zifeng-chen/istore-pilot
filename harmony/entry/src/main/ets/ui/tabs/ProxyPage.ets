@@ -2357,52 +2357,61 @@ export struct ProxyPage {
     return (n / 1048576).toFixed(1) + ' MB';
   }
 
+  /**
+   * 节点分组：和其他块一样是一张卡片。
+   *
+   * 之前这里是「标题行 + 一格格浮在页面底色上的小卡」，和上下两张白卡不是一套
+   * 语言，插件管理又紧贴在后面 —— 看起来像没分组的一堆散块。现在收进一张卡：
+   * 分组名做卡标题，格子改成卡内的浅色块，间距由 Card 自己保证。
+   */
   @Builder
   groupList() {
     if (this.groups.length > 0) {
-      Row() {
-        Text('节点分组')
-          .fontSize(T.F_SUB)
-          .fontColor($r('app.color.text_secondary'));
-        Blank();
-        // 隐藏超时节点：开关放标题行右侧，不占一整行；
-        // 状态来自服务端，所以另一台手机 / Web 端改过这里也会跟着变
-        Text(this.hideTimeout
-          ? (this.hiddenCount > 0 ? '已隐藏 ' + this.hiddenCount + ' 个' : '无超时节点')
-          : '隐藏超时')
-          .fontSize(T.F_TINY)
-          .fontColor($r('app.color.text_secondary'));
-        Toggle({ type: ToggleType.Switch, isOn: this.hideTimeout })
-          .selectedColor($r('app.color.primary'))
-          .margin({ left: 6 })
-          .onChange((on: boolean) => {
-            // 程序化改 isOn（数据回填 / 其他端改过）也会回调，
-            // 状态没变就别打接口 —— 否则每次进代理页都白发一次请求
-            if (on !== this.hideTimeout) {
-              this.setHideTimeout(on);
-            }
-          });
-      }
-      .width('100%')
-      .padding({ left: 4, right: 4 })
-      .margin({ top: this.rail() ? 0 : 18, bottom: 8 });
-
-      ForEach(this.groupRows(), (row: NodeGroup[]) => {
-        Row({ space: 10 }) {
-          ForEach(row, (g: NodeGroup) => {
-            this.groupCard(g, this.indexOfGroup(g.name));
-          }, (g: NodeGroup) => this.groupKey(g));
-          if (row.length < this.groupCols()) {
-            Blank();
+      Card({ gapBottom: T.GAP }) {
+        CardTitle({
+          glyph: Glyph.LIST,
+          title: '节点分组',
+          sub: '共 ' + this.groups.length + ' 组 · 点一组选节点'
+        }) {
+          // 隐藏超时节点：开关放标题行右侧，不占一整行。
+          // 状态存在服务端，另一台设备改过这里也会跟着变
+          Row({ space: 5 }) {
+            Text(this.hideTimeout
+              ? (this.hiddenCount > 0 ? '隐藏 ' + this.hiddenCount : '隐藏中')
+              : '隐藏超时')
+              .fontSize(10.5)
+              .fontColor($r('app.color.text_secondary'));
+            Toggle({ type: ToggleType.Switch, isOn: this.hideTimeout })
+              .selectedColor($r('app.color.primary'))
+              .onChange((on: boolean) => {
+                // 程序化改 isOn（数据回填 / 其他端改过）也会回调，
+                // 状态没变就别打接口 —— 否则每次进代理页都白发一次请求
+                if (on !== this.hideTimeout) {
+                  this.setHideTimeout(on);
+                }
+              });
           }
         }
-        .width('100%')
-        .alignItems(VerticalAlign.Top);
-      }, (row: NodeGroup[]) => this.groupRowKey(row));
+
+        ForEach(this.groupRows(), (row: NodeGroup[]) => {
+          Row({ space: 8 }) {
+            ForEach(row, (g: NodeGroup) => {
+              this.groupCard(g, this.indexOfGroup(g.name));
+            }, (g: NodeGroup) => this.groupKey(g));
+            if (row.length < this.groupCols()) {
+              Blank();
+            }
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Top)
+          .margin({ top: 8 });
+        }, (row: NodeGroup[]) => this.groupRowKey(row));
+      }
     } else if (this.loaded) {
       // 这里原来一律写「没有正在运行的代理后端」，可上面的卡片明明显示「运行中 ·
       // 63 节点」—— 自相矛盾。分成两种：后端在跑但分组没读到，和后端确实没跑。
       Card({ gapBottom: T.GAP }) {
+        CardTitle({ glyph: Glyph.LIST, title: '节点分组', sub: '暂时是空的' });
         // 服务端会说明为什么空着（OpenClash 停着时就是「启动后才看得到」），
         // 直接用它，别在这儿另编一句
         Text(this.groupsErr.length > 0
@@ -2532,11 +2541,8 @@ export struct ProxyPage {
     .alignItems(HorizontalAlign.Start)
     .padding(12)
     .borderRadius(14)
-    // 原来用 surface_sunken(#F4F9F6)，和页面底色 app_bg(#F2F6F4) 几乎同色，
-    // 看着就只剩一圈边框。改成和别的卡片一样用 surface + 浅阴影
-    .backgroundColor($r('app.color.surface'))
-    .border({ width: 0.7, color: $r('app.color.glass_stroke') })
-    .shadow({ radius: 8, color: '#0D000000', offsetX: 0, offsetY: 2 })
+    // 现在这一格套在白色卡片里，用浅底块区分层级（不会再和页面底色撞色）
+    .backgroundColor($r('app.color.surface_sunken'))
     .onClick(() => {
       if (idx >= 0) {
         this.openIdx = idx;

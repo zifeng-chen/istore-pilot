@@ -510,8 +510,8 @@ export struct SettingsPage {
       SettingRow({
         glyph: Glyph.GLOBE,
         title: 'IPv4',
-        subtitle: '运营商分配的地址',
-        value: this.ipv4,
+        subtitle: '运营商分配的地址 · 点开看完整',
+        value: Fmt.maskAddr(this.ipv4),
         valueSize: 0,
         first: false,
         danger: false,
@@ -523,8 +523,8 @@ export struct SettingsPage {
       SettingRow({
         glyph: Glyph.GLOBE,
         title: 'IPv6',
-        subtitle: '外网入口',
-        value: this.ipv6,
+        subtitle: '外网入口 · 点开看完整',
+        value: Fmt.maskAddr(this.ipv6),
         valueSize: 12,
         first: false,
         danger: false,
@@ -536,8 +536,8 @@ export struct SettingsPage {
       SettingRow({
         glyph: Glyph.CHIP,
         title: '内网网关',
-        subtitle: '设备默认走这个地址',
-        value: this.lanV4,
+        subtitle: '设备默认走这个地址 · 点开看完整',
+        value: Fmt.maskAddr(this.lanV4),
         valueSize: 0,
         first: false,
         danger: false,

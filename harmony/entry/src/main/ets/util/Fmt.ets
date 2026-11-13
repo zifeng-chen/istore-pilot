@@ -116,6 +116,52 @@ export class Fmt {
   }
 
   /**
+   * 地址列表里显示用的脱敏版：局域网地址原样，公网 / CGNAT 打码。
+   *
+   * 只作用于「一眼扫过」的列表；点开的弹窗用原值 —— 用户要复制完整地址去填
+   * DDNS、做端口映射。截图时列表不会把 WAN 地址带出去，这是 0.3.9 的取舍。
+   *
+   * - IPv4：保留首段与末段，中间两段打码（`100.*.*.<末段>/32`）
+   * - IPv6：`240e:3a0:5680:…/64` → `240e:3a0:…/64`（保留运营商前缀）
+   */
+  static maskAddr(v: string): string {
+    if (v.length === 0 || v === '—') {
+      return v;
+    }
+    const slash: number = v.indexOf('/');
+    const addr: string = slash >= 0 ? v.substring(0, slash) : v;
+    const suffix: string = slash >= 0 ? v.substring(slash) : '';
+
+    if (addr.indexOf(':') >= 0) {
+      const low: string = addr.toLowerCase();
+      // 回环、链路本地、ULA 本来就是内网地址，没有打码的必要
+      if (low === '::1' || low.startsWith('fe80') || low.startsWith('fc') || low.startsWith('fd')) {
+        return v;
+      }
+      const groups: string[] = addr.split(':').filter((g: string) => g.length > 0);
+      const head: string = groups.length >= 2
+        ? groups[0] + ':' + groups[1]
+        : (groups.length === 1 ? groups[0] : '');
+      return head.length > 0 ? head + ':…' + suffix : v;
+    }
+
+    const p: string[] = addr.split('.');
+    if (p.length !== 4) {
+      return v;
+    }
+    const a: number = Number.parseInt(p[0], 10);
+    const b: number = Number.parseInt(p[1], 10);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) {
+      return v;
+    }
+    const local: boolean = a === 10 || a === 127
+      || (a === 192 && b === 168)
+      || (a === 172 && b >= 16 && b <= 31)
+      || (a === 169 && b === 254);
+    return local ? v : p[0] + '.*.*.' + p[3] + suffix;
+  }
+
+  /**
    * 网口卡片里的极短速率：12.3M / 380K，不带 /s。
    * 一张卡要同时放下 ↓ 和 ↑，加单位就挤不进去了。
    */

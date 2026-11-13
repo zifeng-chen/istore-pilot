@@ -97,6 +97,8 @@ export struct HardwarePage {
 
   // ================================================================ 视图
 
+  // 左右留白由外层 SettingsPage 的二级页容器给（T.PAD=18）。
+  // 这里之前又加了 16，两层叠成 34，卡片被挤窄 —— 真机看着就是「左右间距太大」
   build() {
     Scroll() {
       Column() {
@@ -121,8 +123,7 @@ export struct HardwarePage {
 
         Row().width('100%').height(24);
       }
-      .width('100%')
-      .padding({ left: 16, right: 16, top: 8 });
+      .width('100%');
     }
     .scrollBar(BarState.Off)
     .edgeEffect(EdgeEffect.Spring)

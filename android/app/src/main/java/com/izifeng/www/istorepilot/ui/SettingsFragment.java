@@ -47,6 +47,10 @@ public class SettingsFragment extends BaseFragment {
     private TextView tvWanV4;
     private TextView tvWanV6;
     private TextView tvLanV4;
+    // 列表里显示的是脱敏版，弹窗和复制要用完整值 —— 原始地址单独留一份
+    private String rawV4 = "";
+    private String rawV6 = "";
+    private String rawLan = "";
 
     // 设备信息（原概览页的「机器信息」）
     private TextView tvDevCpu;
@@ -147,15 +151,15 @@ public class SettingsFragment extends BaseFragment {
                 "外网状态", "拨号与链路", "—", true, false, null);
         tvWanV4 = Ui.settingRow(c, net, com.izifeng.www.istorepilot.widget.Glyph.GLOBE,
                 "IPv4", "运营商分配的地址", "—", false, false,
-                () -> showAddress("外网 IPv4", tvWanV4.getText().toString()));
+                () -> showAddress("外网 IPv4", rawV4));
         tvWanV6 = Ui.settingRow(c, net, com.izifeng.www.istorepilot.widget.Glyph.GLOBE,
                 "IPv6", "外网入口", "—", false, false,
-                () -> showAddress("外网 IPv6", tvWanV6.getText().toString()));
+                () -> showAddress("外网 IPv6", rawV6));
         // 完整 IPv6 是 39 个字符，13.5sp 刚好一行放下
         tvWanV6.setTextSize(12.5f);
         tvLanV4 = Ui.settingRow(c, net, com.izifeng.www.istorepilot.widget.Glyph.LINK,
                 "内网网关", "设备默认走这个地址", "—", false, false,
-                () -> showAddress("内网网关", tvLanV4.getText().toString()));
+                () -> showAddress("内网网关", rawLan));
         TextView netNote = Ui.text(c,
                 "外网访问走 IPv6，DNS 里配好 AAAA 记录就能用域名连回来。",
                 11.5f, R.color.text_secondary);
@@ -428,8 +432,10 @@ public class SettingsFragment extends BaseFragment {
                     boolean up = wan.optBoolean("up", false);
                     tvWanState.setText(up ? "已连接" : "未连接");
                     tvWanState.setTextColor(Ui.color(ctx(), up ? R.color.text_primary : R.color.danger));
-                    tvWanV4.setText(firstAddr(wan.optJSONArray("ipv4")));
-                    tvWanV6.setText(ipv6Summary(wan.optJSONArray("ipv6")));
+                    rawV4 = firstAddr(wan.optJSONArray("ipv4"));
+                    rawV6 = ipv6Summary(wan.optJSONArray("ipv6"));
+                    tvWanV4.setText(Fmt.maskAddr(rawV4));
+                    tvWanV6.setText(Fmt.maskAddr(rawV6));
                     long upSec = wan.optLong("uptime", 0);
                     if (tvHeroUptime != null) {
                         tvHeroUptime.setText(upSec > 0 ? Fmt.dur(upSec) : "—");
@@ -437,7 +443,8 @@ public class SettingsFragment extends BaseFragment {
                 }
                 JSONObject lan = body.optJSONObject("lan");
                 if (lan != null) {
-                    tvLanV4.setText(firstAddr(lan.optJSONArray("ipv4")));
+                    rawLan = firstAddr(lan.optJSONArray("ipv4"));
+                    tvLanV4.setText(Fmt.maskAddr(rawLan));
                 }
             }
 
