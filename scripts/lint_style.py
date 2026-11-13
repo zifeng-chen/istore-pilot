@@ -37,6 +37,7 @@ SKIP_DIRS = {
     ".git", ".workbuddy", "__pycache__", "node_modules", "oh_modules",
     "build", "dist", "Pods", "DerivedData", ".gradle", ".ruff_cache",
     "screenshots", "resources",  # 资源目录里没有代码
+    "design",                    # 图标设计源（第三方导出，含长行/行尾空格）
 }
 
 #: 各语言的行宽上限，与 docs/CODE_STYLE.md 一致

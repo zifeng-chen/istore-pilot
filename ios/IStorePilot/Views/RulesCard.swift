@@ -74,7 +74,7 @@ struct RulesCard: View {
                         if busy {
                             ProgressView().tint(C.onPrimary).scaleEffect(0.75)
                         } else {
-                            Image(systemName: "arrow.triangle.2.circlepath")
+                            LineIcon(name: "refresh", size: 15, color: C.primary)
                                 .font(.system(size: 13, weight: .semibold))
                         }
                         Text(busy ? "更新中…" : "立即更新规则")

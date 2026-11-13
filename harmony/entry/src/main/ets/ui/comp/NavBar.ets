@@ -1,4 +1,4 @@
-import { Ico } from './Icons';
+import { IconData } from './IconData';
 import { Pal, T } from '../Theme';
 import { LineIcon } from '../Comp';
 
@@ -23,10 +23,10 @@ export struct NavBar {
 
   // 和 Android / iOS 一致：四个页签。「网络」并进了概览 →「网络设置」二级页
   private items: NavItem[] = [
-    { label: '概览', path: Ico.OVERVIEW },
-    { label: '设备', path: Ico.DEVICES },
-    { label: '代理', path: Ico.PROXY },
-    { label: '设置', path: Ico.SETTINGS }
+    { label: '概览', path: IconData.stroke('system-load') },
+    { label: '设备', path: IconData.stroke('devices') },
+    { label: '代理', path: IconData.stroke('proxy') },
+    { label: '设置', path: IconData.stroke('system-settings') }
   ];
 
   build() {
@@ -62,6 +62,7 @@ export struct NavBar {
           path: item.path,
           color: this.current === i ? Pal.primary() : Pal.iconOff(),
           side: 21,
+          design: 24,
           lineWidth: this.current === i ? 1.85 : 1.6
         })
       }

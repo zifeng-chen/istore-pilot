@@ -37,7 +37,7 @@ struct SubscriptionView: View {
                         }
                     }
                 } else if items.isEmpty {
-                    Card { EmptyHint(icon: "link.badge.plus", text: "还没有订阅，点右上角加一个") }
+                    Card { EmptyHint(icon: "sync", text: "还没有订阅，点右上角加一个") }
                 } else {
                     ListGroup {
                         ForEach(Array(items.enumerated()), id: \.offset) { i, it in
@@ -75,7 +75,7 @@ struct SubscriptionView: View {
                     editing = nil
                     adding = true
                 } label: {
-                    Image(systemName: "plus")
+                    LineIcon(name: "add", size: 15, color: C.primary)
                         .font(.system(size: 15, weight: .semibold))
                 }
             }
@@ -111,7 +111,7 @@ struct SubscriptionView: View {
 
     private func subRow(_ it: J) -> some View {
         HStack(spacing: 11) {
-            Image(systemName: "link")
+            LineIcon(name: "sync", size: 16, color: C.textSecondary)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(it.bool("enabled") ? C.primary : C.textTertiary)
                 .frame(width: 30, height: 30)
@@ -141,7 +141,7 @@ struct SubscriptionView: View {
             Button {
                 menuFor = it
             } label: {
-                Image(systemName: "ellipsis")
+                LineIcon(name: "more", size: 16, color: C.textSecondary)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(C.textSecondary)
                     .frame(width: 32, height: 32)

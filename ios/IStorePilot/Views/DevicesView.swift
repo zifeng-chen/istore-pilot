@@ -128,7 +128,7 @@ struct DevicesView: View {
                 listSkeleton.padding(.horizontal, 16)
             }
         } else if shown.isEmpty {
-            EmptyHint(icon: "wifi.slash", text: "没有符合条件的设备")
+            EmptyHint(icon: "wifi-offline", text: "没有符合条件的设备")
                 .padding(.horizontal, 16)
         } else if cols > 1 {
             // 宽画布：一卡一台、按列铺开。55 台设备两列要滚二十多屏，
@@ -431,7 +431,7 @@ struct DevicesView: View {
 
     private var searchBar: some View {
         HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
+            LineIcon(name: "search", size: 16, color: C.textTertiary)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(C.textSecondary)
             TextField("名称、IP、MAC 或厂商", text: $q)
@@ -440,7 +440,7 @@ struct DevicesView: View {
                 .textInputAutocapitalization(.never)
             if !q.isEmpty {
                 Button { q = "" } label: {
-                    Image(systemName: "xmark.circle.fill")
+                    LineIcon(name: "close", size: 16, color: C.textTertiary)
                         .foregroundStyle(C.textTertiary)
                 }
             }

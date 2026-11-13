@@ -277,28 +277,28 @@ struct SettingsView: View {
 
         return Card {
             VStack(alignment: .leading, spacing: 0) {
-                CardHead(icon: "globe", title: "网络", sub: "外网与内网网关")
+                CardHead(icon: "network", title: "网络", sub: "外网与内网网关")
 
-                plainRow(icon: "dot.radiowaves.left.and.right",
+                plainRow(icon: "internet-status",
                          title: "外网状态",
                          note: wan.str("proto").uppercased() + "　·　" + wan.str("device"),
                          value: wan.bool("up") ? "已连接" : "未连接",
                          valueColor: wan.bool("up") ? C.primary : C.danger)
                 Hairline(inset: 62)
-                plainRow(icon: "number", title: "IPv4", note: "运营商分配 · 点开看完整",
+                plainRow(icon: "ipv4", title: "IPv4", note: "运营商分配 · 点开看完整",
                          value: Mask.addr(v4),
                          onTap: { showAddress("外网 IPv4", v4) })
                 Hairline(inset: 62)
-                plainRow(icon: "number", title: "IPv6", note: "外网入口 · 点开看完整",
+                plainRow(icon: "ipv6", title: "IPv6", note: "外网入口 · 点开看完整",
                          value: v6.isEmpty ? "—" : Mask.addr(v6),
                          onTap: { showAddress("外网 IPv6", v6) })
                 Hairline(inset: 62)
-                plainRow(icon: "house", title: "内网网关", note: "设备默认走这个地址",
+                plainRow(icon: "lan-gateway", title: "内网网关", note: "设备默认走这个地址",
                          value: Mask.addr(lan.objs("ipv4").first?.str("address") ?? "—"),
                          onTap: { showAddress("内网网关", lan.objs("ipv4").first?.str("address") ?? "") })
 
                 Hairline(inset: 62)
-                row(icon: "wifi", title: "宽带详情与配置",
+                row(icon: "network-settings", title: "宽带详情与配置",
                     note: "改接入方式、账号密码、静态 IP") {
                     goWan = true
                 }
@@ -329,21 +329,21 @@ struct SettingsView: View {
 
         return Card {
             VStack(alignment: .leading, spacing: 0) {
-                CardHead(icon: "iphone", title: "设备信息", sub: "处理器、内存与系统盘")
+                CardHead(icon: "device-info", title: "设备信息", sub: "处理器、内存与系统盘")
 
                 // 主机名已在上面的 hero 大标题里，这里不再重复。
                 // 「型号」和「系统版本」也删了：x86 软路由的 board.model 常年是
                 // Default string，这一行只会显示「—」；内核版本概览页已经有了
-                plainRow(icon: "cpu", title: "处理器",
+                plainRow(icon: "processor", title: "处理器",
                          note: cpuBrief(),
                          value: cpu.str("model").replacingOccurrences(of: "(R)", with: "")
                             .replacingOccurrences(of: "(TM)", with: ""))
                 Hairline(inset: 62)
-                plainRow(icon: "memorychip", title: "内存",
+                plainRow(icon: "memory", title: "内存",
                          note: mod.str("type").isEmpty ? "已安装容量" : "\(mod.str("type")) \(mod.int("speed"))",
                          value: F.bytes(mem.dbl("total")))
                 Hairline(inset: 62)
-                plainRow(icon: "internaldrive", title: "系统盘",
+                plainRow(icon: "system-disk", title: "系统盘",
                          note: store.str("mount").isEmpty ? "" : store.str("mount"),
                          value: F.bytes(store.dbl("total")))
 
@@ -370,29 +370,29 @@ struct SettingsView: View {
     private var maintainCard: some View {
         Card {
             VStack(alignment: .leading, spacing: 0) {
-                CardHead(icon: "shippingbox", title: "系统维护", sub: "备份、固件与软件包")
+                CardHead(icon: "package", title: "系统维护", sub: "备份、固件与软件包")
 
-                row(icon: "archivebox", title: "配置备份",
+                row(icon: "backup", title: "配置备份",
                     note: "动网络之前先存一份，随时能退回来") {
                     goBackups = true
                 }
                 Hairline(inset: 62)
-                row(icon: "shippingbox", title: "检查固件更新",
+                row(icon: "system-update", title: "检查固件更新",
                     note: "走系统 OTA 通道", busy: busy == "fw") {
                     checkFirmware()
                 }
                 Hairline(inset: 62)
-                row(icon: "square.stack.3d.up", title: "检查软件包更新",
+                row(icon: "package-update", title: "检查软件包更新",
                     note: "opkg 可升级列表", busy: busy == "pkg") {
                     checkPackages()
                 }
                 Hairline(inset: 62)
-                row(icon: "list.bullet.rectangle", title: "升级进度",
+                row(icon: "upgrade-progress", title: "升级进度",
                     note: "正在进行的 opkg 任务", busy: busy == "progress") {
                     showProgress()
                 }
                 Hairline(inset: 62)
-                row(icon: "arrow.up.doc", title: "上传安装包",
+                row(icon: "upload", title: "上传安装包",
                     note: ".ipk / .run，传到 router 的 /tmp", busy: busy == "up") {
                     showImporter = true
                 }
@@ -414,14 +414,14 @@ struct SettingsView: View {
         if !uploads.isEmpty {
             Card {
                 VStack(alignment: .leading, spacing: 8) {
-                    CardHead(icon: "tray.full", title: "已上传的包", sub: "点查看或删除") {
+                    CardHead(icon: "package", title: "已上传的包", sub: "点查看或删除") {
                     Text("\(uploads.count) 个")
                         .font(F.caption)
                         .foregroundStyle(C.textSecondary)
                 }
                     ForEach(Array(uploads.enumerated()), id: \.offset) { _, u in
                         HStack(spacing: 9) {
-                            Image(systemName: "doc")
+                            LineIcon(name: "config-file", size: 16, color: C.textSecondary)
                                 .font(.system(size: 12))
                                 .foregroundStyle(C.textSecondary)
                             VStack(alignment: .leading, spacing: 1) {
@@ -457,17 +457,17 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 0) {
                 CardHead(icon: "power", title: "电源控制", sub: "重启与关机都会短暂断网")
 
-                row(icon: "arrow.triangle.2.circlepath", title: "重启网络服务",
+                row(icon: "restart-network", title: "重启网络服务",
                     note: "只重拨 WAN，通常 10 秒内恢复") {
                     confirmPower = "restart_network"
                 }
                 Hairline(inset: 62)
-                row(icon: "arrow.clockwise", title: "重启路由器",
+                row(icon: "restart-router", title: "重启路由器",
                     note: "所有设备断网约 1 分钟", danger: true) {
                     confirmPower = "reboot"
                 }
                 Hairline(inset: 62)
-                row(icon: "power", title: "关闭路由器",
+                row(icon: "shutdown", title: "关闭路由器",
                     note: "关机后只能到设备跟前手动开机", danger: true) {
                     confirmPower = "poweroff"
                 }
@@ -478,13 +478,13 @@ struct SettingsView: View {
     private var securityCard: some View {
         Card {
             VStack(alignment: .leading, spacing: 0) {
-                CardHead(icon: "lock.shield", title: "安全", sub: "两个密码，别记混")
-                row(icon: "key", title: "修改 App 登录密码",
+                CardHead(icon: "security", title: "安全", sub: "两个密码，别记混")
+                row(icon: "app-password", title: "修改 App 登录密码",
                     note: "只管这个 App") {
                     showPwd = true
                 }
                 Hairline(inset: 62)
-                row(icon: "key", title: "修改路由器密码",
+                row(icon: "router-password", title: "修改路由器密码",
                     note: "root 账号，影响后台与 SSH", danger: true) {
                     showRootPwd = true
                 }
@@ -532,13 +532,13 @@ struct SettingsView: View {
                 Hairline(inset: 0)
                 themeRow
                 Hairline(inset: 62)
-                row(icon: "trash", title: "清缓存",
+                row(icon: "clear-cache", title: "清缓存",
                     note: "只清手机上的快照，不动路由器") {
                     SnapCache.shared.clear()
                     popup = Popup(title: "已清除", body: "下次进入各页面会重新从路由器读取。")
                 }
                 Hairline(inset: 62)
-                row(icon: "rectangle.portrait.and.arrow.right", title: "退出登录",
+                row(icon: "logout", title: "退出登录",
                     note: "清除凭证并返回登录页") {
                     Api.onAuthFail?()
                     app.signOut()
@@ -658,9 +658,7 @@ struct SettingsView: View {
     }
 
     private func iconTile(_ icon: String, danger: Bool) -> some View {
-        Image(systemName: icon)
-            .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(danger ? C.danger : C.primary)
+        LineIcon(name: icon, size: 18, color: danger ? C.danger : C.primary)
             .frame(width: 32, height: 32)
             .background((danger ? C.danger : C.primary).opacity(0.12))
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))

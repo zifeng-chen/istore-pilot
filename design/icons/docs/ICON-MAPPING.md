@@ -122,3 +122,5 @@
 | `status-loading` | 加载中 | `icons/status/status-loading.svg` |
 | `status-offline` | 离线 | `icons/status/status-offline.svg` |
 | `status-online` | 在线 | `icons/status/status-online.svg` |
+
+| 系统设置 | `system-settings` | `icons/actions/system-settings.svg` |

@@ -225,9 +225,7 @@ struct ProxyView: View {
                 Task { await loadPkg() }
             } label: {
                 HStack(spacing: 12) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(C.primary)
+                    LineIcon(name: "package", size: 16, color: C.primary)
                         .frame(width: 30, height: 30)
                         .background {
                             RoundedRectangle(cornerRadius: 9, style: .continuous)
@@ -448,9 +446,9 @@ struct ProxyView: View {
         } label: {
             HStack(spacing: 12) {
                 // 图标不再垫薄荷色实心底：深绿 hero 上白的才最清楚
-                Image(systemName: "power")
-                    .font(.system(size: 13, weight: on ? .semibold : .medium))
-                    .foregroundStyle(on ? C.heroFg : C.heroFg.opacity(0.55))
+                LineIcon(name: "proxy", size: 16,
+                         color: on ? C.heroFg : C.heroFg.opacity(0.55),
+                         weight: on ? 2.2 : 2)
                 VStack(alignment: .leading, spacing: 3) {
                     // 运行中的那个要一眼认出来：加粗 + 放大半档 + 满白
                     Text(name)
@@ -493,7 +491,7 @@ struct ProxyView: View {
 
         return Card {
             VStack(alignment: .leading, spacing: 10) {
-                CardHead(icon: "bolt", title: "运行模式", sub: "改完立即生效") {
+                CardHead(icon: "toggle", title: "运行模式", sub: "改完立即生效") {
                     Text(modeLabel(mode))
                         .font(F.num(13.5, .medium))
                         .foregroundStyle(C.primary)
@@ -648,7 +646,7 @@ struct ProxyView: View {
 
         return Card(padding: 0) {
             VStack(alignment: .leading, spacing: 0) {
-                CardHead(icon: "list.bullet", title: "配置与节点",
+                CardHead(icon: "config-file", title: "配置与节点",
                          sub: comboSub)
                     .padding(.horizontal, 18)
                     .padding(.top, 18)
@@ -661,9 +659,7 @@ struct ProxyView: View {
                 if comboBackend == "openclash" {
                     HStack(spacing: 10) {
                         // 配置文件用文档图标：钥匙是「密码」的语义，安卓那边同款改过
-                        Image(systemName: "doc.text")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(C.primary)
+                        LineIcon(name: "config-file", size: 16, color: C.primary)
                             .frame(width: 30, height: 30)
                             .background(C.accentSoft)
                             .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
@@ -700,9 +696,7 @@ struct ProxyView: View {
                 } label: {
                     HStack(spacing: 10) {
                         // 订阅是「链接」（订阅地址），不是上传 —— 跟安卓一致
-                        Image(systemName: "link")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(C.primary)
+                        LineIcon(name: "sync", size: 16, color: C.primary)
                             .frame(width: 30, height: 30)
                             .background(C.accentSoft)
                             .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))

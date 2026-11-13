@@ -191,7 +191,7 @@ struct WebPage {
     Column() {
       Row({ space: 8 }) {
         Stack() {
-          GlyphIcon({ kind: Glyph.CHEVRON_LEFT, color: Pal.textPrimary(),
+          GlyphIcon({ kind: Glyph.BACK, color: Pal.textPrimary(),
             side: 19, lineWidth: 2.2 });
         }
         .width(44)

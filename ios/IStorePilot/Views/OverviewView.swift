@@ -130,9 +130,9 @@ struct OverviewView: View {
                     .padding(.bottom, 10)
 
                 HStack(spacing: 0) {
-                    rateBlock(icon: "arrow.down", label: "当前下载", text: F.rate(up))
-                    rateBlock(icon: "arrow.up", label: "当前上传", text: F.rate(down))
-                    rateBlock(icon: "wifi", label: "在线设备", text: "\(onlineCount)")
+                    rateBlock(icon: "download", label: "当前下载", text: F.rate(up))
+                    rateBlock(icon: "upload", label: "当前上传", text: F.rate(down))
+                    rateBlock(icon: "devices", label: "在线设备", text: "\(onlineCount)")
                 }
 
                 // 趋势图直接长在 hero 里，与安卓一致：网快不快是同一件事，
@@ -170,9 +170,7 @@ struct OverviewView: View {
     private func rateBlock(icon: String, label: String, text: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(C.heroFg.opacity(0.9))
+                LineIcon(name: icon, size: 12, color: C.heroFg.opacity(0.9), weight: 2.2)
                     .frame(width: 20, height: 20)
                     .background(Color.white.opacity(0.16))
                     .clipShape(Circle())
@@ -230,7 +228,7 @@ struct OverviewView: View {
 
         return Card {
             VStack(alignment: .leading, spacing: 14) {
-                CardHead(icon: "cpu", title: "系统负载",
+                CardHead(icon: "system-load", title: "系统负载",
                          sub: "CPU · 内存 · 磁盘") {
                     if load.dbl("load1") > 0 {
                         Text(String(format: "负载 %.2f", load.dbl("load1")))
@@ -327,7 +325,7 @@ struct OverviewView: View {
 
         return Card {
             VStack(alignment: .leading, spacing: 12) {
-                CardHead(icon: "cable.connector", title: "网口",
+                CardHead(icon: "ethernet-port", title: "网口",
                          sub: "点开看累计收发") {
                     if !ports.isEmpty {
                         Text("\(online)/\(ports.count) 在线")
@@ -379,7 +377,7 @@ struct OverviewView: View {
 
         return Card {
             VStack(alignment: .leading, spacing: 12) {
-                CardHead(icon: "globe", title: "宽带连接",
+                CardHead(icon: "broadband", title: "宽带连接",
                          sub: up ? "已拨通" : "未连接") {
                     Text(proto.isEmpty ? "配置" : proto)
                         .font(.system(size: 11, weight: .medium))

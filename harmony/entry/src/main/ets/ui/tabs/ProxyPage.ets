@@ -1262,7 +1262,7 @@ export struct ProxyPage {
     Column() {
       Card() {
         Row() {
-          GlyphIcon({ kind: Glyph.POWER, color: Pal.primary(), side: 22 });
+          GlyphIcon({ kind: Glyph.PROXY, color: Pal.primary(), side: 22 });
           Column() {
             Text('还没有代理插件')
               .fontSize(T.F_H2)
@@ -1383,7 +1383,7 @@ export struct ProxyPage {
   installProgress() {
     Card({ gapTop: T.GAP }) {
       CardTitle({
-        glyph: Glyph.BOLT,
+        glyph: Glyph.UPGRADE_PROGRESS,
         title: this.inst.index > 0 && this.inst.total > 0
           ? '正在安装 ' + this.inst.index + ' / ' + this.inst.total
           : '正在安装',
@@ -1620,7 +1620,7 @@ export struct ProxyPage {
           }
           Row({ space: 9 }) {
             GlyphIcon({
-              kind: Glyph.POWER,
+              kind: Glyph.PROXY,
               color: b.running ? Pal.heroFg() : Pal.alpha(Pal.heroFg(), 0.5),
               side: 16,
               lineWidth: 2
@@ -1690,7 +1690,7 @@ export struct ProxyPage {
   @Builder
   modeCard() {
     Card({ gapBottom: T.GAP }) {
-      CardTitle({ glyph: Glyph.BOLT, title: '运行模式', sub: '改完立即生效' });
+      CardTitle({ glyph: Glyph.TOGGLE, title: '运行模式', sub: '改完立即生效' });
       // 分段控件必须有「槽」：选中项原来用纯白做底，而卡片也是白的，
       // 三个选项看起来一模一样，根本看不出当前是规则还是全局
       Row({ space: 4 }) {
@@ -1724,7 +1724,7 @@ export struct ProxyPage {
     Card({ gapBottom: T.GAP }) {
       Column() {
         CardTitle({
-          glyph: Glyph.BOX,
+          glyph: Glyph.CONFIG_FILE,
           title: '配置文件',
           sub: this.configs.length > 1
             ? ('共 ' + this.configs.length + ' 个 · 切换会重启内核')
@@ -1919,7 +1919,7 @@ export struct ProxyPage {
         Row() {
           // 自定义组件后面不能直接链 .margin()，套一层 Row
           Row() {
-            GlyphIcon({ kind: Glyph.LINK, color: Pal.primary(), side: 18, lineWidth: 1.9 });
+            GlyphIcon({ kind: Glyph.SYNC, color: Pal.primary(), side: 18, lineWidth: 1.9 });
           }
           .margin({ right: 10 });
           Text(this.comboBackend().length > 0
@@ -1990,7 +1990,7 @@ export struct ProxyPage {
     Column() {
       Card({ gapBottom: T.GAP }) {
         CardTitle({
-          glyph: Glyph.UPLOAD,
+          glyph: Glyph.PACKAGE,
           title: '插件管理',
           sub: '装、重装或升级 OpenClash / Passwall'
         });
@@ -2375,7 +2375,7 @@ export struct ProxyPage {
     if (this.groups.length > 0) {
       Card({ gapBottom: T.GAP }) {
         CardTitle({
-          glyph: Glyph.LIST,
+          glyph: Glyph.DEVICES,
           title: '节点分组',
           sub: '共 ' + this.groups.length + ' 组 · 点一组选节点'
         }) {
@@ -2417,7 +2417,7 @@ export struct ProxyPage {
       // 这里原来一律写「没有正在运行的代理后端」，可上面的卡片明明显示「运行中 ·
       // 63 节点」—— 自相矛盾。分成两种：后端在跑但分组没读到，和后端确实没跑。
       Card({ gapBottom: T.GAP }) {
-        CardTitle({ glyph: Glyph.LIST, title: '节点分组', sub: '暂时是空的' });
+        CardTitle({ glyph: Glyph.DEVICES, title: '节点分组', sub: '暂时是空的' });
         // 服务端会说明为什么空着（OpenClash 停着时就是「启动后才看得到」），
         // 直接用它，别在这儿另编一句
         Text(this.groupsErr.length > 0

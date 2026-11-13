@@ -245,7 +245,7 @@ struct DeviceDetailView: View {
     private var actionCard: some View {
         VStack(spacing: 10) {
             HStack(spacing: 10) {
-                miniAction(icon: "pencil", title: "重命名", color: C.primary) {
+                miniAction(icon: "edit", title: "重命名", color: C.primary) {
                     newName = d.str("alias", d.str("hostname"))
                     renaming = true
                 }
@@ -285,7 +285,7 @@ struct DeviceDetailView: View {
                             act: @escaping () -> Void) -> some View {
         Button(action: act) {
             VStack(spacing: 5) {
-                Image(systemName: icon).font(.system(size: 15, weight: .medium))
+                LineIcon(name: icon, size: 17, color: color)
                 Text(title).font(.system(size: 11.5))
             }
             .foregroundStyle(disabled ? C.textTertiary : color)

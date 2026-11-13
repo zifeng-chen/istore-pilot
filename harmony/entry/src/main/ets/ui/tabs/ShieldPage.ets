@@ -513,7 +513,7 @@ export struct ShieldPage {
       Row({ space: 10 }) {
         Stack() {
           GlyphIcon({
-            kind: Glyph.TRASH,
+            kind: Glyph.DELETE,
             color: Pal.danger(),
             side: 17,
             lineWidth: 1.9
@@ -870,7 +870,7 @@ export struct ShieldPage {
   @Builder
   dnsCard() {
     RowCard({ gapBottom: this.rail() ? 0 : T.GAP }) {
-      CardTitle({ pad: 16, glyph: Glyph.GLOBE, title: 'DNS 链路', sub: '请求从设备到解析的完整路径' });
+      CardTitle({ pad: 16, glyph: Glyph.NETWORK, title: 'DNS 链路', sub: '请求从设备到解析的完整路径' });
       Column() {
         ForEach(this.hops, (h: DnsHop, i: number) => {
           Column() {
@@ -936,7 +936,7 @@ export struct ShieldPage {
   rankCard() {
     RowCard({ gapBottom: T.GAP }) {
       CardTitle({ pad: 16,
-        glyph: Glyph.LIST,
+        glyph: Glyph.APP_TRAFFIC,
         title: '拦截排行',
         sub: this.window.length > 0 ? this.window : '前 5 名'
       });

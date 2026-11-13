@@ -451,7 +451,7 @@ struct ShieldView: View {
                 }
 
                 if top.isEmpty {
-                    EmptyHint(icon: "shield.slash", text: "还没有拦截记录")
+                    EmptyHint(icon: "intercept", text: "还没有拦截记录")
                 } else {
                     ForEach(Array(top.prefix(6).enumerated()), id: \.offset) { i, it in
                         HStack(spacing: 10) {
@@ -618,7 +618,7 @@ struct AdblockLogView: View {
                         }
                     }
                 } else if shown.isEmpty {
-                    Card { EmptyHint(icon: "doc.text.magnifyingglass", text: "没有记录") }
+                    Card { EmptyHint(icon: "empty", text: "没有记录") }
                 } else {
                     ListGroup {
                         ForEach(Array(shown.enumerated()), id: \.offset) { i, it in

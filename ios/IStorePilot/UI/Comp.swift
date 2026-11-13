@@ -239,9 +239,7 @@ struct CardHead<Trailing: View>: View {
 
     private var row: some View {
         HStack(alignment: .center, spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(C.primary)
+            LineIcon(name: icon, size: 17, color: C.primary)
                 .frame(width: 28, height: 28)
                 .background(C.accentSoft)
                 .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
@@ -463,9 +461,7 @@ struct EmptyHint: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 30, weight: .light))
-                .foregroundStyle(C.textTertiary)
+            LineIcon(name: icon, size: 34, color: C.textTertiary, weight: 1.6)
             Text(text)
                 .font(F.caption)
                 .foregroundStyle(C.textSecondary)

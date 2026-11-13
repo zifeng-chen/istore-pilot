@@ -730,7 +730,7 @@ export struct OverviewPage {
   @Builder
   ringCard() {
     Card({ gapTop: 0, gapBottom: this.rail() ? Bp.gap(this.winW) : T.GAP }) {
-      CardTitle({ glyph: Glyph.CHIP, title: '系统负载', sub: 'CPU · 内存 · 磁盘' }) {
+      CardTitle({ glyph: Glyph.SYSTEM_LOAD, title: '系统负载', sub: 'CPU · 内存 · 磁盘' }) {
         Text('负载 ' + this.load1)
           .fontSize(T.F_TINY)
           .fontColor($r('app.color.text_secondary'));
@@ -751,7 +751,7 @@ export struct OverviewPage {
   @Builder
   wanCard() {
     Card({ gapTop: 0, gapBottom: this.rail() ? Bp.gap(this.winW) : T.GAP }) {
-      CardTitle({ glyph: Glyph.GLOBE, title: '宽带连接', sub: this.wanUp ? '已拨通' : '未连接' }) {
+      CardTitle({ glyph: Glyph.BROADBAND, title: '宽带连接', sub: this.wanUp ? '已拨通' : '未连接' }) {
         Pill({
           text: this.wanProto.length > 0 ? this.wanProto : '配置',
           tone: this.wanUp ? Pal.ok() : Pal.textSecondary()
@@ -775,7 +775,7 @@ export struct OverviewPage {
       Hairline({ indent: 0 });
 
       Row() {
-        GlyphIcon({ kind: Glyph.LINK, color: Pal.primary(), side: 16, lineWidth: 1.9 });
+        GlyphIcon({ kind: Glyph.NETWORK_SETTINGS, color: Pal.primary(), side: 16, lineWidth: 1.9 });
         Column() {
           Text('网络设置')
             .fontSize(T.F_BODY)
@@ -803,7 +803,7 @@ export struct OverviewPage {
   portCard() {
     Card({ gapTop: 0, gapBottom: this.rail() ? Bp.gap(this.winW) : T.GAP }) {
       CardTitle({
-        glyph: Glyph.BOX,
+        glyph: Glyph.ETHERNET_PORT,
         title: '网口',
         // 口数按路由器实际有的物理口来（不写死 4 口），点开某口能看累计收发与 MAC
         sub: this.ports.length > 0

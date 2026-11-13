@@ -7,7 +7,7 @@ import { UI } from '../core/UIState';
 import { SystemBar } from '../core/SystemBar';
 import { Pal, T } from '../ui/Theme';
 import { LineIcon } from '../ui/Comp';
-import { Ico } from '../ui/comp/Icons';
+import { IconData } from '../ui/comp/IconData';
 
 const DEFAULT_BASE: string = 'http://192.168.100.1:8443';
 
@@ -123,9 +123,10 @@ struct LoginPage {
         Column() {
           Stack() {
             LineIcon({
-              path: Ico.SHIELD,
+              path: IconData.stroke('security'),
               color: Pal.primary(),
               side: 46,
+              design: 24,
               lineWidth: 2
             })
           }

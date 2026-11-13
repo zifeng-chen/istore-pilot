@@ -43,7 +43,7 @@ struct AppsView: View {
             ScrollView {
                 LazyVStack(spacing: 10) {
                     if apps.isEmpty {
-                        EmptyHint(icon: "chart.bar", text: "还没有捕获到应用流量")
+                        EmptyHint(icon: "app-traffic", text: "还没有捕获到应用流量")
                     } else {
                         ForEach(Array(apps.enumerated()), id: \.offset) { _, a in
                             row(a)
@@ -110,7 +110,7 @@ struct AppsView: View {
 
     private var searchBar: some View {
         HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
+            LineIcon(name: "search", size: 16, color: C.textTertiary)
                 .font(.system(size: 13))
                 .foregroundStyle(C.textTertiary)
             TextField("搜应用名或分类", text: $q)
@@ -119,7 +119,7 @@ struct AppsView: View {
                 .autocorrectionDisabled()
             if !q.isEmpty {
                 Button { q = "" } label: {
-                    Image(systemName: "xmark.circle.fill")
+                    LineIcon(name: "close", size: 16, color: C.textTertiary)
                         .foregroundStyle(C.textTertiary)
                 }
             }

@@ -517,7 +517,7 @@ export struct SecurityPage {
   @Builder
   deviceCard() {
     Card() {
-      CardTitle({ glyph: Glyph.LINK, title: '设备', sub: '点数字进清单，点行看详情' });
+      CardTitle({ glyph: Glyph.DEVICES, title: '设备', sub: '点数字进清单，点行看详情' });
 
       Row() {
         StatCell({
@@ -573,7 +573,7 @@ export struct SecurityPage {
     Column() {
       Card({ gapTop: 0, gapBottom: 0 }) {
       CardTitle({
-        glyph: Glyph.BOLT,
+        glyph: Glyph.APP_TRAFFIC,
         title: '应用流量',
         sub: this.appTotalBytes > 0
           ? (this.appDays > 1 ? '近 ' + this.appDays + ' 天 · ' : '') + '共 ' + Fmt.bytes(this.appTotalBytes)
@@ -832,7 +832,7 @@ export struct SecurityPage {
     Card() {
       Row() {
         Column() {
-          CardTitle({ glyph: Glyph.SHIELD, title: '拦截', sub: 'AdGuard Home' });
+          CardTitle({ glyph: Glyph.INTERCEPT, title: '拦截', sub: 'AdGuard Home' });
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start);
@@ -1001,9 +1001,9 @@ export struct SecurityPage {
       .width('100%')
       .margin({ top: 10 });
 
-      this.entryRow(Glyph.REFRESH, '规则与更新', '自动更新频率、规则表开关', 2);
+      this.entryRow(Glyph.RULES_REFRESH, '规则与更新', '自动更新频率、规则表开关', 2);
       Hairline({ indent: 0 });
-      this.entryRow(Glyph.LIST, '拦截日志', '最近被挡掉的域名查询', 2);
+      this.entryRow(Glyph.INTERCEPT_LOGS, '拦截日志', '最近被挡掉的域名查询', 2);
       }
     }
   }

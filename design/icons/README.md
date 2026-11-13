@@ -1,6 +1,6 @@
 # iStore Pilot SVG Icon Library
 
-- Version: 1.0.1
+- Version: 1.1.1
 - Icon count: 76 SVG files
 - Canvas: 24×24
 - Stroke: 2px

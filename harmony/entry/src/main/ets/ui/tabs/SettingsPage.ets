@@ -494,12 +494,12 @@ export struct SettingsPage {
   netCard() {
     RowCard({ gapBottom: this.rail() ? 0 : T.GAP }) {
       CardTitle({ pad: 16,
-        glyph: Glyph.GLOBE,
+        glyph: Glyph.NETWORK,
         title: '网络',
         sub: this.protoText.length > 0 ? (this.protoText + ' · 外网与内网网关') : '外网与内网网关'
       });
       SettingRow({
-        glyph: Glyph.LINK,
+        glyph: Glyph.INTERNET_STATUS,
         title: '外网状态',
         subtitle: '拨号与链路',
         value: this.wanUp ? '已连接' : '未连接',
@@ -511,7 +511,7 @@ export struct SettingsPage {
         }
       });
       SettingRow({
-        glyph: Glyph.GLOBE,
+        glyph: Glyph.IPV4,
         title: 'IPv4',
         subtitle: '运营商分配的地址 · 点开看完整',
         value: Fmt.maskAddr(this.ipv4),
@@ -524,7 +524,7 @@ export struct SettingsPage {
         }
       });
       SettingRow({
-        glyph: Glyph.GLOBE,
+        glyph: Glyph.IPV6,
         title: 'IPv6',
         subtitle: '外网入口 · 点开看完整',
         value: Fmt.maskAddr(this.ipv6),
@@ -537,7 +537,7 @@ export struct SettingsPage {
         }
       });
       SettingRow({
-        glyph: Glyph.CHIP,
+        glyph: Glyph.LAN_GATEWAY,
         title: '内网网关',
         subtitle: '设备默认走这个地址 · 点开看完整',
         value: Fmt.maskAddr(this.lanV4),
@@ -560,11 +560,11 @@ export struct SettingsPage {
     Card({ gapBottom: T.GAP }) {
       Column() {
         CardTitle({ glyph: Glyph.POWER, title: '电源', sub: '重启与关机都会短暂断网' });
-        this.powerRow(Glyph.REFRESH, '重启网络服务', '只重拨 WAN，局域网不掉线', 'restart_network');
+        this.powerRow(Glyph.RESTART_NETWORK, '重启网络服务', '只重拨 WAN，局域网不掉线', 'restart_network');
         Hairline({ indent: 0 });
-        this.powerRow(Glyph.REFRESH, '重启路由器', '整机重启，约一分钟', 'reboot');
+        this.powerRow(Glyph.RESTART_ROUTER, '重启路由器', '整机重启，约一分钟', 'reboot');
         Hairline({ indent: 0 });
-        this.powerRow(Glyph.POWER, '关机', '关机后只能按电源键开机', 'poweroff');
+        this.powerRow(Glyph.SHUTDOWN, '关机', '关机后只能按电源键开机', 'poweroff');
       }
       .width('100%');
     }
@@ -639,11 +639,11 @@ export struct SettingsPage {
   @Builder
   hardwareCard() {
     RowCard({ gapBottom: T.GAP }) {
-      CardTitle({ pad: 16, glyph: Glyph.CHIP, title: '设备信息', sub: '处理器、内存与系统盘' });
+      CardTitle({ pad: 16, glyph: Glyph.DEVICE_INFO, title: '设备信息', sub: '处理器、内存与系统盘' });
       // 长字符串一律放副标题（单行省略），右侧值只放短数字。
       // 之前型号放在值里，SettingRow 的值列最宽 50% 会折成两行，一行字变成两行高
       SettingRow({
-        glyph: Glyph.CHIP,
+        glyph: Glyph.PROCESSOR,
         title: '处理器',
         subtitle: this.hwLoaded ? Fmt.orDash(this.hw.obj('cpu').str('model', '')) : '型号',
         value: this.hwLoaded
@@ -657,7 +657,7 @@ export struct SettingsPage {
         }
       });
       SettingRow({
-        glyph: Glyph.CHIP,
+        glyph: Glyph.MEMORY,
         title: '内存',
         subtitle: this.hwLoaded
           ? Fmt.bytes(this.hw.obj('memory').num('used', 0)) + ' / '
@@ -673,7 +673,7 @@ export struct SettingsPage {
         }
       });
       SettingRow({
-        glyph: Glyph.BOX,
+        glyph: Glyph.SYSTEM_DISK,
         title: '系统盘',
         subtitle: this.hw.arr('disks').length > 0
           ? Fmt.orDash(this.hw.arr('disks')[0].str('model', '')) + '　·　'
@@ -689,7 +689,7 @@ export struct SettingsPage {
         }
       });
       SettingRow({
-        glyph: Glyph.LIST,
+        glyph: Glyph.ALL_HARDWARE,
         title: '查看全部硬件',
         subtitle: '内存条、网卡、温度、PCI 设备',
         value: '',
@@ -719,10 +719,10 @@ export struct SettingsPage {
   @Builder
   systemCard() {
     RowCard({ gapBottom: T.GAP }) {
-      CardTitle({ pad: 16, glyph: Glyph.BOX, title: '系统维护', sub: '备份、固件与软件包' });
+      CardTitle({ pad: 16, glyph: Glyph.PACKAGE, title: '系统维护', sub: '备份、固件与软件包' });
       // 备份排第一：它是后面所有危险操作的前提，放最下面用户往往是「改坏了」才想起来找它
       SettingRow({
-        glyph: Glyph.BOX,
+        glyph: Glyph.BACKUP,
         title: '配置备份',
         subtitle: '动网络之前先存一份，随时能退回来',
         value: '',
@@ -735,7 +735,7 @@ export struct SettingsPage {
         }
       });
       SettingRow({
-        glyph: Glyph.BOLT,
+        glyph: Glyph.SYSTEM_UPDATE,
         title: '检查系统更新',
         subtitle: '查的是 iStoreOS 固件镜像',
         value: '',
@@ -748,7 +748,7 @@ export struct SettingsPage {
         }
       });
       SettingRow({
-        glyph: Glyph.BOX,
+        glyph: Glyph.PACKAGE_UPDATE,
         title: '检查软件包更新',
         subtitle: '查的是 opkg 软件包',
         value: '',
@@ -761,7 +761,7 @@ export struct SettingsPage {
         }
       });
       SettingRow({
-        glyph: Glyph.CLOCK,
+        glyph: Glyph.UPGRADE_PROGRESS,
         title: '查看升级进度',
         subtitle: '升级过程中的实时日志',
         value: '',
@@ -780,9 +780,9 @@ export struct SettingsPage {
   @Builder
   securityCard() {
     RowCard({ gapBottom: T.GAP }) {
-      CardTitle({ pad: 16, glyph: Glyph.SHIELD, title: '安全', sub: '两个密码，别记混' });
+      CardTitle({ pad: 16, glyph: Glyph.SECURITY, title: '安全', sub: '两个密码，别记混' });
       SettingRow({
-        glyph: Glyph.KEY,
+        glyph: Glyph.APP_PASSWORD,
         title: '修改 App 登录密码',
         subtitle: '只管这个 App',
         value: '',
@@ -797,7 +797,7 @@ export struct SettingsPage {
       SettingRow({
         // 这一行改的是 root 口令，和上面那行一样是「钥匙」语义；
         // 之前用的是电源图标，看着像要重启路由器
-        glyph: Glyph.KEY,
+        glyph: Glyph.ROUTER_PASSWORD,
         title: '修改路由器密码',
         subtitle: 'root 账号，影响后台与 SSH',
         value: '',
@@ -857,7 +857,7 @@ export struct SettingsPage {
       Hairline({ indent: 16 });
 
       SettingRow({
-        glyph: Glyph.MOON,
+        glyph: Glyph.THEME,
         title: '主题',
         subtitle: '跟随系统或固定深浅色',
         value: this.themeName,
@@ -870,7 +870,7 @@ export struct SettingsPage {
         }
       });
       SettingRow({
-        glyph: Glyph.TRASH,
+        glyph: Glyph.CLEAR_CACHE,
         title: '清缓存',
         subtitle: '只清手机上的快照，不动路由器',
         value: '',

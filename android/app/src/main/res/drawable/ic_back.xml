@@ -6,7 +6,7 @@
     android:viewportWidth="24"
     android:viewportHeight="24">
     <path
-        android:pathData="m15 18-6-6 6-6m-6 6h12"
+        android:pathData="M 15 18 L 9 12 L 15 6 M 9 12 L 21 12"
         android:fillColor="#00000000"
         android:strokeColor="#FFFFFFFF"
         android:strokeWidth="2"

@@ -38,9 +38,9 @@ struct LoginView: View {
                     }
 
                     if !err.isEmpty {
-                        tip(err, color: C.danger, icon: "exclamationmark.triangle.fill")
+                        tip(err, color: C.danger, icon: "status-error")
                     } else if !okTip.isEmpty {
-                        tip(okTip, color: C.ok, icon: "checkmark.circle.fill")
+                        tip(okTip, color: C.ok, icon: "status-success")
                     }
 
                     SubmitButton(form: form, busy: busy, action: { submit() })
@@ -94,8 +94,7 @@ struct LoginView: View {
 
     private func tip(_ text: String, color: Color, icon: String) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 13))
+            LineIcon(name: icon, size: 15, color: color)
             Text(text)
                 .font(F.caption)
                 .fixedSize(horizontal: false, vertical: true)
@@ -200,7 +199,7 @@ private struct AddrField: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "wifi.router")
+            LineIcon(name: "network", size: 15, color: C.textSecondary)
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(C.primary)
                 .frame(width: 22)
@@ -235,7 +234,7 @@ private struct PwdField: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "lock")
+            LineIcon(name: "lock", size: 15, color: C.textTertiary)
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(C.primary)
                 .frame(width: 22)
@@ -265,7 +264,7 @@ private struct PwdField: View {
             Button {
                 show.toggle()
             } label: {
-                Image(systemName: show ? "eye.slash" : "eye")
+                LineIcon(name: show ? "eye-off" : "eye", size: 16, color: C.textSecondary)
                     .foregroundStyle(C.textSecondary)
             }
         }

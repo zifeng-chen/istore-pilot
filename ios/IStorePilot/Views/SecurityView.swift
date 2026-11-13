@@ -236,7 +236,7 @@ struct SecurityView: View {
     private var deviceCard: some View {
         Card {
             VStack(alignment: .leading, spacing: 0) {
-                CardHead(icon: "link", title: "设备", sub: "点数字进清单，点行看详情") {
+                CardHead(icon: "devices", title: "设备", sub: "点数字进清单，点行看详情") {
                     Button {
                         open(.all)
                     } label: {
@@ -362,7 +362,7 @@ struct SecurityView: View {
         } label: {
             Card {
                 VStack(alignment: .leading, spacing: 0) {
-                    CardHead(icon: "bolt", title: "应用流量",
+                    CardHead(icon: "app-traffic", title: "应用流量",
                              sub: (days > 1 ? "近 \(days) 天 · " : "") + "共 " + F.bytes(total)) {
                         Text("全部 \(arr.count) 个 ›")
                             .font(.system(size: 13, weight: .medium))
@@ -422,7 +422,7 @@ struct SecurityView: View {
 
         return Card {
             VStack(alignment: .leading, spacing: 0) {
-                CardHead(icon: "shield.lefthalf.filled", title: "拦截", sub: "AdGuard Home") {
+                CardHead(icon: "intercept", title: "拦截", sub: "AdGuard Home") {
                     Pill(text: adStateText,
                          color: ad.bool("running") ? C.primary : C.textSecondary)
                 }
@@ -525,10 +525,10 @@ struct SecurityView: View {
 
                     Hairline(inset: 0).padding(.top, 12)
 
-                    entryRow("arrow.triangle.2.circlepath", "规则与更新",
+                    entryRow("rules-refresh", "规则与更新",
                              "自动更新频率、规则表开关") { path.append(.shield) }
                     Hairline(inset: 46)
-                    entryRow("list.bullet.rectangle", "拦截日志",
+                    entryRow("intercept-logs", "拦截日志",
                              "最近被挡掉的域名查询") { path.append(.shield) }
                 }
             }
@@ -595,9 +595,7 @@ struct SecurityView: View {
                           tap: @escaping () -> Void) -> some View {
         Button(action: tap) {
             HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(C.primary)
+                LineIcon(name: icon, size: 16, color: C.primary)
                     .frame(width: 30, height: 30)
                     .background(C.primary.opacity(0.12))
                     .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))

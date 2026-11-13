@@ -15,19 +15,23 @@
 
 ## 0.3.9 · 代理页分组卡片化、地址列表脱敏、硬件页间距
 
-### 图标换成设计稿（Android 先行）
+### 图标换成设计稿（三端统一，v1.2.0）
 
-- 接入 `design/icons`（iStore Pilot SVG Icon Library v1.0.1，76 个 24×24 / 2px 描边图标）。
-  规格与原来的手绘 `Glyph` 完全一致，等于把手绘换成设计稿，不是换风格
-- `scripts/gen_icons.py`：SVG → `widget/IconData.java`（path data，运行时
-  `PathParser` 解析一次并缓存）+ 底部页签/返回键的 VectorDrawable
-- 调用点按**语义**逐个换（同一张旧图标在「网口 / 当前配置 / 系统盘」都当过 `BOX`），
-  共 55 处；旧常量保留 `@Deprecated` 别名防漏改
-- 页面图标：系统负载 / 宽带 / 网口 / 设备 / 拦截 / 规则与更新 / 拦截日志 /
-  配置与节点 / 订阅 / 插件 / 各组硬件 / 电源 / 安全 / 主题等全部对上新图标
-- 底部页签与返回键从实心 Material 换成同一套描边图标
-- 图标库缺 `close`（×），本地补了两条线；其余缺漏（`bolt` / `list` / `gear`）
-  已用近义图标替代，清单见 `docs/ICON-LIBRARY.md`
+- 接入 `design/icons`（iStore Pilot SVG Icon Library v1.2.0，77 个 24×24 / 2px 描边图标）。
+  规格与原手绘 `Glyph` 一致，等于把手绘与系统符号换成设计稿，不是换风格
+- `scripts/gen_icons.py` 一条命令产出三端数据，并把圆弧 / 二次曲线 / 相对指令
+  统一归一化成**绝对坐标 M/L/C/Z** —— 三端各留一个极简解析器：
+  - Android `IconData.java` + `PathParser` 静态缓存
+  - 鸿蒙 `IconData.ets` + `IconPath.replay`（Canvas）
+  - iOS `IconData.swift` + 新增 `LineIcon`（Canvas，带路径缓存）
+- 调用点按**语义**逐个重挂（旧 `BOX` 在「网口 / 当前配置 / 系统盘」是三张图），
+  三端共约 140 处；旧常量保留别名防漏改
+- v1.2.0 新增 `system-settings`（设置页签不再借用网络拓扑图）；`broadband`
+  重画成地球+插头（不再像 Wi-Fi）；`ipv4`/`ipv6` 改成数字字形；共 12 个重画
+- iOS 的卡片标题、设置行、空状态、登录提示都换成同一套 path；
+  只有 `chevron.right` / 搜索 / 等控件装饰仍用 SF Symbols
+- 图标库仍缺 `close`（本地补）、`subscription` / `nodes` / `bolt` / `speed-test`
+  （用近义图标顶着），清单见 `docs/ICON-LIBRARY.md`
 - 原图标备份在 `backup/icons-android-20261113/`
 
 ### 代理页（鸿蒙）

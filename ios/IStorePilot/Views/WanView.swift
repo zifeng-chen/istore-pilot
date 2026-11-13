@@ -50,7 +50,7 @@ struct WanView: View {
                         Bone(w: 120, h: 16); Bone(h: 10); Bone(h: 10)
                     } }
                 } else if !err.isEmpty {
-                    EmptyHint(icon: "wifi.exclamationmark", text: err)
+                    EmptyHint(icon: "status-warning", text: err)
                 } else {
                     DuoColumns {
                         statusHero
@@ -354,7 +354,7 @@ struct WanView: View {
                 } label: {
                     HStack(spacing: 7) {
                         if busy { ProgressView().tint(C.onPrimary).scaleEffect(0.75) }
-                        else { Image(systemName: "checkmark.circle").font(.system(size: 14)) }
+                        else { LineIcon(name: "status-success", size: 15, color: C.ok) }
                         Text(busy ? "正在应用…" : "保存并重新拨号")
                             .font(.system(size: 14.5, weight: .medium))
                     }
@@ -525,7 +525,7 @@ struct WanView: View {
                 openLuci()
             } label: {
                 HStack(spacing: 12) {
-                    Image(systemName: "globe")
+                    LineIcon(name: "network", size: 16, color: C.textSecondary)
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(C.primary)
                         .frame(width: 30, height: 30)

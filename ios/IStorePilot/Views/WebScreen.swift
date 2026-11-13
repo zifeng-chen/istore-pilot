@@ -46,7 +46,7 @@ struct WebScreen: View {
                 ctl.view
                 if let note = ctl.blocked {
                     VStack(spacing: 8) {
-                        Image(systemName: "wifi.exclamationmark")
+                        LineIcon(name: "status-warning", size: 30, color: C.textTertiary)
                             .font(.system(size: 26))
                             .foregroundStyle(C.textSecondary)
                         Text(note)
@@ -72,7 +72,7 @@ struct WebScreen: View {
                     dismiss()
                 }
             } label: {
-                Image(systemName: "chevron.left")
+                LineIcon(name: "back", size: 18, color: C.textPrimary)
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(C.textPrimary)
                     .frame(width: 34, height: 38)

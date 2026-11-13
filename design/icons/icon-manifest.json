@@ -454,5 +454,11 @@
     "label_zh": "5G 无线接入",
     "category": "network",
     "path": "icons/network/wifi-5g.svg"
+  },
+  {
+    "name": "system-settings",
+    "label_zh": "系统设置",
+    "category": "actions",
+    "path": "icons/actions/system-settings.svg"
   }
 ]

@@ -28,7 +28,7 @@ struct HardwareView: View {
                         }
                     }
                 } else if !err.isEmpty {
-                    EmptyHint(icon: "exclamationmark.triangle", text: err)
+                    EmptyHint(icon: "status-warning", text: err)
                 } else {
                     heroCard
                     cpuCard
@@ -188,7 +188,7 @@ struct HardwareView: View {
 
     private func moduleRow(_ s: J) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "memorychip")
+            LineIcon(name: "memory", size: 16, color: C.textSecondary)
                 .font(.system(size: 13))
                 .foregroundStyle(C.primary)
                 .frame(width: 26, height: 26)
@@ -236,7 +236,7 @@ struct HardwareView: View {
                 ForEach(Array(disks.enumerated()), id: \.offset) { i, d in
                     Hairline(inset: 0).padding(.top, i == 0 ? 4 : 0)
                     HStack(spacing: 10) {
-                        Image(systemName: "internaldrive")
+                        LineIcon(name: "system-disk", size: 18, color: C.textSecondary)
                             .font(.system(size: 14))
                             .foregroundStyle(C.primary)
                         VStack(alignment: .leading, spacing: 3) {

@@ -31,6 +31,7 @@ public final class Glyph extends View {
     // 常量名与 design/icons 的文件名一一对应（kebab-case → UPPER_SNAKE）
     public static final int CLEAR_CACHE = IconData.CLEAR_CACHE;
     public static final int LOGOUT = IconData.LOGOUT;
+    public static final int SYSTEM_SETTINGS = IconData.SYSTEM_SETTINGS;
     public static final int THEME = IconData.THEME;
     public static final int ADD = IconData.ADD;
     public static final int BACK = IconData.BACK;
@@ -106,7 +107,6 @@ public final class Glyph extends View {
     public static final int STATUS_SUCCESS = IconData.STATUS_SUCCESS;
     public static final int STATUS_WARNING = IconData.STATUS_WARNING;
     public static final int CLOSE = IconData.CLOSE;
-    public static final int COUNT = IconData.COUNT;
 
     // 旧名保留：万一有漏改的调用点，行为仍然是「能看的图标」，不会编译不过
     /** @deprecated 用 NETWORK */

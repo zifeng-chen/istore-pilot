@@ -1,4 +1,4 @@
-import { Ico } from './Icons';
+import { IconData } from './IconData';
 import { UI } from '../../core/UIState';
 import { Pal, T } from '../Theme';
 import { LineIcon } from '../Comp';
@@ -29,10 +29,10 @@ export struct SideNav {
 
   // 四个页签，和手机端、Android、iOS 保持一致
   private items: RailItem[] = [
-    { label: '概览', path: Ico.OVERVIEW, hint: '状态与速率' },
-    { label: '设备', path: Ico.DEVICES, hint: '在线与拦截' },
-    { label: '代理', path: Ico.PROXY, hint: '节点与分流' },
-    { label: '设置', path: Ico.SETTINGS, hint: '连接与维护' }
+    { label: '概览', path: IconData.stroke('system-load'), hint: '状态与速率' },
+    { label: '设备', path: IconData.stroke('devices'), hint: '在线与拦截' },
+    { label: '代理', path: IconData.stroke('proxy'), hint: '节点与分流' },
+    { label: '设置', path: IconData.stroke('system-settings'), hint: '连接与维护' }
   ];
 
   build() {
@@ -111,6 +111,7 @@ export struct SideNav {
         path: item.path,
         color: this.current === i ? Pal.primary() : Pal.iconOff(),
         side: 21,
+        design: 24,
         lineWidth: this.current === i ? 1.85 : 1.6
       })
         .margin({ left: 12 })
