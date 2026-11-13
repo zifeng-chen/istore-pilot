@@ -84,7 +84,8 @@ export struct ShieldPage {
   @Local percent: number = 0;
   @Local modeLabel: string = '';
   @Local running: boolean = false;
-  @Local installed: boolean = true;
+  // 默认 false：状态回来之前别让「卸载」先闪一下
+  @Local installed: boolean = false;
   /** 卸载确认弹层 */
   @Local showUninstall: boolean = false;
   @Local uninstalling: boolean = false;
