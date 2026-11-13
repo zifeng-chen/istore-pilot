@@ -140,7 +140,7 @@ public class SecurityFragment extends BaseFragment {
         // ---------------------------------------------------------- 设备
         Ui.Card dev = Ui.card(c);
         Ui.cardPadding(dev, 9);    // 最后一行是「最近活跃」，行内 9
-        LinearLayout devHead = Ui.cardTitle(c, dev, Glyph.LINK, "设备", "点数字进清单，点行看详情");
+        LinearLayout devHead = Ui.cardTitle(c, dev, Glyph.DEVICES, "设备", "点数字进清单，点行看详情");
         TextView allDev = Ui.text(c, "全部 ›", 13f, R.color.primary);
         allDev.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         allDev.setOnClickListener(v -> openDevices(0));
@@ -179,7 +179,7 @@ public class SecurityFragment extends BaseFragment {
         // ---------------------------------------------------------- 拦截
         Ui.Card ad = Ui.card(c);
         Ui.cardPadding(ad, 10);    // 最后一行是接管开关，行内 10
-        LinearLayout adHead = Ui.cardTitle(c, ad, Glyph.SHIELD, "拦截", "AdGuard Home");
+        LinearLayout adHead = Ui.cardTitle(c, ad, Glyph.INTERCEPT, "拦截", "AdGuard Home");
         tvAdState = Ui.pill(c, "—", R.color.text_secondary);
         adHead.addView(tvAdState);
 
@@ -231,9 +231,9 @@ public class SecurityFragment extends BaseFragment {
                 Ui.dp(c, 48), Ui.dp(c, 28)));
         adBodyBox.addView(swRow);
 
-        adBodyBox.addView(entryRow(c, Glyph.REFRESH, "规则与更新", "自动更新频率、规则表开关",
+        adBodyBox.addView(entryRow(c, Glyph.RULES_REFRESH, "规则与更新", "自动更新频率、规则表开关",
                 true, this::openAdblock));
-        adBodyBox.addView(entryRow(c, Glyph.LIST, "拦截日志", "最近被挡掉的域名查询",
+        adBodyBox.addView(entryRow(c, Glyph.INTERCEPT_LOGS, "拦截日志", "最近被挡掉的域名查询",
                 false, () -> startActivity(new Intent(ctx(), AdblockLogActivity.class))));
         ad.addView(adBodyBox);
 

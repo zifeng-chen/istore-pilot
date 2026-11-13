@@ -222,7 +222,7 @@ public class OverviewFragment extends BaseFragment {
         // 卡片自己左右归零，内边距交给标题行和每根进度条，四张卡的行首才对得齐
         Ui.cardPadding(rings, 0);
         Ui.CardHead healthHead = Ui.cardTitleLive(c, rings,
-                com.izifeng.www.istorepilot.widget.Glyph.CHIP, "系统负载", "CPU · 内存 · 磁盘");
+                com.izifeng.www.istorepilot.widget.Glyph.SYSTEM_LOAD, "系统负载", "CPU · 内存 · 磁盘");
         tvFacts = Ui.text(c, "", 12f, R.color.text_secondary);
         tvFacts.setGravity(Gravity.END);
         healthHead.right.addView(tvFacts);
@@ -253,7 +253,7 @@ public class OverviewFragment extends BaseFragment {
         Ui.Card wanCard = Ui.card(c);
         Ui.cardPadding(wanCard, 11);   // 最后一行是设置行，自带 11
         Ui.CardHead wanHead = Ui.cardTitleLive(c, wanCard,
-                com.izifeng.www.istorepilot.widget.Glyph.GLOBE, "宽带连接", "读取中…");
+                com.izifeng.www.istorepilot.widget.Glyph.BROADBAND, "宽带连接", "读取中…");
         // 副标题是活的：连上/断开、失败原因都写这儿，拿 CardHead 的引用直接改
         tvWanState = wanHead.sub;
 
@@ -278,7 +278,7 @@ public class OverviewFragment extends BaseFragment {
 
         // 原来是一个横贯整卡的主色胶囊按钮，跟别处「一行带图标的入口」不是一套。
         // 换成设置页那种行：图标块 + 标题 + 副标题 + 箭头
-        Ui.settingRow(c, wanCard, com.izifeng.www.istorepilot.widget.Glyph.LINK,
+        Ui.settingRow(c, wanCard, com.izifeng.www.istorepilot.widget.Glyph.NETWORK_SETTINGS,
                 "网络设置", "WAN / LAN / 无线 / 端口转发", "", true, false,
                 () -> openWan());
         root.addView(wanCard);
@@ -290,7 +290,7 @@ public class OverviewFragment extends BaseFragment {
         Ui.Card ports = Ui.card(c);
         Ui.cardPadding(ports, 0);
         Ui.CardHead portHead = Ui.cardTitleLive(c, ports,
-                com.izifeng.www.istorepilot.widget.Glyph.BOX, "网口", "点开看累计收发");
+                com.izifeng.www.istorepilot.widget.Glyph.ETHERNET_PORT, "网口", "点开看累计收发");
         tvPortSummary = Ui.pill(c, "—", R.color.text_secondary);
         portHead.right.addView(tvPortSummary);
 

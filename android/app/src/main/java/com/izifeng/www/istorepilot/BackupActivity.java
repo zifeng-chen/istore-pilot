@@ -99,7 +99,7 @@ public class BackupActivity extends BaseActivity {
         // ---- 列表
         Ui.Card card = Ui.card(c);
         card.setPadding(0, Ui.dp(c, 16), 0, Ui.dp(c, 10));
-        Ui.cardTitle(c, card, Glyph.BOX, "备份列表", "点一项可以恢复或删除");
+        Ui.cardTitle(c, card, Glyph.BACKUP, "备份列表", "点一项可以恢复或删除");
 
         listBox = Ui.column(c);
         card.addView(listBox);

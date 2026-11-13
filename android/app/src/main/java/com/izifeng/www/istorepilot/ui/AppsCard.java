@@ -52,7 +52,7 @@ public class AppsCard {
         LinearLayout head = Ui.row(c);
         head.setPadding(Ui.dp(c, 16), 0, Ui.dp(c, 16), Ui.dp(c, 10));
 
-        LinearLayout iconWrap = Ui.glyphTile(c, com.izifeng.www.istorepilot.widget.Glyph.BOLT,
+        LinearLayout iconWrap = Ui.glyphTile(c, com.izifeng.www.istorepilot.widget.Glyph.APP_TRAFFIC,
                 28, R.color.primary);
         LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(
                 Ui.dp(c, 28), Ui.dp(c, 28));

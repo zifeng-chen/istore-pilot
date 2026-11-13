@@ -144,20 +144,20 @@ public class SettingsFragment extends BaseFragment {
         // 而 WAN 地址属于偶尔看一眼的信息，放设置里更合适
         Ui.Card net = Ui.card(c);
         Ui.cardPadding(net, 11);
-        Ui.cardTitle(c, net, com.izifeng.www.istorepilot.widget.Glyph.GLOBE,
+        Ui.cardTitle(c, net, com.izifeng.www.istorepilot.widget.Glyph.NETWORK,
                 "网络", "外网与内网网关");
 
-        tvWanState = Ui.settingRow(c, net, com.izifeng.www.istorepilot.widget.Glyph.LINK,
+        tvWanState = Ui.settingRow(c, net, com.izifeng.www.istorepilot.widget.Glyph.INTERNET_STATUS,
                 "外网状态", "拨号与链路", "—", true, false, null);
-        tvWanV4 = Ui.settingRow(c, net, com.izifeng.www.istorepilot.widget.Glyph.GLOBE,
+        tvWanV4 = Ui.settingRow(c, net, com.izifeng.www.istorepilot.widget.Glyph.IPV4,
                 "IPv4", "运营商分配的地址", "—", false, false,
                 () -> showAddress("外网 IPv4", rawV4));
-        tvWanV6 = Ui.settingRow(c, net, com.izifeng.www.istorepilot.widget.Glyph.GLOBE,
+        tvWanV6 = Ui.settingRow(c, net, com.izifeng.www.istorepilot.widget.Glyph.IPV6,
                 "IPv6", "外网入口", "—", false, false,
                 () -> showAddress("外网 IPv6", rawV6));
         // 完整 IPv6 是 39 个字符，13.5sp 刚好一行放下
         tvWanV6.setTextSize(12.5f);
-        tvLanV4 = Ui.settingRow(c, net, com.izifeng.www.istorepilot.widget.Glyph.LINK,
+        tvLanV4 = Ui.settingRow(c, net, com.izifeng.www.istorepilot.widget.Glyph.LAN_GATEWAY,
                 "内网网关", "设备默认走这个地址", "—", false, false,
                 () -> showAddress("内网网关", rawLan));
         TextView netNote = Ui.text(c,
@@ -176,19 +176,19 @@ public class SettingsFragment extends BaseFragment {
         // 这一行长期显示「—」；「系统版本」也删了，内核版本概览页已经有了。
         Ui.Card dev = Ui.card(c);
         Ui.cardPadding(dev, 11);
-        Ui.cardTitle(c, dev, com.izifeng.www.istorepilot.widget.Glyph.CHIP,
+        Ui.cardTitle(c, dev, com.izifeng.www.istorepilot.widget.Glyph.DEVICE_INFO,
                 "设备信息", "处理器、内存与系统盘");
 
         TextView[] cpuRow = Ui.settingRowPair(c, dev,
-                com.izifeng.www.istorepilot.widget.Glyph.CHIP,
+                com.izifeng.www.istorepilot.widget.Glyph.PROCESSOR,
                 "处理器", "核心与最高频率", "—", true, false, null);
         tvDevCpu = cpuRow[0];
         tvDevCpuSub = cpuRow[1];
-        tvDevMem = Ui.settingRow(c, dev, com.izifeng.www.istorepilot.widget.Glyph.CHIP,
+        tvDevMem = Ui.settingRow(c, dev, com.izifeng.www.istorepilot.widget.Glyph.MEMORY,
                 "内存", "", "—", false, false, null);
-        tvDevDisk = Ui.settingRow(c, dev, com.izifeng.www.istorepilot.widget.Glyph.BOX,
+        tvDevDisk = Ui.settingRow(c, dev, com.izifeng.www.istorepilot.widget.Glyph.SYSTEM_DISK,
                 "系统盘", "", "—", false, false, null);
-        Ui.settingRow(c, dev, com.izifeng.www.istorepilot.widget.Glyph.LIST,
+        Ui.settingRow(c, dev, com.izifeng.www.istorepilot.widget.Glyph.ALL_HARDWARE,
                 "查看全部硬件", "内存条、网卡、温度、PCI 设备", "", false, false,
                 () -> startActivity(new Intent(ctx(),
                         com.izifeng.www.istorepilot.HardwareActivity.class)));
@@ -197,22 +197,22 @@ public class SettingsFragment extends BaseFragment {
         // ---------------------------------------------------------------- 系统维护
         Ui.Card system = Ui.card(c);
         Ui.cardPadding(system, 11);
-        Ui.cardTitle(c, system, com.izifeng.www.istorepilot.widget.Glyph.BOX,
+        Ui.cardTitle(c, system, com.izifeng.www.istorepilot.widget.Glyph.PACKAGE,
                 "系统维护", "备份、固件与软件包");
         // 备份排在第一行：它是后面所有危险操作的前提，
         // 放在最下面，用户往往是「改坏了」才想起来找它
-        Ui.settingRow(c, system, com.izifeng.www.istorepilot.widget.Glyph.BOX,
+        Ui.settingRow(c, system, com.izifeng.www.istorepilot.widget.Glyph.BACKUP,
                 "配置备份", "动网络之前先存一份，随时能退回来", "", true, false,
                 () -> startActivity(new Intent(ctx(),
                         com.izifeng.www.istorepilot.BackupActivity.class)));
         Ui.settingRow(c, system, com.izifeng.www.istorepilot.widget.Glyph.UPLOAD,
                 "上传安装包", "从手机里选 .ipk / .run", "", false, false, this::pickInstaller);
-        Ui.settingRow(c, system, com.izifeng.www.istorepilot.widget.Glyph.BOLT,
+        Ui.settingRow(c, system, com.izifeng.www.istorepilot.widget.Glyph.SYSTEM_UPDATE,
                 "检查系统更新", "查的是 iStoreOS 固件镜像", "", false, false,
                 this::checkFirmware);
-        Ui.settingRow(c, system, com.izifeng.www.istorepilot.widget.Glyph.BOX,
+        Ui.settingRow(c, system, com.izifeng.www.istorepilot.widget.Glyph.PACKAGE_UPDATE,
                 "检查软件包更新", "查的是 opkg 软件包", "", false, false, this::checkUpdates);
-        Ui.settingRow(c, system, com.izifeng.www.istorepilot.widget.Glyph.CLOCK,
+        Ui.settingRow(c, system, com.izifeng.www.istorepilot.widget.Glyph.UPGRADE_PROGRESS,
                 "查看升级进度", "升级过程中的实时日志", "", false, false,
                 this::showUpgradeProgress);
         TextView sysNote = Ui.text(c,
@@ -231,21 +231,21 @@ public class SettingsFragment extends BaseFragment {
         Ui.cardPadding(power, 11);
         Ui.cardTitle(c, power, com.izifeng.www.istorepilot.widget.Glyph.POWER,
                 "电源控制", "重启与关机都会短暂断网");
-        Ui.settingRow(c, power, com.izifeng.www.istorepilot.widget.Glyph.REFRESH,
+        Ui.settingRow(c, power, com.izifeng.www.istorepilot.widget.Glyph.RESTART_NETWORK,
                 "重启网络服务", "只重拨 WAN，通常 10 秒内恢复", "", true, false,
                 () -> askPower("重启网络服务？",
                         "只会重启 network 服务：WAN 重新拨号，局域网内的设备不会掉线，"
                                 + "但所有正在进行的下载和视频会断一下。\n\n"
                                 + "如果你只是外网连不上，先试这个；不要直接重启路由器。",
                         "重启网络", "restart_network", false, false));
-        Ui.settingRow(c, power, com.izifeng.www.istorepilot.widget.Glyph.REFRESH,
+        Ui.settingRow(c, power, com.izifeng.www.istorepilot.widget.Glyph.RESTART_ROUTER,
                 "重启路由器", "所有设备断网约 1 分钟", "", false, false,
                 () -> askPower("重启路由器？",
                         "整机重启：所有有线、无线设备都会断开约 1 分钟，"
                                 + "代理、拦截、拨号要等开机后重新起来。\n\n"
                                 + "重启期间 App 会显示「连不上」，这是正常的。",
                         "确定重启", "reboot", true, false));
-        Ui.settingRow(c, power, com.izifeng.www.istorepilot.widget.Glyph.POWER,
+        Ui.settingRow(c, power, com.izifeng.www.istorepilot.widget.Glyph.SHUTDOWN,
                 "关闭路由器", "关机后只能到设备跟前手动开机", "", false, true,
                 () -> askPower("关闭路由器？",
                         "关机后：\n"
@@ -259,11 +259,11 @@ public class SettingsFragment extends BaseFragment {
         // ---------------------------------------------------------------- 安全
         Ui.Card security = Ui.card(c);
         Ui.cardPadding(security, 11);
-        Ui.cardTitle(c, security, com.izifeng.www.istorepilot.widget.Glyph.SHIELD,
+        Ui.cardTitle(c, security, com.izifeng.www.istorepilot.widget.Glyph.SECURITY,
                 "安全", "两个密码，别记混");
-        Ui.settingRow(c, security, com.izifeng.www.istorepilot.widget.Glyph.KEY,
+        Ui.settingRow(c, security, com.izifeng.www.istorepilot.widget.Glyph.APP_PASSWORD,
                 "修改 App 登录密码", "只管这个 App", "", true, false, this::changePassword);
-        Ui.settingRow(c, security, com.izifeng.www.istorepilot.widget.Glyph.KEY,
+        Ui.settingRow(c, security, com.izifeng.www.istorepilot.widget.Glyph.ROUTER_PASSWORD,
                 "修改路由器密码", "root 账号，影响后台与 SSH", "", false, true,
                 this::changeRootPassword);
         TextView note = Ui.text(c,
@@ -313,9 +313,9 @@ public class SettingsFragment extends BaseFragment {
         tip.setPadding(Ui.dp(c, 16), Ui.dp(c, 10), Ui.dp(c, 16), Ui.dp(c, 14));
         about.addView(tip);
 
-        tvTheme = Ui.settingRow(c, about, com.izifeng.www.istorepilot.widget.Glyph.MOON,
+        tvTheme = Ui.settingRow(c, about, com.izifeng.www.istorepilot.widget.Glyph.THEME,
                 "主题", "跟随系统或固定深浅色", Theme.name(c), true, false, this::pickTheme);
-        Ui.settingRow(c, about, com.izifeng.www.istorepilot.widget.Glyph.TRASH,
+        Ui.settingRow(c, about, com.izifeng.www.istorepilot.widget.Glyph.CLEAR_CACHE,
                 "清缓存", "只清手机上的快照，不动路由器", "", false, false, this::clearCache);
         Ui.settingRow(c, about, com.izifeng.www.istorepilot.widget.Glyph.LOGOUT,
                 "退出登录", "清除凭证并返回登录页", "", false, false, this::relogin);

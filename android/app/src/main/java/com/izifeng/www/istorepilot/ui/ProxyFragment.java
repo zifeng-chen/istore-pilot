@@ -223,7 +223,7 @@ public class ProxyFragment extends BaseFragment {
         // ---------------------------------------------------------- 运行模式
         Ui.Card mode = Ui.card(c);
         Ui.cardPadding(mode, 0);   // 最后一行是说明文字，自身无内边距
-        LinearLayout modeHead = Ui.cardTitle(c, mode, Glyph.BOLT, "运行模式", "改完立即生效");
+        LinearLayout modeHead = Ui.cardTitle(c, mode, Glyph.TOGGLE, "运行模式", "改完立即生效");
         tvMode = Ui.num(c, "—", 13.5f, R.color.primary);
         tvMode.setGravity(Gravity.END);
         modeHead.addView(tvMode);
@@ -245,7 +245,7 @@ public class ProxyFragment extends BaseFragment {
         // ---------------------------------------------------------- 配置与节点
         Ui.Card combo = Ui.card(c);
         Ui.cardPadding(combo, 3);  // 最后一行是分组标题，底部留 3
-        comboSub = Ui.cardTitleLive(c, combo, Glyph.LIST, "配置与节点",
+        comboSub = Ui.cardTitleLive(c, combo, Glyph.CONFIG_FILE, "配置与节点",
                 "换配置会重启内核，断网十几秒").sub;
 
         // 两个后端都装着、都没运行时，这张卡必须点名管哪一个：
@@ -259,7 +259,7 @@ public class ProxyFragment extends BaseFragment {
         // 当前配置：整行可点，右侧「切换」胶囊给出明确的可操作性。
         // 这一行只对 OpenClash 有意义 —— PassWall 没有「配置文件」，
         // 它的节点直接来自订阅，所以下面会按后端把这一行藏掉
-        LinearLayout cfgSlot = Ui.infoRow(c, combo, Glyph.BOX, "当前配置", true);
+        LinearLayout cfgSlot = Ui.infoRow(c, combo, Glyph.CONFIG_FILE, "当前配置", true);
         tvCurConfig = Ui.num(c, "读取中…", 13.5f, R.color.text_primary);
         tvCurConfig.setGravity(Gravity.END);
         tvCurConfig.setSingleLine(true);
@@ -276,7 +276,7 @@ public class ProxyFragment extends BaseFragment {
         cfgRow = (View) cfgSlot.getParent();
 
         // 订阅：增删改在独立页面，这里只给入口和条数
-        LinearLayout subSlot = Ui.infoRow(c, combo, Glyph.LINK, "订阅管理", false);
+        LinearLayout subSlot = Ui.infoRow(c, combo, Glyph.SYNC, "订阅管理", false);
         tvSubCount = Ui.num(c, "", 13.5f, R.color.text_secondary);
         subSlot.addView(tvSubCount);
         subSlot.addView(Ui.chevron(c));
@@ -323,7 +323,7 @@ public class ProxyFragment extends BaseFragment {
         // 传包装、卸插件。仓库下载那条路放到 hero 里未安装的行上（点一下就装），
         // 这里就不再重复列一遍清单了。
         Ui.Card pkg = Ui.card(c);
-        Ui.cardTitle(c, pkg, Glyph.UPLOAD, "插件管理", "上传安装包 / 卸载插件");
+        Ui.cardTitle(c, pkg, Glyph.PACKAGE, "插件管理", "上传安装包 / 卸载插件");
 
         LinearLayout upSlot = Ui.infoRow(c, pkg, Glyph.UPLOAD, "上传安装包", true);
         TextView upNote = Ui.num(c, "选 .run / .ipk", 12f, R.color.text_secondary);
@@ -331,7 +331,7 @@ public class ProxyFragment extends BaseFragment {
         upSlot.addView(Ui.chevron(c));
         tapRow(upSlot, this::pickPkgFile);
 
-        LinearLayout unSlot = Ui.infoRow(c, pkg, Glyph.LIST, "卸载插件", false);
+        LinearLayout unSlot = Ui.infoRow(c, pkg, Glyph.DELETE, "卸载插件", false);
         tvPkgCount = Ui.num(c, "", 13f, R.color.text_secondary);
         unSlot.addView(tvPkgCount);
         unSlot.addView(Ui.chevron(c));
@@ -454,7 +454,7 @@ public class ProxyFragment extends BaseFragment {
     private void buildEmptyCard(Context c, LinearLayout root) {
         emptyCard = Ui.card(c);
         Ui.cardPadding(emptyCard, 0);
-        Ui.cardTitle(c, emptyCard, Glyph.UPLOAD,
+        Ui.cardTitle(c, emptyCard, Glyph.PACKAGE,
                 "还没安装代理插件", "装一个才能管节点和订阅");
 
         TextView tip = Ui.text(c,
@@ -1178,7 +1178,7 @@ public class ProxyFragment extends BaseFragment {
                 // hero 自己已经有 20dp 内边距，这里不再加左右
                 line.setPadding(0, Ui.dp(c, 10), 0, Ui.dp(c, 10));
 
-                LinearLayout tile = Ui.glyphTile(c, Glyph.POWER, 30, R.color.hero_fg);
+                LinearLayout tile = Ui.glyphTile(c, Glyph.PROXY, 30, R.color.hero_fg);
                 LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(
                         Ui.dp(c, 30), Ui.dp(c, 30));
                 tlp.rightMargin = Ui.dp(c, 12);
@@ -2057,10 +2057,10 @@ public class ProxyFragment extends BaseFragment {
     /** 分组类型 → 图标 */
     private int groupGlyph(String raw) {
         switch (raw == null ? "" : raw.toLowerCase(Locale.ROOT)) {
-            case "urltest": return com.izifeng.www.istorepilot.widget.Glyph.BOLT;
-            case "fallback": return com.izifeng.www.istorepilot.widget.Glyph.SHIELD;
+            case "urltest": return com.izifeng.www.istorepilot.widget.Glyph.LATENCY;
+            case "fallback": return com.izifeng.www.istorepilot.widget.Glyph.SYNC;
             case "relay": return com.izifeng.www.istorepilot.widget.Glyph.LINK;
-            default: return com.izifeng.www.istorepilot.widget.Glyph.LIST;
+            default: return com.izifeng.www.istorepilot.widget.Glyph.DEVICES;
         }
     }
 

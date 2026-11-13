@@ -130,6 +130,10 @@ def check_common(path: str, lang: str, raw: bytes) -> list[Issue]:
                          "文件末尾有多余空行"))
 
     limit = MAX_LINE.get(lang, 0)
+    # 生成文件（带 @generated 头）不按行宽要求：里面的长串是路径数据 / 表格，
+    # 由生成脚本负责排版，人工改不了也不该改
+    if "@generated" in text[:400]:
+        limit = 0
     skip = py_string_lines(text) if lang == "py" else set()
     blank_run = 0
     for i, line in enumerate(text.splitlines(), 1):

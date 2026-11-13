@@ -1,0 +1,458 @@
+[
+  {
+    "name": "system-load",
+    "label_zh": "系统负载",
+    "category": "monitoring",
+    "path": "icons/monitoring/system-load.svg"
+  },
+  {
+    "name": "broadband",
+    "label_zh": "宽带",
+    "category": "monitoring",
+    "path": "icons/monitoring/broadband.svg"
+  },
+  {
+    "name": "network-settings",
+    "label_zh": "网络设置",
+    "category": "monitoring",
+    "path": "icons/monitoring/network-settings.svg"
+  },
+  {
+    "name": "ethernet-port",
+    "label_zh": "网口",
+    "category": "monitoring",
+    "path": "icons/monitoring/ethernet-port.svg"
+  },
+  {
+    "name": "devices",
+    "label_zh": "设备",
+    "category": "monitoring",
+    "path": "icons/monitoring/devices.svg"
+  },
+  {
+    "name": "app-traffic",
+    "label_zh": "应用流量",
+    "category": "monitoring",
+    "path": "icons/monitoring/app-traffic.svg"
+  },
+  {
+    "name": "intercept",
+    "label_zh": "拦截",
+    "category": "monitoring",
+    "path": "icons/monitoring/intercept.svg"
+  },
+  {
+    "name": "rules-refresh",
+    "label_zh": "规则与刷新",
+    "category": "monitoring",
+    "path": "icons/monitoring/rules-refresh.svg"
+  },
+  {
+    "name": "intercept-logs",
+    "label_zh": "拦截日志",
+    "category": "monitoring",
+    "path": "icons/monitoring/intercept-logs.svg"
+  },
+  {
+    "name": "proxy",
+    "label_zh": "代理",
+    "category": "monitoring",
+    "path": "icons/monitoring/proxy.svg"
+  },
+  {
+    "name": "toggle",
+    "label_zh": "开关",
+    "category": "configuration",
+    "path": "icons/configuration/toggle.svg"
+  },
+  {
+    "name": "config-file",
+    "label_zh": "配置文件",
+    "category": "configuration",
+    "path": "icons/configuration/config-file.svg"
+  },
+  {
+    "name": "package",
+    "label_zh": "安装包",
+    "category": "configuration",
+    "path": "icons/configuration/package.svg"
+  },
+  {
+    "name": "link",
+    "label_zh": "连接",
+    "category": "configuration",
+    "path": "icons/configuration/link.svg"
+  },
+  {
+    "name": "server-address",
+    "label_zh": "服务器地址",
+    "category": "configuration",
+    "path": "icons/configuration/server-address.svg"
+  },
+  {
+    "name": "login-user",
+    "label_zh": "登录用户",
+    "category": "configuration",
+    "path": "icons/configuration/login-user.svg"
+  },
+  {
+    "name": "network",
+    "label_zh": "网络",
+    "category": "network",
+    "path": "icons/network/network.svg"
+  },
+  {
+    "name": "internet-status",
+    "label_zh": "外网状态",
+    "category": "network",
+    "path": "icons/network/internet-status.svg"
+  },
+  {
+    "name": "ipv4",
+    "label_zh": "IPv4",
+    "category": "network",
+    "path": "icons/network/ipv4.svg"
+  },
+  {
+    "name": "ipv6",
+    "label_zh": "IPv6",
+    "category": "network",
+    "path": "icons/network/ipv6.svg"
+  },
+  {
+    "name": "lan-gateway",
+    "label_zh": "内网网关",
+    "category": "network",
+    "path": "icons/network/lan-gateway.svg"
+  },
+  {
+    "name": "backup",
+    "label_zh": "配置备份",
+    "category": "maintenance",
+    "path": "icons/maintenance/backup.svg"
+  },
+  {
+    "name": "system-update",
+    "label_zh": "检查系统更新",
+    "category": "maintenance",
+    "path": "icons/maintenance/system-update.svg"
+  },
+  {
+    "name": "package-update",
+    "label_zh": "检查软件包更新",
+    "category": "maintenance",
+    "path": "icons/maintenance/package-update.svg"
+  },
+  {
+    "name": "upgrade-progress",
+    "label_zh": "查看升级进度",
+    "category": "maintenance",
+    "path": "icons/maintenance/upgrade-progress.svg"
+  },
+  {
+    "name": "power",
+    "label_zh": "电源",
+    "category": "maintenance",
+    "path": "icons/maintenance/power.svg"
+  },
+  {
+    "name": "restart-network",
+    "label_zh": "重启网络服务",
+    "category": "maintenance",
+    "path": "icons/maintenance/restart-network.svg"
+  },
+  {
+    "name": "restart-router",
+    "label_zh": "重启路由器",
+    "category": "maintenance",
+    "path": "icons/maintenance/restart-router.svg"
+  },
+  {
+    "name": "shutdown",
+    "label_zh": "关机",
+    "category": "maintenance",
+    "path": "icons/maintenance/shutdown.svg"
+  },
+  {
+    "name": "device-info",
+    "label_zh": "设备信息",
+    "category": "hardware",
+    "path": "icons/hardware/device-info.svg"
+  },
+  {
+    "name": "processor",
+    "label_zh": "处理器",
+    "category": "hardware",
+    "path": "icons/hardware/processor.svg"
+  },
+  {
+    "name": "memory",
+    "label_zh": "内存",
+    "category": "hardware",
+    "path": "icons/hardware/memory.svg"
+  },
+  {
+    "name": "system-disk",
+    "label_zh": "系统盘",
+    "category": "hardware",
+    "path": "icons/hardware/system-disk.svg"
+  },
+  {
+    "name": "all-hardware",
+    "label_zh": "查看全部硬件",
+    "category": "hardware",
+    "path": "icons/hardware/all-hardware.svg"
+  },
+  {
+    "name": "security",
+    "label_zh": "安全",
+    "category": "security",
+    "path": "icons/security/security.svg"
+  },
+  {
+    "name": "app-password",
+    "label_zh": "修改APP登录密码",
+    "category": "security",
+    "path": "icons/security/app-password.svg"
+  },
+  {
+    "name": "router-password",
+    "label_zh": "修改路由器密码",
+    "category": "security",
+    "path": "icons/security/router-password.svg"
+  },
+  {
+    "name": "logout",
+    "label_zh": "退出登录",
+    "category": "actions",
+    "path": "icons/actions/logout.svg"
+  },
+  {
+    "name": "clear-cache",
+    "label_zh": "清缓存",
+    "category": "actions",
+    "path": "icons/actions/clear-cache.svg"
+  },
+  {
+    "name": "theme",
+    "label_zh": "主题",
+    "category": "actions",
+    "path": "icons/actions/theme.svg"
+  },
+  {
+    "name": "add",
+    "label_zh": "添加",
+    "category": "common",
+    "path": "icons/common/add.svg"
+  },
+  {
+    "name": "edit",
+    "label_zh": "编辑",
+    "category": "common",
+    "path": "icons/common/edit.svg"
+  },
+  {
+    "name": "delete",
+    "label_zh": "删除",
+    "category": "common",
+    "path": "icons/common/delete.svg"
+  },
+  {
+    "name": "search",
+    "label_zh": "搜索",
+    "category": "common",
+    "path": "icons/common/search.svg"
+  },
+  {
+    "name": "more",
+    "label_zh": "更多",
+    "category": "common",
+    "path": "icons/common/more.svg"
+  },
+  {
+    "name": "back",
+    "label_zh": "返回",
+    "category": "common",
+    "path": "icons/common/back.svg"
+  },
+  {
+    "name": "download",
+    "label_zh": "下载",
+    "category": "common",
+    "path": "icons/common/download.svg"
+  },
+  {
+    "name": "upload",
+    "label_zh": "上传",
+    "category": "common",
+    "path": "icons/common/upload.svg"
+  },
+  {
+    "name": "copy",
+    "label_zh": "复制",
+    "category": "common",
+    "path": "icons/common/copy.svg"
+  },
+  {
+    "name": "refresh",
+    "label_zh": "刷新",
+    "category": "common",
+    "path": "icons/common/refresh.svg"
+  },
+  {
+    "name": "chevron-right",
+    "label_zh": "下一步",
+    "category": "common",
+    "path": "icons/common/chevron-right.svg"
+  },
+  {
+    "name": "chevron-down",
+    "label_zh": "展开",
+    "category": "common",
+    "path": "icons/common/chevron-down.svg"
+  },
+  {
+    "name": "lock",
+    "label_zh": "锁定",
+    "category": "common",
+    "path": "icons/common/lock.svg"
+  },
+  {
+    "name": "unlock",
+    "label_zh": "解锁",
+    "category": "common",
+    "path": "icons/common/unlock.svg"
+  },
+  {
+    "name": "eye",
+    "label_zh": "显示",
+    "category": "common",
+    "path": "icons/common/eye.svg"
+  },
+  {
+    "name": "eye-off",
+    "label_zh": "隐藏",
+    "category": "common",
+    "path": "icons/common/eye-off.svg"
+  },
+  {
+    "name": "signal",
+    "label_zh": "信号强度",
+    "category": "common",
+    "path": "icons/common/signal.svg"
+  },
+  {
+    "name": "latency",
+    "label_zh": "网络延迟",
+    "category": "common",
+    "path": "icons/common/latency.svg"
+  },
+  {
+    "name": "packet-loss",
+    "label_zh": "丢包率",
+    "category": "common",
+    "path": "icons/common/packet-loss.svg"
+  },
+  {
+    "name": "download-speed",
+    "label_zh": "下载速率",
+    "category": "common",
+    "path": "icons/common/download-speed.svg"
+  },
+  {
+    "name": "upload-speed",
+    "label_zh": "上传速率",
+    "category": "common",
+    "path": "icons/common/upload-speed.svg"
+  },
+  {
+    "name": "wifi-offline",
+    "label_zh": "网络断开",
+    "category": "common",
+    "path": "icons/common/wifi-offline.svg"
+  },
+  {
+    "name": "sync",
+    "label_zh": "同步",
+    "category": "common",
+    "path": "icons/common/sync.svg"
+  },
+  {
+    "name": "empty",
+    "label_zh": "空状态",
+    "category": "common",
+    "path": "icons/common/empty.svg"
+  },
+  {
+    "name": "permission",
+    "label_zh": "权限不足",
+    "category": "common",
+    "path": "icons/common/permission.svg"
+  },
+  {
+    "name": "timeout",
+    "label_zh": "连接超时",
+    "category": "common",
+    "path": "icons/common/timeout.svg"
+  },
+  {
+    "name": "status-success",
+    "label_zh": "成功",
+    "category": "status",
+    "path": "icons/status/status-success.svg"
+  },
+  {
+    "name": "status-warning",
+    "label_zh": "警告",
+    "category": "status",
+    "path": "icons/status/status-warning.svg"
+  },
+  {
+    "name": "status-error",
+    "label_zh": "错误",
+    "category": "status",
+    "path": "icons/status/status-error.svg"
+  },
+  {
+    "name": "status-info",
+    "label_zh": "信息提示",
+    "category": "status",
+    "path": "icons/status/status-info.svg"
+  },
+  {
+    "name": "status-loading",
+    "label_zh": "加载中",
+    "category": "status",
+    "path": "icons/status/status-loading.svg"
+  },
+  {
+    "name": "status-offline",
+    "label_zh": "离线",
+    "category": "status",
+    "path": "icons/status/status-offline.svg"
+  },
+  {
+    "name": "status-online",
+    "label_zh": "在线",
+    "category": "status",
+    "path": "icons/status/status-online.svg"
+  },
+  {
+    "name": "wired-connection",
+    "label_zh": "有线接入",
+    "category": "network",
+    "path": "icons/network/wired-connection.svg"
+  },
+  {
+    "name": "wifi-2-4g",
+    "label_zh": "2.4G 无线接入",
+    "category": "network",
+    "path": "icons/network/wifi-2-4g.svg"
+  },
+  {
+    "name": "wifi-5g",
+    "label_zh": "5G 无线接入",
+    "category": "network",
+    "path": "icons/network/wifi-5g.svg"
+  }
+]

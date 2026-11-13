@@ -1,0 +1,5 @@
+.ip-icon{display:inline-block;width:24px;height:24px;flex:0 0 auto;color:currentColor;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle}
+.ip-icon--sm{width:16px;height:16px}.ip-icon--md{width:20px;height:20px}.ip-icon--lg{width:28px;height:28px}.ip-icon--xl{width:32px;height:32px}
+.ip-icon--muted{color:var(--ip-icon-muted,#8A929E)}.ip-icon--primary{color:var(--ip-icon-primary,#159F85)}
+.ip-icon--success{color:var(--ip-icon-success,#16A36A)}.ip-icon--warning{color:var(--ip-icon-warning,#E9A02A)}
+.ip-icon--danger{color:var(--ip-icon-danger,#E5484D)}.ip-icon--info{color:var(--ip-icon-info,#2585E8)}

@@ -176,7 +176,7 @@ public class WanActivity extends BaseActivity {
         Context c = this;
         Ui.Card card = Ui.card(c);
         card.setPadding(0, Ui.dp(c, 16), 0, Ui.dp(c, 14));
-        Ui.cardTitle(c, card, Glyph.BOLT, "连接操作", "只动链路，不改配置");
+        Ui.cardTitle(c, card, Glyph.RESTART_NETWORK, "连接操作", "只动链路，不改配置");
 
         LinearLayout row = Ui.row(c);
         row.setPadding(Ui.dp(c, 16), Ui.dp(c, 14), Ui.dp(c, 16), 0);
@@ -214,7 +214,7 @@ public class WanActivity extends BaseActivity {
     private void buildProto(LinearLayout root) {
         Ui.Card card = Ui.card(this);
         card.setPadding(0, Ui.dp(this, 16), 0, Ui.dp(this, 14));
-        Ui.cardTitle(this, card, Glyph.GLOBE, "接入方式", "改这里会重拨");
+        Ui.cardTitle(this, card, Glyph.NETWORK_SETTINGS, "接入方式", "改这里会重拨");
         segHost = Ui.column(this);
         segHost.setPadding(Ui.dp(this, 16), 0, Ui.dp(this, 16), 0);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
@@ -228,7 +228,7 @@ public class WanActivity extends BaseActivity {
     private void buildForm(LinearLayout root) {
         Ui.Card card = Ui.card(this);
         card.setPadding(0, Ui.dp(this, 16), 0, Ui.dp(this, 10));
-        Ui.cardTitle(this, card, Glyph.KEY, "参数", "密码留空表示不修改");
+        Ui.cardTitle(this, card, Glyph.ROUTER_PASSWORD, "参数", "密码留空表示不修改");
         formBox = Ui.column(this);
         formBox.setPadding(Ui.dp(this, 16), 0, Ui.dp(this, 16), 0);
         card.addView(formBox);
@@ -257,7 +257,7 @@ public class WanActivity extends BaseActivity {
     private void buildLan(LinearLayout root) {
         Ui.Card card = Ui.card(this);
         card.setPadding(0, Ui.dp(this, 16), 0, Ui.dp(this, 12));
-        Ui.cardTitle(this, card, Glyph.LINK, "局域网", "内网网段与 DHCP（只读）");
+        Ui.cardTitle(this, card, Glyph.LAN_GATEWAY, "局域网", "内网网段与 DHCP（只读）");
         lanBox = Ui.column(this);
         lanBox.setPadding(Ui.dp(this, 16), 0, Ui.dp(this, 16), 0);
         card.addView(lanBox);
@@ -268,7 +268,7 @@ public class WanActivity extends BaseActivity {
         Context c = this;
         Ui.Card card = Ui.card(c);
         card.setPadding(0, Ui.dp(c, 16), 0, Ui.dp(c, 10));
-        Ui.cardTitle(c, card, Glyph.SHIELD, "防火墙", "谁能从外面进来（只读）");
+        Ui.cardTitle(c, card, Glyph.SECURITY, "防火墙", "谁能从外面进来（只读）");
         fwBox = Ui.column(c);
         fwBox.setPadding(Ui.dp(c, 16), 0, Ui.dp(c, 16), 0);
         card.addView(fwBox);
@@ -297,7 +297,7 @@ public class WanActivity extends BaseActivity {
     private void buildWeb(LinearLayout root) {
         Ui.Card card = Ui.card(this);
         card.setPadding(0, Ui.dp(this, 4), 0, Ui.dp(this, 4));
-        Ui.settingRow(this, card, Glyph.GLOBE, "路由器网页端",
+        Ui.settingRow(this, card, Glyph.SERVER_ADDRESS, "路由器网页端",
                 "改网段、地址池、端口转发、DDNS", "", true, false, this::openLuci);
         root.addView(card);
     }
