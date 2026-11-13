@@ -804,6 +804,26 @@ export struct SecurityPage {
     .backgroundColor($r('app.color.surface'));
   }
 
+  /** 未安装卡里的一条价值点：小圆点 + 一句话 */
+  @Builder
+  adValue(text: string) {
+    Row({ space: 8 }) {
+      Row()
+        .width(5)
+        .height(5)
+        .borderRadius(3)
+        .backgroundColor($r('app.color.primary'))
+        .margin({ top: 6 });
+      Text(text)
+        .fontSize(T.F_SUB)
+        .fontColor($r('app.color.text_secondary'))
+        .lineHeight(19)
+        .layoutWeight(1);
+    }
+    .width('100%')
+    .alignItems(VerticalAlign.Top);
+  }
+
   @Builder
   adCard() {
     Card() {
@@ -823,61 +843,83 @@ export struct SecurityPage {
       .alignItems(VerticalAlign.Top);
 
       if (!this.adInstalled) {
-        // 没装本体：统计、规则、日志、接管全都无从谈起，只留说明 + 安装入口
-        Text('这台软路由上没有装 AdGuard Home。装上之后拦截、规则、日志会自动启用，App 不用更新。')
-          .fontSize(T.F_SUB)
-          .fontColor($r('app.color.text_secondary'))
-          .width('100%')
-          .margin({ top: 12 });
+        // 没装本体：统计、规则、日志、接管全都无从谈起。
+        // 这里不写一段说明，改成三条「装上能得到什么」+ 一个主动作 ——
+        // 用户在这一屏要的是判断值不值得装，不是读产品文档
+        Column({ space: 7 }) {
+          this.adValue('装完全网设备一起生效，不用逐台设置');
+          this.adValue('能看拦截日志、热门域名和放行名单');
+          this.adValue('先只观察，不接管 DNS，随时可退');
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+        .margin({ top: 12 });
 
-        if (this.adInstalling || this.adInstallErr.length > 0) {
-          Text(this.adInstallErr.length > 0 ? '失败：' + this.adInstallErr
-            : this.adInstallStep + ' · ' + this.adInstallPct.toString() + '%')
+        if (this.adInstalling) {
+          Text(this.adInstallStep + ' · ' + this.adInstallPct.toString() + '%')
             .fontSize(T.F_TINY)
-            .fontColor(this.adInstallErr.length > 0
-              ? $r('app.color.danger') : $r('app.color.text_secondary'))
+            .fontColor($r('app.color.text_secondary'))
+            .width('100%')
+            .margin({ top: 14 });
+
+          Stack({ alignContent: Alignment.Start }) {
+            Row()
+              .width('100%')
+              .height(6)
+              .borderRadius(3)
+              .backgroundColor($r('app.color.track'));
+            Row()
+              .width(Math.max(2, this.adInstallPct).toString() + '%')
+              .height(6)
+              .borderRadius(3)
+              .backgroundColor($r('app.color.primary'));
+          }
+          .width('100%')
+          .height(6)
+          .margin({ top: 6 });
+        }
+
+        if (this.adInstallErr.length > 0) {
+          Text('失败：' + this.adInstallErr)
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.danger'))
             .width('100%')
             .margin({ top: 10 });
         }
 
-        Row() {
-          Text(this.adInstalling ? '安装中…' : '一键安装')
-            .fontSize(T.F_BODY)
-            .fontColor($r('app.color.on_primary'));
-        }
-        .width('100%')
-        .height(42)
-        .justifyContent(FlexAlign.Center)
-        .backgroundColor($r('app.color.primary'))
-        .borderRadius(12)
-        .opacity(this.adInstalling ? 0.55 : 1)
-        .margin({ top: 14 })
-        .onClick(() => {
-          if (!this.adInstalling) {
-            this.askInstall();
-          }
-        });
+        Text(this.adInstalling ? '正在安装…' : '安装 AdGuard Home')
+          .fontSize(T.F_BODY)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.on_primary'))
+          .textAlign(TextAlign.Center)
+          .width('100%')
+          .height(42)
+          .backgroundColor($r('app.color.primary'))
+          .borderRadius(12)
+          .opacity(this.adInstalling ? 0.55 : 1)
+          .margin({ top: 16 })
+          .onClick(() => {
+            if (!this.adInstalling) {
+              this.askInstall();
+            }
+          });
 
-        Row() {
-          Text('去路由器网页安装')
-            .fontSize(T.F_SUB)
-            .fontColor($r('app.color.text_secondary'));
-        }
-        .width('100%')
-        .height(38)
-        .justifyContent(FlexAlign.Center)
-        .borderRadius(12)
-        .border({ width: 1, color: $r('app.color.divider') })
-        .margin({ top: 8 })
-        .onClick(() => {
-          this.openInstall();
-        });
-
-        Text('一键安装不改 DNS：装完只监听本机，接管全网仍是单独一步。')
-          .fontSize(T.F_TINY)
+        Text('约 6.6 MB · 需要路由器能上网')
+          .fontSize(10.5)
           .fontColor($r('app.color.text_tertiary'))
           .width('100%')
-          .margin({ top: 8 });
+          .textAlign(TextAlign.Center)
+          .margin({ top: 6 });
+
+        Text('手动安装 / 去路由器网页')
+          .fontSize(T.F_SUB)
+          .fontColor($r('app.color.primary'))
+          .width('100%')
+          .textAlign(TextAlign.Center)
+          .padding({ top: 12, bottom: 4 })
+          .onClick(() => {
+            this.openInstall();
+          });
       } else {
         Row() {
           Text(Fmt.count(this.adBlocked))

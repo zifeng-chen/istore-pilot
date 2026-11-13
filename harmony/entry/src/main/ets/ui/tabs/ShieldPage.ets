@@ -1,11 +1,12 @@
 import { common } from '@kit.AbilityKit';
+import { promptAction } from '@kit.ArkUI';
 import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
 import { UI, UIState } from '../../core/UIState';
 import { Fmt } from '../../util/Fmt';
 import { Bp } from '../Breakpoint';
 import { Pal, T } from '../Theme';
-import { Card, CardTitle, Chip, Hairline, Note, Pill, RowCard } from '../Comp';
+import { Card, CardTitle, Chip, Comp, GlyphIcon, Hairline, Note, Pill, RowCard } from '../Comp';
 import { Glyph } from '../comp/Icons';
 
 interface RankItem {
@@ -83,6 +84,11 @@ export struct ShieldPage {
   @Local percent: number = 0;
   @Local modeLabel: string = '';
   @Local running: boolean = false;
+  @Local installed: boolean = true;
+  /** 卸载确认弹层 */
+  @Local showUninstall: boolean = false;
+  @Local uninstalling: boolean = false;
+  @Local uninstallErr: string = '';
   @Local rules: number = 0;
   @Local window: string = '';
   @Local top: RankItem[] = [];
@@ -199,6 +205,7 @@ export struct ShieldPage {
     this.percent = stats.num('percent', 0);
     this.modeLabel = j.str('mode_label', '');
     this.running = j.bool('running', false);
+    this.installed = j.bool('installed', true);
     this.rules = j.obj('filters').num('rules', 0);
 
     const listening: J = j.obj('listening');
@@ -443,6 +450,9 @@ export struct ShieldPage {
             Column() {
               this.rulesCard();
               this.rankCard();
+              if (this.installed) {
+                this.uninstallCard();
+              }
             }
             .layoutWeight(1)
             .alignItems(HorizontalAlign.Start);
@@ -457,6 +467,9 @@ export struct ShieldPage {
             this.rankCard();
             this.rulesCard();
             this.logCard();
+            if (this.installed) {
+              this.uninstallCard();
+            }
           }
           .width('100%');
         }
@@ -476,7 +489,172 @@ export struct ShieldPage {
     .scrollBar(BarState.Off)
     .edgeEffect(EdgeEffect.Spring)
     .backgroundColor($r('app.color.app_bg'))
-    .align(Alignment.Top);
+    .align(Alignment.Top)
+    .bindSheet($$this.showUninstall, this.uninstallSheet(), {
+      height: 470,
+      dragBar: true,
+      showClose: false,
+      backgroundColor: $r('app.color.app_bg'),
+      onDisappear: () => {
+        this.showUninstall = false;
+      }
+    });
+  }
+
+  /** 卸载入口：放在拦截页最底部，红色只给这一处 */
+  @Builder
+  uninstallCard() {
+    Card({ gapTop: T.GAP }) {
+      Row({ space: 10 }) {
+        Stack() {
+          GlyphIcon({
+            kind: Glyph.TRASH,
+            color: Pal.danger(),
+            side: 17,
+            lineWidth: 1.9
+          });
+        }
+        .width(30)
+        .height(30)
+        .borderRadius(10)
+        .backgroundColor(Comp.alpha(Pal.danger(), 0.12));
+
+        Column() {
+          Text('卸载 AdGuard Home')
+            .fontSize(T.F_BODY)
+            .fontColor($r('app.color.danger'));
+          Text('会先退出 DNS 接管，配置与日志可选保留')
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_tertiary'))
+            .margin({ top: 2 });
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1);
+
+        Text('›')
+          .fontSize(18)
+          .fontColor($r('app.color.text_tertiary'));
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
+      .onClick(() => {
+        this.uninstallErr = '';
+        this.showUninstall = true;
+      });
+    }
+  }
+
+  @Builder
+  uninstallSheet() {
+    Column() {
+      Row() {
+        Text('卸载 AdGuard Home')
+          .fontSize(T.F_H1)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'))
+          .layoutWeight(1);
+        Stack() {
+          Stack() {
+            GlyphIcon({ kind: Glyph.CLOSE, color: Pal.textSecondary(), side: 14, lineWidth: 2.1 });
+          }
+          .width(30)
+          .height(30)
+          .borderRadius(15)
+          .backgroundColor($r('app.color.surface_hi'));
+        }
+        .width(44)
+        .height(44)
+        .onClick(() => {
+          if (!this.uninstalling) {
+            this.showUninstall = false;
+          }
+        });
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center);
+
+      Text('卸载前会先把 DNS 还给 dnsmasq，再停服务、删本体 —— 接管中的话也不会断网。')
+        .fontSize(T.F_SUB)
+        .fontColor($r('app.color.text_secondary'))
+        .lineHeight(20)
+        .width('100%')
+        .margin({ top: 10 });
+
+      Text('配置、规则与日志怎么处理？')
+        .fontSize(T.F_TINY)
+        .fontColor($r('app.color.text_tertiary'))
+        .width('100%')
+        .margin({ top: 14 });
+
+      Button(this.uninstalling ? '正在卸载…' : '卸载，保留配置')
+        .type(ButtonType.Normal)
+        .borderRadius(14)
+        .height(46)
+        .width('100%')
+        .fontSize(15)
+        .fontColor($r('app.color.primary'))
+        .backgroundColor($r('app.color.accent_soft'))
+        .margin({ top: 8 })
+        .enabled(!this.uninstalling)
+        .onClick(() => {
+          this.doUninstall(false);
+        });
+
+      Button(this.uninstalling ? '正在卸载…' : '卸载，并删除配置与日志')
+        .type(ButtonType.Normal)
+        .borderRadius(14)
+        .height(46)
+        .width('100%')
+        .fontSize(15)
+        .fontColor($r('app.color.on_primary'))
+        .backgroundColor($r('app.color.danger'))
+        .margin({ top: 10 })
+        .enabled(!this.uninstalling)
+        .onClick(() => {
+          this.doUninstall(true);
+        });
+
+      Text('「保留」会在 /etc/AdGuardHome 留下配置、规则缓存与查询历史，重装后直接接着用。')
+        .fontSize(10.5)
+        .fontColor($r('app.color.text_tertiary'))
+        .lineHeight(16)
+        .width('100%')
+        .margin({ top: 10 });
+
+      if (this.uninstallErr.length > 0) {
+        Text(this.uninstallErr)
+          .fontSize(T.F_TINY)
+          .fontColor($r('app.color.danger'))
+          .width('100%')
+          .margin({ top: 10 });
+      }
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+    .padding({ left: 18, right: 18, top: 8 });
+  }
+
+  private async doUninstall(purge: boolean): Promise<void> {
+    if (this.uninstalling) {
+      return;
+    }
+    this.uninstalling = true;
+    this.uninstallErr = '';
+    const body: Record<string, Object> = {
+      'confirm': 'uninstall',
+      'purge': purge
+    };
+    const r: ApiResult = await Api.post(this.ctx(), '/api/v1/adblock/uninstall', body);
+    this.uninstalling = false;
+    if (r.ok && r.data.bool('ok', true)) {
+      this.showUninstall = false;
+      promptAction.showToast({ message: r.data.str('message', '已卸载') });
+      await this.load(false);
+    } else {
+      this.uninstallErr = r.ok
+        ? r.data.str('error', '卸载失败')
+        : r.error;
+    }
   }
 
   @Builder

@@ -79,6 +79,8 @@ public class AdblockFragment extends BaseFragment {
     /** 一键安装：Agent 在路由器上跑，这里只显示进度 */
     private TextView tvInstall;
     private boolean installBusy;
+    /** 底部「卸载」卡：只在已安装时显示 */
+    private LinearLayout uninstallCard;
     private final Handler ui = new Handler(Looper.getMainLooper());
 
     @Override
@@ -255,6 +257,73 @@ public class AdblockFragment extends BaseFragment {
         alp.topMargin = Ui.dp(c, 12);
         ops.addView(actionBox, alp);
         root.addView(ops);
+
+        // ------------------------------------------------------------ 卸载
+        // 只做一件事：卸载。放在页面最底部，红字，和其他操作分开
+        Ui.Card danger = Ui.card(c);
+        danger.setVisibility(View.GONE);
+        uninstallCard = danger;
+        LinearLayout ur = Ui.row(c);
+        ur.setGravity(Gravity.CENTER_VERTICAL);
+        ur.setPadding(Ui.dp(c, 16), Ui.dp(c, 14), Ui.dp(c, 16), Ui.dp(c, 14));
+        LinearLayout uCol = Ui.column(c);
+        TextView uTitle = Ui.text(c, "卸载 AdGuard Home", 15f, R.color.danger);
+        uTitle.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        uCol.addView(uTitle);
+        TextView uSub = Ui.text(c, "会先退出 DNS 接管，配置与日志可选保留",
+                11.5f, R.color.text_tertiary);
+        uSub.setPadding(0, Ui.dp(c, 4), 0, 0);
+        uCol.addView(uSub);
+        ur.addView(uCol, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        ur.addView(Ui.chevron(c));
+        ur.setOnClickListener(v -> askUninstall());
+        danger.addView(ur);
+        root.addView(danger);
+    }
+
+    /** 卸载：配置留不留让用户选，两个选项都是不可逆操作 */
+    private void askUninstall() {
+        Sheet.actions(ctx(), "卸载 AdGuard Home",
+                "卸载前会先把 DNS 还给 dnsmasq，再停服务、删本体 —— 接管中也不会断网。\n"
+                        + "配置、规则缓存与查询历史默认保留，重装后可以直接接着用。",
+                new String[]{"卸载，保留配置", "卸载，并删除配置与日志"},
+                index -> doUninstall(index == 1));
+    }
+
+    private void doUninstall(boolean purge) {
+        JSONObject body = new JSONObject();
+        try {
+            body.put("confirm", "uninstall");
+            body.put("purge", purge);
+        } catch (Exception ignored) {
+            // 常量键值，put 不会抛
+        }
+        Toast.makeText(ctx(), purge ? "正在卸载并清理配置…" : "正在卸载…",
+                Toast.LENGTH_SHORT).show();
+        Api.post(ctx(), "/api/v1/adblock/uninstall", body, new Cb() {
+            @Override
+            public void onData(JSONObject data, boolean fromCache) {
+                if (!isAdded()) {
+                    return;
+                }
+                if (data.optBoolean("ok", false)) {
+                    Toast.makeText(ctx(), data.optString("message", "已卸载"),
+                            Toast.LENGTH_LONG).show();
+                    load(true);
+                } else {
+                    Sheet.message(ctx(), "卸载失败",
+                            data.optString("error", "未知原因"));
+                }
+            }
+
+            @Override
+            public void onError(String message) {
+                if (isAdded()) {
+                    Sheet.message(ctx(), "卸载失败", message);
+                }
+            }
+        });
     }
 
     // ================================================================ 规则更新
@@ -889,6 +958,9 @@ public class AdblockFragment extends BaseFragment {
     }
 
     private void renderActions(boolean installed, boolean running) {
+        if (uninstallCard != null) {
+            uninstallCard.setVisibility(installed ? View.VISIBLE : View.GONE);
+        }
         if (actionBox == null) {
             return;
         }

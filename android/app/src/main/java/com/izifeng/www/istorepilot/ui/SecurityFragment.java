@@ -66,6 +66,11 @@ public class SecurityFragment extends BaseFragment {
     private TextView tvAdRate;
     private Toggle swTakeover;
     private boolean syncing = false;
+    /** 未安装时的引导块 / 已装时的统计块，两者互斥显示 */
+    private LinearLayout adEmptyBox;
+    private LinearLayout adBodyBox;
+    private TextView tvAdInstall;
+    private boolean adInstalling = false;
 
     private JSONArray devices = new JSONArray();
     private AppsCard appsCard;
@@ -178,6 +183,7 @@ public class SecurityFragment extends BaseFragment {
         tvAdState = Ui.pill(c, "—", R.color.text_secondary);
         adHead.addView(tvAdState);
 
+        adBodyBox = Ui.column(c);
         LinearLayout adLine = Ui.row(c);
         adLine.setGravity(Gravity.BOTTOM);
         adLine.setPadding(Ui.dp(c, 16), Ui.dp(c, 16), Ui.dp(c, 16), 0);
@@ -186,15 +192,15 @@ public class SecurityFragment extends BaseFragment {
         TextView adUnit = Ui.text(c, "次拦截", 12.5f, R.color.text_secondary);
         adUnit.setPadding(Ui.dp(c, 7), 0, 0, Ui.dp(c, 6));
         adLine.addView(adUnit);
-        ad.addView(adLine);
+        adBodyBox.addView(adLine);
 
         tvAdSub = Ui.text(c, "共查询 — 次", 12f, R.color.text_secondary);
         tvAdSub.setPadding(Ui.dp(c, 16), Ui.dp(c, 4), Ui.dp(c, 16), 0);
-        ad.addView(tvAdSub);
+        adBodyBox.addView(tvAdSub);
 
         tvAdRate = Ui.text(c, "拦截率 —", 12f, R.color.text_secondary);
         tvAdRate.setPadding(Ui.dp(c, 16), Ui.dp(c, 2), Ui.dp(c, 16), 0);
-        ad.addView(tvAdRate);
+        adBodyBox.addView(tvAdRate);
 
         // 总开关：接管全网是所有拦截功能的前提，所以放在一级页而不是二级页。
         // 它改的是 DNS 走向 —— 全网设备解析都会变，属于「肯定影响网络」的项，
@@ -223,12 +229,49 @@ public class SecurityFragment extends BaseFragment {
         });
         swRow.addView(swTakeover, new LinearLayout.LayoutParams(
                 Ui.dp(c, 48), Ui.dp(c, 28)));
-        ad.addView(swRow);
+        adBodyBox.addView(swRow);
 
-        ad.addView(entryRow(c, Glyph.REFRESH, "规则与更新", "自动更新频率、规则表开关",
+        adBodyBox.addView(entryRow(c, Glyph.REFRESH, "规则与更新", "自动更新频率、规则表开关",
                 true, this::openAdblock));
-        ad.addView(entryRow(c, Glyph.LIST, "拦截日志", "最近被挡掉的域名查询",
+        adBodyBox.addView(entryRow(c, Glyph.LIST, "拦截日志", "最近被挡掉的域名查询",
                 false, () -> startActivity(new Intent(ctx(), AdblockLogActivity.class))));
+        ad.addView(adBodyBox);
+
+        // 未安装：统计、接管开关、规则/日志入口全都没有意义，换成
+        // 三条「装上能得到什么」+ 一个安装入口
+        adEmptyBox = Ui.column(c);
+        adEmptyBox.setPadding(Ui.dp(c, 16), Ui.dp(c, 10), Ui.dp(c, 16), Ui.dp(c, 6));
+        adEmptyBox.addView(bullet(c, "装完全网设备一起生效，不用逐台设置"));
+        adEmptyBox.addView(bullet(c, "能看拦截日志、热门域名和放行名单"));
+        adEmptyBox.addView(bullet(c, "先只观察，不接管 DNS，随时可退"));
+
+        tvAdInstall = Ui.text(c, "", 11.5f, R.color.text_secondary);
+        tvAdInstall.setLineSpacing(Ui.dp(c, 2), 1f);
+        tvAdInstall.setPadding(0, Ui.dp(c, 10), 0, 0);
+        tvAdInstall.setVisibility(View.GONE);
+        adEmptyBox.addView(tvAdInstall);
+
+        TextView adInstallBtn = Ui.filled(c, "安装 AdGuard Home",
+                R.color.primary, R.color.on_primary);
+        adInstallBtn.setOnClickListener(v -> askInstallHere());
+        LinearLayout.LayoutParams ibp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        ibp.topMargin = Ui.dp(c, 12);
+        adEmptyBox.addView(adInstallBtn, ibp);
+
+        TextView adSize = Ui.text(c, "约 6.6 MB · 需要路由器能上网", 10.5f, R.color.text_tertiary);
+        adSize.setGravity(Gravity.CENTER);
+        adSize.setPadding(0, Ui.dp(c, 6), 0, 0);
+        adEmptyBox.addView(adSize);
+
+        TextView adManual = Ui.text(c, "手动安装 / 去路由器网页", 12.5f, R.color.primary);
+        adManual.setGravity(Gravity.CENTER);
+        adManual.setPadding(0, Ui.dp(c, 12), 0, Ui.dp(c, 4));
+        adManual.setOnClickListener(v -> openAdblock());
+        adEmptyBox.addView(adManual);
+
+        adEmptyBox.setVisibility(View.GONE);
+        ad.addView(adEmptyBox);
         root.addView(ad);
 
         Ui.space(c, root, 8);
@@ -579,6 +622,107 @@ public class SecurityFragment extends BaseFragment {
         return wrap;
     }
 
+    /** 未安装卡里的一条价值点：小圆点 + 一句话 */
+    private LinearLayout bullet(Context c, String text) {
+        LinearLayout row = Ui.row(c);
+        View dot = new View(c);
+        GradientDrawable d = new GradientDrawable();
+        d.setShape(GradientDrawable.OVAL);
+        d.setColor(Ui.color(c, R.color.primary));
+        dot.setBackground(d);
+        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(
+                Ui.dp(c, 5), Ui.dp(c, 5));
+        dlp.topMargin = Ui.dp(c, 6);
+        dlp.rightMargin = Ui.dp(c, 8);
+        row.addView(dot, dlp);
+        TextView t = Ui.text(c, text, 12.5f, R.color.text_secondary);
+        t.setLineSpacing(Ui.dp(c, 2), 1f);
+        row.addView(t, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        row.setPadding(0, Ui.dp(c, 4), 0, Ui.dp(c, 4));
+        return row;
+    }
+
+    /** 拦截卡上的安装入口：先讲清楚做什么，再由 Agent 在路由器上跑 */
+    private void askInstallHere() {
+        Sheet.confirm(ctx(), "在路由器上安装 AdGuard Home？",
+                "Agent 会在路由器上联网下载本体（约 6.6 MB）并装到 /usr/bin/AdGuardHome，"
+                        + "以观察模式启动：只监听本机，不改 DNS、不影响家里上网。\n\n"
+                        + "大约 1–3 分钟，可以切走干别的。",
+                "开始安装", false, this::startInstallHere);
+    }
+
+    private void startInstallHere() {
+        if (adInstalling) {
+            return;
+        }
+        adInstalling = true;
+        tvAdInstall.setTextColor(Ui.color(ctx(), R.color.text_secondary));
+        tvAdInstall.setText("已提交，正在安装…");
+        tvAdInstall.setVisibility(View.VISIBLE);
+
+        JSONObject body = new JSONObject();
+        try {
+            body.put("confirm", "install");
+        } catch (Exception ignored) {
+            // key / value 都是常量，put 不会抛；声明式 catch 而已
+        }
+        Api.post(ctx(), "/api/v1/adblock/install", body, new Cb() {
+            @Override
+            public void onData(JSONObject data, boolean fromCache) {
+                if (!isAdded()) {
+                    return;
+                }
+                if (!data.optBoolean("ok", false)) {
+                    adInstalling = false;
+                    tvAdInstall.setTextColor(Ui.color(ctx(), R.color.danger));
+                    tvAdInstall.setText("失败：" + data.optString("error", "安装没被受理"));
+                    return;
+                }
+                tickInstallHere();
+            }
+
+            @Override
+            public void onError(String message) {
+                adInstalling = false;
+                if (isAdded()) {
+                    tvAdInstall.setTextColor(Ui.color(ctx(), R.color.danger));
+                    tvAdInstall.setText("失败：" + message);
+                }
+            }
+        });
+    }
+
+    /** 1.2 秒一跳，装完自动重新拉一次状态，卡片会切成已装 */
+    private void tickInstallHere() {
+        if (!isAdded() || !adInstalling) {
+            return;
+        }
+        Api.get(ctx(), "/api/v1/adblock/install", new Cb() {
+            @Override
+            public void onData(JSONObject s, boolean fromCache) {
+                if (!isAdded()) {
+                    return;
+                }
+                boolean done = s.optBoolean("done", false);
+                boolean ok = s.optBoolean("ok", false);
+                String err = s.optString("error", "");
+                String step = s.optString("step", "");
+                tvAdInstall.setTextColor(Ui.color(ctx(),
+                        done && !ok ? R.color.danger : R.color.text_secondary));
+                tvAdInstall.setText(ok ? "已安装，正在刷新…"
+                        : (!err.isEmpty() ? "失败：" + err
+                        : step + " · " + s.optInt("pct", 0) + "%"));
+                if (done && !s.optBoolean("running", false)) {
+                    adInstalling = false;
+                    load(true);
+                    return;
+                }
+                tvAdInstall.postDelayed(SecurityFragment.this::tickInstallHere, 1200);
+            }
+        });
+    }
+
     private void renderAd(JSONObject b) {
         adInstalled = b.optBoolean("installed", false);
         boolean running = b.optBoolean("running", false);
@@ -620,8 +764,11 @@ public class SecurityFragment extends BaseFragment {
         swTakeover.setOn(adTakeover, true);
         syncing = false;
 
-        if (!adInstalled) {
-            tvAdSub.setText("AdGuard Home 未安装，拦截不可用");
+        if (adBodyBox != null) {
+            adBodyBox.setVisibility(adInstalled ? View.VISIBLE : View.GONE);
+        }
+        if (adEmptyBox != null) {
+            adEmptyBox.setVisibility(adInstalled ? View.GONE : View.VISIBLE);
         }
     }
 

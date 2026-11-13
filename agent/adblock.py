@@ -55,6 +55,7 @@ AGH_UCI = "/etc/config/AdGuardHome"
 
 #: 一键安装要落的目录（与 LuCI 插件约定的一致）
 AGH_DIR = "/usr/bin/AdGuardHome"
+AGH_DATA_DIR = "/etc/AdGuardHome"
 AGH_WORKDIR = "/etc/AdGuardHome"
 AGH_WEB_PORT = 3000
 AGH_TARBALL = ("https://static.adtidy.org/adguardhome/release/"
@@ -1119,6 +1120,72 @@ def release() -> dict:
         "holder": holder,
     }
 
+
+def uninstall(purge: bool = False) -> dict:
+    """卸载 AdGuard Home。
+
+    顺序不能变：接管状态下 AGH 是 53 的唯一应答者，先删它等于全屋断 DNS。
+    所以：退出接管（dnsmasq 拿回 53）→ 停服 → 禁用开机启动 → 删本体 →
+    可选清理 /etc/AdGuardHome（配置、规则缓存、查询日志）。
+
+    purge=False 时保留配置，重装后规则与日志都还在。
+    """
+    if not _installed():
+        return _not_installed()
+
+    st = status()
+    released = False
+    if st.get("mode") == "takeover":
+        r = release()
+        if not r.get("ok"):
+            return {
+                "ok": False,
+                "released": False,
+                "error": "退出接管失败，已中止卸载（先保证网络可用）："
+                         + str(r.get("message") or r.get("error") or ""),
+                "holder": r.get("holder", ""),
+            }
+        released = True
+
+    _run(["/etc/init.d/AdGuardHome", "stop"], timeout=120)
+    _run(["uci", "set", "AdGuardHome.AdGuardHome.enabled=0"], timeout=5)
+    _run(["uci", "commit", "AdGuardHome"], timeout=5)
+
+    removed: list[str] = []
+    for path in (AGH_DIR, "/etc/init.d/AdGuardHome"):
+        try:
+            if os.path.isdir(path):
+                shutil.rmtree(path)
+                removed.append(path)
+            elif os.path.exists(path):
+                os.remove(path)
+                removed.append(path)
+        except OSError as exc:
+            return {"ok": False, "error": "删除 %s 失败：%s" % (path, exc),
+                    "removed": removed, "released": released}
+
+    purged = False
+    if purge:
+        for path in (AGH_DATA_DIR, AGH_YAML, "/etc/config/AdGuardHome"):
+            try:
+                if os.path.isdir(path):
+                    shutil.rmtree(path)
+                    purged = True
+                elif os.path.exists(path):
+                    os.remove(path)
+                    purged = True
+            except OSError as exc:
+                return {"ok": False, "released": released, "removed": removed,
+                        "error": "本体已删除，但清理 %s 失败：%s" % (path, exc)}
+
+    return {
+        "ok": True,
+        "released": released,
+        "purged": purged,
+        "removed": removed,
+        "kept": "" if purged else AGH_DATA_DIR + "（配置、规则与日志）",
+        "message": "已卸载 AdGuard Home" + ("，配置与日志已删除" if purged else "，配置与日志保留"),
+    }
 
 def verify() -> dict:
     """App 里「体检」以外的独立校验：现在这条路到底通不通。"""

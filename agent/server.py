@@ -595,6 +595,13 @@ class Handler(BaseHTTPRequestHandler):
                 # 一键安装：必须带 confirm=install，跑在后台线程里，
                 # 这个接口只负责「受理」，进度靠 GET 同一个路径查
                 self._json(adblock.install(str(body.get("confirm", ""))))
+            elif path == "/api/v1/adblock/uninstall":
+                # 卸载：接管中会先把 DNS 还给 dnsmasq 再删本体。
+                # purge=true 连 /etc/AdGuardHome 的配置与日志一起删
+                if str(body.get("confirm", "")) != "uninstall":
+                    self._error(400, "卸载需要 confirm=uninstall")
+                else:
+                    self._json(adblock.uninstall(bool(body.get("purge", False))))
 
             elif path == "/api/v1/network/wan":
                 self._json(netcfg.apply_wan(body))

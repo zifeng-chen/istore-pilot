@@ -52,6 +52,12 @@ struct SecurityView: View {
 
     @State private var askTakeover: Bool? = nil
     @State private var busy = false
+    /// 设备页拦截卡上的安装流程（未安装时才用）
+    @State private var adAskInstall = false
+    @State private var adInstalling = false
+    @State private var adInstallStep = ""
+    @State private var adInstallPct = 0
+    @State private var adInstallErr = ""
 
     private let tick = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
 
@@ -144,6 +150,14 @@ struct SecurityView: View {
                 Text(takeover
                      ? "退出后所有设备改回运营商 DNS：广告拦截立即失效，已建立的连接不受影响。"
                      : "会把全网的域名查询切到 AdGuard Home。已连设备在租约续期后生效，中途有一两秒解析抖动；如果 AGH 已停用，全网会短时无法解析域名。")
+            }
+            .alert("在路由器上安装 AdGuard Home？", isPresented: $adAskInstall) {
+                Button("取消", role: .cancel) {}
+                Button("开始安装") { startAdInstall() }
+            } message: {
+                Text("Agent 会联网下载本体（约 6.6 MB）并装到路由器，"
+                     + "以观察模式启动：只监听本机，不改 DNS、不影响家里上网。\n\n"
+                     + "大约 1–3 分钟，可以切走干别的。")
             }
     }
 
@@ -400,6 +414,7 @@ struct SecurityView: View {
     // MARK: - 拦截卡
 
     private var adCard: some View {
+        let installed = ad.bool("installed")
         let stats = ad.obj("stats") ?? [:]
         let blocked = stats.int("blocked")
         let queries = stats.int("queries")
@@ -412,57 +427,160 @@ struct SecurityView: View {
                          color: ad.bool("running") ? C.primary : C.textSecondary)
                 }
 
-                HStack(alignment: .firstTextBaseline, spacing: 7) {
-                    Text(F.count(blocked))
-                        .font(F.num(30, .semibold))
-                        .foregroundStyle(C.textPrimary)
-                    Text("次拦截")
-                        .font(.system(size: 12.5))
-                        .foregroundStyle(C.textSecondary)
-                }
-                .padding(.top, 12)
+                if !installed {
+                    // 未安装：统计、接管开关、规则/日志入口全都没有意义。
+                    // 换成三条「装上能得到什么」+ 一个安装入口
+                    VStack(alignment: .leading, spacing: 8) {
+                        adValue("装完全网设备一起生效，不用逐台设置")
+                        adValue("能看拦截日志、热门域名和放行名单")
+                        adValue("先只观察，不接管 DNS，随时可退")
+                    }
+                    .padding(.top, 12)
 
-                Text("今日共查询 \(F.count(queries)) 次")
-                    .font(.system(size: 12))
-                    .foregroundStyle(C.textSecondary)
-                    .padding(.top, 4)
-                Text(pct > 0 ? "拦截率 \(String(format: "%.0f%%", pct))" : "今天还没有拦截记录")
-                    .font(.system(size: 12))
-                    .foregroundStyle(C.textSecondary)
-                    .padding(.top, 2)
+                    if adInstalling || !adInstallErr.isEmpty {
+                        Text(adInstallErr.isEmpty
+                             ? "\(adInstallStep) · \(adInstallPct)%"
+                             : "失败：\(adInstallErr)")
+                            .font(F.tiny)
+                            .foregroundStyle(adInstallErr.isEmpty ? C.textSecondary : C.danger)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 10)
+                        if adInstalling {
+                            ProgressView(value: Double(adInstallPct), total: 100)
+                                .tint(C.primary)
+                                .padding(.top, 6)
+                        }
+                    }
 
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("接管全网 DNS")
-                            .font(F.body)
+                    Button {
+                        adAskInstall = true
+                    } label: {
+                        Text(adInstalling ? "正在安装…" : "安装 AdGuard Home")
+                            .font(.system(size: 15, weight: .medium))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .foregroundStyle(C.onPrimary)
+                            .background(C.primary)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(adInstalling)
+                    .padding(.top, 14)
+
+                    Text("约 6.6 MB · 需要路由器能上网")
+                        .font(.system(size: 11))
+                        .foregroundStyle(C.textTertiary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 6)
+
+                    Button("手动安装 / 去路由器网页") { path.append(.shield) }
+                        .font(.system(size: 13))
+                        .foregroundStyle(C.primary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 10)
+                } else {
+                    HStack(alignment: .firstTextBaseline, spacing: 7) {
+                        Text(F.count(blocked))
+                            .font(F.num(30, .semibold))
                             .foregroundStyle(C.textPrimary)
-                        Text("关闭后所有设备改回运营商 DNS")
-                            .font(.system(size: 11.5))
+                        Text("次拦截")
+                            .font(.system(size: 12.5))
                             .foregroundStyle(C.textSecondary)
                     }
-                    Spacer(minLength: 6)
-                    Toggle("", isOn: Binding(
-                        get: { takeover },
-                        set: { newValue in
-                            // 数据刷新会让 get 的值变，SwiftUI 偶尔会带着新值回调
-                            // set（那不是用户点的）；值没变就直接忽略，别弹确认
-                            guard newValue != takeover else { return }
-                            askTakeover = newValue
+                    .padding(.top, 12)
+
+                    Text("今日共查询 \(F.count(queries)) 次")
+                        .font(.system(size: 12))
+                        .foregroundStyle(C.textSecondary)
+                        .padding(.top, 4)
+                    Text(pct > 0 ? "拦截率 \(String(format: "%.0f%%", pct))" : "今天还没有拦截记录")
+                        .font(.system(size: 12))
+                        .foregroundStyle(C.textSecondary)
+                        .padding(.top, 2)
+
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("接管全网 DNS")
+                                .font(F.body)
+                                .foregroundStyle(C.textPrimary)
+                            Text("关闭后所有设备改回运营商 DNS")
+                                .font(.system(size: 11.5))
+                                .foregroundStyle(C.textSecondary)
                         }
-                    ))
-                    .labelsHidden()
-                    .tint(C.primary)
-                    .disabled(!ad.bool("installed") || busy)
+                        Spacer(minLength: 6)
+                        Toggle("", isOn: Binding(
+                            get: { takeover },
+                            set: { newValue in
+                                // 数据刷新会让 get 的值变，SwiftUI 偶尔会带着新值回调
+                                // set（那不是用户点的）；值没变就直接忽略，别弹确认
+                                guard newValue != takeover else { return }
+                                askTakeover = newValue
+                            }
+                        ))
+                        .labelsHidden()
+                        .tint(C.primary)
+                        .disabled(!ad.bool("installed") || busy)
+                    }
+                    .padding(.top, 14)
+
+                    Hairline(inset: 0).padding(.top, 12)
+
+                    entryRow("arrow.triangle.2.circlepath", "规则与更新",
+                             "自动更新频率、规则表开关") { path.append(.shield) }
+                    Hairline(inset: 46)
+                    entryRow("list.bullet.rectangle", "拦截日志",
+                             "最近被挡掉的域名查询") { path.append(.shield) }
                 }
-                .padding(.top, 14)
+            }
+        }
+    }
 
-                Hairline(inset: 0).padding(.top, 12)
+    /// 未安装卡里的一条价值点：小圆点 + 一句话
+    private func adValue(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Circle()
+                .fill(C.primary)
+                .frame(width: 5, height: 5)
+                .padding(.top, 6)
+            Text(text)
+                .font(.system(size: 12.5))
+                .foregroundStyle(C.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
 
-                entryRow("arrow.triangle.2.circlepath", "规则与更新",
-                         "自动更新频率、规则表开关") { path.append(.shield) }
-                Hairline(inset: 46)
-                entryRow("list.bullet.rectangle", "拦截日志",
-                         "最近被挡掉的域名查询") { path.append(.shield) }
+    /// 设备页上的安装：Agent 在路由器上跑，这里只轮询进度
+    private func startAdInstall() {
+        adInstalling = true
+        adInstallErr = ""
+        adInstallStep = "已提交，正在安装…"
+        adInstallPct = 0
+
+        Task {
+            let body: J = ["confirm": "install"]
+            _ = try? await Api.post("/api/v1/adblock/install", body)
+            for _ in 0..<90 {
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
+                guard let s = try? await Api.get("/api/v1/adblock/install") else { continue }
+                let done = s.bool("done")
+                let ok = s.bool("ok")
+                await MainActor.run {
+                    adInstallStep = s.str("step")
+                    adInstallPct = s.int("pct")
+                    adInstallErr = s.str("error")
+                }
+                if done && !s.bool("running") {
+                    await MainActor.run {
+                        adInstalling = false
+                        if ok { adInstallStep = "已安装，正在刷新…" }
+                    }
+                    await load(quiet: false)
+                    return
+                }
+            }
+            await MainActor.run {
+                adInstalling = false
+                adInstallErr = "安装超时，可到「拦截」页看进度"
             }
         }
     }

@@ -15,6 +15,10 @@ struct ShieldView: View {
     @State private var installStep = ""
     @State private var installPct = 0
     @State private var installErr = ""
+    /// 卸载确认与进度
+    @State private var uninstallAsk = false
+    @State private var uninstalling = false
+    @State private var uninstallErr = ""
 
     private let tick = Timer.publish(every: 6, on: .main, in: .common).autoconnect()
 
@@ -53,6 +57,7 @@ struct ShieldView: View {
                         dnsCard
                         RulesCard { Task { await load() } }
                         actionCard
+                        uninstallCard
                     }
                     if !err.isEmpty {
                         Text(err).font(F.tiny).foregroundStyle(C.danger)
@@ -79,6 +84,81 @@ struct ShieldView: View {
     }
 
     // MARK: - 未安装
+
+    /// 卸载：放在拦截页最底部，红色只给这一处
+    private var uninstallCard: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 0) {
+                Button {
+                    uninstallErr = ""
+                    uninstallAsk = true
+                } label: {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("卸载 AdGuard Home")
+                                .font(F.body)
+                                .foregroundStyle(C.danger)
+                            Text("会先退出 DNS 接管，配置与日志可选保留")
+                                .font(.system(size: 11.5))
+                                .foregroundStyle(C.textTertiary)
+                        }
+                        Spacer(minLength: 6)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(C.textTertiary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(uninstalling)
+
+                if uninstalling {
+                    ProgressView().tint(C.primary).padding(.top, 10)
+                }
+                if !uninstallErr.isEmpty {
+                    Text(uninstallErr)
+                        .font(F.tiny)
+                        .foregroundStyle(C.danger)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 8)
+                }
+            }
+        }
+        .confirmationDialog("卸载 AdGuard Home？", isPresented: $uninstallAsk,
+                            titleVisibility: .visible) {
+            Button("卸载，保留配置") { uninstall(false) }
+            Button("卸载，并删除配置与日志", role: .destructive) { uninstall(true) }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("卸载前会先把 DNS 还给 dnsmasq，再停服务、删本体 —— 接管中也不会断网。\n"
+                 + "「保留」会在 /etc/AdGuardHome 留下配置、规则缓存与查询历史，重装后接着用。")
+        }
+    }
+
+    private func uninstall(_ purge: Bool) {
+        uninstalling = true
+        uninstallErr = ""
+        Task {
+            let body: J = ["confirm": "uninstall", "purge": purge]
+            do {
+                let r = try await Api.post("/api/v1/adblock/uninstall", body)
+                if r["ok"] == nil || r.bool("ok") {
+                    await MainActor.run { uninstalling = false }
+                    await load()
+                } else {
+                    await MainActor.run {
+                        uninstalling = false
+                        uninstallErr = r.str("error", "卸载失败")
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    uninstalling = false
+                    uninstallErr = error.localizedDescription
+                }
+            }
+        }
+    }
 
     private var installCard: some View {
         Card {
