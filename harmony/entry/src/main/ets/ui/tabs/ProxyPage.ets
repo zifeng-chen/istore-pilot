@@ -1140,8 +1140,8 @@ export struct ProxyPage {
       .alignItems(VerticalAlign.Bottom)
       .constraintSize({ maxWidth: Bp.CONTENT_MAX })
       .padding({
-        left: this.rail() ? 20 : T.PAD,
-        right: this.rail() ? 20 : T.PAD,
+        left: this.rail() ? T.PAD_WIDE : T.PAD,
+        right: this.rail() ? T.PAD_WIDE : T.PAD,
         top: 8,
         bottom: 8
       });
@@ -1199,8 +1199,8 @@ export struct ProxyPage {
           .width('100%')
           .constraintSize({ maxWidth: Bp.CONTENT_MAX })
           .padding({
-            left: this.rail() ? 20 : T.PAD,
-            right: this.rail() ? 20 : T.PAD,
+            left: this.rail() ? T.PAD_WIDE : T.PAD,
+            right: this.rail() ? T.PAD_WIDE : T.PAD,
             top: 2
           });
         }
@@ -1367,7 +1367,7 @@ export struct ProxyPage {
           .fontSize(T.F_SUB)
           .fontColor($r('app.color.primary'))
           .padding({ left: 12, right: 12, top: 5, bottom: 5 })
-          .borderRadius(99)
+          .borderRadius(T.R_PILL)
           .backgroundColor($r('app.color.accent_soft'))
           .margin({ left: 8 })
           .onClick(() => {
@@ -1446,7 +1446,7 @@ export struct ProxyPage {
     }
     .width('100%')
     // top 32 是给系统拖拽条让位：18 的时候「关闭」正好被那条横线穿过
-    .padding({ left: 20, right: 20, top: 32, bottom: 20 });
+    .padding({ left: T.PAD_WIDE, right: T.PAD_WIDE, top: 32, bottom: 20 });
   }
 
   @Builder
@@ -1474,7 +1474,7 @@ export struct ProxyPage {
           .layoutWeight(1)
           .textAlign(TextAlign.Center)
           .padding({ top: 11, bottom: 11 })
-          .borderRadius(99)
+          .borderRadius(T.R_PILL)
           .backgroundColor($r('app.color.surface_sunken'))
           .onClick(() => {
             this.showSheet = false;
@@ -1485,7 +1485,7 @@ export struct ProxyPage {
           .layoutWeight(1)
           .textAlign(TextAlign.Center)
           .padding({ top: 11, bottom: 11 })
-          .borderRadius(99)
+          .borderRadius(T.R_PILL)
           .backgroundColor($r('app.color.primary'))
           .onClick(() => {
             this.doInstall(false);
@@ -1523,7 +1523,7 @@ export struct ProxyPage {
           .layoutWeight(1)
           .textAlign(TextAlign.Center)
           .padding({ top: 11, bottom: 11 })
-          .borderRadius(99)
+          .borderRadius(T.R_PILL)
           .backgroundColor($r('app.color.surface_sunken'))
           .onClick(() => {
             this.doInstall(true);
@@ -1534,7 +1534,7 @@ export struct ProxyPage {
           .layoutWeight(1)
           .textAlign(TextAlign.Center)
           .padding({ top: 11, bottom: 11 })
-          .borderRadius(99)
+          .borderRadius(T.R_PILL)
           .backgroundColor($r('app.color.primary'))
           .onClick(() => {
             this.doInstall(false);
@@ -1565,7 +1565,7 @@ export struct ProxyPage {
           .backgroundColor(this.anyRunning() ? Pal.heroOn() : Pal.heroOff())
           .margin({ right: 7 });
         Text(this.anyRunning() ? '运行中' : '都没在运行')
-          .fontSize(12.5)
+          .fontSize(T.F_SUB)
           .fontWeight(FontWeight.Medium)
           .fontColor(Pal.heroFg());
         Blank();
@@ -1575,15 +1575,15 @@ export struct ProxyPage {
           .fontSize(T.F_TINY)
           .fontColor(Pal.heroFgSoft())
           .padding({ left: 9, right: 9, top: 3, bottom: 3 })
-          .borderRadius(99)
-          .backgroundColor('#29FFFFFF');
+          .borderRadius(T.R_PILL)
+          .backgroundColor($r('app.color.hero_chip'));
       }
       .width('100%')
       .alignItems(VerticalAlign.Center);
 
       // ② 大标题：运行中显示当前配置名，没跑写「未启用」
       Text(this.heroTitle())
-        .fontSize(26)
+        .fontSize(T.F_HERO)
         .fontWeight(FontWeight.Medium)
         .fontColor(Pal.heroFg())
         .maxLines(1)
@@ -1602,7 +1602,7 @@ export struct ProxyPage {
 
       // ④ 后端列表
       Text('代理后端 · 用右侧按钮启停')
-        .fontSize(11)
+        .fontSize(T.F_TINY)
         .fontColor(Pal.heroFgSoft())
         .width('100%')
         .margin({ top: 16, bottom: 2 });
@@ -1645,12 +1645,12 @@ export struct ProxyPage {
 
             // 状态胶囊：一律白字，靠透明度区分（深绿底上再加彩色底反而是噪音）
             Text(!b.installed ? '未安装' : (b.running ? '运行中' : '未运行'))
-              .fontSize(11)
+              .fontSize(T.F_TINY)
               .fontWeight(b.running ? FontWeight.Medium : FontWeight.Normal)
               .fontColor(b.running ? Pal.heroFg() : Pal.alpha(Pal.heroFg(), 0.6))
               .padding({ left: 9, right: 9, top: 3, bottom: 3 })
-              .borderRadius(99)
-              .backgroundColor(b.running ? '#33FFFFFF' : '#1AFFFFFF');
+              .borderRadius(T.R_PILL)
+              .backgroundColor(b.running ? $r('app.color.hero_chip_strong') : $r('app.color.hero_chip_weak'));
 
             if (b.installed) {
               Text(this.busyBackend === b.id ? '处理中…' : (b.running ? '停止' : '启动'))
@@ -1658,8 +1658,12 @@ export struct ProxyPage {
                 .fontWeight(FontWeight.Medium)
                 .fontColor(Pal.heroFg())
                 .padding({ left: 10, right: 10, top: 3, bottom: 3 })
-                .borderRadius(99)
-                .backgroundColor('#29FFFFFF')
+                .borderRadius(T.R_PILL)
+                .backgroundColor($r('app.color.hero_chip'))
+                .constraintSize({ minHeight: 44, minWidth: 44 })
+                .textAlign(TextAlign.Center)
+                .accessibilityText(b.running ? '停止 ' + b.label : '启动 ' + b.label)
+                .clickEffect({ level: ClickEffectLevel.LIGHT })
                 .margin({ left: 6 })
                 .onClick(() => {
                   this.toggleBackend(b.id, !b.running);
@@ -1674,7 +1678,7 @@ export struct ProxyPage {
       }, (b: Backend) => b.id + '|' + (b.running ? '1' : '0') + '|' + b.nodes);
     }
     .width('100%')
-    .padding({ left: 20, right: 20, top: 18, bottom: 14 })
+    .padding({ left: T.PAD_WIDE, right: T.PAD_WIDE, top: 18, bottom: 14 })
     .borderRadius(T.R_CARD)
     .linearGradient({
       angle: 135,
@@ -1748,7 +1752,7 @@ export struct ProxyPage {
               .fontWeight(FontWeight.Medium)
               .fontColor($r('app.color.primary'))
               .padding({ left: 12, right: 12, top: 5, bottom: 5 })
-              .borderRadius(99)
+              .borderRadius(T.R_PILL)
               .backgroundColor($r('app.color.accent_soft'));
           }
         }
@@ -1843,10 +1847,10 @@ export struct ProxyPage {
 
       Button('取消')
         .type(ButtonType.Normal)
-        .borderRadius(14)
+        .borderRadius(T.R_SM)
         .height(44)
         .width('100%')
-        .fontSize(15)
+        .fontSize(T.F_BODY)
         .fontColor($r('app.color.text_primary'))
         .backgroundColor($r('app.color.surface_hi'))
         .margin({ top: 14 })
@@ -1882,6 +1886,7 @@ export struct ProxyPage {
       }
       .width(44)
       .height(44)
+      .accessibilityText('关闭')
       .onClick(() => {
         this.showGroup = false;
         this.showPkg = false;
@@ -1924,7 +1929,7 @@ export struct ProxyPage {
             .fontColor($r('app.color.text_primary'))
             .layoutWeight(1);
           Text('›')
-            .fontSize(18)
+            .fontSize(T.F_H1)
             .fontColor($r('app.color.text_tertiary'));
         }
         .width('100%')
@@ -1959,7 +1964,7 @@ export struct ProxyPage {
       .textAlign(TextAlign.Center)
       .layoutWeight(1)
       .height(30)
-      .borderRadius(12)
+      .borderRadius(T.R_SM)
       .backgroundColor(this.comboBackend() === id
         ? $r('app.color.segment_thumb')
         : Color.Transparent)
@@ -2004,7 +2009,7 @@ export struct ProxyPage {
           .alignItems(HorizontalAlign.Start)
           .layoutWeight(1);
           Text('›')
-            .fontSize(18)
+            .fontSize(T.F_H1)
             .fontColor($r('app.color.text_tertiary'));
         }
         .width('100%')
@@ -2057,6 +2062,7 @@ export struct ProxyPage {
         }
         .width(44)
         .height(44)
+        .accessibilityText('关闭')
         .onClick(() => {
           this.showPkg = false;
         });
@@ -2076,7 +2082,7 @@ export struct ProxyPage {
             }
             .width(32)
             .height(32)
-            .borderRadius(10)
+            .borderRadius(T.R_XS)
             .backgroundColor($r('app.color.accent_soft'))
             .alignContent(Alignment.Center);
 
@@ -2219,7 +2225,7 @@ export struct ProxyPage {
       .align(Alignment.Top);
     }
     .width('100%')
-    .padding({ left: 20, right: 20, top: 32, bottom: 16 });
+    .padding({ left: T.PAD_WIDE, right: T.PAD_WIDE, top: 32, bottom: 16 });
   }
 
   @Builder
@@ -2310,7 +2316,7 @@ export struct ProxyPage {
               .fontSize(T.F_TINY)
               .fontColor($r('app.color.text_secondary'))
               .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-              .borderRadius(99)
+              .borderRadius(T.R_PILL)
               .backgroundColor($r('app.color.surface_sunken'))
               .onClick(() => {
                 this.pkgConfirm = '';
@@ -2319,7 +2325,7 @@ export struct ProxyPage {
               .fontSize(T.F_TINY)
               .fontColor($r('app.color.on_primary'))
               .padding({ left: 12, right: 12, top: 5, bottom: 5 })
-              .borderRadius(99)
+              .borderRadius(T.R_PILL)
               .backgroundColor($r('app.color.primary'))
               .onClick(() => {
                 this.doPkgInstall();
@@ -2331,7 +2337,7 @@ export struct ProxyPage {
             .fontSize(T.F_SUB)
             .fontColor($r('app.color.primary'))
             .padding({ left: 12, right: 12, top: 5, bottom: 5 })
-            .borderRadius(99)
+            .borderRadius(T.R_PILL)
             .backgroundColor($r('app.color.accent_soft'))
             .margin({ left: 8 })
             .onClick(() => {
@@ -2379,7 +2385,7 @@ export struct ProxyPage {
             Text(this.hideTimeout
               ? (this.hiddenCount > 0 ? '隐藏 ' + this.hiddenCount : '隐藏中')
               : '隐藏超时')
-              .fontSize(10.5)
+              .fontSize(T.F_TINY)
               .fontColor($r('app.color.text_secondary'));
             Toggle({ type: ToggleType.Switch, isOn: this.hideTimeout })
               .selectedColor($r('app.color.primary'))
@@ -2491,14 +2497,14 @@ export struct ProxyPage {
     Column() {
       Row({ space: 6 }) {
         Text(this.groupType(g.type))
-          .fontSize(10.5)
+          .fontSize(T.F_TINY)
           .fontColor($r('app.color.text_secondary'))
           .padding({ left: 6, right: 6, top: 2.5, bottom: 2.5 })
-          .borderRadius(99)
+          .borderRadius(T.R_PILL)
           .backgroundColor($r('app.color.surface_hi'));
         Blank();
         Text('›')
-          .fontSize(12)
+          .fontSize(T.F_SUB)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_tertiary'))
           .textAlign(TextAlign.Center)
@@ -2529,7 +2535,7 @@ export struct ProxyPage {
 
       Row() {
         Text(g.members.length + ' 个节点')
-          .fontSize(10.5)
+          .fontSize(T.F_TINY)
           .fontColor($r('app.color.text_tertiary'))
           .fontFeature("\"tnum\" on");
       }
@@ -2537,12 +2543,16 @@ export struct ProxyPage {
       .margin({ top: 4 });
     }
     .layoutWeight(1)
-    .height(104)
+    .constraintSize({ minHeight: 104 })
     .alignItems(HorizontalAlign.Start)
     .padding(12)
-    .borderRadius(14)
+    .borderRadius(T.R_SM)
     // 现在这一格套在白色卡片里，用浅底块区分层级（不会再和页面底色撞色）
     .backgroundColor($r('app.color.surface_sunken'))
+    .accessibilityText(g.name + '，当前 ' + (g.now.length > 0 ? g.now : '未选择')
+      + '，' + g.members.length + ' 个节点')
+    .accessibilityGroup(true)
+    .clickEffect({ level: ClickEffectLevel.LIGHT })
     .onClick(() => {
       if (idx >= 0) {
         this.openIdx = idx;
@@ -2574,7 +2584,7 @@ export struct ProxyPage {
             ? $r('app.color.text_secondary')
             : $r('app.color.primary'))
           .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-          .borderRadius(99)
+          .borderRadius(T.R_PILL)
           .backgroundColor($r('app.color.accent_soft'))
           .onClick(() => {
             if (this.openIdx >= 0 && this.openIdx < this.groups.length) {
@@ -2592,6 +2602,7 @@ export struct ProxyPage {
         }
         .width(44)
         .height(44)
+        .accessibilityText('关闭')
         .onClick(() => {
           this.showGroup = false;
         });
@@ -2652,7 +2663,7 @@ export struct ProxyPage {
                           .fontSize(T.F_TINY)
                           .fontColor(this.delayHex(m.delay))
                           .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-                          .borderRadius(99)
+                          .borderRadius(T.R_PILL)
                           .backgroundColor(Comp.alpha(this.delayHex(m.delay), 0.16))
                           .fontFeature("\"tnum\" on");
                       } else if (m.name === this.groups[this.openIdx].now) {
@@ -2787,13 +2798,13 @@ export struct ProxyPage {
       .textAlign(TextAlign.Center)
       .layoutWeight(1)
       .height(32)
-      .borderRadius(12)
+      .borderRadius(T.R_SM)
       .backgroundColor(this.mode === value
         ? $r('app.color.segment_thumb')
         : Color.Transparent)
       .shadow({
         radius: this.mode === value ? 3 : 0,
-        color: '#14000000',
+        color: $r('app.color.shadow_1'),
         offsetY: 1
       })
       .onClick(() => {

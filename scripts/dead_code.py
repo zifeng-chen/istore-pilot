@@ -135,6 +135,10 @@ def check_decls(exts: tuple[str, ...], lang: str) -> list[dict]:
     out: list[dict] = []
     for path in files:
         src = text_of(path)
+        # 实现框架接口的类（如 LazyForEach 的 IDataSource）：方法是给框架回调的，
+        # 代码里只有声明处出现一次，按「没被引用」判会全部误报
+        if re.search(r"\bimplements\s+\w*DataSource\b", src):
+            continue
         pat = decl_pattern(os.path.splitext(path)[1])
         for m in pat.finditer(src):
             name = m.group(1)

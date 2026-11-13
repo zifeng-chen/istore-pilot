@@ -4,6 +4,7 @@ import { Api, ApiResult } from '../api/Api';
 import { Session } from '../core/Session';
 import { Shell } from '../core/Shell';
 import { UI, UIState } from '../core/UIState';
+import { Motion } from '../core/Motion';
 import { SystemBar } from '../core/SystemBar';
 import { Pal, T } from '../ui/Theme';
 import { Appearance } from '../ui/Appearance';
@@ -70,15 +71,15 @@ struct Index {
     this.tintSystemBars(true);
 
     // 入场：图标放大淡入，名字晚 120ms、标语晚 220ms
-    animateTo({ duration: 420, curve: Curve.EaseOut }, () => {
+    animateTo({ duration: Motion.ms(420), curve: Curve.EaseOut }, () => {
       this.logoIn = true;
     });
     await this.sleep(120);
-    animateTo({ duration: 380, curve: Curve.Linear }, () => {
+    animateTo({ duration: Motion.ms(380), curve: Curve.Linear }, () => {
       this.nameIn = true;
     });
     await this.sleep(100);
-    animateTo({ duration: 380, curve: Curve.Linear }, () => {
+    animateTo({ duration: Motion.ms(380), curve: Curve.Linear }, () => {
       this.tagIn = true;
     });
 
@@ -290,19 +291,19 @@ struct Index {
       Image($r('app.media.app_icon'))
         .width(88)
         .height(88)
-        .borderRadius(20)
+        .borderRadius(T.R_LG)
         .opacity(this.logoIn ? 1 : 0)
         .scale({ x: this.logoIn ? 1 : 0.86, y: this.logoIn ? 1 : 0.86 });
 
       Text('iStore Pilot')
-        .fontSize(27)
+        .fontSize(T.F_HERO)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.hero_fg'))
         .margin({ top: 18 })
         .opacity(this.nameIn ? 1 : 0);
 
       Text('家庭网络，一屏看完')
-        .fontSize(13)
+        .fontSize(T.F_SUB)
         .fontColor($r('app.color.hero_fg'))
         .opacity(this.tagIn ? 0.72 : 0)
         .margin({ top: 8 });
@@ -326,7 +327,7 @@ struct Index {
         .height(3);
 
         Text(this.splashTip)
-          .fontSize(11.5)
+          .fontSize(T.F_TINY)
           .fontColor($r('app.color.hero_fg'))
           .opacity(0.6)
           .margin({ top: 10 });

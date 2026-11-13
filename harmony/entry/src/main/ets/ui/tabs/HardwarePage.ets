@@ -200,19 +200,19 @@ export struct HardwarePage {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .layoutWeight(1);
         Text('已运行 ' + this.upText)
-          .fontSize(10.5)
+          .fontSize(T.F_TINY)
           .fontColor($r('app.color.hero_fg'))
           .maxLines(1)
           .padding({ left: 9, right: 9, top: 3, bottom: 3 })
-          .borderRadius(99)
-          .backgroundColor('#29FFFFFF')
+          .borderRadius(T.R_PILL)
+          .backgroundColor($r('app.color.hero_chip'))
           .margin({ left: 8 });
       }
       .width('100%')
       .alignItems(VerticalAlign.Center);
 
       Text(this.title())
-        .fontSize(19)
+        .fontSize(T.F_H1)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.hero_fg'))
         .maxLines(2)
@@ -224,7 +224,7 @@ export struct HardwarePage {
         + this.hw.obj('system').str('version', '') + '　·　内核 '
         + this.hw.obj('system').str('kernel', '—') + '　·　'
         + this.hw.obj('system').str('arch', '—'))
-        .fontSize(11)
+        .fontSize(T.F_TINY)
         .fontColor($r('app.color.hero_fg_soft'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -303,11 +303,11 @@ export struct HardwarePage {
   cell(label: string, value: string) {
     Column() {
       Text(label)
-        .fontSize(11)
+        .fontSize(T.F_TINY)
         .fontColor($r('app.color.text_tertiary'))
         .maxLines(1);
       Text(value)
-        .fontSize(15)
+        .fontSize(T.F_BODY)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.text_primary'))
         .fontFeature("\"tnum\" on")
@@ -319,7 +319,7 @@ export struct HardwarePage {
     .layoutWeight(1)
     .alignItems(HorizontalAlign.Start)
     .padding({ left: 12, right: 12, top: 10, bottom: 10 })
-    .borderRadius(12)
+    .borderRadius(T.R_SM)
     .backgroundColor($r('app.color.surface_sunken'));
   }
 
@@ -332,7 +332,7 @@ export struct HardwarePage {
         // 型号独占一行：它是这一卡里最长也最该被看清的东西，
         // 塞进 Kv 的右侧值列会被挤成两行、还贴到卡片边
         Text(Fmt.orDash(this.hw.obj('cpu').str('model', '')))
-          .fontSize(16)
+          .fontSize(T.F_H2)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .maxLines(2)
@@ -393,7 +393,7 @@ export struct HardwarePage {
 
         Text(Fmt.bytes(this.hw.obj('memory').num('used', 0)) + ' / '
           + Fmt.bytes(this.hw.obj('memory').num('total', 0)))
-          .fontSize(15)
+          .fontSize(T.F_BODY)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .fontFeature("\"tnum\" on")
@@ -438,16 +438,16 @@ export struct HardwarePage {
     Column() {
       Row({ space: 8 }) {
         Text(Fmt.orDash(m.str('size', '')))
-          .fontSize(15)
+          .fontSize(T.F_BODY)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'));
         Text((m.str('type', '') + (m.num('speed', 0) > 0
           ? ' ' + m.num('speed', 0).toString() : '')
           + (m.str('form', '').length > 0 ? ' · ' + m.str('form', '') : '')).trim())
-          .fontSize(10.5)
+          .fontSize(T.F_TINY)
           .fontColor($r('app.color.text_secondary'))
           .padding({ left: 7, right: 7, top: 2.5, bottom: 2.5 })
-          .borderRadius(99)
+          .borderRadius(T.R_PILL)
           .backgroundColor($r('app.color.surface_sunken'))
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -457,7 +457,7 @@ export struct HardwarePage {
       .alignItems(VerticalAlign.Center);
 
       Text((m.str('vendor', '') + ' ' + m.str('part', '')).trim())
-        .fontSize(12)
+        .fontSize(T.F_SUB)
         .fontColor($r('app.color.text_secondary'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -465,7 +465,7 @@ export struct HardwarePage {
         .margin({ top: 4 });
 
       Text(m.str('slot', ''))
-        .fontSize(10.5)
+        .fontSize(T.F_TINY)
         .fontColor($r('app.color.text_tertiary'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })

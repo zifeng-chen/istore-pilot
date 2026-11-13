@@ -86,11 +86,11 @@
     },
     {
       "name": "text_secondary",
-      "value": "#93A39E"
+      "value": "#9FB0AA"
     },
     {
       "name": "text_tertiary",
-      "value": "#6E807A"
+      "value": "#8E9E98"
     },
     {
       "name": "divider",
@@ -131,6 +131,38 @@
     {
       "name": "ic_launcher_background",
       "value": "#0E9F7E"
+    },
+    {
+      "name": "scrim",
+      "value": "#99000000"
+    },
+    {
+      "name": "hero_chip",
+      "value": "#29FFFFFF"
+    },
+    {
+      "name": "hero_chip_strong",
+      "value": "#33FFFFFF"
+    },
+    {
+      "name": "hero_chip_weak",
+      "value": "#1AFFFFFF"
+    },
+    {
+      "name": "toast_bg",
+      "value": "#E60A100E"
+    },
+    {
+      "name": "shadow_1",
+      "value": "#33000000"
+    },
+    {
+      "name": "shadow_2",
+      "value": "#40000000"
+    },
+    {
+      "name": "shadow_3",
+      "value": "#52000000"
     }
   ]
 }

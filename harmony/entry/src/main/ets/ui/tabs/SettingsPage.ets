@@ -5,6 +5,7 @@ import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
 import { AppInfo } from '../../core/AppInfo';
 import { UI, UIState } from '../../core/UIState';
+import { Motion } from '../../core/Motion';
 import { Session } from '../../core/Session';
 import { Shell } from '../../core/Shell';
 import { Snap } from '../../core/Snap';
@@ -108,13 +109,13 @@ export struct SettingsPage {
   /** 进子页：同时告诉壳层，藏掉底部导航、把返回手势改成「退回一级页」 */
   private openSub(s: string): void {
     Shell.enter(s === 'backup' ? '配置备份' : '硬件信息');
-    this.getUIContext().animateTo({ duration: 220, curve: Curve.EaseOut }, () => {
+    this.getUIContext().animateTo({ duration: Motion.ms(220), curve: Curve.EaseOut }, () => {
       this.sub = s;
     });
   }
 
   private closeSub(): void {
-    this.getUIContext().animateTo({ duration: 200, curve: Curve.EaseIn }, () => {
+    this.getUIContext().animateTo({ duration: Motion.ms(200), curve: Curve.EaseIn }, () => {
       this.sub = '';
     });
     Shell.leave();
@@ -249,8 +250,8 @@ export struct SettingsPage {
       .height('100%')
       .backgroundColor($r('app.color.app_bg'))
       .padding({
-        left: this.rail() ? 20 : T.PAD,
-        right: this.rail() ? 20 : T.PAD,
+        left: this.rail() ? T.PAD_WIDE : T.PAD,
+        right: this.rail() ? T.PAD_WIDE : T.PAD,
         top: 8
       })
       // 从右边推进来，和另两个二级页同一个手感
@@ -266,8 +267,8 @@ export struct SettingsPage {
             .fontColor($r('app.color.text_primary'))
             .width('100%')
             .padding({
-              left: this.rail() ? 20 : T.PAD,
-              right: this.rail() ? 20 : T.PAD,
+              left: this.rail() ? T.PAD_WIDE : T.PAD,
+              right: this.rail() ? T.PAD_WIDE : T.PAD,
               top: 8,
               bottom: 10
             });
@@ -315,8 +316,8 @@ export struct SettingsPage {
               .width('100%')
               .alignItems(HorizontalAlign.Center)
               .padding({
-                left: this.rail() ? 20 : T.PAD,
-                right: this.rail() ? 20 : T.PAD,
+                left: this.rail() ? T.PAD_WIDE : T.PAD,
+                right: this.rail() ? T.PAD_WIDE : T.PAD,
                 top: 2
               });
             }
@@ -338,11 +339,11 @@ export struct SettingsPage {
 
       if (this.toast.length > 0) {
         Text(this.toast)
-          .fontSize(13)
+          .fontSize(T.F_SUB)
           .fontColor($r('app.color.hero_fg'))
           .padding({ left: 16, right: 16, top: 9, bottom: 9 })
           .borderRadius(T.R_PILL)
-          .backgroundColor('#CC1F2A26')
+          .backgroundColor($r('app.color.toast_bg'))
           .margin({ bottom: 88 })
           .hitTestBehavior(HitTestMode.None);
       }
@@ -378,6 +379,8 @@ export struct SettingsPage {
       }
       .layoutWeight(0)
       .padding({ left: 2, right: 10, top: 4, bottom: 4 })
+      .accessibilityText('返回')
+      .clickEffect({ level: ClickEffectLevel.LIGHT })
       .onClick(() => {
         this.closeSub();
       });
@@ -410,7 +413,7 @@ export struct SettingsPage {
           .backgroundColor(this.online ? $r('app.color.hero_fg') : Pal.warn())
           .margin({ right: 7 });
         Text(this.online ? '已连接' : '连不上')
-          .fontSize(12.5)
+          .fontSize(T.F_SUB)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.hero_fg'))
           .layoutWeight(1);
@@ -422,7 +425,7 @@ export struct SettingsPage {
       // 原来标题是路由器的主机名，而主机名在概览页已经出现过一次；
       // 这一页真正需要一眼确认的是「我现在用哪个账号、连的是哪台」。
       Text(this.userName.length > 0 ? this.userName : '未登录')
-        .fontSize(24)
+        .fontSize(T.F_HERO)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.hero_fg'))
         .maxLines(1)
@@ -432,7 +435,7 @@ export struct SettingsPage {
         .margin({ top: 10 });
 
       Text(this.hostText())
-        .fontSize(12.5)
+        .fontSize(T.F_SUB)
         .fontColor($r('app.color.hero_fg_soft'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -449,7 +452,7 @@ export struct SettingsPage {
       .margin({ top: 16 });
     }
     .width('100%')
-    .padding({ left: 20, right: 20, top: 22, bottom: 22 })
+    .padding({ left: T.PAD_WIDE, right: T.PAD_WIDE, top: 22, bottom: 22 })
     .borderRadius(T.R_CARD)
     .linearGradient({
       angle: 135,
@@ -580,7 +583,7 @@ export struct SettingsPage {
       }
       .width(30)
       .height(30)
-      .borderRadius(10)
+      .borderRadius(T.R_XS)
       .backgroundColor(action === 'poweroff'
         ? Comp.alpha(Pal.danger(), 0.12)
         : $r('app.color.accent_soft'));
@@ -824,16 +827,16 @@ export struct SettingsPage {
         Image($r('app.media.app_icon'))
           .width(52)
           .height(52)
-          .borderRadius(14)
+          .borderRadius(T.R_SM)
           .margin({ right: 13 });
         Column() {
           Text('iStore Pilot')
-            .fontSize(18)
+            .fontSize(T.F_H1)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'));
           // 版本号问系统要（AppScope/app.json5 的 versionName），不再写死
           Text('版本 ' + AppInfo.version() + ' · HarmonyOS')
-            .fontSize(12.5)
+            .fontSize(T.F_SUB)
             .fontColor($r('app.color.text_secondary'))
             .margin({ top: 4 });
         }
@@ -963,7 +966,7 @@ export struct SettingsPage {
       Column()
         .width('100%')
         .height('100%')
-        .backgroundColor('#66000000')
+        .backgroundColor($r('app.color.scrim'))
         .onClick(() => {
           this.closeSheet();
         });
@@ -988,6 +991,7 @@ export struct SettingsPage {
           }
           .width(44)
           .height(44)
+          .accessibilityText('关闭')
           .onClick(() => {
             this.closeSheet();
           });
@@ -996,7 +1000,7 @@ export struct SettingsPage {
         .alignItems(VerticalAlign.Center);
 
         Text(this.addrValue)
-          .fontSize(16)
+          .fontSize(T.F_H2)
           .lineHeight(24)
           .fontColor($r('app.color.text_primary'))
           .fontFeature("\"tnum\" on")
@@ -1005,7 +1009,7 @@ export struct SettingsPage {
           .copyOption(CopyOptions.LocalDevice)
           .margin({ top: 12 })
           .padding(14)
-          .borderRadius(13)
+          .borderRadius(T.R_SM)
           .backgroundColor($r('app.color.surface_hi'));
 
         Text('长按地址可以直接选中')
@@ -1017,10 +1021,10 @@ export struct SettingsPage {
         Row({ space: 10 }) {
           Button('关闭')
             .type(ButtonType.Normal)
-            .borderRadius(14)
+            .borderRadius(T.R_SM)
             .height(44)
             .layoutWeight(1)
-            .fontSize(15)
+            .fontSize(T.F_BODY)
             .fontColor($r('app.color.text_primary'))
             .backgroundColor($r('app.color.surface_hi'))
             .onClick(() => {
@@ -1028,10 +1032,10 @@ export struct SettingsPage {
             });
           Button('复制')
             .type(ButtonType.Normal)
-            .borderRadius(14)
+            .borderRadius(T.R_SM)
             .height(44)
             .layoutWeight(1)
-            .fontSize(15)
+            .fontSize(T.F_BODY)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.on_primary'))
             .backgroundColor($r('app.color.primary'))
@@ -1046,7 +1050,7 @@ export struct SettingsPage {
       .constraintSize({ maxWidth: 420 })
       .alignItems(HorizontalAlign.Start)
       .padding(18)
-      .borderRadius(20)
+      .borderRadius(T.R_LG)
       .backgroundColor($r('app.color.surface'))
       .shadow({ radius: 24, color: '#33000000', offsetX: 0, offsetY: 8 });
     }
@@ -1083,6 +1087,7 @@ export struct SettingsPage {
           }
           .width(44)
           .height(44)
+          .accessibilityText('关闭')
           .onClick(() => {
             this.closeSheet();
           });
@@ -1103,10 +1108,10 @@ export struct SettingsPage {
         if (this.sheet === SHEET_INFO) {
           Button('知道了')
             .type(ButtonType.Normal)
-            .borderRadius(14)
+            .borderRadius(T.R_SM)
             .height(44)
             .width('100%')
-            .fontSize(15)
+            .fontSize(T.F_BODY)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.on_primary'))
             .backgroundColor($r('app.color.primary'))
@@ -1118,10 +1123,10 @@ export struct SettingsPage {
           Row({ space: 10 }) {
             Button('取消')
               .type(ButtonType.Normal)
-              .borderRadius(14)
+              .borderRadius(T.R_SM)
               .height(44)
               .layoutWeight(1)
-              .fontSize(15)
+              .fontSize(T.F_BODY)
               .fontColor($r('app.color.text_primary'))
               .backgroundColor($r('app.color.surface_hi'))
               .onClick(() => {
@@ -1129,10 +1134,10 @@ export struct SettingsPage {
               });
             Button(this.busy ? '处理中…' : '保存')
               .type(ButtonType.Normal)
-              .borderRadius(14)
+              .borderRadius(T.R_SM)
               .height(44)
               .layoutWeight(1)
-              .fontSize(15)
+              .fontSize(T.F_BODY)
               .fontWeight(FontWeight.Medium)
               .fontColor($r('app.color.on_primary'))
               .backgroundColor($r('app.color.primary'))
@@ -1147,14 +1152,14 @@ export struct SettingsPage {
       }
       .width('100%')
       .constraintSize({ maxWidth: 520 })
-      .padding({ left: 20, right: 20, top: 18, bottom: 22 })
+      .padding({ left: T.PAD_WIDE, right: T.PAD_WIDE, top: 18, bottom: 22 })
       .borderRadius({ topLeft: 26, topRight: 26 })
       .backgroundColor($r('app.color.surface'))
       .border({ width: 0.7, color: $r('app.color.glass_stroke') });
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#66000000');
+    .backgroundColor($r('app.color.scrim'));
   }
 
   @Builder
@@ -1163,7 +1168,7 @@ export struct SettingsPage {
       ForEach(Appearance.NAMES, (name: string, i: number) => {
         Row() {
           Text(name)
-            .fontSize(15)
+            .fontSize(T.F_BODY)
             .fontColor($r('app.color.text_primary'))
             .layoutWeight(1);
           if (Appearance.current() === i) {
@@ -1173,7 +1178,7 @@ export struct SettingsPage {
         .width('100%')
         .height(46)
         .padding({ left: 14, right: 14 })
-        .borderRadius(13)
+        .borderRadius(T.R_SM)
         .backgroundColor(Appearance.current() === i
           ? $r('app.color.accent_soft')
           : $r('app.color.surface_hi'))
@@ -1195,8 +1200,8 @@ export struct SettingsPage {
         .width('100%');
       TextInput({ text: this.f1, placeholder: '192.168.100.1:8443' })
         .height(46)
-        .fontSize(15)
-        .borderRadius(13)
+        .fontSize(T.F_BODY)
+        .borderRadius(T.R_SM)
         .backgroundColor($r('app.color.surface_hi'))
         .padding({ left: 13, right: 13 })
         .margin({ top: 10 })
@@ -1220,8 +1225,8 @@ export struct SettingsPage {
       TextInput({ text: this.f1, placeholder: '当前密码' })
         .type(InputType.Password)
         .height(46)
-        .fontSize(15)
-        .borderRadius(13)
+        .fontSize(T.F_BODY)
+        .borderRadius(T.R_SM)
         .backgroundColor($r('app.color.surface_hi'))
         .padding({ left: 13, right: 13 })
         .margin({ top: 10 })
@@ -1231,8 +1236,8 @@ export struct SettingsPage {
       TextInput({ text: this.f2, placeholder: '新密码（至少 8 位）' })
         .type(InputType.Password)
         .height(46)
-        .fontSize(15)
-        .borderRadius(13)
+        .fontSize(T.F_BODY)
+        .borderRadius(T.R_SM)
         .backgroundColor($r('app.color.surface_hi'))
         .padding({ left: 13, right: 13 })
         .margin({ top: 8 })
@@ -1247,7 +1252,7 @@ export struct SettingsPage {
   @Builder
   infoSheetBody() {
     Text(this.infoBody)
-      .fontSize(13.5)
+      .fontSize(T.F_SUB)
       .lineHeight(21)
       .fontColor($r('app.color.text_secondary'))
       .width('100%')
@@ -1465,10 +1470,10 @@ struct HeroStat {
   build() {
     Column() {
       Text(this.label)
-        .fontSize(11)
+        .fontSize(T.F_TINY)
         .fontColor($r('app.color.hero_fg_soft'));
       Text(this.value)
-        .fontSize(16)
+        .fontSize(T.F_H2)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.hero_fg'))
         .fontFeature("\"tnum\" on")

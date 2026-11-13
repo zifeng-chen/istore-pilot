@@ -42,9 +42,9 @@ export struct NavBar {
     .backdropBlur(24)
     // 悬浮胶囊，不是贴边通栏条：安卓那边是圆角 26 + 0.7 描边 + 投影，
     // 外面还留 14 的边。原来这里是一条通栏 + 顶部细线，两个 App 一眼就不像。
-    .borderRadius(26)
+    .borderRadius(T.R_XL)
     .border({ width: 0.7, color: $r('app.color.glass_stroke') })
-    .shadow({ radius: 22, color: '#1A000000', offsetY: 8 })
+    .shadow({ radius: 22, color: $r('app.color.shadow_3'), offsetY: 8 })
   }
 
   @Builder
@@ -55,7 +55,7 @@ export struct NavBar {
           Row()
             .width(46)
             .height(28)
-            .borderRadius(14)
+            .borderRadius(T.R_SM)
             .backgroundColor($r('app.color.accent_soft2'));
         }
         LineIcon({
@@ -69,7 +69,7 @@ export struct NavBar {
       .height(28);
 
       Text(item.label)
-        .fontSize(10.5)
+        .fontSize(T.F_TINY)
         .fontWeight(this.current === i ? FontWeight.Medium : FontWeight.Normal)
         .fontColor(this.current === i
           ? $r('app.color.primary')
@@ -80,6 +80,9 @@ export struct NavBar {
     .justifyContent(FlexAlign.Center)
     .onClick(() => {
       this.onChange(i);
-    });
+    })
+    .accessibilityText(item.label + (this.current === i ? '，已选中' : ''))
+    .accessibilityGroup(true)
+    .clickEffect({ level: ClickEffectLevel.LIGHT });
   }
 }

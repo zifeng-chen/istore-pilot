@@ -260,11 +260,13 @@ struct SubscriptionPage {
       // 顶栏
       Row({ space: 6 }) {
         Text('‹')
-          .fontSize(26)
+          .fontSize(T.F_HERO)
           .fontColor($r('app.color.primary'))
           .width(44)
           .height(44)
           .textAlign(TextAlign.Center)
+          .accessibilityText('返回')
+          .clickEffect({ level: ClickEffectLevel.LIGHT })
           .onClick(() => {
             router.back();
           });
@@ -279,9 +281,13 @@ struct SubscriptionPage {
         Text('添加')
           .fontSize(T.F_SUB)
           .fontColor($r('app.color.primary'))
-          .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-          .borderRadius(99)
+          .padding({ left: 14, right: 14, top: 4, bottom: 4 })
+          .borderRadius(T.R_PILL)
           .backgroundColor($r('app.color.accent_soft'))
+          // 视觉仍是小胶囊，热区撑到 44
+          .constraintSize({ minHeight: 44, minWidth: 44 })
+          .textAlign(TextAlign.Center)
+          .clickEffect({ level: ClickEffectLevel.LIGHT })
           .onClick(() => {
             this.editId = '';
             // 新增的订阅必须落在当前这个后端上，否则会写进另一套
@@ -339,7 +345,7 @@ struct SubscriptionPage {
                         .fontSize(T.F_TINY)
                         .fontColor($r('app.color.primary'))
                         .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-                        .borderRadius(99)
+                        .borderRadius(T.R_PILL)
                         .backgroundColor($r('app.color.accent_soft'));
                     }
                   }
@@ -412,7 +418,7 @@ struct SubscriptionPage {
           .fontWeight(FontWeight.Medium)
           .fontColor(this.logTone())
           .padding({ left: 9, right: 9, top: 3, bottom: 3 })
-          .borderRadius(99)
+          .borderRadius(T.R_PILL)
           .backgroundColor(Comp.alpha(this.logTone(), 0.14));
       }
       .width('100%')
@@ -438,14 +444,14 @@ struct SubscriptionPage {
 
       if (this.logOpen && this.logTail.length > 0) {
         Text(this.logText())
-          .fontSize(10.5)
+          .fontSize(T.F_TINY)
           .lineHeight(16)
           .fontColor($r('app.color.text_secondary'))
           .fontFamily('monospace')
           .wordBreak(WordBreak.BREAK_ALL)
           .width('100%')
           .padding(10)
-          .borderRadius(10)
+          .borderRadius(T.R_XS)
           .backgroundColor($r('app.color.surface_sunken'));
       }
     }
@@ -457,6 +463,10 @@ struct SubscriptionPage {
       .fontSize(T.F_SUB)
       .fontColor(danger ? $r('app.color.danger') : $r('app.color.primary'))
       .padding({ left: 12, right: 12, top: 5, bottom: 5 })
+      .constraintSize({ minHeight: 44, minWidth: 44 })
+      .textAlign(TextAlign.Center)
+      .accessibilityText(text)
+      .clickEffect({ level: ClickEffectLevel.LIGHT })
       .onClick(() => {
         tap();
       });
@@ -519,7 +529,7 @@ struct SubscriptionPage {
             .fontSize(T.F_BODY)
             .fontColor($r('app.color.on_primary'))
             .padding({ left: 22, right: 22, top: 8, bottom: 8 })
-            .borderRadius(99)
+            .borderRadius(T.R_PILL)
             .backgroundColor($r('app.color.primary'))
             .onClick(() => {
               this.save();

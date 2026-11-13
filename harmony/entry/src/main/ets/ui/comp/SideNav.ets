@@ -1,6 +1,6 @@
 import { Ico } from './Icons';
 import { UI } from '../../core/UIState';
-import { Pal } from '../Theme';
+import { Pal, T } from '../Theme';
 import { LineIcon } from '../Comp';
 
 interface RailItem {
@@ -44,7 +44,7 @@ export struct SideNav {
             Row()
               .width(30)
               .height(30)
-              .borderRadius(9)
+              .borderRadius(T.R_XS)
               .backgroundColor($r('app.color.accent_soft2'));
             LineIcon({
               path: 'M7 9 L11.5 5.5 M7 9 L11.5 12.5 M7 9 L7 9.1',
@@ -58,11 +58,11 @@ export struct SideNav {
 
           Column() {
             Text('iStore Pilot')
-              .fontSize(14)
+              .fontSize(T.F_BODY)
               .fontWeight(FontWeight.Medium)
               .fontColor($r('app.color.text_primary'));
             Text(this.hostname.length > 0 ? this.hostname : 'iStoreOS')
-              .fontSize(10.5)
+              .fontSize(T.F_TINY)
               .fontColor($r('app.color.text_secondary'))
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis });
@@ -85,7 +85,7 @@ export struct SideNav {
       Blank();
 
       Text('v' + (UI.agentVer.length > 0 ? UI.agentVer : '2.14.0'))
-        .fontSize(10.5)
+        .fontSize(T.F_TINY)
         .fontColor($r('app.color.text_tertiary'))
         .padding({ left: 20, bottom: 16 });
     }
@@ -117,13 +117,13 @@ export struct SideNav {
 
       Column() {
         Text(item.label)
-          .fontSize(14)
+          .fontSize(T.F_BODY)
           .fontWeight(this.current === i ? FontWeight.Medium : FontWeight.Normal)
           .fontColor(this.current === i
             ? $r('app.color.primary')
             : $r('app.color.text_primary'));
         Text(item.hint)
-          .fontSize(10.5)
+          .fontSize(T.F_TINY)
           .fontColor($r('app.color.text_secondary'))
           .margin({ top: 1 });
       }
@@ -134,7 +134,7 @@ export struct SideNav {
     .width('100%')
     .height(52)
     .alignItems(VerticalAlign.Center)
-    .borderRadius(12)
+    .borderRadius(T.R_SM)
     .backgroundColor(this.current === i ? $r('app.color.accent_soft') : Color.Transparent)
     .margin({ left: 8, right: 8, bottom: 2 })
     .onClick(() => {

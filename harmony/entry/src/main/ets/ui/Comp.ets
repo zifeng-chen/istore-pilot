@@ -30,7 +30,7 @@ export struct Card {
     .backgroundColor($r('app.color.surface'))
     .borderRadius(T.R_CARD)
     .border({ width: 0.7, color: $r('app.color.glass_stroke') })
-    .shadow({ radius: 12, color: '#12000000', offsetX: 0, offsetY: 3 });
+    .shadow({ radius: 12, color: $r('app.color.shadow_2'), offsetX: 0, offsetY: 3 });
   }
 }
 
@@ -249,7 +249,7 @@ export struct HeroStat {
   build() {
     Column() {
       Text(this.label)
-        .fontSize(11)
+        .fontSize(T.F_TINY)
         .fontColor($r('app.color.hero_fg_soft'))
         .maxLines(1);
       Text(this.value)
@@ -398,7 +398,7 @@ export struct RowCard {
     .backgroundColor($r('app.color.surface'))
     .borderRadius(T.R_CARD)
     .border({ width: 0.7, color: $r('app.color.glass_stroke') })
-    .shadow({ radius: 6, color: '#0D000000', offsetX: 0, offsetY: 1 })
+    .shadow({ radius: 6, color: $r('app.color.shadow_1'), offsetX: 0, offsetY: 1 })
     .clip(true);
   }
 }
@@ -434,7 +434,7 @@ export struct CardTitle {
       }
       .width(28)
       .height(28)
-      .borderRadius(9)
+      .borderRadius(T.R_XS)
       .backgroundColor($r('app.color.accent_soft'));
 
       Column() {
@@ -505,12 +505,12 @@ export struct SettingRow {
         }
         .width(30)
         .height(30)
-        .borderRadius(10)
+        .borderRadius(T.R_XS)
         .backgroundColor(this.iconBg());
 
         Column() {
           Text(this.title)
-            .fontSize(14.5)
+            .fontSize(T.F_BODY)
             .fontWeight(FontWeight.Medium)
             .fontColor(this.danger ? $r('app.color.danger') : $r('app.color.text_primary'))
             .maxLines(1)
@@ -586,7 +586,7 @@ export struct Chip {
 
   build() {
     Text(this.label)
-      .fontSize(13)
+      .fontSize(T.F_SUB)
       .fontWeight(FontWeight.Medium)
       .fontColor(this.on ? $r('app.color.primary') : $r('app.color.text_secondary'))
       .textAlign(TextAlign.Center)

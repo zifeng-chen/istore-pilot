@@ -178,7 +178,7 @@ export struct PortTile {
             .borderRadius(3)
             .backgroundColor(this.up ? Pal.ok() : Pal.textTertiary());
           Text(this.up ? this.speedText : '—')
-            .fontSize(11)
+            .fontSize(T.F_TINY)
             .fontWeight(FontWeight.Medium)
             .fontColor(this.up ? $r('app.color.primary') : $r('app.color.text_tertiary'))
             .fontFeature("\"tnum\" on");
@@ -191,7 +191,7 @@ export struct PortTile {
       .alignItems(VerticalAlign.Center);
 
       Text(this.name)
-        .fontSize(15.5)
+        .fontSize(T.F_BODY)
         .fontWeight(FontWeight.Medium)
         .fontColor(this.up ? $r('app.color.text_primary') : $r('app.color.text_secondary'))
         .margin({ top: 9 })
@@ -199,7 +199,7 @@ export struct PortTile {
         .textOverflow({ overflow: TextOverflow.Ellipsis });
 
       Text(this.stateText())
-        .fontSize(11.5)
+        .fontSize(T.F_TINY)
         .fontColor($r('app.color.text_secondary'))
         .margin({ top: 3 })
         .maxLines(1)
@@ -215,13 +215,13 @@ export struct PortTile {
 
       Row() {
         Text(this.up ? '↓ ' + this.rxText : '↓ —')
-          .fontSize(12)
+          .fontSize(T.F_SUB)
           .fontWeight(FontWeight.Medium)
           .fontColor(this.up ? $r('app.color.primary') : $r('app.color.text_tertiary'))
           .fontFeature("\"tnum\" on")
           .layoutWeight(1);
         Text(this.up ? '↑ ' + this.txText : '↑ —')
-          .fontSize(12)
+          .fontSize(T.F_SUB)
           .fontWeight(FontWeight.Medium)
           .fontColor(this.up ? $r('app.color.warn') : $r('app.color.text_tertiary'))
           .fontFeature("\"tnum\" on")
@@ -233,7 +233,7 @@ export struct PortTile {
     .width('100%')
     .alignItems(HorizontalAlign.Start)
     .padding({ left: 13, right: 13, top: 11, bottom: 12 })
-    .borderRadius(16)
+    .borderRadius(T.R_MD)
     .backgroundColor(this.up ? $r('app.color.surface_hi') : $r('app.color.surface_sunken'))
     .border({
       width: this.up && this.role === 'wan' ? 1.1 : 0.7,
@@ -242,6 +242,10 @@ export struct PortTile {
             this.role === 'wan' ? 0.55 : 0.26)
         : $r('app.color.glass_stroke')
     })
+    .accessibilityText(this.name + '，' + (this.up ? '已连接' : '未连接')
+      + (this.up ? '，下行 ' + this.rxText + '，上行 ' + this.txText : ''))
+    .accessibilityGroup(true)
+    .clickEffect({ level: ClickEffectLevel.LIGHT })
     .onClick(() => {
       this.onTap();
     });

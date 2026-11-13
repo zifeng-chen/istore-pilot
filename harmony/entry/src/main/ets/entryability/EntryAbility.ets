@@ -3,6 +3,7 @@ import { display, window } from '@kit.ArkUI';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { Api } from '../api/Api';
 import { UI } from '../core/UIState';
+import { Motion } from '../core/Motion';
 import { SystemBar } from '../core/SystemBar';
 import { Pal } from '../ui/Theme';
 
@@ -11,6 +12,7 @@ const TAG: string = 'IStoreAbility';
 
 export default class EntryAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    Motion.sync(this.context);
     hilog.info(DOMAIN, TAG, 'onCreate');
 
     // 令牌失效统一走这里：置一个时间戳，Index 页监听后跳登录页。

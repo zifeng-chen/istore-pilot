@@ -3,6 +3,7 @@ import { router } from '@kit.ArkUI';
 import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
 import { UI, UIState } from '../../core/UIState';
+import { Motion } from '../../core/Motion';
 import { Shell } from '../../core/Shell';
 import { Fmt } from '../../util/Fmt';
 import { Pal, T } from '../Theme';
@@ -291,7 +292,7 @@ export struct SecurityPage {
     this.subFilter = filter;
     // 二级页是从右边推上来的：壳（Index）据此藏掉底部导航，
     // 返回键也从「退出 App」改成「退回一级页」
-    this.getUIContext().animateTo({ duration: 220, curve: Curve.EaseOut }, () => {
+    this.getUIContext().animateTo({ duration: Motion.ms(220), curve: Curve.EaseOut }, () => {
       this.sub = n;
     });
   }
@@ -309,7 +310,7 @@ export struct SecurityPage {
   @Monitor('ui.backTick')
   onBackAsked(): void {
     if (this.sub !== 0) {
-      this.getUIContext().animateTo({ duration: 200, curve: Curve.EaseIn }, () => {
+      this.getUIContext().animateTo({ duration: Motion.ms(200), curve: Curve.EaseIn }, () => {
         this.sub = 0;
       });
     }
@@ -347,8 +348,10 @@ export struct SecurityPage {
       }
       .layoutWeight(0)
       .padding({ left: 2, right: 10, top: 4, bottom: 4 })
+      .accessibilityText('返回')
+      .clickEffect({ level: ClickEffectLevel.LIGHT })
       .onClick(() => {
-        this.getUIContext().animateTo({ duration: 200, curve: Curve.EaseIn }, () => {
+        this.getUIContext().animateTo({ duration: Motion.ms(200), curve: Curve.EaseIn }, () => {
           this.sub = 0;
         });
       });
@@ -382,17 +385,17 @@ export struct SecurityPage {
           .backgroundColor($r('app.color.hero_fg'))
           .margin({ right: 7 });
         Text('局域网')
-          .fontSize(12.5)
+          .fontSize(T.F_SUB)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.hero_fg'))
           .layoutWeight(1);
         Text(this.adTakeover ? '拦截已接管' : (this.adInstalled ? '拦截未接管' : '拦截未装'))
-          .fontSize(11)
+          .fontSize(T.F_TINY)
           .fontColor($r('app.color.hero_fg'))
           .opacity(0.86)
           .padding({ left: 9, right: 9, top: 4, bottom: 4 })
           .borderRadius(T.R_PILL)
-          .backgroundColor(Comp.alpha('#FFFFFF', 0.16));
+          .backgroundColor(Comp.alpha(Pal.heroFg(), 0.16));
       }
       .width('100%')
       .alignItems(VerticalAlign.Center);
@@ -414,7 +417,7 @@ export struct SecurityPage {
         : (this.blocked > 0
           ? '共 ' + this.total + ' 台  ·  ' + this.blocked + ' 台已禁网'
           : '共 ' + this.total + ' 台'))
-        .fontSize(12)
+        .fontSize(T.F_SUB)
         .fontColor($r('app.color.hero_fg'))
         .opacity(0.8)
         .width('100%')
@@ -422,7 +425,7 @@ export struct SecurityPage {
     }
     .alignItems(HorizontalAlign.Start)
     .width('100%')
-    .padding({ left: 20, right: 20, top: 18, bottom: 18 })
+    .padding({ left: T.PAD_WIDE, right: T.PAD_WIDE, top: 18, bottom: 18 })
     .borderRadius(T.R_CARD)
     .linearGradient({
       angle: 135,
@@ -440,7 +443,7 @@ export struct SecurityPage {
       Row() {
         Column() {
           Text(d.name)
-            .fontSize(14.5)
+            .fontSize(T.F_BODY)
             .fontColor($r('app.color.text_primary'))
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis });
@@ -454,7 +457,7 @@ export struct SecurityPage {
 
         Column() {
           Text(d.bps < 1024 ? '空闲' : Fmt.bps(d.bps))
-            .fontSize(12)
+            .fontSize(T.F_SUB)
             .fontColor(d.bps < 1024 ? $r('app.color.text_secondary') : $r('app.color.primary'))
             .fontFeature("\"tnum\" on");
           if (d.blocked) {
@@ -485,13 +488,13 @@ export struct SecurityPage {
       .width(30)
       .height(30)
       .justifyContent(FlexAlign.Center)
-      .borderRadius(9)
+      .borderRadius(T.R_XS)
       .backgroundColor($r('app.color.accent_soft'))
       .margin({ right: 11 });
 
       Column() {
         Text(title)
-          .fontSize(14.5)
+          .fontSize(T.F_BODY)
           .fontColor($r('app.color.text_primary'));
         Text(note)
           .fontSize(T.F_TINY)
@@ -660,7 +663,7 @@ export struct SecurityPage {
             .fontSize(T.F_TINY)
             .fontColor($r('app.color.text_secondary'));
           Text(Fmt.bytes(this.appTotalBytes))
-            .fontSize(28)
+            .fontSize(T.F_HERO)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'))
             .margin({ top: 3 });
@@ -700,7 +703,7 @@ export struct SecurityPage {
       }
 
       Text('按域名归类；认不出名字的连接归到「IP 直连」')
-        .fontSize(10.5)
+        .fontSize(T.F_TINY)
         .fontColor($r('app.color.text_tertiary'))
         .margin({ top: 9 });
     }
@@ -756,7 +759,7 @@ export struct SecurityPage {
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'));
           Text('占 ' + Math.round(a.share) + '%')
-            .fontSize(10.5)
+            .fontSize(T.F_TINY)
             .fontColor($r('app.color.text_tertiary'))
             .margin({ top: 4 });
         }
@@ -783,7 +786,7 @@ export struct SecurityPage {
     }
     .width('100%')
     .padding({ left: 14, right: 14, top: 12, bottom: 12 })
-    .borderRadius(18)
+    .borderRadius(T.R_LG)
     .backgroundColor($r('app.color.surface'))
     .border({ width: 0.7, color: $r('app.color.glass_stroke') });
   }
@@ -893,9 +896,10 @@ export struct SecurityPage {
           .fontColor($r('app.color.on_primary'))
           .textAlign(TextAlign.Center)
           .width('100%')
-          .height(42)
+          .constraintSize({ minHeight: 44 })
+          .padding({ top: 11, bottom: 11 })
           .backgroundColor($r('app.color.primary'))
-          .borderRadius(12)
+          .borderRadius(T.R_SM)
           .opacity(this.adInstalling ? 0.55 : 1)
           .margin({ top: 16 })
           .onClick(() => {
@@ -905,7 +909,7 @@ export struct SecurityPage {
           });
 
         Text('约 6.6 MB · 需要路由器能上网')
-          .fontSize(10.5)
+          .fontSize(T.F_TINY)
           .fontColor($r('app.color.text_tertiary'))
           .width('100%')
           .textAlign(TextAlign.Center)
@@ -923,7 +927,7 @@ export struct SecurityPage {
       } else {
         Row() {
           Text(Fmt.count(this.adBlocked))
-          .fontSize(30)
+          .fontSize(T.F_HERO)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .fontFeature("\"tnum\" on");
@@ -937,13 +941,13 @@ export struct SecurityPage {
       .margin({ top: 12 });
 
       Text('今日共查询 ' + Fmt.count(this.adQueries) + ' 次')
-        .fontSize(12)
+        .fontSize(T.F_SUB)
         .fontColor($r('app.color.text_secondary'))
         .width('100%')
         .margin({ top: 4 });
 
       Text(this.adPct > 0 ? '拦截率 ' + Math.round(this.adPct) + '%' : '今天还没有拦截记录')
-        .fontSize(12)
+        .fontSize(T.F_SUB)
         .fontColor($r('app.color.text_secondary'))
         .width('100%')
         .margin({ top: 2 });

@@ -454,8 +454,8 @@ export struct OverviewPage {
         .fontColor($r('app.color.text_primary'))
         .width('100%')
         .padding({
-          left: this.rail() ? 20 : T.PAD,
-          right: this.rail() ? 20 : T.PAD,
+          left: this.rail() ? T.PAD_WIDE : T.PAD,
+          right: this.rail() ? T.PAD_WIDE : T.PAD,
           top: 8,
           bottom: 10
         });
@@ -496,8 +496,8 @@ export struct OverviewPage {
           .width('100%')
           .alignItems(HorizontalAlign.Center)
           .padding({
-            left: this.rail() ? 20 : T.PAD,
-            right: this.rail() ? 20 : T.PAD,
+            left: this.rail() ? T.PAD_WIDE : T.PAD,
+            right: this.rail() ? T.PAD_WIDE : T.PAD,
             top: 2
           });
         }
@@ -557,6 +557,7 @@ export struct OverviewPage {
         }
         .width(44)
         .height(44)
+        .accessibilityText('关闭')
         .onClick(() => {
           this.showPort = false;
         });
@@ -614,13 +615,13 @@ export struct OverviewPage {
           .backgroundColor(this.stale ? Pal.warn() : $r('app.color.hero_fg'))
           .margin({ right: 7 });
         Text(this.verdict.length > 0 ? this.verdict : '正在读取…')
-          .fontSize(12.5)
+          .fontSize(T.F_SUB)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.hero_fg'))
           .maxLines(1);
         Blank();
         Text('iStoreOS ' + Fmt.orDash(this.osVersion))
-          .fontSize(11)
+          .fontSize(T.F_TINY)
           .fontColor($r('app.color.hero_fg'))
           .padding({ left: 8, right: 8, top: 3, bottom: 3 })
           .borderRadius(T.R_PILL)
@@ -633,7 +634,7 @@ export struct OverviewPage {
       // Column 默认 alignItems 是 Center，不写 width/textAlign 就会整行居中 ——
       // 截图里主机名和内核那行就是飘在中间的
       Text(this.hostname)
-        .fontSize(27)
+        .fontSize(T.F_HERO)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.hero_fg'))
         .maxLines(1)
@@ -700,7 +701,7 @@ export struct OverviewPage {
       .margin({ top: 14 });
     }
     .width('100%')
-    .padding({ left: 20, right: 20, top: 18, bottom: 18 })
+    .padding({ left: T.PAD_WIDE, right: T.PAD_WIDE, top: 18, bottom: 18 })
     .borderRadius(T.R_CARD)
     .linearGradient({
       angle: 135,

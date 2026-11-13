@@ -1,6 +1,14 @@
 import { Pal } from '../Theme';
 import { Fmt } from '../../util/Fmt';
 
+/** '#RRGGBB' + 透明度 → '#AARRGGBB'，Canvas 只吃字符串 */
+function alpha(hex: string, a: number): string {
+  const v: number = Math.max(0, Math.min(255, Math.round(a * 255)));
+  const aa: string = v.toString(16).padStart(2, '0').toUpperCase();
+  return '#' + aa + hex.replace('#', '').slice(-6);
+}
+
+
 /**
  * 流量趋势折线图：上行一条、下行一条，带面积渐变。
  *
@@ -92,7 +100,7 @@ export struct TrendChart {
       this.ctx.stroke();
 
       if (g === 0 || g === 2 || g === 4) {
-        this.ctx.fillStyle = g === 4 ? '#96FFFFFF' : '#8CFFFFFF';
+        this.ctx.fillStyle = g === 4 ? alpha(Pal.heroFg(), 0.59) : alpha(Pal.heroFg(), 0.55);
         const v: number = top * (1 - g / 4);
         this.ctx.fillText(Fmt.bpsAxis(v), w - 2, y + 3);
       }
@@ -122,7 +130,7 @@ export struct TrendChart {
       this.ctx.strokeStyle = '#662ED3A6';
       this.ctx.stroke();
 
-      this.ctx.fillStyle = '#8CFFFFFF';
+      this.ctx.fillStyle = alpha(Pal.heroFg(), 0.55);
       this.ctx.font = '11vp sans-serif';
       this.ctx.textAlign = 'center';
       this.ctx.fillText('正在采样…', (x0 + x1) / 2, y0 + plotH / 2 + 4);

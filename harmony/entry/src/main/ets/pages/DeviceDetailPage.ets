@@ -100,11 +100,13 @@ struct DeviceDetailPage {
       // 顶栏：返回 + 标题 + 在线状态
       Row({ space: 6 }) {
         Text('‹')
-          .fontSize(26)
+          .fontSize(T.F_HERO)
           .fontColor($r('app.color.primary'))
           .width(44)
           .height(44)
           .textAlign(TextAlign.Center)
+          .accessibilityText('返回')
+          .clickEffect({ level: ClickEffectLevel.LIGHT })
           .onClick(() => {
             router.back();
           });
@@ -177,7 +179,7 @@ struct DeviceDetailPage {
               .fontSize(T.F_TINY)
               .fontColor($r('app.color.danger'))
               .padding({ left: 8, right: 8, top: 2, bottom: 2 })
-              .borderRadius(99)
+              .borderRadius(T.R_PILL)
               .backgroundColor(Pal.alpha(Pal.danger(), 0.14));
           }
         }
@@ -273,7 +275,7 @@ struct DeviceDetailPage {
         .fontFeature("\"tnum\" on")
         .maxLines(1);
       Text(label)
-        .fontSize(10.5)
+        .fontSize(T.F_TINY)
         .fontColor($r('app.color.text_secondary'))
         .margin({ top: 2 });
     }
@@ -436,7 +438,7 @@ struct DeviceDetailPage {
       .layoutWeight(1);
 
       Text('›')
-        .fontSize(18)
+        .fontSize(T.F_H1)
         .fontColor($r('app.color.text_tertiary'));
     }
     .width('100%')

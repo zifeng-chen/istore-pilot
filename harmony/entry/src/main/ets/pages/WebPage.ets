@@ -197,6 +197,8 @@ struct WebPage {
         .width(44)
         .height(44)
         .alignContent(Alignment.Center)
+        .accessibilityText('返回')
+        .clickEffect({ level: ClickEffectLevel.LIGHT })
         .onClick(() => this.close());
         Column({ space: 2 }) {
           Text('路由器网页端')

@@ -32,6 +32,27 @@
 - 卡片左右间距从 34vp 收到 18vp：外层二级页已经给了 `T.PAD`，内层又加了 16，
   两层叠一起把卡片挤窄了 —— 这是「左右间距太大」的根因
 
+### UI/UX 规范对齐（按 6 维 32 条全量过一遍）
+
+- **对比度提到 4.5:1**（原 3:1）：浅色 secondary 5.63 / tertiary 5.11 / danger 5.74 /
+  ok 6.18（白底），深色全部 ≥5.1；Android / iOS 同步换色
+- **颜色全部 Token 化**：硬编码的遮罩、hero 胶囊、投影、toast 底色搬进 color.json，
+  base + dark 各一套；品牌图标色单独保留（内容，不是 UI 色）
+- **字号收敛到 8 档**：44 / 33 / 28 / 20 / 16 / 15 / 12.5 / 11.5，
+  页面里再没有 10.5、13.5、14.5 这类散值
+- **圆角收敛到 6 档**：8 / 12 / 16 / 20 / 24 / full；**间距回到 8 网格**：
+  页面 16（宽屏 24）、卡片 16
+- **热区 ≥44**：小胶囊（更新/添加/启停）用 `constraintSize(minWidth/minHeight)` 撑开，
+  视觉尺寸不变；所有可点文字/卡片补 `clickEffect` 按下反馈
+- **无障碍**：返回、关闭、页签、网口块、分组卡、列表操作补 `accessibilityText`
+  与 `accessibilityGroup`
+- **大字号**：主按钮从固定 height 改 `minHeight + padding`
+- **长列表**：拦截日志改 `List + LazyForEach`（新增 `core/Lazy.ets`）
+- **断点补第四档**：`Bp.XL 1200`（PC / 平行视界），Form 变四档
+- **减弱动效**：`core/Motion.ets` 读系统 `animator_duration_scale`，
+  为 0 时转场时长归零
+- 新增 `docs/UI_UX_CHECKLIST.md`：32 条现状 + 发版前 5 步手检
+
 ### AdGuard Home：未安装引导与卸载（三端）
 
 - **设备页拦截卡（未安装）**：去掉「— 次拦截」和整个接管开关，换成三条价值点

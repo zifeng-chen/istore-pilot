@@ -7,21 +7,24 @@
  * 折叠屏开合时会看到明显闪烁。这里改成把窗口宽度写进 AppStorage，
  * 各页面自己按宽度算列数 —— 只有真正需要变的组件会重建。
  *
- * 三档的由来（vp）：
+ * 四档（对齐 HarmonyOS UX 规范的 sm / md / lg / xl）：
  *   compact  < 600   手机竖屏
  *   medium   600–840 手机横屏、小折叠展开、7 寸平板
- *   expanded ≥ 840   8 寸以上平板、折叠屏完全展开
+ *   expanded 840–1200 8 寸以上平板、折叠屏完全展开
+ *   xlarge   ≥ 1200  PC / 平行视界窗口
  * 840 是 HarmonyOS 官方给「是否显示侧边栏」的经验值，和侧栏 208 的宽度也配套。
  */
 export enum Form {
   Compact,
   Medium,
-  Expanded
+  Expanded,
+  XLarge
 }
 
 export class Bp {
   static readonly MD: number = 600;
   static readonly LG: number = 840;
+  static readonly XL: number = 1200;
 
   /** 侧边导航栏宽度。太窄放不下「概览」两个字 + 图标，太宽会把内容区挤得太瘦 */
   static readonly RAIL_W: number = 208;
@@ -30,6 +33,9 @@ export class Bp {
   static readonly CONTENT_MAX: number = 1100;
 
   static form(w: number): Form {
+    if (w >= Bp.XL) {
+      return Form.XLarge;
+    }
     if (w >= Bp.LG) {
       return Form.Expanded;
     }

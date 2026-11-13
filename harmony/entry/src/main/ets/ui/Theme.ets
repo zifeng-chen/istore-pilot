@@ -11,19 +11,26 @@ import { common } from '@kit.AbilityKit';
  * Pal 走 resourceManager.getColorSync，浅色/深色两套值仍然只在 color.json 里维护。
  */
 export class T {
-  // 圆角
-  static readonly R_CARD: number = 22;
-  static readonly R_INNER: number = 14;
-  static readonly R_PILL: number = 100;
+  // 圆角：6 档（8 / 12 / 16 / 20 / 24 / full），页面里不许再出现裸值
+  static readonly R_XS: number = 8;      // 小徽标、小方块
+  static readonly R_SM: number = 12;     // 按钮、输入框、内嵌块
+  static readonly R_MD: number = 16;     // 分组、提示块
+  static readonly R_LG: number = 20;     // 卡片
+  static readonly R_XL: number = 24;     // 弹层
+  static readonly R_CARD: number = 20;
+  static readonly R_INNER: number = 12;
+  static readonly R_PILL: number = 999;
 
-  // 间距
-  static readonly PAD: number = 18;      // 页面左右留白
-  static readonly GAP: number = 12;      // 卡片之间
+  // 间距：8 的倍数（8 / 16 / 24 / 32）
+  static readonly PAD: number = 16;      // 页面左右留白
+  static readonly PAD_WIDE: number = 24; // 平板 / 侧栏页留白
+  static readonly GAP: number = 16;      // 卡片之间
   static readonly CARD_PAD: number = 16; // 卡片内边距
 
   // 字号
+  static readonly F_DISPLAY: number = 44; // 极少数主数字（拦截率）
   static readonly F_TITLE: number = 33;  // 页面大标题
-  static readonly F_HERO: number = 30;   // hero 大数字
+  static readonly F_HERO: number = 28;   // hero 大数字
   static readonly F_H1: number = 20;
   static readonly F_H2: number = 16;
   static readonly F_BODY: number = 15;
@@ -117,15 +124,15 @@ export class Pal {
   }
 
   static textSecondary(): string {
-    return Pal.of($r('app.color.text_secondary'), '#6F7A74');
+    return Pal.of($r('app.color.text_secondary'), '#5F6A64');
   }
 
   static textTertiary(): string {
-    return Pal.of($r('app.color.text_tertiary'), '#7E8883');
+    return Pal.of($r('app.color.text_tertiary'), '#67706B');
   }
 
   static danger(): string {
-    return Pal.of($r('app.color.danger'), '#FF3B30');
+    return Pal.of($r('app.color.danger'), '#C81E1E');
   }
 
   static warn(): string {
@@ -133,7 +140,7 @@ export class Pal {
   }
 
   static ok(): string {
-    return Pal.of($r('app.color.ok'), '#1E8E3E');
+    return Pal.of($r('app.color.ok'), '#177030');
   }
 
   static heroFrom(): string {

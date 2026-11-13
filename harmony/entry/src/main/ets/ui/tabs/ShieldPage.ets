@@ -3,6 +3,7 @@ import { promptAction } from '@kit.ArkUI';
 import { Api, ApiResult } from '../../api/Api';
 import { J } from '../../core/Json';
 import { UI, UIState } from '../../core/UIState';
+import { SimpleData } from '../../core/Lazy';
 import { Fmt } from '../../util/Fmt';
 import { Bp } from '../Breakpoint';
 import { Pal, T } from '../Theme';
@@ -103,6 +104,8 @@ export struct ShieldPage {
   @Local logItems: LogItem[] = [];
   @Local logOnlyBlocked: boolean = true;
   @Local logTotal: number = 0;
+  /** 日志走 LazyForEach：最多 120 条，不必一次性建完所有行 */
+  private logs: SimpleData<LogItem> = new SimpleData<LogItem>();
 
   // ---- 规则更新
   @Local ruleAuto: boolean = false;
@@ -315,6 +318,7 @@ export struct ShieldPage {
       });
     }
     this.logItems = out;
+    this.logs.set(out);
   }
 
   private async loadRules(): Promise<void> {
@@ -480,8 +484,8 @@ export struct ShieldPage {
       .width('100%')
       .alignItems(HorizontalAlign.Center)
       .padding({
-        left: this.rail() ? 20 : T.PAD,
-        right: this.rail() ? 20 : T.PAD,
+        left: this.rail() ? T.PAD_WIDE : T.PAD,
+        right: this.rail() ? T.PAD_WIDE : T.PAD,
         top: 8
       });
     }
@@ -517,7 +521,7 @@ export struct ShieldPage {
         }
         .width(30)
         .height(30)
-        .borderRadius(10)
+        .borderRadius(T.R_XS)
         .backgroundColor(Comp.alpha(Pal.danger(), 0.12));
 
         Column() {
@@ -533,7 +537,7 @@ export struct ShieldPage {
         .layoutWeight(1);
 
         Text('›')
-          .fontSize(18)
+          .fontSize(T.F_H1)
           .fontColor($r('app.color.text_tertiary'));
       }
       .width('100%')
@@ -565,6 +569,7 @@ export struct ShieldPage {
         }
         .width(44)
         .height(44)
+        .accessibilityText('关闭')
         .onClick(() => {
           if (!this.uninstalling) {
             this.showUninstall = false;
@@ -589,10 +594,11 @@ export struct ShieldPage {
 
       Button(this.uninstalling ? '正在卸载…' : '卸载，保留配置')
         .type(ButtonType.Normal)
-        .borderRadius(14)
-        .height(46)
+        .borderRadius(T.R_SM)
+        .constraintSize({ minHeight: 44 })
+        .padding({ top: 10, bottom: 10 })
         .width('100%')
-        .fontSize(15)
+        .fontSize(T.F_BODY)
         .fontColor($r('app.color.primary'))
         .backgroundColor($r('app.color.accent_soft'))
         .margin({ top: 8 })
@@ -603,10 +609,11 @@ export struct ShieldPage {
 
       Button(this.uninstalling ? '正在卸载…' : '卸载，并删除配置与日志')
         .type(ButtonType.Normal)
-        .borderRadius(14)
-        .height(46)
+        .borderRadius(T.R_SM)
+        .constraintSize({ minHeight: 44 })
+        .padding({ top: 10, bottom: 10 })
         .width('100%')
-        .fontSize(15)
+        .fontSize(T.F_BODY)
         .fontColor($r('app.color.on_primary'))
         .backgroundColor($r('app.color.danger'))
         .margin({ top: 10 })
@@ -616,7 +623,7 @@ export struct ShieldPage {
         });
 
       Text('「保留」会在 /etc/AdGuardHome 留下配置、规则缓存与查询历史，重装后直接接着用。')
-        .fontSize(10.5)
+        .fontSize(T.F_TINY)
         .fontColor($r('app.color.text_tertiary'))
         .lineHeight(16)
         .width('100%')
@@ -674,7 +681,7 @@ export struct ShieldPage {
               ? $r('app.color.primary')
               : $r('app.color.warn'))
             .padding({ left: 8, right: 8, top: 2, bottom: 2 })
-            .borderRadius(99)
+            .borderRadius(T.R_PILL)
             .backgroundColor(this.preflightReady
               ? $r('app.color.accent_soft')
               : Pal.alpha(Pal.warn(), 0.14));
@@ -736,11 +743,12 @@ export struct ShieldPage {
             .fontSize(T.F_TINY)
             .fontColor($r('app.color.primary'))
             .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-            .borderRadius(99)
+            .borderRadius(T.R_PILL)
             .backgroundColor($r('app.color.accent_soft'))
             .onClick(() => {
               this.logOnlyBlocked = !this.logOnlyBlocked;
               this.logItems = [];
+              this.logs.set([]);
               this.loadLog();
             });
         }
@@ -753,42 +761,60 @@ export struct ShieldPage {
             .fontColor($r('app.color.text_secondary'))
             .padding({ top: 6, bottom: 6 });
         } else {
-          ForEach(this.logItems, (it: LogItem, i: number) => {
-            Row({ space: 8 }) {
-              Text(it.clock)
-                .fontSize(10.5)
-                .fontColor($r('app.color.text_tertiary'))
-                .fontFeature("\"tnum\" on")
-                .width(52);
-              Text(it.domain)
-                .fontSize(T.F_SUB)
-                .fontColor($r('app.color.text_primary'))
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-                .layoutWeight(1);
-              Text(it.client)
-                .fontSize(10.5)
-                .fontColor($r('app.color.text_tertiary'))
-                .maxLines(1)
-                .width(76)
-                .textAlign(TextAlign.End);
-              if (it.blocked) {
-                Text('拦')
-                  .fontSize(10.5)
-                  .fontColor($r('app.color.danger'))
-                  .padding({ left: 5, right: 5, top: 1, bottom: 1 })
-                  .borderRadius(5)
-                  .backgroundColor(Pal.alpha(Pal.danger(), 0.14));
+          // 固定高度 + 自身滚动：LazyForEach 需要确定的可视区，
+          // 也让这张卡不会因为 120 条日志把整页撑到几屏
+          List({ space: 0 }) {
+            LazyForEach(this.logs, (it: LogItem, i: number) => {
+              ListItem() {
+                this.logRow(it, i);
               }
-            }
-            .width('100%')
-            .padding({ top: 5, bottom: 5 })
-            .alignItems(VerticalAlign.Center);
-          }, (it: LogItem, i: number) => it.clock + it.domain + i);
+            }, (it: LogItem, i: number) => it.clock + it.domain + i.toString())
+          }
+          .width('100%')
+          .height(360)
+          .scrollBar(BarState.Off)
+          .nestedScroll({
+            scrollForward: NestedScrollMode.SELF_FIRST,
+            scrollBackward: NestedScrollMode.SELF_FIRST
+          });
         }
       }
       .width('100%');
     }
+  }
+
+  @Builder
+  logRow(it: LogItem, i: number) {
+    Row({ space: 8 }) {
+      Text(it.clock)
+        .fontSize(T.F_TINY)
+        .fontColor($r('app.color.text_tertiary'))
+        .fontFeature("\"tnum\" on")
+        .width(52);
+      Text(it.domain)
+        .fontSize(T.F_SUB)
+        .fontColor($r('app.color.text_primary'))
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .layoutWeight(1);
+      Text(it.client)
+        .fontSize(T.F_TINY)
+        .fontColor($r('app.color.text_tertiary'))
+        .maxLines(1)
+        .width(76)
+        .textAlign(TextAlign.End);
+      if (it.blocked) {
+        Text('拦')
+          .fontSize(T.F_TINY)
+          .fontColor($r('app.color.danger'))
+          .padding({ left: 5, right: 5, top: 1, bottom: 1 })
+          .borderRadius(5)
+          .backgroundColor(Pal.alpha(Pal.danger(), 0.14));
+      }
+    }
+    .width('100%')
+    .padding({ top: 5, bottom: 5 })
+    .alignItems(VerticalAlign.Center);
   }
 
   @Builder
@@ -811,7 +837,7 @@ export struct ShieldPage {
       .alignItems(VerticalAlign.Top);
 
       Text(this.percent.toFixed(0) + '%')
-        .fontSize(44)
+        .fontSize(T.F_DISPLAY)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.hero_fg'))
         .fontFeature("\"tnum\" on")
@@ -939,7 +965,7 @@ export struct ShieldPage {
               }
               .width(20)
               .height(20)
-              .borderRadius(10)
+              .borderRadius(T.R_XS)
               .backgroundColor(i === 0 ? $r('app.color.primary') : $r('app.color.surface_hi'));
 
               Column() {
@@ -1020,7 +1046,7 @@ export struct ShieldPage {
 
       // ---- 频率
       Text('自动更新频率')
-        .fontSize(12.5)
+        .fontSize(T.F_SUB)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.text_secondary'))
         .width('100%')
@@ -1051,11 +1077,11 @@ export struct ShieldPage {
 
       Row() {
         Text('下次更新')
-          .fontSize(13.5)
+          .fontSize(T.F_SUB)
           .fontColor($r('app.color.text_secondary'));
         Blank();
         Text(this.ruleNext.length > 0 ? this.ruleNext : '—')
-          .fontSize(13.5)
+          .fontSize(T.F_SUB)
           .fontColor(this.ruleAuto ? $r('app.color.text_primary') : $r('app.color.warn'))
           .fontFeature("\"tnum\" on");
       }
@@ -1066,10 +1092,10 @@ export struct ShieldPage {
       Row() {
         Button(this.ruleBusy ? '处理中…' : '立即更新规则')
           .type(ButtonType.Normal)
-          .borderRadius(13)
+          .borderRadius(T.R_SM)
           .height(42)
           .width('100%')
-          .fontSize(14.5)
+          .fontSize(T.F_BODY)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.primary'))
           .backgroundColor($r('app.color.accent_soft'))
@@ -1102,7 +1128,7 @@ export struct ShieldPage {
             Row() {
               Column() {
                 Text(item.name)
-                  .fontSize(14.5)
+                  .fontSize(T.F_BODY)
                   .fontWeight(FontWeight.Medium)
                   .fontColor(item.enabled
                     ? $r('app.color.text_primary')
@@ -1167,7 +1193,7 @@ struct ShieldStat {
   build() {
     Column() {
       Text(this.value)
-        .fontSize(19)
+        .fontSize(T.F_H1)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.hero_fg'))
         .fontFeature("\"tnum\" on")

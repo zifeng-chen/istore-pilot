@@ -15,7 +15,7 @@ enum C {
     static let surfaceHi     = dyn(0xF2F2F7, 0x243430)
     static let surfaceSunken = dyn(0xF4F9F6, 0x141C1A)
 
-    static let primary       = dyn(0x00A87E, 0x32D7AC)
+    static let primary       = dyn(0x00805E, 0x32D7AC)
     static let primaryDim    = dyn(0x007F5E, 0x17B58C)
     static let onPrimary     = dyn(0xFFFFFF, 0x04241C)
 
@@ -36,13 +36,13 @@ enum C {
     // 导航未选中图标：不能复用 textSecondary，尺寸小、对比度要更高一档
     static let iconOff       = dyn(0x59635F, 0x87968F)
 
-    static let danger        = dyn(0xFF3B30, 0xFF453A)
-    static let warn          = dyn(0xFF9500, 0xFFD60A)
-    static let ok            = dyn(0x34C759, 0x30D158)
+    static let danger        = dyn(0xC81E1E, 0xFF453A)
+    static let warn          = dyn(0xB45309, 0xFFD60A)
+    static let ok            = dyn(0x177030, 0x30D158)
 
     static let textPrimary   = dyn(0x000000, 0xFFFFFF)
-    static let textSecondary = dyn(0x6F7A74, 0x93A39E)
-    static let textTertiary  = dyn(0xC7C7CC, 0x5A6B66)
+    static let textSecondary = dyn(0x5F6A64, 0x9FB0AA)
+    static let textTertiary  = dyn(0x67706B, 0x8E9E98)
 
     static let divider       = dyn(0xDFE5E2, 0x3A4A44)
     static let track         = dyn(0xE1E7E4, 0x33423C)

@@ -217,7 +217,7 @@ export struct BackupsPage {
         .fontColor($r('app.color.text_secondary'))
         .width('100%');
       Text(this.loaded ? this.count + ' 份' : '—')
-        .fontSize(27)
+        .fontSize(T.F_HERO)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.text_primary'))
         .fontFeature("\"tnum\" on")

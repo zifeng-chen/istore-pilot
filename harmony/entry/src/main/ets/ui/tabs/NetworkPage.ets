@@ -291,18 +291,18 @@ export struct NetworkPage {
           .margin({ right: 7 });
 
         Text(this.wanUp ? '已拨通' : (this.wanNote.length > 0 ? this.wanNote : '未连接'))
-          .fontSize(12.5)
+          .fontSize(T.F_SUB)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.hero_fg'))
           .layoutWeight(1);
 
         Text(this.proto.length > 0 ? this.proto : '未配置')
-          .fontSize(11)
+          .fontSize(T.F_TINY)
           .fontColor($r('app.color.hero_fg'))
           .opacity(0.86)
           .padding({ left: 9, right: 9, top: 4, bottom: 4 })
           .borderRadius(T.R_PILL)
-          .backgroundColor(Comp.alpha('#FFFFFF', 0.16));
+          .backgroundColor(Comp.alpha(Pal.heroFg(), 0.16));
       }
       .width('100%')
       .alignItems(VerticalAlign.Center);
@@ -317,7 +317,7 @@ export struct NetworkPage {
         .margin({ top: 12 });
 
       Text(this.subLine())
-        .fontSize(12)
+        .fontSize(T.F_SUB)
         .fontColor($r('app.color.hero_fg'))
         .opacity(0.8)
         .width('100%')
@@ -325,7 +325,7 @@ export struct NetworkPage {
     }
     .alignItems(HorizontalAlign.Start)
     .width('100%')
-    .padding({ left: 20, right: 20, top: 18, bottom: 18 })
+    .padding({ left: T.PAD_WIDE, right: T.PAD_WIDE, top: 18, bottom: 18 })
     .borderRadius(T.R_CARD)
     .linearGradient({
       angle: 135,
@@ -345,7 +345,7 @@ export struct NetworkPage {
           .fontSize(T.F_BODY)
           .fontColor($r('app.color.on_primary'))
           .backgroundColor($r('app.color.primary'))
-          .borderRadius(19)
+          .borderRadius(T.R_LG)
           .enabled(!this.acting)
           .onClick(() => this.askAction('reconnect'));
 
@@ -355,7 +355,7 @@ export struct NetworkPage {
           .fontSize(T.F_BODY)
           .fontColor($r('app.color.text_primary'))
           .backgroundColor($r('app.color.surface_sunken'))
-          .borderRadius(19)
+          .borderRadius(T.R_LG)
           .enabled(!this.acting)
           .onClick(() => this.askAction(this.wanUp ? 'down' : 'up'));
       }
@@ -471,7 +471,7 @@ export struct NetworkPage {
               : $r('app.color.text_secondary'))
             .textAlign(TextAlign.Center)
             .height(34)
-            .borderRadius(17)
+            .borderRadius(T.R_MD)
             .layoutWeight(1)
             .backgroundColor(this.protoKey === k
               ? $r('app.color.accent_soft2')
@@ -518,11 +518,12 @@ export struct NetworkPage {
 
       Button(this.savingWan ? '正在应用…' : '保存并重新拨号')
         .width('100%')
-        .height(42)
+        .constraintSize({ minHeight: 44 })
+        .padding({ top: 10, bottom: 10 })
         .fontSize(T.F_BODY)
         .fontColor($r('app.color.on_primary'))
         .backgroundColor($r('app.color.primary'))
-        .borderRadius(12)
+        .borderRadius(T.R_SM)
         .margin({ top: 12 })
         .enabled(!this.savingWan)
         .onClick(() => this.askSaveWan());
@@ -780,11 +781,11 @@ export struct NetworkPage {
     Card({ gapTop: 0, gapBottom: 0 }) {
       Row({ space: 12 }) {
         Text('🌐')
-          .fontSize(15)
+          .fontSize(T.F_BODY)
           .width(30)
           .height(30)
           .textAlign(TextAlign.Center)
-          .borderRadius(9)
+          .borderRadius(T.R_XS)
           .backgroundColor($r('app.color.accent_soft'));
         Column({ space: 3 }) {
           Text('路由器网页端')

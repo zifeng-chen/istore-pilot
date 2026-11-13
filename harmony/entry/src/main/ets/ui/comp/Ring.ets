@@ -48,7 +48,7 @@ export struct Ring {
             .maxLines(1)
             .textAlign(TextAlign.Center);
           Text(this.caption)
-            .fontSize(10.5)
+            .fontSize(T.F_TINY)
             .fontColor($r('app.color.text_secondary'))
             .margin({ top: 1 })
             .maxLines(1);

@@ -349,8 +349,8 @@ export struct DevicesPage {
       .width('100%')
       .constraintSize({ maxWidth: Bp.CONTENT_MAX })
       .padding({
-        left: this.rail() ? 20 : T.PAD,
-        right: this.rail() ? 20 : T.PAD,
+        left: this.rail() ? T.PAD_WIDE : T.PAD,
+        right: this.rail() ? T.PAD_WIDE : T.PAD,
         top: 8
       });
     }
@@ -430,14 +430,14 @@ export struct DevicesPage {
         // 接入方式徽标（5G / 2.4G / LAN）替掉原来的首字方块：
         // 一排方块看不出「插线还是无线、连的哪个频段」，而那才是用户想知道的
         Text(d.badge)
-          .fontSize(10.5)
+          .fontSize(T.F_TINY)
           .fontWeight(FontWeight.Medium)
           .fontColor(this.badgeColor(d))
           .textAlign(TextAlign.Center)
           // 正方形：5G / 2.4G / WiFi / LAN / — 一律同尺寸，不再随文字长短忽宽忽窄
           .width(30)
           .height(30)
-          .borderRadius(9)
+          .borderRadius(T.R_XS)
           .backgroundColor(d.badgeReal ? Pal.alpha(this.badgeColor(d), 0.14) : Color.Transparent)
           .border({ width: d.badgeReal ? 0 : 1, color: Pal.alpha(this.badgeColor(d), 0.42) });
 
@@ -505,7 +505,7 @@ export struct DevicesPage {
 
   /** 内容区真实可用宽度：扣掉侧栏、页面留白 */
   private usableWidth(): number {
-    const pad: number = this.rail() ? 20 : T.PAD;
+    const pad: number = this.rail() ? T.PAD_WIDE : T.PAD;
     return Bp.contentWidth(this.winW) - pad * 2;
   }
 
@@ -648,7 +648,7 @@ export struct DevicesPage {
           .borderRadius(3)
           .backgroundColor(d.online ? $r('app.color.primary') : $r('app.color.text_tertiary'));
         Text(d.shortName)
-          .fontSize(12.5)
+          .fontSize(T.F_SUB)
           .fontWeight(FontWeight.Medium)
           .fontColor(d.online ? $r('app.color.text_primary') : $r('app.color.text_secondary'))
           .maxLines(1)
@@ -657,7 +657,7 @@ export struct DevicesPage {
         // 角标 = 「点得进去」：方形卡放不下整行 chevron，右上角一枚小箭头就够
         if (d.blocked) {
           Text('禁')
-            .fontSize(10.5)
+            .fontSize(T.F_TINY)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.danger'))
             .textAlign(TextAlign.Center)
@@ -667,7 +667,7 @@ export struct DevicesPage {
             .backgroundColor(Pal.accentSoft());
         } else {
           Text('›')
-            .fontSize(12)
+            .fontSize(T.F_SUB)
             .fontWeight(FontWeight.Bold)
             .fontColor(d.online ? $r('app.color.primary') : $r('app.color.text_tertiary'))
             .textAlign(TextAlign.Center)
@@ -682,14 +682,14 @@ export struct DevicesPage {
       .width('100%');
 
       Text(d.meta)
-        .fontSize(10.5)
+        .fontSize(T.F_TINY)
         .fontColor(d.online ? $r('app.color.text_secondary') : $r('app.color.text_tertiary'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .margin({ top: 2 });
 
       Text(d.badge)
-        .fontSize(10.5)
+        .fontSize(T.F_TINY)
         .fontWeight(FontWeight.Medium)
         .fontColor(this.badgeColor(d))
         .padding({ left: 5, right: 5, top: 1.5, bottom: 1.5 })
@@ -701,13 +701,13 @@ export struct DevicesPage {
       Blank();
 
       Text(d.online ? d.rate : '—')
-        .fontSize(13)
+        .fontSize(T.F_SUB)
         .fontWeight(FontWeight.Medium)
         .fontColor(d.online ? $r('app.color.primary') : $r('app.color.text_tertiary'))
         .fontFeature("\"tnum\" on")
         .maxLines(1);
       Text('共 ' + d.total)
-        .fontSize(10.5)
+        .fontSize(T.F_TINY)
         .fontColor($r('app.color.text_tertiary'))
         .fontFeature("\"tnum\" on")
         .maxLines(1)
@@ -717,7 +717,7 @@ export struct DevicesPage {
     .height(this.cardSide())
     .alignItems(HorizontalAlign.Start)
     .padding({ left: 10, right: 10, top: 10, bottom: 10 })
-    .borderRadius(14)
+    .borderRadius(T.R_SM)
     .backgroundColor(d.online ? $r('app.color.surface') : $r('app.color.surface_sunken'))
     .border({ width: 0.5, color: $r('app.color.divider') })
     .onClick(() => {

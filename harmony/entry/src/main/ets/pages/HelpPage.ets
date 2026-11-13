@@ -34,6 +34,8 @@ struct HelpPage {
         .width(44)
         .height(44)
         .justifyContent(FlexAlign.Center)
+        .accessibilityText('返回')
+        .clickEffect({ level: ClickEffectLevel.LIGHT })
         .onClick(() => {
           router.back();
         });
@@ -186,7 +188,7 @@ struct HelpPage {
         .textAlign(TextAlign.Center)
         .width(20)
         .height(20)
-        .borderRadius(10)
+        .borderRadius(T.R_XS)
         .backgroundColor($r('app.color.accent_soft'));
 
       Column() {
@@ -232,13 +234,13 @@ struct HelpPage {
   @Builder
   code(text: string) {
     Text(text)
-      .fontSize(12.5)
+      .fontSize(T.F_SUB)
       .fontColor($r('app.color.text_primary'))
       .lineHeight(19)
       .copyOption(CopyOptions.LocalDevice)
       .width('100%')
       .padding({ left: 11, right: 11, top: 9, bottom: 9 })
-      .borderRadius(10)
+      .borderRadius(T.R_XS)
       .backgroundColor($r('app.color.surface_sunken'))
       .margin({ top: 8 });
   }

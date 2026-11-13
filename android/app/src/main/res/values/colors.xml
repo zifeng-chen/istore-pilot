@@ -9,7 +9,7 @@
     <color name="surface_hi">#F2F2F7</color>
     <color name="surface_sunken">#F4F9F6</color>
     <color name="surface_glass">#E6FFFFFF</color>
-    <color name="primary">#00A87E</color>
+    <color name="primary">#00805E</color>
     <color name="primary_dim">#007F5E</color>
     <color name="primary_bright">#2ED3A6</color>
     <color name="on_primary">#FFFFFF</color>
@@ -31,16 +31,16 @@
     <!-- 主色的极淡底：图标衬底、选中行、强调块。别再用 surface_hi 充数 -->
     <color name="accent_soft">#1700A87E</color>
     <color name="accent_soft2">#2900A87E</color>
-    <color name="danger">#FF3B30</color>
-    <color name="warn">#FF9500</color>
-    <color name="ok">#34C759</color>
+    <color name="danger">#C81E1E</color>
+    <color name="warn">#B45309</color>
+    <color name="ok">#177030</color>
     <color name="text_primary">#000000</color>
     <!-- 次要文字不能照抄 iOS 的 #8E8E93：那个值压在白卡上只有 3.5:1，
          而界面里 11.5~12.5sp 的说明文字全是它，小字低对比最容易读成「糊」。
          收到 #6F7A74 后约 4.46:1，既过 AA 又不会重到跟正文抢层次。
          深色那套的 #93A39E 本身有 6.2:1，不需要动。 -->
-    <color name="text_secondary">#6F7A74</color>
-    <color name="text_tertiary">#C7C7CC</color>
+    <color name="text_secondary">#5F6A64</color>
+    <color name="text_tertiary">#67706B</color>
     <color name="divider">#DFE5E2</color>
     <color name="track">#E1E7E4</color>
     <!-- 分段控件专用：浅色下是「浅槽 + 白色滑块」，深色下必须反过来变成

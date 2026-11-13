@@ -70,7 +70,7 @@
     },
     {
       "name": "danger",
-      "value": "#FF3B30"
+      "value": "#C81E1E"
     },
     {
       "name": "warn",
@@ -78,7 +78,7 @@
     },
     {
       "name": "ok",
-      "value": "#1E8E3E"
+      "value": "#177030"
     },
     {
       "name": "text_primary",
@@ -86,11 +86,11 @@
     },
     {
       "name": "text_secondary",
-      "value": "#6F7A74"
+      "value": "#5F6A64"
     },
     {
       "name": "text_tertiary",
-      "value": "#7E8883"
+      "value": "#67706B"
     },
     {
       "name": "divider",
@@ -131,6 +131,38 @@
     {
       "name": "ic_launcher_background",
       "value": "#0E9F7E"
+    },
+    {
+      "name": "scrim",
+      "value": "#66000000"
+    },
+    {
+      "name": "hero_chip",
+      "value": "#29FFFFFF"
+    },
+    {
+      "name": "hero_chip_strong",
+      "value": "#33FFFFFF"
+    },
+    {
+      "name": "hero_chip_weak",
+      "value": "#1AFFFFFF"
+    },
+    {
+      "name": "toast_bg",
+      "value": "#E61F2A26"
+    },
+    {
+      "name": "shadow_1",
+      "value": "#0D000000"
+    },
+    {
+      "name": "shadow_2",
+      "value": "#12000000"
+    },
+    {
+      "name": "shadow_3",
+      "value": "#1A000000"
     }
   ]
 }

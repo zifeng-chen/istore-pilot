@@ -131,11 +131,11 @@ struct LoginPage {
           }
           .width(76)
           .height(76)
-          .borderRadius(24)
+          .borderRadius(T.R_XL)
           .backgroundColor($r('app.color.accent_soft'));
 
           Text('iStore Pilot')
-            .fontSize(28)
+            .fontSize(T.F_HERO)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'))
             .margin({ top: 18 });
