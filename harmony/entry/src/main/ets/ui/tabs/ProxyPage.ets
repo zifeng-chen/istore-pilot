@@ -1643,26 +1643,29 @@ export struct ProxyPage {
             .layoutWeight(1)
             .margin({ left: 10 });
 
-            // 状态胶囊：一律白字，靠透明度区分（深绿底上再加彩色底反而是噪音）
-            Text(!b.installed ? '未安装' : (b.running ? '运行中' : '未运行'))
-              .fontSize(T.F_TINY)
-              .fontWeight(b.running ? FontWeight.Medium : FontWeight.Normal)
-              .fontColor(b.running ? Pal.heroFg() : Pal.alpha(Pal.heroFg(), 0.6))
-              .padding({ left: 9, right: 9, top: 3, bottom: 3 })
-              .borderRadius(T.R_PILL)
-              .backgroundColor(b.running ? $r('app.color.hero_chip_strong') : $r('app.color.hero_chip_weak'));
-
-            if (b.installed) {
+            // 一个按钮同时承担「状态」和「开关」：运行中显示「停止」、停着显示
+            // 「启动」。之前是「状态胶囊 + 启停按钮」两颗并排，同一件事说两遍，
+            // 而且小屏上把名字挤得只剩几个字
+            if (!b.installed) {
+              Text('未安装')
+                .fontSize(T.F_TINY)
+                .fontColor(Pal.alpha(Pal.heroFg(), 0.6))
+                .padding({ left: 9, right: 9, top: 3, bottom: 3 })
+                .borderRadius(T.R_PILL)
+                .backgroundColor($r('app.color.hero_chip_weak'));
+            } else {
               Text(this.busyBackend === b.id ? '处理中…' : (b.running ? '停止' : '启动'))
                 .fontSize(T.F_SUB)
                 .fontWeight(FontWeight.Medium)
-                .fontColor(Pal.heroFg())
-                .padding({ left: 10, right: 10, top: 3, bottom: 3 })
+                .fontColor(b.running ? Pal.heroFg() : Pal.alpha(Pal.heroFg(), 0.9))
+                .padding({ left: 12, right: 12, top: 3, bottom: 3 })
                 .borderRadius(T.R_PILL)
-                .backgroundColor($r('app.color.hero_chip'))
+                .backgroundColor(b.running
+                  ? $r('app.color.hero_chip_strong')
+                  : $r('app.color.hero_chip'))
                 .constraintSize({ minHeight: 44, minWidth: 44 })
                 .textAlign(TextAlign.Center)
-                .accessibilityText(b.running ? '停止 ' + b.label : '启动 ' + b.label)
+                .accessibilityText((b.running ? '运行中，点按停止 ' : '未运行，点按启动 ') + b.label)
                 .clickEffect({ level: ClickEffectLevel.LIGHT })
                 .margin({ left: 6 })
                 .onClick(() => {
@@ -2042,15 +2045,30 @@ export struct ProxyPage {
     return '从本地文件装，或从仓库下载';
   }
 
+  /**
+   * 插件管理弹层。
+   *
+   * 原来标题写的是「安装包」，里面把本地安装、进度、已装、仓库四件事
+   * 平铺在一页里，只靠一行小字分组 —— 和代理页其它卡片不是一套语言。
+   * 现在按卡片分区，每个分区有自己的标题和一句说明。
+   */
   @Builder
   pkgSheet() {
     Column() {
       Row() {
-        Text('安装包')
-          .fontSize(T.F_H1)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.text_primary'))
-          .layoutWeight(1);
+        Column() {
+          Text('插件管理')
+            .fontSize(T.F_H1)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.text_primary'));
+          Text('装、重装或升级 OpenClash / Passwall')
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_secondary'))
+            .margin({ top: 3 });
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1);
+
         Stack() {
           Stack() {
             GlyphIcon({ kind: Glyph.CLOSE, color: Pal.textSecondary(), side: 14, lineWidth: 2.1 });
@@ -2069,154 +2087,185 @@ export struct ProxyPage {
       }
       .width('100%')
       .alignItems(VerticalAlign.Center)
-      .padding({ bottom: 14 });
+      .padding({ bottom: 12 });
 
       Scroll() {
         Column() {
-          // ---- 1. 本地文件：不依赖路由器能不能上外网。
-          // 原来是整块主色底的大按钮，和页面里其它入口（白卡 + 图标 + 箭头）不是一路；
-          // 这里改成同样的卡片行，主色只留给图标底
-          Row({ space: 12 }) {
-            Stack() {
-              GlyphIcon({ kind: Glyph.UPLOAD, color: Pal.primary(), side: 17, lineWidth: 1.9 });
-            }
-            .width(32)
-            .height(32)
-            .borderRadius(T.R_XS)
-            .backgroundColor($r('app.color.accent_soft'))
-            .alignContent(Alignment.Center);
+          // ---- 1. 本地安装：不依赖路由器能不能上外网
+          Card({ gapBottom: T.GAP }) {
+            CardTitle({
+              glyph: Glyph.PACKAGE,
+              title: '本地安装',
+              sub: this.uploading ? '正在上传安装包' : '手机里有包就能装'
+            });
 
-            Column() {
-              Text(this.uploading ? '正在上传 ' + this.uploadName : '从本地文件安装')
-                .fontSize(T.F_BODY)
-                .fontWeight(FontWeight.Medium)
-                .fontColor($r('app.color.text_primary'))
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis });
-              Text(this.uploading ? '传完会自动问你要不要装' : '选 .run / .ipk，手机里有包就能装')
-                .fontSize(T.F_TINY)
-                .fontColor($r('app.color.text_secondary'))
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-                .margin({ top: 3 });
-            }
-            .alignItems(HorizontalAlign.Start)
-            .layoutWeight(1);
+            Row({ space: 12 }) {
+              Stack() {
+                GlyphIcon({ kind: Glyph.UPLOAD, color: Pal.primary(), side: 17, lineWidth: 1.9 });
+              }
+              .width(32)
+              .height(32)
+              .borderRadius(T.R_XS)
+              .backgroundColor($r('app.color.accent_soft'))
+              .alignContent(Alignment.Center);
 
-            GlyphIcon({ kind: Glyph.CHEVRON, color: Pal.textTertiary(), side: 14, lineWidth: 1.9 });
-          }
-          .width('100%')
-          .padding({ left: 14, right: 14, top: 13, bottom: 13 })
-          .borderRadius(T.R_CARD)
-          .backgroundColor($r('app.color.surface'))
-          .border({ width: 0.7, color: $r('app.color.glass_stroke') })
-          .opacity(this.uploading ? 0.6 : 1)
-          .onClick(() => {
-            if (!this.uploading) {
-              this.pickPkg();
-            }
-          });
-
-          if (this.pkgMsg.length > 0) {
-            Text(this.pkgMsg)
-              .fontSize(T.F_TINY)
-              .fontColor($r('app.color.warn'))
-              .width('100%')
-              .margin({ top: 8 })
-              .lineHeight(18);
-          }
-
-          // ---- 2. 任务进度
-          if (this.pkgTask.running || (this.pkgTask.done && this.pkgTask.ok)) {
-            this.pkgProgress();
-          }
-
-          // ---- 3. 已安装：只能装不能卸的界面是残的
-          if (this.installedList().length > 0) {
-            Text('已安装')
-              .fontSize(T.F_SUB)
-              .fontColor($r('app.color.text_secondary'))
-              .width('100%')
-              .margin({ top: T.GAP, bottom: 2 });
-
-            ForEach(this.installedList(), (b: Backend) => {
-              Row() {
-                Text(b.label)
-                  .fontSize(T.F_SUB)
+              Column() {
+                Text(this.uploading ? '正在上传 ' + this.uploadName : '从本地文件安装')
+                  .fontSize(T.F_BODY)
+                  .fontWeight(FontWeight.Medium)
                   .fontColor($r('app.color.text_primary'))
-                  .layoutWeight(1);
-                Text('卸载')
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis });
+                Text('选 .run / .ipk，传完会自动问你要不要装')
                   .fontSize(T.F_TINY)
-                  .fontColor($r('app.color.danger'))
-                  .padding({ left: 12, top: 6, bottom: 6 })
+                  .fontColor($r('app.color.text_secondary'))
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  .margin({ top: 3 });
+              }
+              .alignItems(HorizontalAlign.Start)
+              .layoutWeight(1);
+
+              GlyphIcon({ kind: Glyph.CHEVRON, color: Pal.textTertiary(), side: 14, lineWidth: 1.9 });
+            }
+            .width('100%')
+            .padding({ top: 12, bottom: 2 })
+            .alignItems(VerticalAlign.Center)
+            .opacity(this.uploading ? 0.6 : 1)
+            .onClick(() => {
+              if (!this.uploading) {
+                this.pickPkg();
+              }
+            });
+
+            if (this.pkgMsg.length > 0) {
+              Text(this.pkgMsg)
+                .fontSize(T.F_TINY)
+                .fontColor($r('app.color.warn'))
+                .width('100%')
+                .margin({ top: 8 })
+                .lineHeight(18);
+            }
+          }
+
+          // ---- 2. 安装进度：只在有任务时出现
+          if (this.pkgTask.running || (this.pkgTask.done && this.pkgTask.ok)) {
+            Card({ gapBottom: T.GAP }) {
+              CardTitle({
+                glyph: Glyph.UPGRADE_PROGRESS,
+                title: '安装进度',
+                sub: this.pkgTask.running ? '正在写入路由器' : '已完成'
+              });
+              this.pkgProgress();
+            }
+          }
+
+          // ---- 3. 已安装
+          Card({ gapBottom: T.GAP }) {
+            CardTitle({
+              glyph: Glyph.PROXY,
+              title: '已安装',
+              sub: this.installedList().length === 0
+                ? '一个都没装'
+                : this.installedList().length.toString() + ' 个后端'
+            });
+
+            if (this.installedList().length === 0) {
+              Text('还没有安装代理插件，可以先从下面仓库装一个。')
+                .fontSize(T.F_BODY)
+                .fontColor($r('app.color.text_secondary'))
+                .width('100%')
+                .margin({ top: 10 });
+            } else {
+              ForEach(this.installedList(), (b: Backend, i: number) => {
+                Column() {
+                  if (i > 0) {
+                    Hairline({ indent: 0 });
+                  }
+                  Row({ space: 10 }) {
+                    Column() {
+                      Text(b.label)
+                        .fontSize(T.F_BODY)
+                        .fontWeight(FontWeight.Medium)
+                        .fontColor($r('app.color.text_primary'));
+                      Text(b.running ? '运行中 · ' + b.nodes + ' 个节点' : '未运行')
+                        .fontSize(T.F_TINY)
+                        .fontColor($r('app.color.text_secondary'))
+                        .margin({ top: 3 });
+                    }
+                    .alignItems(HorizontalAlign.Start)
+                    .layoutWeight(1);
+
+                    Text('卸载')
+                      .fontSize(T.F_SUB)
+                      .fontColor($r('app.color.danger'))
+                      .padding({ left: 12, right: 12, top: 5, bottom: 5 })
+                      .borderRadius(T.R_PILL)
+                      .backgroundColor(Comp.alpha(Pal.danger(), 0.12))
+                      .constraintSize({ minHeight: 44, minWidth: 44 })
+                      .textAlign(TextAlign.Center)
+                      .accessibilityText('卸载 ' + b.label)
+                      .onClick(() => {
+                        this.askUninstall(b.id, b.label);
+                      });
+                  }
+                  .width('100%')
+                  .padding({ top: 10, bottom: 10 })
+                  .alignItems(VerticalAlign.Center);
+                }
+                .width('100%');
+              }, (b: Backend) => b.id + '|' + (b.running ? '1' : '0'));
+            }
+          }
+
+          // ---- 4. 从仓库下载
+          Card({ gapBottom: T.GAP }) {
+            CardTitle({
+              glyph: Glyph.DOWNLOAD,
+              title: '从仓库下载',
+              sub: this.pkgSys.length > 0 ? '已匹配 ' + this.pkgSys : '按系统版本与架构匹配'
+            }) {
+              if (this.pkgLoading) {
+                Text('读取中…')
+                  .fontSize(T.F_TINY)
+                  .fontColor($r('app.color.text_tertiary'));
+              } else {
+                Text('刷新')
+                  .fontSize(T.F_TINY)
+                  .fontColor($r('app.color.primary'))
+                  .constraintSize({ minHeight: 44, minWidth: 44 })
+                  .textAlign(TextAlign.Center)
                   .onClick(() => {
-                    this.askUninstall(b.id, b.label);
+                    this.loadPkg(true);
                   });
               }
-              .width('100%')
-              .padding({ top: 4, bottom: 4 })
-              .alignItems(VerticalAlign.Center);
-            }, (b: Backend) => b.id);
-          }
-
-          // ---- 4. 仓库下载
-          Row() {
-            Text('从仓库下载')
-              .fontSize(T.F_SUB)
-              .fontColor($r('app.color.text_secondary'));
-            Blank();
-            if (this.pkgLoading) {
-              Text('读取中…')
-                .fontSize(T.F_TINY)
-                .fontColor($r('app.color.text_tertiary'));
-            } else {
-              Text('刷新')
-                .fontSize(T.F_TINY)
-                .fontColor($r('app.color.primary'))
-                .onClick(() => {
-                  this.loadPkg(true);
-                });
             }
-          }
-          .width('100%')
-          .margin({ top: T.GAP, bottom: 2 })
-          .alignItems(VerticalAlign.Center);
 
-          // 仓库是按系统版本 + 架构分开发的：24.10 和 25.12 在另一个仓库的
-          // release 里，同一版本里还分 x86_64 / aarch64_a53 / _a72 / _generic。
-          // 这行是在告诉用户「我选的是哪一套」，装错了要先看见才知道。
-          if (this.pkgSys.length > 0) {
-            Text('已按当前系统匹配：' + this.pkgSys)
-              .fontSize(T.F_TINY)
-              .fontColor($r('app.color.text_tertiary'))
-              .width('100%')
-              .margin({ top: 2 });
-          }
+            if (this.pkgItems.length === 0) {
+              Text(this.pkgLoading ? '正在读取仓库…' : '没读到仓库清单')
+                .fontSize(T.F_BODY)
+                .fontColor($r('app.color.text_secondary'))
+                .width('100%')
+                .margin({ top: 10 });
+            } else {
+              ForEach(this.pkgItems, (it: PkgItem) => {
+                this.pkgRow(it);
+              }, (it: PkgItem) => it.backend + '|' + it.version + '|' + it.local);
+            }
 
-          if (this.pkgItems.length === 0) {
-            Text(this.pkgLoading ? '正在读取仓库…' : '没读到仓库清单')
-              .fontSize(T.F_TINY)
-              .fontColor($r('app.color.text_tertiary'))
-              .width('100%')
-              .margin({ top: 6 });
-          } else {
-            ForEach(this.pkgItems, (it: PkgItem) => {
-              this.pkgRow(it);
-            }, (it: PkgItem) => it.backend + '|' + it.version + '|' + it.local);
-          }
-
-          // ---- 4. 通道状态
-          if (this.pkgChans.length > 0) {
-            Text('下载通道：' + this.chanLine())
-              .fontSize(T.F_TINY)
-              .fontColor($r('app.color.text_tertiary'))
-              .width('100%')
-              .margin({ top: 10 })
-              .lineHeight(18);
+            if (this.pkgChans.length > 0) {
+              Text('下载通道：' + this.chanLine())
+                .fontSize(T.F_TINY)
+                .fontColor($r('app.color.text_tertiary'))
+                .width('100%')
+                .margin({ top: 10 })
+                .lineHeight(18);
+            }
           }
 
           Note({ text: 'PassWall 的包约 80 MB，按现在这条线路可能要十几分钟；'
             + '着急就直接用上面的本地文件安装。' });
+          Row().height(16);
         }
         .width('100%');
       }
@@ -2225,7 +2274,7 @@ export struct ProxyPage {
       .align(Alignment.Top);
     }
     .width('100%')
-    .padding({ left: T.PAD_WIDE, right: T.PAD_WIDE, top: 32, bottom: 16 });
+    .padding({ left: T.PAD_WIDE, right: T.PAD_WIDE, top: 20, bottom: 12 });
   }
 
   @Builder

@@ -4,7 +4,8 @@ import { Api, ApiResult } from '../api/Api';
 import { J } from '../core/Json';
 import { UI } from '../core/UIState';
 import { Pal, T } from '../ui/Theme';
-import { Card, Comp, Hairline } from '../ui/Comp';
+import { Card, CardTitle, Comp, GlyphIcon, Hairline, Note } from '../ui/Comp';
+import { Glyph } from '../ui/comp/Icons';
 
 interface SubItem {
   id: string;
@@ -320,61 +321,89 @@ struct SubscriptionPage {
               .width('100%')
               .padding(20);
           } else {
-            ForEach(this.items, (it: SubItem, i: number) => {
-              Card({ gapTop: i === 0 && !this.editing ? 0 : T.GAP }) {
+            // 一条订阅一行，收在同一张卡里：和设置页、代理页的列表是同一套语言。
+            // 原来每条订阅各占一张卡、下面拉三个文字按钮，三条地址就把一屏占满了
+            Card({ gapTop: 0, gapBottom: T.GAP }) {
+              CardTitle({
+                glyph: Glyph.SYNC,
+                title: '订阅地址',
+                sub: this.items.length.toString() + ' 条 · 点一行改名称或地址'
+              });
+
+              ForEach(this.items, (it: SubItem, i: number) => {
                 Column() {
-                  Row({ space: 8 }) {
+                  if (i > 0) {
+                    Hairline({ indent: 0 });
+                  }
+                  Row({ space: 10 }) {
+                    Stack() {
+                      GlyphIcon({ kind: Glyph.SYNC, color: Pal.primary(), side: 16, lineWidth: 1.9 });
+                    }
+                    .width(32)
+                    .height(32)
+                    .borderRadius(T.R_XS)
+                    .backgroundColor($r('app.color.accent_soft'))
+                    .alignContent(Alignment.Center);
+
                     Column() {
-                      Text(it.name)
-                        .fontSize(T.F_H2)
-                        .fontColor($r('app.color.text_primary'))
-                        .maxLines(1)
-                        .textOverflow({ overflow: TextOverflow.Ellipsis });
+                      Row({ space: 6 }) {
+                        Text(it.name)
+                          .fontSize(T.F_BODY)
+                          .fontWeight(FontWeight.Medium)
+                          .fontColor($r('app.color.text_primary'))
+                          .maxLines(1)
+                          .textOverflow({ overflow: TextOverflow.Ellipsis });
+                        if (it.inUse) {
+                          Text('使用中')
+                            .fontSize(T.F_TINY)
+                            .fontColor($r('app.color.primary'))
+                            .padding({ left: 6, right: 6, top: 1, bottom: 1 })
+                            .borderRadius(T.R_PILL)
+                            .backgroundColor($r('app.color.accent_soft'));
+                        }
+                      }
+                      .width('100%');
+
                       Text(it.masked)
                         .fontSize(T.F_TINY)
                         .fontColor($r('app.color.text_tertiary'))
                         .maxLines(1)
                         .textOverflow({ overflow: TextOverflow.Ellipsis })
+                        .width('100%')
                         .margin({ top: 3 });
                     }
                     .alignItems(HorizontalAlign.Start)
                     .layoutWeight(1);
 
-                    if (it.inUse) {
-                      Text('使用中')
-                        .fontSize(T.F_TINY)
-                        .fontColor($r('app.color.primary'))
-                        .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-                        .borderRadius(T.R_PILL)
-                        .backgroundColor($r('app.color.accent_soft'));
-                    }
+                    Text(this.busy === it.id ? '更新中…' : '更新')
+                      .fontSize(T.F_TINY)
+                      .fontColor($r('app.color.primary'))
+                      .padding({ left: 12, right: 12, top: 5, bottom: 5 })
+                      .borderRadius(T.R_PILL)
+                      .backgroundColor($r('app.color.accent_soft'))
+                      .constraintSize({ minHeight: 44, minWidth: 44 })
+                      .textAlign(TextAlign.Center)
+                      .accessibilityText('更新 ' + it.name)
+                      .clickEffect({ level: ClickEffectLevel.LIGHT })
+                      .onClick(() => {
+                        this.act('refresh', it);
+                      });
+
+                    GlyphIcon({ kind: Glyph.CHEVRON, color: Pal.textTertiary(), side: 14, lineWidth: 1.9 });
                   }
                   .width('100%')
-                  .padding({ top: 4, bottom: 4 });
-
-                  Hairline({ indent: 0 });
-
-                  Row() {
-                    this.op('编辑', () => {
-                      this.editId = it.id;
-                      this.editBackend = it.backend;
-                      this.nameDraft = it.name;
-                      this.urlDraft = it.url;
-                      this.editing = true;
-                    });
-                    this.op(this.busy === it.id ? '处理中…' : '更新', () => {
-                      this.act('refresh', it);
-                    });
-                    this.op('删除', () => {
-                      this.act('delete', it);
-                    }, true);
-                  }
-                  .width('100%')
-                  .padding({ top: 8 });
+                  .padding({ top: 12, bottom: 12 })
+                  .alignItems(VerticalAlign.Center)
+                  .onClick(() => {
+                    this.openEdit(it);
+                  });
                 }
                 .width('100%');
-              }
-            }, (it: SubItem) => it.id);
+              }, (it: SubItem) => it.id + '|' + (it.inUse ? '1' : '0'));
+
+              Note({ text: '地址来自路由器上的 uci 配置，列表只显示脱敏后的样子；'
+                + '「更新」会让后端重新拉一遍，几十秒后节点才会变。' });
+            }
           }
 
           Row().height(24);
@@ -404,15 +433,35 @@ struct SubscriptionPage {
   }
 
   /** 最近一次更新的结果：时间、成败、耗时，日志可展开 */
+  /** 点一行订阅：把现有值填进编辑弹层 */
+  private openEdit(it: SubItem): void {
+    this.editId = it.id;
+    this.editBackend = it.backend;
+    this.nameDraft = it.name;
+    this.urlDraft = it.url;
+    this.editing = true;
+  }
+
+  /** 删除放在编辑弹层里：列表上只留「更新」，误触的概率小一半 */
+  private deleteCurrent(): void {
+    const id: string = this.editId;
+    this.editing = false;
+    for (let i = 0; i < this.items.length; i++) {
+      if (this.items[i].id === id) {
+        this.act('delete', this.items[i]);
+        return;
+      }
+    }
+  }
+
   @Builder
   logCard() {
     Card({ gapBottom: T.GAP }) {
-      Row() {
-        Text('最近更新')
-          .fontSize(T.F_H2)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.text_primary'))
-          .layoutWeight(1);
+      CardTitle({
+        glyph: Glyph.REFRESH,
+        title: '最近更新',
+        sub: this.clockText(this.logAt)
+      }) {
         Text(this.logStateText())
           .fontSize(T.F_TINY)
           .fontWeight(FontWeight.Medium)
@@ -421,10 +470,8 @@ struct SubscriptionPage {
           .borderRadius(T.R_PILL)
           .backgroundColor(Comp.alpha(this.logTone(), 0.14));
       }
-      .width('100%')
-      .alignItems(VerticalAlign.Center);
 
-      Text(this.clockText(this.logAt) + ' · ' + this.logSummary
+      Text(this.logSummary
         + (this.logSeconds > 0 && !this.logRunning
           ? '（' + this.logSeconds.toString() + ' 秒）' : ''))
         .fontSize(T.F_TINY)
@@ -455,21 +502,6 @@ struct SubscriptionPage {
           .backgroundColor($r('app.color.surface_sunken'));
       }
     }
-  }
-
-  @Builder
-  op(text: string, tap: () => void, danger: boolean = false) {
-    Text(text)
-      .fontSize(T.F_SUB)
-      .fontColor(danger ? $r('app.color.danger') : $r('app.color.primary'))
-      .padding({ left: 12, right: 12, top: 5, bottom: 5 })
-      .constraintSize({ minHeight: 44, minWidth: 44 })
-      .textAlign(TextAlign.Center)
-      .accessibilityText(text)
-      .clickEffect({ level: ClickEffectLevel.LIGHT })
-      .onClick(() => {
-        tap();
-      });
   }
 
   @Builder
@@ -524,6 +556,16 @@ struct SubscriptionPage {
           });
 
         Row() {
+          if (this.editId.length > 0) {
+            Text('删除这条')
+              .fontSize(T.F_BODY)
+              .fontColor($r('app.color.danger'))
+              .padding({ left: 2, right: 16, top: 8, bottom: 8 })
+              .constraintSize({ minHeight: 44 })
+              .onClick(() => {
+                this.deleteCurrent();
+              });
+          }
           Blank();
           Text(this.busy === 'save' ? '保存中…' : '保存')
             .fontSize(T.F_BODY)
