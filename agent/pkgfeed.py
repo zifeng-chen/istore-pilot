@@ -47,6 +47,10 @@ from concurrent.futures import ThreadPoolExecutor
 
 UA = "istore-agent"
 
+# 能装的两个后端。PassWall2 与 PassWall 互相冲突，安装白名单里没有它，
+# 所以 catalog 也不列 —— 免得用户点一个必然失败的按钮。
+PKG_INSTALLABLE = ("openclash", "passwall")
+
 # 只认这三个：PassWall2 与 PassWall 会互相冲突，装之前要提示。
 BACKENDS = {
     "openclash": {"label": "OpenClash", "prefix": "OpenClash_", "pkg": "luci-app-openclash"},
@@ -396,6 +400,10 @@ def catalog(force: bool = False) -> dict:
             items, channel = _catalog_tree(profile)
     except (urllib.error.URLError, OSError, LookupError) as exc:
         return {"ok": False, "items": [], "channel": "", "error": str(exc), **profile}
+
+    # PassWall2 不列给客户端：安装接口的 PKG_TARGETS 只认 openclash / passwall，
+    # 列出来用户点了只会失败 —— 「看得见装不了」比不显示更糟
+    items = [x for x in items if x.get("backend") in PKG_INSTALLABLE]
 
     data = {"ok": bool(items), "channel": channel, "fetched": int(now), "items": items, **profile}
     if items:

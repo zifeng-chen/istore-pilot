@@ -565,6 +565,10 @@ def check_updates(refresh: bool = False) -> dict:
 
 OTA_BIN = "/bin/ota"
 OTA_DIR = "/var/run/ota"
+# 固件镜像落在 /tmp：ota download 自己也是写这里
+FW_IMG = "/tmp/firmware.img"
+FW_SUM = "/tmp/firmware.img.sha256sum"
+FW_PROGRESS = "/tmp/firmware.img.progress"
 
 
 def _strip_html(text: str) -> str:
@@ -657,7 +661,72 @@ def firmware_check() -> dict:
         "sha256": info.get("sha256", ""),
         "changelog": _ota_changelog() if code in (0, 1) else "",
         "elapsed": elapsed,
+        # 下载 / 刷写是两步：用户能先下载、看清进度，再决定什么时候重启
+        "downloaded": (os.path.exists(FW_IMG) and os.path.exists(FW_SUM)
+                       and not os.path.exists(FW_PROGRESS)),
+        "downloading": os.path.exists(FW_PROGRESS),
+        "progress": _fw_progress(),
     }
+
+
+def _fw_progress() -> str:
+    """下载进度：ota download 用 curl 的进度条写这个文件，取最后一行。"""
+    try:
+        with open(FW_PROGRESS, "r", encoding="utf-8", errors="replace") as fh:
+            text = fh.read()[-2000:]
+    except OSError:
+        return ""
+    lines = [x.strip() for x in text.replace("\r", "\n").splitlines() if x.strip()]
+    return lines[-1] if lines else ""
+
+
+def firmware_download() -> dict:
+    """后台下载最新固件到 /tmp，**不刷写、不重启**。
+
+    和刷写分开是有意的：下载可以慢慢跑（几百 MB），刷写会重启路由器。
+    两件事绑在一个按钮里，用户点完就只能盯着断网。
+    """
+    if not os.path.exists(OTA_BIN):
+        return {"ok": False, "error": "这台设备没有 /bin/ota，只能到网页端升级"}
+    if os.path.exists(FW_IMG) and not os.path.exists(FW_PROGRESS):
+        return {"ok": True, "already": True,
+                "note": "固件已经下载好了，可以直接刷写"}
+    if os.path.exists(FW_PROGRESS):
+        return {"ok": True, "already": True, "note": "下载正在进行"}
+    try:
+        with open("/tmp/ota-download.log", "wb") as fh:
+            subprocess.Popen([OTA_BIN, "download"], stdout=fh, stderr=fh,
+                             stdin=subprocess.DEVNULL, start_new_session=True,
+                             close_fds=True)
+    except OSError as exc:
+        return {"ok": False, "error": str(exc)}
+    time.sleep(0.3)
+    return {"ok": True, "started": True,
+            "note": "开始下载固件，进度会实时回传"}
+
+
+def firmware_install() -> dict:
+    """刷写已下载的固件并重启。
+
+    这是唯一一个会让路由器重启的接口，客户端必须先二次确认。
+    sysupgrade 不带 -n：保留配置（和 iStoreOS 网页端的 OTA 一致）。
+    """
+    if not os.path.exists(FW_IMG):
+        return {"ok": False, "error": "固件还没下载，先点「下载固件」"}
+    if os.path.exists(FW_PROGRESS):
+        return {"ok": False, "error": "固件还在下载，等下载完成再刷写"}
+    if not os.path.exists("/sbin/sysupgrade"):
+        return {"ok": False, "error": "这台设备没有 sysupgrade，只能到网页端升级"}
+    try:
+        with open("/tmp/ota-install.log", "wb") as fh:
+            subprocess.Popen(["/sbin/sysupgrade", FW_IMG], stdout=fh, stderr=fh,
+                             stdin=subprocess.DEVNULL, start_new_session=True,
+                             close_fds=True)
+    except OSError as exc:
+        return {"ok": False, "error": str(exc)}
+    time.sleep(0.3)
+    return {"ok": True, "restarting": True,
+            "note": "正在刷写固件，路由器会在 2~5 分钟内重启"}
 
 
 def upgrade(names: list[str] | None = None) -> dict:

@@ -544,6 +544,16 @@ class Handler(BaseHTTPRequestHandler):
                     # 网页端会掉回登录页（用户会以为是 App 坏了）
                     luci.remember(str(body.get("new", "")))
                 self._json(result)
+            elif path == "/api/v1/system/firmware":
+                # 固件升级分两步：先下载（不重启），刷写单独一次确认
+                action = str(body.get("action", ""))
+                if action == "download":
+                    self._json(system.firmware_download())
+                elif action == "install":
+                    self._json(system.firmware_install())
+                else:
+                    self._json({"ok": False,
+                                "error": "action 只能是 download / install"})
             elif path == "/api/v1/system/update":
                 action = str(body.get("action", "status"))
                 if action == "check":

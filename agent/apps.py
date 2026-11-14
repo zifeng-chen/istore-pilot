@@ -100,7 +100,9 @@ _RULES: list[tuple[tuple[str, ...], str, str]] = [
     (("primevideo", "aiv-cdn"), "Prime Video", "视频"),
     (("plex",), "Plex", "局域网"),
     (("emby", "jellyfin"), "Emby / Jellyfin", "局域网"),
-    (("ug.link", "ugreen"), "绿联 NAS", "局域网"),
+    # ugnas.com 是绿联 NAS 的远程直连域名，早期只认 ug.link / ugreen，
+    # 结果应用榜上多出一行「ugnas.com」，图标也匹配不上
+    (("ug.link", "ugreen", "ugnas"), "绿联 NAS", "局域网"),
     (("synology", "quickconnect"), "群晖 NAS", "局域网"),
     # ---------------------------------------------------------- 社交
     # 企业微信的域名里带 weixin，必须排在微信前面，否则永远被归到微信
@@ -141,7 +143,9 @@ _RULES: list[tuple[tuple[str, ...], str, str]] = [
     (("github", "githubusercontent", "ghcr.io"), "GitHub", "开发"),
     (("npmjs", "pypi", "docker.io", "docker.com"), "开发仓库", "开发"),
     # ---------------------------------------------------------- 购物 / 出行
-    (("alicdn", "taobao", "tmall", "alipay", "alibaba"), "淘宝 / 支付宝", "购物"),
+    # 这里不能带 alibaba：带了之后 alibaba.com 会被算成淘宝，图标也变橙色
+    # 购物袋。集团域名交给下面的「阿里巴巴」那条。
+    (("alicdn", "taobao", "tmall", "alipay"), "淘宝 / 支付宝", "购物"),
     (("360buyimg", "jd.com", "jdpay", "jdcloud", "jdurl"), "京东", "购物"),
     (("pinduoduo", "yangkeduo", "pddpic"), "拼多多", "购物"),
     (("meituan", "dianping", "sankuai"), "美团", "购物"),
@@ -183,6 +187,12 @@ _RULES: list[tuple[tuple[str, ...], str, str]] = [
     (("pan.baidu", "baidupcs", "baiduyun"), "百度网盘", "工具"),
     (("aliyundrive", "alipan"), "阿里云盘", "工具"),
     (("xunlei", "xluser"), "迅雷", "工具"),
+    # 下面几个是「域名成了应用名」的典型：没命中规则就素面朝天挂一行
+    # 「kiro.dev」「qiaohuapp.com」在榜上，既看不懂也配不到图标
+    (("kiro.dev", "kiro.ai", "kiro"), "Kiro", "AI"),
+    (("qiaohuapp", "qiaohu.com", "qiaohu"), "巧虎", "教育"),
+    (("alibaba.com", "alibabacloud", "alicdn", "alipayobjects", "alibaba"),
+     "阿里巴巴", "商务"),
     (("bdstatic", "baidu.com", "bdurl"), "百度", "搜索"),
     (("quark", "uc.cn", "ucweb"), "夸克 / UC", "搜索"),
     (("tencent.com", "myqcloud", "tencent-cloud", "gtimg"), "腾讯", "系统"),

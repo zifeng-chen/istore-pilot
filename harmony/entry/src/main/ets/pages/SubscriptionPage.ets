@@ -281,11 +281,13 @@ struct SubscriptionPage {
           .layoutWeight(1);
         Text('添加')
           .fontSize(T.F_SUB)
+          .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.primary'))
           .padding({ left: 14, right: 14, top: 4, bottom: 4 })
-          .borderRadius(T.R_PILL)
+          // 动作按钮一律 12 圆角，胶囊只留给「使用中」这类状态标签
+          .borderRadius(T.R_SM)
           .backgroundColor($r('app.color.accent_soft'))
-          // 视觉仍是小胶囊，热区撑到 44
+          // 视觉尺寸不变，热区撑到 44
           .constraintSize({ minHeight: 44, minWidth: 44 })
           .textAlign(TextAlign.Center)
           .clickEffect({ level: ClickEffectLevel.LIGHT })
@@ -377,10 +379,12 @@ struct SubscriptionPage {
 
                     Text(this.busy === it.id ? '更新中…' : '更新')
                       .fontSize(T.F_TINY)
-                      .fontColor($r('app.color.primary'))
+                      .fontColor(it.inUse ? $r('app.color.primary') : $r('app.color.text_secondary'))
                       .padding({ left: 12, right: 12, top: 5, bottom: 5 })
-                      .borderRadius(T.R_PILL)
-                      .backgroundColor($r('app.color.accent_soft'))
+                      .borderRadius(T.R_SM)
+                      .backgroundColor(it.inUse
+                        ? $r('app.color.accent_soft')
+                        : $r('app.color.surface_sunken'))
                       .constraintSize({ minHeight: 44, minWidth: 44 })
                       .textAlign(TextAlign.Center)
                       .accessibilityText('更新 ' + it.name)
@@ -571,7 +575,7 @@ struct SubscriptionPage {
             .fontSize(T.F_BODY)
             .fontColor($r('app.color.on_primary'))
             .padding({ left: 22, right: 22, top: 8, bottom: 8 })
-            .borderRadius(T.R_PILL)
+            .borderRadius(T.R_SM)
             .backgroundColor($r('app.color.primary'))
             .onClick(() => {
               this.save();

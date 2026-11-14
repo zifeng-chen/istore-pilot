@@ -104,6 +104,8 @@ public final class AppIcons {
         MAP.put("中国电信", R.drawable.ic_app_ct);
         MAP.put("中国移动", R.drawable.ic_app_cmcc);
         MAP.put("字节跳动", R.drawable.ic_app_bytedance);
+        MAP.put("微软", R.drawable.ic_app_microsoft);
+        MAP.put("阿里巴巴", R.drawable.ic_app_aliyun);
     }
 
     private AppIcons() {

@@ -2182,13 +2182,13 @@ export struct ProxyPage {
                   if (i > 0) {
                     Hairline({ indent: 0 });
                   }
-                  Row({ space: 10 }) {
+                  Row({ space: 8 }) {
                     Column() {
                       Text(b.label)
                         .fontSize(T.F_BODY)
                         .fontWeight(FontWeight.Medium)
                         .fontColor($r('app.color.text_primary'));
-                      Text(b.running ? '运行中 · ' + b.nodes + ' 个节点' : '未运行')
+                      Text(this.pkgsSub(b))
                         .fontSize(T.F_TINY)
                         .fontColor($r('app.color.text_secondary'))
                         .margin({ top: 3 });
@@ -2196,15 +2196,35 @@ export struct ProxyPage {
                     .alignItems(HorizontalAlign.Start)
                     .layoutWeight(1);
 
+                    // 有新版本才出现。仓库那边对应的「下载安装」已经置灰，
+                    // 升级入口只留这一处，免得同一件事两个按钮
+                    if (this.pkgNewer(b.id)) {
+                      Text(this.pkgConfirm === b.id ? '确认更新' : '更新')
+                        .fontSize(T.F_SUB)
+                        .fontColor($r('app.color.on_primary'))
+                        .padding({ left: 12, right: 12, top: 5, bottom: 5 })
+                        .borderRadius(T.R_SM)
+                        .backgroundColor($r('app.color.primary'))
+                        .constraintSize({ minHeight: 44, minWidth: 44 })
+                        .textAlign(TextAlign.Center)
+                        .accessibilityText('更新 ' + b.label)
+                        .clickEffect({ level: ClickEffectLevel.LIGHT })
+                        .onClick(() => {
+                          this.upgrade(b.id);
+                        });
+                    }
+
                     Text('卸载')
                       .fontSize(T.F_SUB)
                       .fontColor($r('app.color.danger'))
                       .padding({ left: 12, right: 12, top: 5, bottom: 5 })
-                      .borderRadius(T.R_PILL)
+                      // 和「更新」「下载安装」一样用 12 的圆角，胶囊只留给状态标签
+                      .borderRadius(T.R_SM)
                       .backgroundColor(Comp.alpha(Pal.danger(), 0.12))
                       .constraintSize({ minHeight: 44, minWidth: 44 })
                       .textAlign(TextAlign.Center)
                       .accessibilityText('卸载 ' + b.label)
+                      .clickEffect({ level: ClickEffectLevel.LIGHT })
                       .onClick(() => {
                         this.askUninstall(b.id, b.label);
                       });
@@ -2321,6 +2341,49 @@ export struct ProxyPage {
     return parts.join(' · ');
   }
 
+  /** 已安装卡里那一行状态：版本 + 有无更新 */
+  private pkgsSub(b: Backend): string {
+    const it: PkgItem | null = this.pkgFor(b.id);
+    let s: string = b.running ? '运行中 · ' + b.nodes + ' 个节点' : '未运行';
+    if (it !== null && it.local.length > 0) {
+      s += ' · ' + it.local;
+    }
+    if (it !== null && it.newer) {
+      s += ' → ' + it.version;
+    }
+    return s;
+  }
+
+  /** 仓库里这一项有没有比本机新 */
+  private pkgNewer(backend: string): boolean {
+    const it: PkgItem | null = this.pkgFor(backend);
+    return it !== null && it.local.length > 0 && it.newer;
+  }
+
+  private pkgFor(backend: string): PkgItem | null {
+    for (let i = 0; i < this.pkgItems.length; i++) {
+      if (this.pkgItems[i].backend === backend) {
+        return this.pkgItems[i];
+      }
+    }
+    return null;
+  }
+
+  /** 「更新」按钮：走和下载安装同一条路，只是带了确认 */
+  private upgrade(backend: string): void {
+    const it: PkgItem | null = this.pkgFor(backend);
+    if (it === null) {
+      this.toast = '仓库里没有这个包，先刷新清单';
+      return;
+    }
+    if (this.pkgConfirm === backend) {
+      this.doPkgInstall();
+      return;
+    }
+    // 第一次点先摆出「确认更新」，再点一次才真的开始 —— 和下载安装一致
+    this.askPkg(backend, 'github', it.file);
+  }
+
   private pkgNote(it: PkgItem): string {
     let s: string = '';
     if (it.local.length === 0) {
@@ -2365,7 +2428,7 @@ export struct ProxyPage {
               .fontSize(T.F_TINY)
               .fontColor($r('app.color.text_secondary'))
               .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-              .borderRadius(T.R_PILL)
+              .borderRadius(T.R_SM)
               .backgroundColor($r('app.color.surface_sunken'))
               .onClick(() => {
                 this.pkgConfirm = '';
@@ -2374,21 +2437,36 @@ export struct ProxyPage {
               .fontSize(T.F_TINY)
               .fontColor($r('app.color.on_primary'))
               .padding({ left: 12, right: 12, top: 5, bottom: 5 })
-              .borderRadius(T.R_PILL)
+              .borderRadius(T.R_SM)
               .backgroundColor($r('app.color.primary'))
               .onClick(() => {
                 this.doPkgInstall();
               });
           }
           .margin({ left: 8 });
+        } else if (it.local.length > 0) {
+          // 本机已经有了：这一行只作「仓库里有什么」的信息展示，
+          // 升级入口在「已安装」卡里，避免同一件事两个按钮
+          Text('已安装')
+            .fontSize(T.F_SUB)
+            .fontColor($r('app.color.text_tertiary'))
+            .padding({ left: 12, right: 12, top: 5, bottom: 5 })
+            .borderRadius(T.R_SM)
+            .backgroundColor($r('app.color.surface_sunken'))
+            .constraintSize({ minHeight: 44, minWidth: 44 })
+            .textAlign(TextAlign.Center)
+            .margin({ left: 8 });
         } else {
           Text('下载安装')
             .fontSize(T.F_SUB)
             .fontColor($r('app.color.primary'))
             .padding({ left: 12, right: 12, top: 5, bottom: 5 })
-            .borderRadius(T.R_PILL)
+            .borderRadius(T.R_SM)
             .backgroundColor($r('app.color.accent_soft'))
+            .constraintSize({ minHeight: 44, minWidth: 44 })
+            .textAlign(TextAlign.Center)
             .margin({ left: 8 })
+            .clickEffect({ level: ClickEffectLevel.LIGHT })
             .onClick(() => {
               this.askPkg(it.backend, 'github', it.file);
             });

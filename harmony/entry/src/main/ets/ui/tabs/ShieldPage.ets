@@ -509,7 +509,7 @@ export struct ShieldPage {
   /** 卸载入口：放在拦截页最底部，红色只给这一处 */
   @Builder
   uninstallCard() {
-    Card({ gapTop: T.GAP }) {
+    RowCard({ gapBottom: T.GAP }) {
       Row({ space: 10 }) {
         Stack() {
           GlyphIcon({
@@ -542,6 +542,7 @@ export struct ShieldPage {
       }
       .width('100%')
       .alignItems(VerticalAlign.Center)
+      .padding({ left: 16, right: 16, top: 10, bottom: 14 })
       .onClick(() => {
         this.uninstallErr = '';
         this.showUninstall = true;
@@ -667,32 +668,32 @@ export struct ShieldPage {
 
   @Builder
   preflightCard() {
-    Card({ gapTop: T.GAP }) {
-      Column() {
-        Row() {
-          Text('拦截体检')
-            .fontSize(T.F_H2)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.text_primary'))
-            .layoutWeight(1);
-          Text(this.preflightReady ? '全部就绪' : '有待处理')
-            .fontSize(T.F_TINY)
-            .fontColor(this.preflightReady
-              ? $r('app.color.primary')
-              : $r('app.color.warn'))
-            .padding({ left: 8, right: 8, top: 2, bottom: 2 })
-            .borderRadius(T.R_PILL)
-            .backgroundColor(this.preflightReady
-              ? $r('app.color.accent_soft')
-              : Pal.alpha(Pal.warn(), 0.14));
-        }
-        .width('100%')
-        .margin({ bottom: 8 });
+    RowCard({ gapBottom: T.GAP }) {
+      CardTitle({
+        pad: 16,
+        glyph: Glyph.STATUS_INFO,
+        title: '拦截体检',
+        sub: this.checks.length > 0 ? this.checks.length.toString() + ' 项检查' : '正在检查'
+      }) {
+        Text(this.preflightReady ? '全部就绪' : '有待处理')
+          .fontSize(T.F_TINY)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(this.preflightReady
+            ? $r('app.color.primary')
+            : $r('app.color.warn'))
+          .padding({ left: 9, right: 9, top: 3, bottom: 3 })
+          .borderRadius(T.R_PILL)
+          .backgroundColor(this.preflightReady
+            ? $r('app.color.accent_soft')
+            : Pal.alpha(Pal.warn(), 0.14));
+      }
 
+      Column() {
         if (this.checks.length === 0) {
           Text('读取中…')
             .fontSize(T.F_SUB)
-            .fontColor($r('app.color.text_secondary'));
+            .fontColor($r('app.color.text_secondary'))
+            .padding({ left: 16, right: 16, top: 10, bottom: 14 });
         } else {
           ForEach(this.checks, (c: CheckItem, i: number) => {
             Row({ space: 8 }) {
@@ -718,9 +719,9 @@ export struct ShieldPage {
             }
             .width('100%')
             .alignItems(VerticalAlign.Top)
-            .padding({ top: 7, bottom: 7 });
+            .padding({ left: 16, right: 16, top: 8, bottom: 8 });
             if (i < this.checks.length - 1) {
-              Hairline({ indent: 14 });
+              Hairline({ indent: 30 });
             }
           }, (c: CheckItem, i: number) => c.label + i);
         }
@@ -731,35 +732,44 @@ export struct ShieldPage {
 
   @Builder
   logCard() {
-    Card({ gapTop: T.GAP }) {
-      Column() {
-        Row() {
-          Text('最近查询')
-            .fontSize(T.F_H2)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.text_primary'))
-            .layoutWeight(1);
-          Text(this.logOnlyBlocked ? '只看拦截' : '全部')
-            .fontSize(T.F_TINY)
-            .fontColor($r('app.color.primary'))
-            .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-            .borderRadius(T.R_PILL)
-            .backgroundColor($r('app.color.accent_soft'))
-            .onClick(() => {
-              this.logOnlyBlocked = !this.logOnlyBlocked;
-              this.logItems = [];
-              this.logs.set([]);
-              this.loadLog();
-            });
-        }
-        .width('100%')
-        .margin({ bottom: 6 });
+    RowCard({ gapBottom: T.GAP }) {
+      CardTitle({
+        pad: 16,
+        glyph: Glyph.INTERCEPT_LOGS,
+        title: '最近查询',
+        sub: this.logItems.length > 0
+          ? '最近 ' + this.logItems.length.toString() + ' 条'
+          : '点右侧切换筛选'
+      }) {
+        // 筛选开关做成小胶囊（标签语义），和下面「全部就绪」同一套
+        Text(this.logOnlyBlocked ? '只看拦截' : '全部查询')
+          .fontSize(T.F_TINY)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(this.logOnlyBlocked
+            ? $r('app.color.primary')
+            : $r('app.color.text_secondary'))
+          .padding({ left: 9, right: 9, top: 3, bottom: 3 })
+          .borderRadius(T.R_PILL)
+          .backgroundColor(this.logOnlyBlocked
+            ? $r('app.color.accent_soft')
+            : $r('app.color.surface_sunken'))
+          .constraintSize({ minHeight: 28 })
+          .textAlign(TextAlign.Center)
+          .clickEffect({ level: ClickEffectLevel.LIGHT })
+          .onClick(() => {
+            this.logOnlyBlocked = !this.logOnlyBlocked;
+            this.logItems = [];
+            this.logs.set([]);
+            this.loadLog();
+          });
+      }
 
+      Column() {
         if (this.logItems.length === 0) {
           Text(this.logTotal > 0 ? '这段时间没有被拦截的记录' : '还没有查询记录')
             .fontSize(T.F_SUB)
             .fontColor($r('app.color.text_secondary'))
-            .padding({ top: 6, bottom: 6 });
+            .padding({ left: 16, right: 16, top: 10, bottom: 14 });
         } else {
           // 固定高度 + 自身滚动：LazyForEach 需要确定的可视区，
           // 也让这张卡不会因为 120 条日志把整页撑到几屏
@@ -813,7 +823,7 @@ export struct ShieldPage {
       }
     }
     .width('100%')
-    .padding({ top: 5, bottom: 5 })
+    .padding({ left: 16, right: 16, top: 6, bottom: 6 })
     .alignItems(VerticalAlign.Center);
   }
 
@@ -864,12 +874,12 @@ export struct ShieldPage {
       colors: [[Pal.heroFrom(), 0.0], [Pal.heroTo(), 1.0]]
     })
     .border({ width: 0.7, color: $r('app.color.hero_stroke') })
-    .margin({ bottom: this.rail() ? Bp.gap(this.winW) : T.GAP });
+    .margin({ bottom: T.GAP });
   }
 
   @Builder
   dnsCard() {
-    RowCard({ gapBottom: this.rail() ? 0 : T.GAP }) {
+    RowCard({ gapBottom: T.GAP }) {
       CardTitle({ pad: 16, glyph: Glyph.NETWORK, title: 'DNS 链路', sub: '请求从设备到解析的完整路径' });
       Column() {
         ForEach(this.hops, (h: DnsHop, i: number) => {

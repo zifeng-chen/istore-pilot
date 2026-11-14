@@ -69,6 +69,11 @@ export struct SettingsPage {
   @Local addrValue: string = '';
   @Local infoTitle: string = '';
   @Local infoBody: string = '';
+  /** 信息弹层底部的动作按钮（空 = 只有「知道了」）。
+   *  固件升级需要「下载 → 刷写」两步，纯文字弹层没法承载动作 */
+  @Local infoAction: string = '';
+  @Local infoActionLabel: string = '';
+  @Local infoActionDanger: boolean = false;
   @Local f1: string = '';
   @Local f2: string = '';
   @Local busy: boolean = false;
@@ -759,7 +764,7 @@ export struct SettingsPage {
         danger: false,
         arrow: true,
         onTap: () => {
-          this.checkPackages();
+          this.openPackages();
         }
       });
       SettingRow({
@@ -1137,19 +1142,51 @@ export struct SettingsPage {
         }
 
         if (this.sheet === SHEET_INFO) {
-          Button('知道了')
-            .type(ButtonType.Normal)
-            .borderRadius(T.R_SM)
-            .height(44)
+          if (this.infoAction.length > 0) {
+            Row({ space: 10 }) {
+              Button('关闭')
+                .type(ButtonType.Normal)
+                .borderRadius(T.R_SM)
+                .height(44)
+                .layoutWeight(1)
+                .fontSize(T.F_BODY)
+                .fontColor($r('app.color.text_primary'))
+                .backgroundColor($r('app.color.surface_hi'))
+                .onClick(() => {
+                  this.closeSheet();
+                });
+              Button(this.infoActionLabel)
+                .type(ButtonType.Normal)
+                .borderRadius(T.R_SM)
+                .height(44)
+                .layoutWeight(1.4)
+                .fontSize(T.F_BODY)
+                .fontWeight(FontWeight.Medium)
+                .fontColor($r('app.color.on_primary'))
+                .backgroundColor(this.infoActionDanger
+                  ? $r('app.color.danger')
+                  : $r('app.color.primary'))
+                .onClick(() => {
+                  this.runInfoAction();
+                });
+            }
             .width('100%')
-            .fontSize(T.F_BODY)
-            .fontWeight(FontWeight.Medium)
-            .fontColor($r('app.color.on_primary'))
-            .backgroundColor($r('app.color.primary'))
-            .margin({ top: 18 })
-            .onClick(() => {
-              this.closeSheet();
-            });
+            .margin({ top: 18 });
+          } else {
+            Button('知道了')
+              .type(ButtonType.Normal)
+              .borderRadius(T.R_SM)
+              .height(44)
+              .width('100%')
+              .fontSize(T.F_BODY)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.on_primary'))
+              .backgroundColor($r('app.color.primary'))
+              .margin({ top: 18 })
+              .onClick(() => {
+                this.closeSheet();
+              });
+          }
         } else {
           Row({ space: 10 }) {
             Button('取消')
@@ -1413,13 +1450,32 @@ export struct SettingsPage {
       return;
     }
 
+    const downloading: boolean = r.data.bool('downloading', false);
+    const downloaded: boolean = r.data.bool('downloaded', false);
+
     let sb: string = '当前  ' + cur + '\n最新  ' + latest;
     const image: string = r.data.str('image', '');
     if (image.length > 0) {
       sb += '\n\n镜像  ' + image;
     }
-    sb += '\n\n升级入口：iStoreOS 后台 → 系统 → OTA。';
-    sb += '\n刷固件会重启路由器，中途断电有变砖风险，所以不在 App 里代跑。';
+    if (downloading) {
+      const prog: string = r.data.str('progress', '');
+      sb += '\n\n正在下载' + (prog.length > 0 ? '：' + prog : '…');
+      sb += '\n下载完再点「刷写并重启」，中途不碰路由器。';
+      this.infoAction = 'fw_refresh';
+      this.infoActionLabel = '刷新进度';
+      this.infoActionDanger = false;
+    } else if (downloaded) {
+      sb += '\n\n固件已下载完成。刷写会重启路由器，约 2~5 分钟，期间全网断网。';
+      this.infoAction = 'fw_install';
+      this.infoActionLabel = '刷写并重启';
+      this.infoActionDanger = true;
+    } else {
+      sb += '\n\n先把固件下到路由器（不重启），下完再决定什么时候刷写。';
+      this.infoAction = 'fw_download';
+      this.infoActionLabel = '下载固件';
+      this.infoActionDanger = false;
+    }
     const log: string = r.data.str('changelog', '');
     if (log.length > 0) {
       sb += '\n\n————\n' + (log.length > 700 ? log.substring(0, 700) + '…' : log);
@@ -1429,43 +1485,81 @@ export struct SettingsPage {
     this.sheetTitle = this.infoTitle;
   }
 
-  private async checkPackages(): Promise<void> {
+  /** 固件弹层底部的动作：下载 / 刷新进度 / 刷写 */
+  private runInfoAction(): void {
     const ctx = this.ctx();
-    this.infoTitle = '正在检查软件包';
-    this.infoBody = '正在读取已安装软件包与本地索引…';
-    this.sheet = SHEET_INFO;
-    this.sheetTitle = this.infoTitle;
+    if (this.infoAction === 'fw_download') {
+      this.fwDownload();
+      return;
+    }
+    if (this.infoAction === 'fw_refresh') {
+      this.checkFirmware();
+      return;
+    }
+    if (this.infoAction === 'fw_install') {
+      this.getUIContext().showAlertDialog({
+        title: '刷写固件并重启？',
+        message: '路由器会立即重启，全网断网 2~5 分钟。刷写中不要断电 —— '
+          + '断电有变砖风险，只能拆机上编程器。',
+        primaryButton: {
+          value: '刷写并重启',
+          fontColor: Pal.danger(),
+          action: () => {
+            this.fwInstall();
+          }
+        },
+        secondaryButton: {
+          value: '先不刷',
+          fontColor: Pal.textSecondary(),
+          action: () => {
+          }
+        }
+      });
+    }
+  }
 
-    // refresh=false：只读现有索引，秒回；拉索引留给真正的升级动作
-    const body: Record<string, Object> = { 'action': 'check', 'refresh': false };
-    const r: ApiResult = await Api.post(ctx, '/api/v1/system/update', body);
-    if (!r.ok || !r.data.bool('ok', false)) {
-      this.infoTitle = '检查失败';
-      this.infoBody = r.data.str('error', r.error.length > 0 ? r.error : '读取软件源失败，稍后再试。');
-      this.sheetTitle = this.infoTitle;
-      return;
+  private async fwDownload(): Promise<void> {
+    const ctx = this.ctx();
+    const body: Record<string, Object> = { 'action': 'download' };
+    const r: ApiResult = await Api.post(ctx, '/api/v1/system/firmware', body);
+    this.infoTitle = r.data.bool('ok', false) ? '已开始下载' : '下载没起来';
+    this.infoBody = r.ok
+      ? r.data.str('note', '') || r.data.str('error', '')
+      : r.error;
+    if (!r.data.bool('ok', false)) {
+      this.infoBody = r.data.str('error', r.error.length > 0 ? r.error : '下载没被受理');
     }
-    const pkgs: J[] = r.data.arr('packages');
-    if (pkgs.length === 0) {
-      this.infoTitle = '软件包已是最新';
-      this.infoBody = '系统 iStoreOS ' + r.data.obj('firmware').str('version', '') +
-        ' 上装的软件包全部是最新版。\n\n想要固件本体升级，用上面的「检查系统更新」。';
-      this.sheetTitle = this.infoTitle;
-      return;
-    }
-    let sb: string = '共 ' + pkgs.length + ' 个软件包可以升级：\n\n';
-    const show: number = Math.min(pkgs.length, 10);
-    for (let i = 0; i < show; i++) {
-      sb += '· ' + pkgs[i].str('name', '') + '\n  ' +
-        pkgs[i].str('current', '') + ' → ' + pkgs[i].str('latest', '') + '\n';
-    }
-    if (pkgs.length > show) {
-      sb += '… 还有 ' + (pkgs.length - show) + ' 个\n';
-    }
-    sb += '\n升级在路由器后台跑，中途不要断电，会断网一两分钟。';
-    this.infoTitle = '发现 ' + pkgs.length + ' 个可升级';
-    this.infoBody = sb;
+    // 下载是后台任务，这里换成一个「刷新进度」的动作
+    this.infoAction = 'fw_refresh';
+    this.infoActionLabel = '刷新进度';
+    this.infoActionDanger = false;
     this.sheetTitle = this.infoTitle;
+  }
+
+  private async fwInstall(): Promise<void> {
+    const ctx = this.ctx();
+    const body: Record<string, Object> = { 'action': 'install' };
+    const r: ApiResult = await Api.post(ctx, '/api/v1/system/firmware', body);
+    const ok: boolean = r.ok && r.data.bool('ok', false);
+    this.infoTitle = ok ? '正在刷写' : '刷写没开始';
+    this.infoBody = ok
+      ? (r.data.str('note', '路由器即将重启，重启后 Wi-Fi 会自己回来。')
+        + '\n\nApp 会断开，等路由器起来重新连上就行。')
+      : r.data.str('error', r.error.length > 0 ? r.error : '路由器拒绝了这次刷写');
+    this.infoAction = '';
+    this.infoActionLabel = '';
+    this.infoActionDanger = false;
+    this.sheetTitle = this.infoTitle;
+  }
+
+  /**
+   * 打开「软件包更新」二级页。
+   *
+   * 原来这里是弹一个纯文本层、只列前 10 个包名 —— 看得见但动不了。
+   * 列表要搜索、要勾选、要跨滚动保留选中，塞不进弹层。
+   */
+  private openPackages(): void {
+    router.pushUrl({ url: 'pages/PackageUpdatePage' });
   }
 
   private async showProgress(): Promise<void> {

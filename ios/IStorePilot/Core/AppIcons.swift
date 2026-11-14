@@ -98,6 +98,8 @@ enum AppIcons {
         "中国电信": "app_ct",
         "中国移动": "app_cmcc",
         "字节跳动": "app_bytedance",
+        "微软": "app_microsoft",
+        "阿里巴巴": "app_aliyun",
     ]
 
     static func asset(_ name: String) -> String? {

@@ -96,8 +96,34 @@ const APP_ICONS: Map<string, Resource> = new Map<string, Resource>([
   ['中国电信', $r('app.media.ic_app_ct')],
   ['中国移动', $r('app.media.ic_app_cmcc')],
   ['字节跳动', $r('app.media.ic_app_bytedance')],
+  ['微软', $r('app.media.ic_app_microsoft')],
+  ['阿里巴巴', $r('app.media.ic_app_aliyun')],
 ]);
 
+/** 关键词 → 图标：应用名是 Agent 按域名算出来的，名字会变，兜一层包含匹配 */
+const KEYWORD_ICONS: [string, Resource][] = [
+  ['微软', $r('app.media.ic_app_microsoft')],
+  ['阿里', $r('app.media.ic_app_aliyun')],
+  ['绿联', $r('app.media.ic_app_ugreen')],
+  ['华为', $r('app.media.ic_app_huawei')],
+  ['腾讯', $r('app.media.ic_app_tencent')],
+  ['字节', $r('app.media.ic_app_bytedance')],
+  ['苹果', $r('app.media.ic_app_apple')],
+  ['谷歌', $r('app.media.ic_app_google')],
+  ['百度', $r('app.media.ic_app_baidu')],
+  ['网易', $r('app.media.ic_app_netease')],
+];
+
+/** 先精确匹配，再按关键词兜底；都没有返回 undefined，调用方画首字色块 */
 export function appIconOf(name: string): Resource | undefined {
-  return APP_ICONS.get(name);
+  const exact: Resource | undefined = APP_ICONS.get(name);
+  if (exact !== undefined) {
+    return exact;
+  }
+  for (let i = 0; i < KEYWORD_ICONS.length; i++) {
+    if (name.indexOf(KEYWORD_ICONS[i][0]) >= 0) {
+      return KEYWORD_ICONS[i][1];
+    }
+  }
+  return undefined;
 }

@@ -22,7 +22,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 JAVA_MAP = os.path.join(
-    ROOT, "android/app/src/main/java/com/chaof/istoreos/util/AppIcons.java")
+    ROOT, "android/app/src/main/java/com/izifeng/www/istorepilot/util/AppIcons.java")
 ANDROID_ICONS = os.path.join(ROOT, "android/app/src/main/res/drawable-nodpi")
 
 IOS_ASSETS = os.path.join(ROOT, "ios/IStorePilot/Assets.xcassets")
@@ -86,6 +86,24 @@ def sync_ios(pairs: list[tuple[str, str]]) -> int:
     return len(pairs)
 
 
+# 名字里带这些词就用对应图标。
+# 加这一层是因为「应用名」是 Agent 侧按域名规则算出来的，规则一改名字就变
+# （ugnas.com → 绿联 NAS、alibaba.com → 阿里巴巴……），客户端死守精确匹配
+# 的话每次都要跟着改表。先精确、再按关键词兜底，漏配的概率小很多。
+KEYWORD_ICONS = [
+    ("微软", "ic_app_microsoft"),
+    ("阿里", "ic_app_aliyun"),
+    ("绿联", "ic_app_ugreen"),
+    ("华为", "ic_app_huawei"),
+    ("腾讯", "ic_app_tencent"),
+    ("字节", "ic_app_bytedance"),
+    ("苹果", "ic_app_apple"),
+    ("谷歌", "ic_app_google"),
+    ("百度", "ic_app_baidu"),
+    ("网易", "ic_app_netease"),
+]
+
+
 def sync_harmony(pairs: list[tuple[str, str]]) -> int:
     os.makedirs(HARMONY_MEDIA, exist_ok=True)
     for _, res in pairs:
@@ -105,8 +123,26 @@ def sync_harmony(pairs: list[tuple[str, str]]) -> int:
     lines += [
         "]);",
         "",
+        "/** 关键词 → 图标：应用名是 Agent 按域名算出来的，名字会变，兜一层包含匹配 */",
+        "const KEYWORD_ICONS: [string, Resource][] = [",
+    ]
+    for kw, res in KEYWORD_ICONS:
+        lines.append("  ['%s', $r('app.media.%s')]," % (kw, res))
+    lines += [
+        "];",
+        "",
+        "/** 先精确匹配，再按关键词兜底；都没有返回 undefined，调用方画首字色块 */",
         "export function appIconOf(name: string): Resource | undefined {",
-        "  return APP_ICONS.get(name);",
+        "  const exact: Resource | undefined = APP_ICONS.get(name);",
+        "  if (exact !== undefined) {",
+        "    return exact;",
+        "  }",
+        "  for (let i = 0; i < KEYWORD_ICONS.length; i++) {",
+        "    if (name.indexOf(KEYWORD_ICONS[i][0]) >= 0) {",
+        "      return KEYWORD_ICONS[i][1];",
+        "    }",
+        "  }",
+        "  return undefined;",
         "}",
         "",
     ]
