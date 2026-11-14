@@ -139,11 +139,4 @@ public final class Demo {
             routes = null;
         }
     }
-
-    /** 冷启动时恢复上次状态：上次停在演示模式的话，首屏不能去连路由器 */
-    public static void restore(Context c) {
-        if (isOn(c)) {
-            ensure(c);
-        }
-    }
 }

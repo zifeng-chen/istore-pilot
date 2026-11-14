@@ -69,7 +69,6 @@ public class LoginActivity extends BaseActivity {
      */
     private void openDemo() {
         Demo.setOn(this, true);
-        Demo.restore(this);
         Session.setBase(this, "http://demo.local:8443");
         Session.saveToken(this, "demo-mode",
                 System.currentTimeMillis() / 1000L + 365L * 86400L, "演示模式");

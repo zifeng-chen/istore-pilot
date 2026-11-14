@@ -82,10 +82,13 @@ public final class Api {
         if (Demo.isOn(app)) {
             if ("POST".equals(method)) {
                 UI.post(() -> cb.onError(Demo.READ_ONLY));
-            } else {
+                return;
+            }
+            // 第一次取数要解析 130 KB 的 demo.json，别压在主线程上
+            POOL.execute(() -> {
                 final JSONObject d = Demo.data(app, path);
                 UI.post(() -> cb.onData(d, false));
-            }
+            });
             return;
         }
 
