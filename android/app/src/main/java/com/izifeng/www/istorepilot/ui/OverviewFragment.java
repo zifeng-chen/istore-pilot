@@ -14,6 +14,7 @@ import android.widget.TextView;
 import com.izifeng.www.istorepilot.R;
 import com.izifeng.www.istorepilot.api.Api;
 import com.izifeng.www.istorepilot.api.Cb;
+import com.izifeng.www.istorepilot.core.Demo;
 import com.izifeng.www.istorepilot.util.Fmt;
 import com.izifeng.www.istorepilot.util.Ui;
 import com.izifeng.www.istorepilot.widget.PortTile;
@@ -518,7 +519,9 @@ public class OverviewFragment extends BaseFragment {
                 paintHeroSys();
             }
             if (tvHeroBadge != null) {
-                tvHeroBadge.setText(ver.isEmpty() ? "iStoreOS" : "iStoreOS " + ver);
+                // 演示模式下改成「演示数据」：审核员第一眼就知道不是真机
+                tvHeroBadge.setText(Demo.isOn(ctx()) ? "演示数据"
+                        : (ver.isEmpty() ? "iStoreOS" : "iStoreOS " + ver));
             }
         }
 

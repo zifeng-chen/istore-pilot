@@ -20,8 +20,8 @@ APP = "IStorePilot"
 PROJ = "IStorePilot.xcodeproj"
 BUNDLE_ID = "com.izifeng.www.istorepilot"
 NAME = "iStore Pilot"
-VERSION = "0.3.9"
-BUILD = "43"
+VERSION = "0.4.0"
+BUILD = "44"
 DEPLOY = "16.0"
 
 
@@ -49,6 +49,8 @@ def main() -> int:
     swift, groups = scan()
     assets = f"{APP}/Assets.xcassets"
     plist = f"{APP}/Info.plist"
+    # 演示数据：随 App 组一起进 Resources，Bundle.main 里按名字取
+    demo = f"{APP}/demo.json"
 
     out = []
     a = out.append
@@ -68,6 +70,8 @@ def main() -> int:
           f"{{isa = PBXBuildFile; fileRef = {uid('fr:' + p)} /* {os.path.basename(p)} */; }};")
     a(f"\t\t{uid('bf:' + assets)} /* Assets.xcassets in Resources */ = "
       f"{{isa = PBXBuildFile; fileRef = {uid('fr:' + assets)} /* Assets.xcassets */; }};")
+    a(f"\t\t{uid('bf:' + demo)} /* demo.json in Resources */ = "
+      f"{{isa = PBXBuildFile; fileRef = {uid('fr:' + demo)} /* demo.json */; }};")
     a("/* End PBXBuildFile section */")
 
     # ---------- PBXFileReference ----------
@@ -79,6 +83,9 @@ def main() -> int:
     a(f"\t\t{uid('fr:' + assets)} /* Assets.xcassets */ = "
       f"{{isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; "
       f"path = Assets.xcassets; sourceTree = \"<group>\"; }};")
+    a(f"\t\t{uid('fr:' + demo)} /* demo.json */ = "
+      f"{{isa = PBXFileReference; lastKnownFileType = text.json; "
+      f"path = demo.json; sourceTree = \"<group>\"; }};")
     a(f"\t\t{uid('fr:' + plist)} /* Info.plist */ = "
       f"{{isa = PBXFileReference; lastKnownFileType = text.plist.xml; "
       f"path = Info.plist; sourceTree = \"<group>\"; }};")
@@ -130,6 +137,7 @@ def main() -> int:
         a(f"\t\t\t\t{uid('group:' + g)} /* {g.split('/')[-1]} */,")
     a(f"\t\t\t\t{uid('fr:' + assets)} /* Assets.xcassets */,")
     a(f"\t\t\t\t{uid('fr:' + plist)} /* Info.plist */,")
+    a(f"\t\t\t\t{uid('fr:' + demo)} /* demo.json */,")
     a("\t\t\t);")
     a(f"\t\t\tpath = {APP};")
     a("\t\t\tsourceTree = \"<group>\";")
@@ -210,6 +218,7 @@ def main() -> int:
     a("\t\t\tbuildActionMask = 2147483647;")
     a("\t\t\tfiles = (")
     a(f"\t\t\t\t{uid('bf:' + assets)} /* Assets.xcassets in Resources */,")
+    a(f"\t\t\t\t{uid('bf:' + demo)} /* demo.json in Resources */,")
     a("\t\t\t);")
     a("\t\t\trunOnlyForDeploymentPostprocessing = 0;")
     a("\t\t};")

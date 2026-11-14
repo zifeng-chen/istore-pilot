@@ -245,7 +245,9 @@ struct SettingsView: View {
 
     /// 只留 host:port，给离线时当标题用
     private var bareBase: String {
-        Session.base.replacingOccurrences(of: "http://", with: "")
+        // 演示模式的 base 是占位符，直接显示会让人以为是坏了的地址
+        if Demo.isOn { return "本地示例数据" }
+        return Session.base.replacingOccurrences(of: "http://", with: "")
             .replacingOccurrences(of: "https://", with: "")
     }
 
@@ -538,8 +540,11 @@ struct SettingsView: View {
                     popup = Popup(title: "已清除", body: "下次进入各页面会重新从路由器读取。")
                 }
                 Hairline(inset: 62)
-                row(icon: "logout", title: "退出登录",
-                    note: "清除凭证并返回登录页") {
+                row(icon: "logout",
+                    title: Demo.isOn ? "退出演示" : "退出登录",
+                    note: Demo.isOn ? "回到登录页并关闭示例数据" : "清除凭证并返回登录页") {
+                    // 演示模式一起关掉：只清令牌的话，下次连真机前 Api 还会走示例数据
+                    Demo.isOn = false
                     Api.onAuthFail?()
                     app.signOut()
                 }

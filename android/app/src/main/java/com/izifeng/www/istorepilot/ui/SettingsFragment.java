@@ -17,6 +17,7 @@ import android.widget.Toast;
 import com.izifeng.www.istorepilot.R;
 import com.izifeng.www.istorepilot.api.Api;
 import com.izifeng.www.istorepilot.api.Cb;
+import com.izifeng.www.istorepilot.core.Demo;
 import com.izifeng.www.istorepilot.core.Session;
 import com.izifeng.www.istorepilot.core.Snap;
 import com.izifeng.www.istorepilot.util.Fmt;
@@ -318,7 +319,9 @@ public class SettingsFragment extends BaseFragment {
         Ui.settingRow(c, about, com.izifeng.www.istorepilot.widget.Glyph.CLEAR_CACHE,
                 "清缓存", "只清手机上的快照，不动路由器", "", false, false, this::clearCache);
         Ui.settingRow(c, about, com.izifeng.www.istorepilot.widget.Glyph.LOGOUT,
-                "退出登录", "清除凭证并返回登录页", "", false, false, this::relogin);
+                Demo.isOn(ctx()) ? "退出演示" : "退出登录",
+                Demo.isOn(ctx()) ? "回到登录页并关闭示例数据" : "清除凭证并返回登录页",
+                "", false, false, this::relogin);
         root.addView(about);
     }
 
@@ -346,7 +349,8 @@ public class SettingsFragment extends BaseFragment {
         if (tvBase == null) {
             return;
         }
-        String base = Session.base(ctx()).replaceFirst("^https?://", "");
+        String base = Demo.isOn(ctx()) ? "本地示例数据"
+                : Session.base(ctx()).replaceFirst("^https?://", "");
         tvBase.setText(base);
         if (tvHeroLatency != null) {
             tvHeroLatency.setText(heroLatency);
@@ -627,6 +631,8 @@ public class SettingsFragment extends BaseFragment {
     }
 
     private void relogin() {
+        // 演示模式一起关掉：只清令牌的话，下次连真机前 Api 还会走示例数据
+        Demo.setOn(ctx(), false);
         Session.logout(ctx());
         startActivity(new Intent(ctx(), LoginActivity.class));
         requireActivity().finish();

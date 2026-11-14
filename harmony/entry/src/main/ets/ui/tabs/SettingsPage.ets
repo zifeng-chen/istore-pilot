@@ -7,6 +7,7 @@ import { AppInfo } from '../../core/AppInfo';
 import { UI, UIState } from '../../core/UIState';
 import { Motion } from '../../core/Motion';
 import { Session } from '../../core/Session';
+import { Demo } from '../../core/Demo';
 import { Shell } from '../../core/Shell';
 import { Snap } from '../../core/Snap';
 import { Fmt } from '../../util/Fmt';
@@ -87,7 +88,8 @@ export struct SettingsPage {
 
   aboutToAppear(): void {
     this.winW = this.ui.winW;
-    this.server = Session.base();
+    // 演示模式的 base 是占位符 'demo'，直接显示会让人以为是坏了的地址
+    this.server = Demo.isOn() ? '本地示例数据' : Session.base();
     this.userName = Session.user();
     this.themeName = Appearance.label();
     this.tokenOk = Session.token().length > 0;
@@ -141,7 +143,7 @@ export struct SettingsPage {
 
   private async load(): Promise<void> {
     const ctx = this.ctx();
-    this.server = Session.base();
+    this.server = Demo.isOn() ? '本地示例数据' : Session.base();
     this.tokenOk = Session.token().length > 0;
 
     this.loadHardware();
@@ -910,8 +912,8 @@ export struct SettingsPage {
       });
       SettingRow({
         glyph: Glyph.LOGOUT,
-        title: '退出登录',
-        subtitle: '清除凭证并返回登录页',
+        title: Demo.isOn() ? '退出演示' : '退出登录',
+        subtitle: Demo.isOn() ? '回到登录页并关闭示例数据' : '清除凭证并返回登录页',
         value: '',
         valueSize: 0,
         first: false,
@@ -938,8 +940,11 @@ export struct SettingsPage {
 
   private relogin(): void {
     const ctx = this.ctx();
-    Session.signOut(ctx).then(() => {
-      router.replaceUrl({ url: 'pages/LoginPage' });
+    // 演示模式要一起关掉：只清令牌的话，下次登录真机前 Api 还会走示例数据
+    Demo.leave(ctx).then(() => {
+      Session.signOut(ctx).then(() => {
+        router.replaceUrl({ url: 'pages/LoginPage' });
+      });
     });
   }
 

@@ -3,6 +3,7 @@ import { Http, HttpResult } from './Http';
 import { J } from '../core/Json';
 import { Session } from '../core/Session';
 import { Snap } from '../core/Snap';
+import { Demo } from '../core/Demo';
 
 export interface ApiResult {
   ok: boolean;
@@ -33,6 +34,9 @@ export class Api {
   }
 
   static async peek(ctx: common.Context, path: string): Promise<ApiResult> {
+    if (Demo.isOn()) {
+      return Api.demoResult(path);
+    }
     const text: string = await Snap.get(ctx, path);
     if (text.length === 0) {
       return {
@@ -45,18 +49,30 @@ export class Api {
   }
 
   static async get(ctx: common.Context, path: string): Promise<ApiResult> {
+    if (Demo.isOn()) {
+      return Api.demoResult(path);
+    }
     const r: HttpResult = await Http.send(Session.base(), Session.token(), 'GET', path, '');
     return Api.finish(ctx, path, r);
   }
 
   /** 不走快照，用于「先登录再请求」这类必须实时的场景 */
   static async getFresh(ctx: common.Context, path: string): Promise<ApiResult> {
+    if (Demo.isOn()) {
+      return Api.demoResult(path);
+    }
     const r: HttpResult = await Http.send(Session.base(), Session.token(), 'GET', path, '');
     return Api.finish(ctx, path, r);
   }
 
   static async post(ctx: common.Context, path: string,
     body: Record<string, Object>): Promise<ApiResult> {
+    if (Demo.isOn()) {
+      // 写操作一律拒绝，且明确说明原因 —— 假装成功会让审核员以为真的生效了
+      return {
+        ok: false, fromCache: false, code: 403, data: J.empty(), error: Demo.readOnly()
+      };
+    }
     const text: string = JSON.stringify(body);
     const r: HttpResult = await Http.send(Session.base(), Session.token(), 'POST', path, text);
     return Api.finish(ctx, path, r);
@@ -105,6 +121,11 @@ export class Api {
    * `{ok:false,error:"文件太大（上限 128 MB）"}` 来说明拒绝原因的。
    */
   static async uploadPkg(filename: string, data: ArrayBuffer): Promise<ApiResult> {
+    if (Demo.isOn()) {
+      return {
+        ok: false, fromCache: false, code: 403, data: J.empty(), error: Demo.readOnly()
+      };
+    }
     const r: HttpResult = await Http.upload(Session.base(), Session.token(),
       '/api/v1/system/upload', filename, data);
     const d: J = J.parse(r.body);
@@ -114,6 +135,21 @@ export class Api {
       code: r.code,
       data: d,
       error: r.ok ? d.str('error', '') : (r.error.length > 0 ? r.error : ('HTTP ' + r.code))
+    };
+  }
+
+  /**
+   * 演示模式下的只读取数。返回的 ok 恒为 true —— 界面不该在演示里显示
+   * 「读取失败」；真没录到的接口给空对象，各页的 J 封装都有默认值兜底。
+   */
+  private static demoResult(path: string): ApiResult {
+    const body: string = Demo.data(path);
+    return {
+      ok: true,
+      fromCache: false,
+      code: 200,
+      data: J.parse(body.length > 0 ? body : '{"ok":true}'),
+      error: ''
     };
   }
 

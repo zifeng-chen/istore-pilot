@@ -35,9 +35,14 @@ enum Api {
     /// 令牌失效时统一回到登录页
     static var onAuthFail: (() -> Void)?
 
-    static func cached(_ path: String) -> J? { SnapCache.shared.get(path) }
+    static func cached(_ path: String) -> J? {
+        // 演示模式不读真实快照，否则会先闪一下上次连真机时的数据
+        if Demo.isOn { return nil }
+        return SnapCache.shared.get(path)
+    }
 
     static func get(_ path: String, cache: Bool = true) async throws -> J {
+        if Demo.isOn { return Demo.data(path) }
         let j = try await exec(base: Session.base, token: Session.token,
                                method: "GET", path: path, body: nil, timeout: 15)
         if cache { SnapCache.shared.put(path, j) }
@@ -45,7 +50,11 @@ enum Api {
     }
 
     static func post(_ path: String, _ body: J? = nil, slow: Bool = false) async throws -> J {
-        try await exec(base: Session.base, token: Session.token,
+        // 写操作一律拒绝，且明确说明原因 —— 假装成功会让人以为真的生效了
+        if Demo.isOn {
+            throw ApiError(code: 403, message: Demo.readOnly)
+        }
+        return try await exec(base: Session.base, token: Session.token,
                        method: "POST", path: path, body: body,
                        timeout: slow ? 180 : 20)
     }

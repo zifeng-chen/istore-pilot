@@ -2,6 +2,7 @@ import { common } from '@kit.AbilityKit';
 import { display, LengthMetrics, router, window } from '@kit.ArkUI';
 import { Api, ApiResult } from '../api/Api';
 import { Session } from '../core/Session';
+import { Demo } from '../core/Demo';
 import { Snap } from '../core/Snap';
 import { UI } from '../core/UIState';
 import { SystemBar } from '../core/SystemBar';
@@ -61,6 +62,28 @@ struct LoginPage {
       }
     }).catch(() => {
     });
+  }
+
+  /**
+   * 进演示模式：不需要地址和密码，数据全部来自包内的示例。
+   *
+   * 协议勾选照样要：商店审核要求「使用前明确同意」，演示也是使用。
+   */
+  private async openDemo(): Promise<void> {
+    if (!this.agreed) {
+      this.err = '请先阅读并同意《用户协议》和《隐私政策》';
+      return;
+    }
+    const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    await Demo.init(ctx);
+    if (!await Demo.enter(ctx)) {
+      this.err = '演示数据缺失，请更新到最新版本';
+      return;
+    }
+    // 演示态也给一个假令牌：Session.loggedIn() 用它决定进不进 App，
+    // 真的请求一个都不会发出去（Api 层先拦了）
+    await Session.signIn(ctx, 'demo', 'demo-mode', '演示模式');
+    router.replaceUrl({ url: 'pages/Index' });
   }
 
   private openAgreement(kind: string): void {
@@ -299,6 +322,19 @@ struct LoginPage {
             .margin({ top: 16 })
             .onClick(() => {
               router.pushUrl({ url: 'pages/HelpPage' });
+            });
+
+          // 演示入口：没有路由器的人（评审、朋友、想先看看的人）不用卡在登录页。
+          // 数据是打包在 App 里的示例，只读，不联网
+          Text('没有路由器？先看看演示 →')
+            .fontSize(T.F_SUB)
+            .fontColor($r('app.color.text_secondary'))
+            .width('100%')
+            .textAlign(TextAlign.Center)
+            .constraintSize({ minHeight: 44 })
+            .margin({ top: 4 })
+            .onClick(() => {
+              this.openDemo();
             });
         }
         .padding(20)

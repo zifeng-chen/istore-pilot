@@ -1,6 +1,7 @@
 import { common } from '@kit.AbilityKit';
 import { router } from '@kit.ArkUI';
 import { Api, ApiResult } from '../../api/Api';
+import { Demo } from '../../core/Demo';
 import { J } from '../../core/Json';
 import { UI, UIState } from '../../core/UIState';
 import { Fmt } from '../../util/Fmt';
@@ -620,7 +621,9 @@ export struct OverviewPage {
           .fontColor($r('app.color.hero_fg'))
           .maxLines(1);
         Blank();
-        Text('iStoreOS ' + Fmt.orDash(this.osVersion))
+        // 演示模式下这里换成「演示数据」：审核员第一眼就知道不是真机，
+        // 也不会去追「为什么版本号和我的路由器不一样」
+        Text(Demo.isOn() ? '演示数据' : 'iStoreOS ' + Fmt.orDash(this.osVersion))
           .fontSize(T.F_TINY)
           .fontColor($r('app.color.hero_fg'))
           .padding({ left: 8, right: 8, top: 3, bottom: 3 })

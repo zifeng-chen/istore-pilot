@@ -11,6 +11,7 @@ import com.izifeng.www.istorepilot.MainActivity;
 import com.izifeng.www.istorepilot.R;
 import com.izifeng.www.istorepilot.api.Api;
 import com.izifeng.www.istorepilot.api.Cb;
+import com.izifeng.www.istorepilot.core.Demo;
 import com.izifeng.www.istorepilot.core.Session;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
@@ -49,6 +50,7 @@ public class LoginActivity extends BaseActivity {
         btn.setOnClickListener(v -> submit());
         findViewById(R.id.help).setOnClickListener(v ->
                 startActivity(new Intent(LoginActivity.this, HelpActivity.class)));
+        findViewById(R.id.demo).setOnClickListener(v -> openDemo());
         pwd.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_DONE
                     || (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER)) {
@@ -57,6 +59,22 @@ public class LoginActivity extends BaseActivity {
             }
             return false;
         });
+    }
+
+    /**
+     * 进演示模式：不需要地址和密码，数据全部来自包内的示例。
+     *
+     * 演示态照样写一个「假令牌」：MainActivity 用 tokenValid 判断进不进主界面，
+     * 真正的请求一个都不会发出去（Api 层先拦了）。
+     */
+    private void openDemo() {
+        Demo.setOn(this, true);
+        Demo.restore(this);
+        Session.setBase(this, "http://demo.local:8443");
+        Session.saveToken(this, "demo-mode",
+                System.currentTimeMillis() / 1000L + 365L * 86400L, "演示模式");
+        startActivity(new Intent(LoginActivity.this, MainActivity.class));
+        finish();
     }
 
     private void submit() {

@@ -2,6 +2,7 @@ import { common } from '@kit.AbilityKit';
 import { display, router, window } from '@kit.ArkUI';
 import { Api, ApiResult } from '../api/Api';
 import { Session } from '../core/Session';
+import { Demo } from '../core/Demo';
 import { Shell } from '../core/Shell';
 import { UI, UIState } from '../core/UIState';
 import { Motion } from '../core/Motion';
@@ -64,6 +65,8 @@ struct Index {
     const started: number = Date.now();
 
     await Session.init(ctx);
+    // 演示态从本地恢复：上次停在演示模式的话，这一屏的数据不能去连路由器
+    await Demo.init(ctx);
     Pal.bind(ctx.getApplicationContext());
     // 深浅色要在第一帧之前定下来，否则会先闪一下系统色再跳到用户选的
     await Appearance.init(ctx);
