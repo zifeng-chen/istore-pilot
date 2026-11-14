@@ -6,6 +6,7 @@
     "pages/NetSettingsPage",
     "pages/WebPage",
     "pages/DeviceDetailPage",
-    "pages/SubscriptionPage"
+    "pages/SubscriptionPage",
+    "pages/AgreementPage"
   ]
 }

@@ -870,6 +870,32 @@ export struct SettingsPage {
         }
       });
       SettingRow({
+        glyph: Glyph.CONFIG_FILE,
+        title: '用户协议',
+        subtitle: '使用本应用前请阅读',
+        value: '',
+        valueSize: 0,
+        first: false,
+        danger: false,
+        arrow: true,
+        onTap: () => {
+          router.pushUrl({ url: 'pages/AgreementPage', params: { kind: 'terms' } });
+        }
+      });
+      SettingRow({
+        glyph: Glyph.SECURITY,
+        title: '隐私政策',
+        subtitle: '不收集、不上传任何个人信息',
+        value: '',
+        valueSize: 0,
+        first: false,
+        danger: false,
+        arrow: true,
+        onTap: () => {
+          router.pushUrl({ url: 'pages/AgreementPage', params: { kind: 'privacy' } });
+        }
+      });
+      SettingRow({
         glyph: Glyph.CLEAR_CACHE,
         title: '清缓存',
         subtitle: '只清手机上的快照，不动路由器',

@@ -5,6 +5,7 @@ const PREF_NAME: string = 'istore_session';
 const KEY_BASE: string = 'base';
 const KEY_TOKEN: string = 'token';
 const KEY_USER: string = 'user';
+const KEY_AGREED: string = 'agreed';
 
 /**
  * 服务器地址与登录令牌。
@@ -20,6 +21,8 @@ export class Session {
   private static baseUrl: string = '';
   private static authToken: string = '';
   private static userName: string = '';
+  /** 是否已同意用户协议与隐私政策（同意过一次就不再拦） */
+  private static agreedOk: boolean = false;
 
   /** 首次启动时调一次，之后所有读写都走内存 + 异步落盘 */
   static async init(ctx: common.Context): Promise<void> {
@@ -31,6 +34,7 @@ export class Session {
     Session.baseUrl = (await p.get(KEY_BASE, '')) as string;
     Session.authToken = (await p.get(KEY_TOKEN, '')) as string;
     Session.userName = (await p.get(KEY_USER, '')) as string;
+    Session.agreedOk = (await p.get(KEY_AGREED, false)) as boolean;
   }
 
   static base(): string {
@@ -60,6 +64,18 @@ export class Session {
       v = v + ':8443';
     }
     return v;
+  }
+
+  static accepted(): boolean {
+    return Session.agreedOk;
+  }
+
+  /** 勾选并登录后落盘：下次打开直接带勾 */
+  static async accept(ctx: common.Context): Promise<void> {
+    Session.agreedOk = true;
+    const p = await Session.ready(ctx);
+    await p.put(KEY_AGREED, true);
+    await p.flush();
   }
 
   static token(): string {

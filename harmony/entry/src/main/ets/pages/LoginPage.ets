@@ -1,5 +1,5 @@
 import { common } from '@kit.AbilityKit';
-import { display, router, window } from '@kit.ArkUI';
+import { display, LengthMetrics, router, window } from '@kit.ArkUI';
 import { Api, ApiResult } from '../api/Api';
 import { Session } from '../core/Session';
 import { Snap } from '../core/Snap';
@@ -19,6 +19,8 @@ struct LoginPage {
   @State busy: boolean = false;
   @State err: string = '';
   @State probe: string = '';
+  /** 是否勾选同意协议。审核要求使用前明确同意，不勾不登录 */
+  @State agreed: boolean = false;
   @State safeTop: number = 0;
 
   aboutToAppear(): void {
@@ -31,6 +33,7 @@ struct LoginPage {
       if (Session.base().length > 0) {
         this.host = Session.base();
       }
+      this.agreed = Session.accepted();
     });
     this.safeTop = UI.safeTop;
     // 再从窗口量一次：冷启动直接进登录页时，Index 的 measureSafeArea 还没跑过，
@@ -60,6 +63,10 @@ struct LoginPage {
     });
   }
 
+  private openAgreement(kind: string): void {
+    router.pushUrl({ url: 'pages/AgreementPage', params: { kind: kind } });
+  }
+
   private async doLogin(): Promise<void> {
     if (this.busy) {
       return;
@@ -72,9 +79,15 @@ struct LoginPage {
       this.err = '请填写密码';
       return;
     }
+    if (!this.agreed) {
+      this.err = '请先阅读并同意《用户协议》和《隐私政策》';
+      return;
+    }
     this.busy = true;
     this.err = '';
     this.probe = '';
+    const appCtx = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    await Session.accept(appCtx);
 
     const target: string = Session.normalize(this.host);
     this.host = target;
@@ -216,6 +229,38 @@ struct LoginPage {
               .width('100%')
               .margin({ top: 8 });
           }
+
+          // 协议同意：审核要求「使用前明确同意」，两条协议都是本地页面，不跳外链
+          Flex({ wrap: FlexWrap.Wrap, alignItems: ItemAlign.Center, space: { main: LengthMetrics.vp(4) } }) {
+            Toggle({ type: ToggleType.Checkbox, isOn: this.agreed })
+              .selectedColor($r('app.color.primary'))
+              .width(28)
+              .height(28)
+              .margin({ right: 6 })
+              .onChange((on: boolean) => {
+                this.agreed = on;
+              });
+            Text('我已阅读并同意')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_secondary'));
+            Text('《用户协议》')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.primary'))
+              .onClick(() => {
+                this.openAgreement('terms');
+              });
+            Text('和')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_secondary'));
+            Text('《隐私政策》')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.primary'))
+              .onClick(() => {
+                this.openAgreement('privacy');
+              });
+          }
+          .width('100%')
+          .margin({ top: 18 });
 
           Row({ space: 10 }) {
             Button('测试连接')
