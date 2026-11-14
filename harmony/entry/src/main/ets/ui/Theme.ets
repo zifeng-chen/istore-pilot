@@ -159,7 +159,7 @@ export class Pal {
   }
   /** hero 上的次要文字 */
   static heroFgSoft(): string {
-    return Pal.of($r('app.color.hero_fg_soft'), '#D9FFFFFF');
+    return Pal.of($r('app.color.hero_fg_soft'), '#F2FFFFFF');
   }
   /** hero 上的「在线 / 运行中」强调色（薄荷） */
   static heroOn(): string {

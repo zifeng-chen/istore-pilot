@@ -1,25 +1,10 @@
-import { IconData } from './IconData';
-
-/**
- * 页签图标里只留下「控件装饰」：返回箭头、行尾箭头、对勾、关闭。
- *
- * 这些是 22×22 手算的坐标，和 24 格的设计稿混用会因为缩放比例不同而粗细不一，
- * 所以它们留在 Ico，由 LineIcon 用 design=22 画；语义图标一律走 Glyph。
- */
-export class Ico {
-  static readonly CHEVRON: string = 'M8.5 5.5 L14.5 11 L8.5 16.5';
-  static readonly CHECK: string = 'M4.5 11.5 L9 16 L17.5 6.5';
-  static readonly CLOSE: string = 'M6.6 6.6 L17.4 17.4 M17.4 6.6 L6.6 17.4';
-}
-
 /**
  * 小图标（卡片标题、设置行、按钮）。
  *
  * 图形来自 design/icons（iStore Pilot SVG Icon Library），由
- * scripts/gen_icons.py 归一化成 24×24 的 M/L/C/Z，运行时交给 GlyphIcon
- * 用 Canvas 回放。常量名 = 文件名（kebab-case → UPPER_SNAKE）。
- *
- * 22 格那套手算路径已经退到 Ico，只服务返回/行尾箭头这类「控件装饰」。
+ * scripts/gen_icons.py 落成 media 里的 SVG（见 IconData.ets 的 IconRes），
+ * 运行期由 GlyphIcon 用 Image 渲染并按色值上色。
+ * 常量名 = 文件名（kebab-case → UPPER_SNAKE）。
  */
 export class Glyph {
   static readonly ADD: string = 'add';
@@ -118,12 +103,4 @@ export class Glyph {
   static readonly SWAP: string = 'sync';
   static readonly TRASH: string = 'delete';
   static readonly MOON: string = 'theme';
-
-  static stroke(kind: string): string {
-    return IconData.stroke(kind);
-  }
-
-  static fill(kind: string): string {
-    return IconData.fill(kind);
-  }
 }

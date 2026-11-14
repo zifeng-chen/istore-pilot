@@ -1,10 +1,9 @@
-import { IconData } from './IconData';
 import { Pal, T } from '../Theme';
-import { LineIcon } from '../Comp';
+import { GlyphIcon } from '../Comp';
 
 interface NavItem {
   label: string;
-  path: string;
+  kind: string;
 }
 
 /**
@@ -23,10 +22,10 @@ export struct NavBar {
 
   // 和 Android / iOS 一致：四个页签。「网络」并进了概览 →「网络设置」二级页
   private items: NavItem[] = [
-    { label: '概览', path: IconData.stroke('system-load') },
-    { label: '设备', path: IconData.stroke('devices') },
-    { label: '代理', path: IconData.stroke('proxy') },
-    { label: '设置', path: IconData.stroke('system-settings') }
+    { label: '概览', kind: 'system-load' },
+    { label: '设备', kind: 'devices' },
+    { label: '代理', kind: 'proxy' },
+    { label: '设置', kind: 'system-settings' }
   ];
 
   build() {
@@ -58,12 +57,10 @@ export struct NavBar {
             .borderRadius(T.R_SM)
             .backgroundColor($r('app.color.accent_soft2'));
         }
-        LineIcon({
-          path: item.path,
+        GlyphIcon({
+          kind: item.kind,
           color: this.current === i ? Pal.primary() : Pal.iconOff(),
-          side: 21,
-          design: 24,
-          lineWidth: this.current === i ? 1.85 : 1.6
+          side: 21
         })
       }
       .width(46)

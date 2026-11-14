@@ -1,5 +1,7 @@
+import { common2D, drawing } from '@kit.ArkGraphics2D';
 import { T, Pal } from './Theme';
 import { Glyph } from './comp/Icons';
+import { IconRes } from './comp/IconData';
 
 /**
  * 卡片容器。
@@ -103,131 +105,48 @@ export struct Kv {
 }
 
 /**
- * SVG 路径（只支持绝对 M / L / C / Z）回放到 Canvas 2D。
+ * 图标上色。
  *
- * 为什么不用 `Path` 组件：本项目实测 `Path().commands('M3 16.2 C...')` 只画出了
- * 第一个 M 点 —— 描边宽度成了圆头线帽，看起来就是一个 2vp 的小点。加父 `Shape`、
- * 设 `viewPort`、给 Path 设宽高都试过，都不行；而 Canvas（趋势图、环形）一直正常。
- * 所以图标统一走 Canvas。
- */
-export class IconPath {
-  static replay(ctx: CanvasRenderingContext2D, d: string,
-    scale: number, ox: number, oy: number): void {
-    const segs: string[] = IconPath.split(d);
-    for (let i = 0; i < segs.length; i++) {
-      const seg: string = segs[i];
-      const cmd: string = seg.charAt(0);
-      const nums: number[] = IconPath.numbers(seg.substring(1));
-      if (cmd === 'M' || cmd === 'L') {
-        for (let j = 0; j + 1 < nums.length; j += 2) {
-          if (cmd === 'M') {
-            ctx.moveTo(ox + nums[j] * scale, oy + nums[j + 1] * scale);
-          } else {
-            ctx.lineTo(ox + nums[j] * scale, oy + nums[j + 1] * scale);
-          }
-        }
-      } else if (cmd === 'C') {
-        for (let j = 0; j + 5 < nums.length; j += 6) {
-          ctx.bezierCurveTo(
-            ox + nums[j] * scale, oy + nums[j + 1] * scale,
-            ox + nums[j + 2] * scale, oy + nums[j + 3] * scale,
-            ox + nums[j + 4] * scale, oy + nums[j + 5] * scale);
-        }
-      } else if (cmd === 'Z') {
-        ctx.closePath();
-      }
-    }
-  }
-
-  /** 按指令字母切段，逗号当分隔符 */
-  private static split(d: string): string[] {
-    const out: string[] = [];
-    let cur: string = '';
-    for (let i = 0; i < d.length; i++) {
-      const ch: string = d.charAt(i);
-      if (ch === 'M' || ch === 'L' || ch === 'C' || ch === 'Z') {
-        if (cur.length > 0) {
-          out.push(cur);
-        }
-        cur = ch;
-      } else if (ch === ',') {
-        cur += ' ';
-      } else {
-        cur += ch;
-      }
-    }
-    if (cur.length > 0) {
-      out.push(cur);
-    }
-    return out;
-  }
-
-  private static numbers(s: string): number[] {
-    const out: number[] = [];
-    let cur: string = '';
-    for (let i = 0; i < s.length; i++) {
-      const ch: string = s.charAt(i);
-      const isNum: boolean = (ch >= '0' && ch <= '9') || ch === '.' || ch === '-';
-      if (isNum) {
-        cur += ch;
-      } else if (cur.length > 0) {
-        out.push(Number.parseFloat(cur));
-        cur = '';
-      }
-    }
-    if (cur.length > 0) {
-      out.push(Number.parseFloat(cur));
-    }
-    return out;
-  }
-}
-
-/**
- * 线条图标（页签、返回箭头、行尾箭头、登录页盾牌都走它）。
+ * media 里的 SVG 是纯黑的（#000000），颜色在运行时用 SRC_IN 叠上去：
+ * 保留图形的 alpha、把 RGB 换成目标色，描边和实心点一起上色，
+ * 同一个图标就不用为每种颜色各存一份文件。
  *
- * `design` 是路径的坐标系边长：页签那套按 22 格手算，Glyph 那套是 24 格 + 1 的留白。
+ * 色值只有十来个，按色值缓存 —— 一屏几十个图标，没必要每次 build
+ * 都新建一个 native 滤镜对象。
  */
-@ComponentV2
-export struct LineIcon {
-  @Param path: string = '';
-  @Param color: string = '';
-  @Param side: number = 22;
-  @Param lineWidth: number = 1.7;
-  @Param spin: number = 0;
-  @Param design: number = 22;
+export class Tint {
+  private static cache: Map<string, drawing.ColorFilter> = new Map();
 
-  private cfg: RenderingContextSettings = new RenderingContextSettings(true);
-  private cv: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.cfg);
-  private ready: boolean = false;
-
-  @Monitor('path','color')
-  redraw(): void {
-    if (this.ready) {
-      this.draw();
+  static of(hex: string): drawing.ColorFilter {
+    const hit: drawing.ColorFilter | undefined = Tint.cache.get(hex);
+    if (hit !== undefined) {
+      return hit;
     }
+    const c: common2D.Color = Tint.rgba(hex);
+    const f: drawing.ColorFilter =
+      drawing.ColorFilter.createBlendModeColorFilter(c, drawing.BlendMode.SRC_IN);
+    Tint.cache.set(hex, f);
+    return f;
   }
 
-  private draw(): void {
-    const s: number = this.side;
-    this.cv.clearRect(0, 0, s, s);
-    this.cv.strokeStyle = this.color;
-    this.cv.lineWidth = this.lineWidth;
-    this.cv.lineCap = 'round';
-    this.cv.lineJoin = 'round';
-    this.cv.beginPath();
-    IconPath.replay(this.cv, this.path, s / this.design, 0, 0);
-    this.cv.stroke();
-  }
-
-  build() {
-    Canvas(this.cv)
-      .width(this.side)
-      .height(this.side)
-      .rotate({ angle: this.spin })
-      .onReady(() => {
-        this.ready = true;
-        this.draw();
-      });
+  /** '#RRGGBB' / '#AARRGGBB' → common2D.Color（每一位都是 0-255） */
+  private static rgba(hex: string): common2D.Color {
+    let body: string = hex.startsWith('#') ? hex.substring(1) : hex;
+    if (body.length === 6) {
+      body = 'FF' + body;
+    } else if (body.length !== 8) {
+      body = 'FF000000';
+    }
+    const v: number = Number.parseInt(body, 16);
+    if (Number.isNaN(v)) {
+      return { alpha: 255, red: 0, green: 0, blue: 0 };
+    }
+    return {
+      alpha: (v >>> 24) & 0xFF,
+      red: (v >>> 16) & 0xFF,
+      green: (v >>> 8) & 0xFF,
+      blue: v & 0xFF
+    };
   }
 }
 
@@ -312,9 +231,14 @@ export struct CardHeader {
 /**
  * 线性图标。
  *
- * 24×24 的 Path 指令由 viewPort 缩放，所以同一套路径在 15 和 22 上
- * 观感一致 —— 页签那套 Ico 是按 22 格手算的，尺寸一变粗细就漂。
- * viewPort 往外扩 1 格：描边 2 的话边缘会逃出去半个线宽，被裁掉就变方角了。
+ * 图形来自 design/icons，由 scripts/gen_icons.py 落成 media 里的 SVG
+ * （26 视口、描边 2），这里只负责尺寸、颜色和朝向。
+ *
+ * 为什么不再用 Canvas 自绘：应用市场审核按控件类型量两件事 ——
+ * Canvas 会被当成「没有背景色的文本」量对比度（实测 1.03），
+ * 也会被量边缘锯齿（31px 的小箭头 94.67，阈值 90）。换成 Image 渲染矢量
+ * 资源后，控件类型变了、光栅化交给系统，两个指标都不再成立；
+ * 顺带也不用再等 onReady 才能画第一次。
  */
 @ComponentV2
 export struct GlyphIcon {
@@ -322,52 +246,19 @@ export struct GlyphIcon {
   @Param color: string = '';
   /** 组件边长（vp）。不能叫 size —— 那是 CustomComponent 自带的属性方法 */
   @Param side: number = 20;
+  /** 历史参数：描边已经烘进 SVG，这里不再使用，保留只为不动几百处调用点 */
   @Param lineWidth: number = 2;
-
-  private cfg: RenderingContextSettings = new RenderingContextSettings(true);
-  private cv: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.cfg);
-  private ready: boolean = false;
-
-  @Monitor('kind','color')
-  redraw(): void {
-    if (this.ready) {
-      this.draw();
-    }
-  }
-
-  private draw(): void {
-    const s: number = this.side;
-    // 设计稿是 24 格，留 1 的边 → 26 的视口，坐标要整体平移 1 格
-    const k: number = s / 26;
-    const o: number = k;
-    this.cv.clearRect(0, 0, s, s);
-    this.cv.lineCap = 'round';
-    this.cv.lineJoin = 'round';
-
-    this.cv.beginPath();
-    this.cv.strokeStyle = this.color;
-    this.cv.lineWidth = this.lineWidth * k;
-    IconPath.replay(this.cv, Glyph.stroke(this.kind), k, o, o);
-    this.cv.stroke();
-
-    // 色盘的孔、信息图标的点必须实心，混在描边里整条路径都会被填满
-    const f: string = Glyph.fill(this.kind);
-    if (f.length > 0) {
-      this.cv.beginPath();
-      this.cv.fillStyle = this.color;
-      IconPath.replay(this.cv, f, k, o, o);
-      this.cv.fill();
-    }
-  }
+  /** 旋转角度（返回箭头用 180 把「向右」变成「向左」） */
+  @Param spin: number = 0;
 
   build() {
-    Canvas(this.cv)
+    Image(IconRes.of(this.kind))
       .width(this.side)
       .height(this.side)
-      .onReady(() => {
-        this.ready = true;
-        this.draw();
-      });
+      .objectFit(ImageFit.Contain)
+      .colorFilter(Tint.of(this.color))
+      .rotate({ angle: this.spin })
+      .draggable(false);
   }
 }
 

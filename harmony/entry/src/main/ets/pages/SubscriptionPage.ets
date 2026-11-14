@@ -285,10 +285,10 @@ struct SubscriptionPage {
           .fontColor($r('app.color.primary'))
           .padding({ left: 14, right: 14, top: 4, bottom: 4 })
           // 动作按钮一律 12 圆角，胶囊只留给「使用中」这类状态标签
-          .borderRadius(T.R_SM)
+          .borderRadius(T.R_PILL)
           .backgroundColor($r('app.color.accent_soft'))
           // 视觉尺寸不变，热区撑到 44
-          .constraintSize({ minHeight: 44, minWidth: 44 })
+          .constraintSize({ minHeight: 44, minWidth: 78 })
           .textAlign(TextAlign.Center)
           .clickEffect({ level: ClickEffectLevel.LIGHT })
           .onClick(() => {
@@ -381,11 +381,11 @@ struct SubscriptionPage {
                       .fontSize(T.F_TINY)
                       .fontColor(it.inUse ? $r('app.color.primary') : $r('app.color.text_secondary'))
                       .padding({ left: 12, right: 12, top: 5, bottom: 5 })
-                      .borderRadius(T.R_SM)
+                      .borderRadius(T.R_PILL)
                       .backgroundColor(it.inUse
                         ? $r('app.color.accent_soft')
                         : $r('app.color.surface_sunken'))
-                      .constraintSize({ minHeight: 44, minWidth: 44 })
+                      .constraintSize({ minHeight: 44, minWidth: 78 })
                       .textAlign(TextAlign.Center)
                       .accessibilityText('更新 ' + it.name)
                       .clickEffect({ level: ClickEffectLevel.LIGHT })
@@ -575,7 +575,7 @@ struct SubscriptionPage {
             .fontSize(T.F_BODY)
             .fontColor($r('app.color.on_primary'))
             .padding({ left: 22, right: 22, top: 8, bottom: 8 })
-            .borderRadius(T.R_SM)
+            .borderRadius(T.R_PILL)
             .backgroundColor($r('app.color.primary'))
             .onClick(() => {
               this.save();

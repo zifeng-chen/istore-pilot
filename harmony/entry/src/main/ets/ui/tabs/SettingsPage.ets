@@ -14,8 +14,8 @@ import { Fmt } from '../../util/Fmt';
 import { Appearance } from '../Appearance';
 import { Bp } from '../Breakpoint';
 import { Pal, T } from '../Theme';
-import { Card, CardTitle, Comp, GlyphIcon, Hairline, LineIcon, Note, RowCard, SettingRow } from '../Comp';
-import { Glyph, Ico } from '../comp/Icons';
+import { Card, CardTitle, Comp, GlyphIcon, Hairline, Note, RowCard, SettingRow } from '../Comp';
+import { Glyph } from '../comp/Icons';
 import { BackupsPage } from './BackupsPage';
 import { HardwarePage } from './HardwarePage';
 
@@ -376,11 +376,10 @@ export struct SettingsPage {
   backBar(title: string) {
     Row() {
       Row() {
-        LineIcon({
-          path: Ico.CHEVRON,
+        GlyphIcon({
+          kind: Glyph.CHEVRON_RIGHT,
           color: Pal.textPrimary(),
           side: 20,
-          lineWidth: 1.9,
           spin: 180
         });
       }
@@ -1022,7 +1021,7 @@ export struct SettingsPage {
             }
             .width(30)
             .height(30)
-            .borderRadius(15)
+            .borderRadius(T.R_XS)
             .backgroundColor($r('app.color.surface_hi'));
           }
           .width(44)
@@ -1057,7 +1056,7 @@ export struct SettingsPage {
         Row({ space: 10 }) {
           Button('关闭')
             .type(ButtonType.Normal)
-            .borderRadius(T.R_SM)
+            .borderRadius(T.R_PILL)
             .height(44)
             .layoutWeight(1)
             .fontSize(T.F_BODY)
@@ -1068,7 +1067,7 @@ export struct SettingsPage {
             });
           Button('复制')
             .type(ButtonType.Normal)
-            .borderRadius(T.R_SM)
+            .borderRadius(T.R_PILL)
             .height(44)
             .layoutWeight(1)
             .fontSize(T.F_BODY)
@@ -1118,7 +1117,7 @@ export struct SettingsPage {
             }
             .width(30)
             .height(30)
-            .borderRadius(15)
+            .borderRadius(T.R_XS)
             .backgroundColor($r('app.color.surface_hi'));
           }
           .width(44)
@@ -1146,7 +1145,7 @@ export struct SettingsPage {
             Row({ space: 10 }) {
               Button('关闭')
                 .type(ButtonType.Normal)
-                .borderRadius(T.R_SM)
+                .borderRadius(T.R_PILL)
                 .height(44)
                 .layoutWeight(1)
                 .fontSize(T.F_BODY)
@@ -1157,7 +1156,7 @@ export struct SettingsPage {
                 });
               Button(this.infoActionLabel)
                 .type(ButtonType.Normal)
-                .borderRadius(T.R_SM)
+                .borderRadius(T.R_PILL)
                 .height(44)
                 .layoutWeight(1.4)
                 .fontSize(T.F_BODY)
@@ -1175,7 +1174,7 @@ export struct SettingsPage {
           } else {
             Button('知道了')
               .type(ButtonType.Normal)
-              .borderRadius(T.R_SM)
+              .borderRadius(T.R_PILL)
               .height(44)
               .width('100%')
               .fontSize(T.F_BODY)
@@ -1191,7 +1190,7 @@ export struct SettingsPage {
           Row({ space: 10 }) {
             Button('取消')
               .type(ButtonType.Normal)
-              .borderRadius(T.R_SM)
+              .borderRadius(T.R_PILL)
               .height(44)
               .layoutWeight(1)
               .fontSize(T.F_BODY)
@@ -1202,7 +1201,7 @@ export struct SettingsPage {
               });
             Button(this.busy ? '处理中…' : '保存')
               .type(ButtonType.Normal)
-              .borderRadius(T.R_SM)
+              .borderRadius(T.R_PILL)
               .height(44)
               .layoutWeight(1)
               .fontSize(T.F_BODY)

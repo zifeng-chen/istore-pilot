@@ -565,7 +565,7 @@ export struct ShieldPage {
           }
           .width(30)
           .height(30)
-          .borderRadius(15)
+          .borderRadius(T.R_XS)
           .backgroundColor($r('app.color.surface_hi'));
         }
         .width(44)
@@ -595,7 +595,7 @@ export struct ShieldPage {
 
       Button(this.uninstalling ? '正在卸载…' : '卸载，保留配置')
         .type(ButtonType.Normal)
-        .borderRadius(T.R_SM)
+        .borderRadius(T.R_PILL)
         .constraintSize({ minHeight: 44 })
         .padding({ top: 10, bottom: 10 })
         .width('100%')
@@ -610,7 +610,7 @@ export struct ShieldPage {
 
       Button(this.uninstalling ? '正在卸载…' : '卸载，并删除配置与日志')
         .type(ButtonType.Normal)
-        .borderRadius(T.R_SM)
+        .borderRadius(T.R_PILL)
         .constraintSize({ minHeight: 44 })
         .padding({ top: 10, bottom: 10 })
         .width('100%')
@@ -1102,7 +1102,7 @@ export struct ShieldPage {
       Row() {
         Button(this.ruleBusy ? '处理中…' : '立即更新规则')
           .type(ButtonType.Normal)
-          .borderRadius(T.R_SM)
+          .borderRadius(T.R_PILL)
           .height(42)
           .width('100%')
           .fontSize(T.F_BODY)

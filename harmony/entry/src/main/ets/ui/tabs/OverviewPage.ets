@@ -553,7 +553,7 @@ export struct OverviewPage {
           }
           .width(30)
           .height(30)
-          .borderRadius(15)
+          .borderRadius(T.R_XS)
           .backgroundColor($r('app.color.surface_hi'));
         }
         .width(44)

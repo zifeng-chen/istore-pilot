@@ -8,8 +8,8 @@ import { Shell } from '../../core/Shell';
 import { Fmt } from '../../util/Fmt';
 import { Pal, T } from '../Theme';
 import { Bp } from '../Breakpoint';
-import { Card, CardTitle, Comp, GlyphIcon, Hairline, HeroStat, LineIcon, Pill } from '../Comp';
-import { Glyph, Ico } from '../comp/Icons';
+import { Card, CardTitle, Comp, GlyphIcon, Hairline, HeroStat, Pill } from '../Comp';
+import { Glyph } from '../comp/Icons';
 import { AppIcon } from '../comp/AppIcon';
 import { DevicesPage } from './DevicesPage';
 import { ShieldPage } from './ShieldPage';
@@ -338,11 +338,10 @@ export struct SecurityPage {
   backBar(title: string) {
     Row() {
       Row() {
-        LineIcon({
-          path: Ico.CHEVRON,
+        GlyphIcon({
+          kind: Glyph.CHEVRON_RIGHT,
           color: Pal.textPrimary(),
           side: 20,
-          lineWidth: 1.9,
           spin: 180
         });
       }
@@ -504,7 +503,7 @@ export struct SecurityPage {
       .alignItems(HorizontalAlign.Start)
       .layoutWeight(1);
 
-      LineIcon({ path: Ico.CHEVRON, color: Pal.textTertiary(), side: 16, lineWidth: 1.6 })
+      GlyphIcon({ kind: Glyph.CHEVRON_RIGHT, color: Pal.textTertiary(), side: 16 })
     }
     .width('100%')
     .padding({ top: 11, bottom: 11 })
@@ -586,7 +585,7 @@ export struct SecurityPage {
             Text('全部 ' + this.appRows.length + ' 个')
               .fontSize(T.F_TINY)
               .fontColor($r('app.color.primary'));
-            LineIcon({ path: Ico.CHEVRON, color: Pal.primary(), side: 12, lineWidth: 1.6 });
+            GlyphIcon({ kind: Glyph.CHEVRON_RIGHT, color: Pal.primary(), side: 12 });
           }
           .alignItems(VerticalAlign.Center);
         }
@@ -899,7 +898,7 @@ export struct SecurityPage {
           .constraintSize({ minHeight: 44 })
           .padding({ top: 11, bottom: 11 })
           .backgroundColor($r('app.color.primary'))
-          .borderRadius(T.R_SM)
+          .borderRadius(T.R_PILL)
           .opacity(this.adInstalling ? 0.55 : 1)
           .margin({ top: 16 })
           .onClick(() => {

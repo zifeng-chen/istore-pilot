@@ -50,7 +50,7 @@
     },
     {
       "name": "hero_fg_soft",
-      "value": "#D9FFFFFF"
+      "value": "#F2FFFFFF"
     },
     {
       "name": "hero_stroke",
@@ -62,7 +62,7 @@
     },
     {
       "name": "accent_soft",
-      "value": "#1700A87E"
+      "value": "#1200A87E"
     },
     {
       "name": "accent_soft2",

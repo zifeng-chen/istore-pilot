@@ -345,7 +345,7 @@ export struct NetworkPage {
           .fontSize(T.F_BODY)
           .fontColor($r('app.color.on_primary'))
           .backgroundColor($r('app.color.primary'))
-          .borderRadius(T.R_LG)
+          .borderRadius(T.R_PILL)
           .enabled(!this.acting)
           .onClick(() => this.askAction('reconnect'));
 
@@ -355,7 +355,7 @@ export struct NetworkPage {
           .fontSize(T.F_BODY)
           .fontColor($r('app.color.text_primary'))
           .backgroundColor($r('app.color.surface_sunken'))
-          .borderRadius(T.R_LG)
+          .borderRadius(T.R_PILL)
           .enabled(!this.acting)
           .onClick(() => this.askAction(this.wanUp ? 'down' : 'up'));
       }
@@ -523,7 +523,7 @@ export struct NetworkPage {
         .fontSize(T.F_BODY)
         .fontColor($r('app.color.on_primary'))
         .backgroundColor($r('app.color.primary'))
-        .borderRadius(T.R_SM)
+        .borderRadius(T.R_PILL)
         .margin({ top: 12 })
         .enabled(!this.savingWan)
         .onClick(() => this.askSaveWan());

@@ -1,8 +1,8 @@
 import { router } from '@kit.ArkUI';
 import { UI } from '../core/UIState';
 import { Pal, T } from '../ui/Theme';
-import { Card, CardHeader, LineIcon, Note } from '../ui/Comp';
-import { Ico } from '../ui/comp/Icons';
+import { Card, CardHeader, GlyphIcon, Note } from '../ui/Comp';
+import { Glyph } from '../ui/comp/Icons';
 
 /**
  * 使用帮助：从「路由器上还没有 Agent」讲到「四个页签怎么用」。
@@ -23,11 +23,10 @@ struct HelpPage {
       // 顶栏：和另外几个二级页同一套（只有箭头，不写「返回」），路由页整页压上来
       Row({ space: 4 }) {
         Row() {
-          LineIcon({
-            path: Ico.CHEVRON,
+          GlyphIcon({
+            kind: Glyph.CHEVRON_RIGHT,
             color: Pal.textPrimary(),
             side: 20,
-            lineWidth: 1.9,
             spin: 180
           });
         }

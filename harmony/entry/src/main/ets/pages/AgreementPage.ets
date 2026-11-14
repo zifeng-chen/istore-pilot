@@ -2,8 +2,8 @@ import { router } from '@kit.ArkUI';
 import { Agreements } from '../core/Agreements';
 import { UI } from '../core/UIState';
 import { Pal, T } from '../ui/Theme';
-import { Card, LineIcon } from '../ui/Comp';
-import { Ico } from '../ui/comp/Icons';
+import { Card, GlyphIcon } from '../ui/Comp';
+import { Glyph } from '../ui/comp/Icons';
 
 /**
  * 用户协议 / 隐私政策（本地页）。
@@ -40,11 +40,10 @@ struct AgreementPage {
     Column() {
       Row({ space: 4 }) {
         Row() {
-          LineIcon({
-            path: Ico.CHEVRON,
+          GlyphIcon({
+            kind: Glyph.CHEVRON_RIGHT,
             color: Pal.textPrimary(),
             side: 20,
-            lineWidth: 1.9,
             spin: 180
           });
         }

@@ -1,11 +1,10 @@
-import { IconData } from './IconData';
 import { UI } from '../../core/UIState';
 import { Pal, T } from '../Theme';
-import { LineIcon } from '../Comp';
+import { GlyphIcon } from '../Comp';
 
 interface RailItem {
   label: string;
-  path: string;
+  kind: string;
   hint: string;
 }
 
@@ -29,10 +28,10 @@ export struct SideNav {
 
   // 四个页签，和手机端、Android、iOS 保持一致
   private items: RailItem[] = [
-    { label: '概览', path: IconData.stroke('system-load'), hint: '状态与速率' },
-    { label: '设备', path: IconData.stroke('devices'), hint: '在线与拦截' },
-    { label: '代理', path: IconData.stroke('proxy'), hint: '节点与分流' },
-    { label: '设置', path: IconData.stroke('system-settings'), hint: '连接与维护' }
+    { label: '概览', kind: 'system-load', hint: '状态与速率' },
+    { label: '设备', kind: 'devices', hint: '在线与拦截' },
+    { label: '代理', kind: 'proxy', hint: '节点与分流' },
+    { label: '设置', kind: 'system-settings', hint: '连接与维护' }
   ];
 
   build() {
@@ -46,12 +45,7 @@ export struct SideNav {
               .height(30)
               .borderRadius(T.R_XS)
               .backgroundColor($r('app.color.accent_soft2'));
-            LineIcon({
-              path: 'M7 9 L11.5 5.5 M7 9 L11.5 12.5 M7 9 L7 9.1',
-              color: Pal.primary(),
-              side: 22,
-              lineWidth: 1.8
-            })
+            GlyphIcon({ kind: 'nav-mark', color: Pal.primary(), side: 22 })
           }
           .width(30)
           .height(30);
@@ -107,12 +101,10 @@ export struct SideNav {
         .borderRadius(2)
         .backgroundColor(Pal.primary());
 
-      LineIcon({
-        path: item.path,
+      GlyphIcon({
+        kind: item.kind,
         color: this.current === i ? Pal.primary() : Pal.iconOff(),
-        side: 21,
-        design: 24,
-        lineWidth: this.current === i ? 1.85 : 1.6
+        side: 21
       })
         .margin({ left: 12 })
 

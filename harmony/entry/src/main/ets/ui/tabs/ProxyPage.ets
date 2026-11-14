@@ -1663,7 +1663,7 @@ export struct ProxyPage {
                 .backgroundColor(b.running
                   ? $r('app.color.hero_chip_strong')
                   : $r('app.color.hero_chip'))
-                .constraintSize({ minHeight: 44, minWidth: 44 })
+                .constraintSize({ minHeight: 44, minWidth: 78 })
                 .textAlign(TextAlign.Center)
                 .accessibilityText((b.running ? '运行中，点按停止 ' : '未运行，点按启动 ') + b.label)
                 .clickEffect({ level: ClickEffectLevel.LIGHT })
@@ -1850,7 +1850,7 @@ export struct ProxyPage {
 
       Button('取消')
         .type(ButtonType.Normal)
-        .borderRadius(T.R_SM)
+        .borderRadius(T.R_PILL)
         .height(44)
         .width('100%')
         .fontSize(T.F_BODY)
@@ -1884,7 +1884,7 @@ export struct ProxyPage {
         }
         .width(30)
         .height(30)
-        .borderRadius(15)
+        .borderRadius(T.R_XS)
         .backgroundColor($r('app.color.surface_hi'));
       }
       .width(44)
@@ -2075,7 +2075,7 @@ export struct ProxyPage {
           }
           .width(30)
           .height(30)
-          .borderRadius(15)
+          .borderRadius(T.R_XS)
           .backgroundColor($r('app.color.surface_hi'));
         }
         .width(44)
@@ -2203,9 +2203,9 @@ export struct ProxyPage {
                         .fontSize(T.F_SUB)
                         .fontColor($r('app.color.on_primary'))
                         .padding({ left: 12, right: 12, top: 5, bottom: 5 })
-                        .borderRadius(T.R_SM)
+                        .borderRadius(T.R_PILL)
                         .backgroundColor($r('app.color.primary'))
-                        .constraintSize({ minHeight: 44, minWidth: 44 })
+                        .constraintSize({ minHeight: 44, minWidth: 78 })
                         .textAlign(TextAlign.Center)
                         .accessibilityText('更新 ' + b.label)
                         .clickEffect({ level: ClickEffectLevel.LIGHT })
@@ -2219,9 +2219,9 @@ export struct ProxyPage {
                       .fontColor($r('app.color.danger'))
                       .padding({ left: 12, right: 12, top: 5, bottom: 5 })
                       // 和「更新」「下载安装」一样用 12 的圆角，胶囊只留给状态标签
-                      .borderRadius(T.R_SM)
+                      .borderRadius(T.R_PILL)
                       .backgroundColor(Comp.alpha(Pal.danger(), 0.12))
-                      .constraintSize({ minHeight: 44, minWidth: 44 })
+                      .constraintSize({ minHeight: 44, minWidth: 78 })
                       .textAlign(TextAlign.Center)
                       .accessibilityText('卸载 ' + b.label)
                       .clickEffect({ level: ClickEffectLevel.LIGHT })
@@ -2253,7 +2253,7 @@ export struct ProxyPage {
                 Text('刷新')
                   .fontSize(T.F_TINY)
                   .fontColor($r('app.color.primary'))
-                  .constraintSize({ minHeight: 44, minWidth: 44 })
+                  .constraintSize({ minHeight: 44, minWidth: 78 })
                   .textAlign(TextAlign.Center)
                   .onClick(() => {
                     this.loadPkg(true);
@@ -2428,7 +2428,7 @@ export struct ProxyPage {
               .fontSize(T.F_TINY)
               .fontColor($r('app.color.text_secondary'))
               .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-              .borderRadius(T.R_SM)
+              .borderRadius(T.R_PILL)
               .backgroundColor($r('app.color.surface_sunken'))
               .onClick(() => {
                 this.pkgConfirm = '';
@@ -2437,7 +2437,7 @@ export struct ProxyPage {
               .fontSize(T.F_TINY)
               .fontColor($r('app.color.on_primary'))
               .padding({ left: 12, right: 12, top: 5, bottom: 5 })
-              .borderRadius(T.R_SM)
+              .borderRadius(T.R_PILL)
               .backgroundColor($r('app.color.primary'))
               .onClick(() => {
                 this.doPkgInstall();
@@ -2451,9 +2451,9 @@ export struct ProxyPage {
             .fontSize(T.F_SUB)
             .fontColor($r('app.color.text_tertiary'))
             .padding({ left: 12, right: 12, top: 5, bottom: 5 })
-            .borderRadius(T.R_SM)
+            .borderRadius(T.R_PILL)
             .backgroundColor($r('app.color.surface_sunken'))
-            .constraintSize({ minHeight: 44, minWidth: 44 })
+            .constraintSize({ minHeight: 44, minWidth: 78 })
             .textAlign(TextAlign.Center)
             .margin({ left: 8 });
         } else {
@@ -2461,9 +2461,9 @@ export struct ProxyPage {
             .fontSize(T.F_SUB)
             .fontColor($r('app.color.primary'))
             .padding({ left: 12, right: 12, top: 5, bottom: 5 })
-            .borderRadius(T.R_SM)
+            .borderRadius(T.R_PILL)
             .backgroundColor($r('app.color.accent_soft'))
-            .constraintSize({ minHeight: 44, minWidth: 44 })
+            .constraintSize({ minHeight: 44, minWidth: 78 })
             .textAlign(TextAlign.Center)
             .margin({ left: 8 })
             .clickEffect({ level: ClickEffectLevel.LIGHT })
@@ -2724,7 +2724,7 @@ export struct ProxyPage {
           }
           .width(30)
           .height(30)
-          .borderRadius(15)
+          .borderRadius(T.R_XS)
           .backgroundColor($r('app.color.surface_hi'));
         }
         .width(44)

@@ -22,7 +22,7 @@
 | 端 | 数据 | 渲染 | 页签 |
 |---|---|---|---|
 | Android | `widget/IconData.java` | `Glyph` + `androidx PathParser`，解析一次静态缓存 | `res/drawable/ic_nav_*.xml`（VectorDrawable） |
-| 鸿蒙 | `ui/comp/IconData.ets` | `GlyphIcon` + `IconPath.replay`（Canvas） | `NavBar`/`SideNav` 直接用 `IconData.stroke()` |
+| 鸿蒙 | `resources/base/media/ic_*.svg` + `ui/comp/IconData.ets` | `GlyphIcon` = `Image` + `ColorFilter(SRC_IN)` 上色 | `IconRes.of(kind)` 查表；不再用 Canvas（审核按控件类型量对比度/锯齿） |
 | iOS | `UI/IconData.swift` | `LineIcon`（`Canvas` + 自写解析器，带缓存） | 底部标签沿用系统 TabView，图标走 `LineIcon` |
 
 改图流程：换 `design/icons/icons/**/*.svg` → `python scripts/gen_icons.py` → 三端重新编译。
