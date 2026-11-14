@@ -6,9 +6,7 @@ import { Demo } from '../core/Demo';
 import { Snap } from '../core/Snap';
 import { UI } from '../core/UIState';
 import { SystemBar } from '../core/SystemBar';
-import { Pal, T } from '../ui/Theme';
-import { LineIcon } from '../ui/Comp';
-import { IconData } from '../ui/comp/IconData';
+import { T } from '../ui/Theme';
 
 const DEFAULT_BASE: string = 'http://192.168.100.1:8443';
 
@@ -155,21 +153,13 @@ struct LoginPage {
   build() {
     Column() {
       Column() {
-        // 品牌区
+        // 品牌区：用 App 自己的图标，不再拿「安全盾牌」顶替
         Column() {
-          Stack() {
-            LineIcon({
-              path: IconData.stroke('security'),
-              color: Pal.primary(),
-              side: 46,
-              design: 24,
-              lineWidth: 2
-            })
-          }
-          .width(76)
-          .height(76)
-          .borderRadius(T.R_XL)
-          .backgroundColor($r('app.color.accent_soft'));
+          Image($r('app.media.app_icon'))
+            .width(76)
+            .height(76)
+            .borderRadius(T.R_XL)
+            .shadow({ radius: 18, color: $r('app.color.shadow_2'), offsetX: 0, offsetY: 5 });
 
           Text('iStore Pilot')
             .fontSize(T.F_HERO)
@@ -257,8 +247,9 @@ struct LoginPage {
           Flex({ wrap: FlexWrap.Wrap, alignItems: ItemAlign.Center, space: { main: LengthMetrics.vp(4) } }) {
             Toggle({ type: ToggleType.Checkbox, isOn: this.agreed })
               .selectedColor($r('app.color.primary'))
-              .width(28)
-              .height(28)
+              // 20 是 Material checkbox 的标准视觉尺寸；28 在一行小字旁边太抢眼
+              .width(20)
+              .height(20)
               .margin({ right: 6 })
               .onChange((on: boolean) => {
                 this.agreed = on;

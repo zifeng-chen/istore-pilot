@@ -6,7 +6,8 @@ import { UI, UIState } from '../../core/UIState';
 import { Fmt } from '../../util/Fmt';
 import { Bp } from '../Breakpoint';
 import { Pal, T } from '../Theme';
-import { GroupBox, Hairline } from '../Comp';
+import { GroupBox, GlyphIcon, Hairline } from '../Comp';
+import { Glyph } from '../comp/Icons';
 
 /**
  * 徽标文字：能缩写就缩写（5G / 2.4G / WiFi / LAN），与安卓 `Access.shortLabel`、
@@ -396,6 +397,30 @@ export struct DevicesPage {
     }
   }
 
+  /**
+   * 徽标图标。用图标包里的那一套，不再只靠两个字的缩写：
+   *   - 有线 → wired-connection（RJ45）
+   *   - 5G   → wifi-5g，2.4G → wifi-2-4g，频段不明 → wifi
+   *   - 离线 → wifi-offline
+   * 类型认不出来返回空串，调用方退回原来的文字徽标。
+   */
+  private badgeGlyph(d: DevRow): string {
+    if (!d.online) {
+      return Glyph.WIFI_OFFLINE;
+    }
+    if (d.type === 'wired') {
+      return Glyph.WIRED_CONNECTION;
+    }
+    if (d.badge === '5G') {
+      return Glyph.WIFI_5G;
+    }
+    if (d.badge === '2.4G') {
+      return Glyph.WIFI_2_4G;
+    }
+    // 图标包里没有「不分频段的 wifi」，这种情况退回文字徽标（显示 WiFi）
+    return '';
+  }
+
   /** 徽标配色：5G 用主色、2.4G 用警示色，离线整体压灰 —— 与安卓一致 */
   private badgeColor(d: DevRow): string {
     if (!d.online) {
@@ -429,17 +454,29 @@ export struct DevicesPage {
       Row({ space: 10 }) {
         // 接入方式徽标（5G / 2.4G / LAN）替掉原来的首字方块：
         // 一排方块看不出「插线还是无线、连的哪个频段」，而那才是用户想知道的
-        Text(d.badge)
-          .fontSize(T.F_TINY)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(this.badgeColor(d))
-          .textAlign(TextAlign.Center)
-          // 正方形：5G / 2.4G / WiFi / LAN / — 一律同尺寸，不再随文字长短忽宽忽窄
-          .width(30)
-          .height(30)
-          .borderRadius(T.R_XS)
-          .backgroundColor(d.badgeReal ? Pal.alpha(this.badgeColor(d), 0.14) : Color.Transparent)
-          .border({ width: d.badgeReal ? 0 : 1, color: Pal.alpha(this.badgeColor(d), 0.42) });
+        Stack() {
+          if (this.badgeGlyph(d).length > 0) {
+            GlyphIcon({
+              kind: this.badgeGlyph(d),
+              color: this.badgeColor(d),
+              side: 17,
+              lineWidth: 1.9
+            });
+          } else {
+            Text(d.badge)
+              .fontSize(T.F_TINY)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(this.badgeColor(d));
+          }
+        }
+        .width(30)
+        .height(30)
+        .borderRadius(T.R_XS)
+        .alignContent(Alignment.Center)
+        .backgroundColor(d.badgeReal ? Pal.alpha(this.badgeColor(d), 0.14) : Color.Transparent)
+        .border({ width: d.badgeReal ? 0 : 1, color: Pal.alpha(this.badgeColor(d), 0.42) })
+        // 读屏时把图标说不出的话补上
+        .accessibilityText('接入方式 ' + d.badge);
 
         Column() {
           Row({ space: 6 }) {
@@ -688,15 +725,27 @@ export struct DevicesPage {
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .margin({ top: 2 });
 
-      Text(d.badge)
-        .fontSize(T.F_TINY)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(this.badgeColor(d))
-        .padding({ left: 5, right: 5, top: 1.5, bottom: 1.5 })
-        .borderRadius(6)
-        .backgroundColor(d.badgeReal ? Pal.alpha(this.badgeColor(d), 0.14) : Color.Transparent)
-        .border({ width: d.badgeReal ? 0 : 1, color: Pal.alpha(this.badgeColor(d), 0.42) })
-        .margin({ top: 5 });
+      Row({ space: 3 }) {
+        if (this.badgeGlyph(d).length > 0) {
+          GlyphIcon({
+            kind: this.badgeGlyph(d),
+            color: this.badgeColor(d),
+            side: 12,
+            lineWidth: 2
+          });
+        }
+        Text(d.badge)
+          .fontSize(T.F_TINY)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(this.badgeColor(d));
+      }
+      .padding({ left: 5, right: 6, top: 1.5, bottom: 1.5 })
+      .borderRadius(6)
+      .alignItems(VerticalAlign.Center)
+      .backgroundColor(d.badgeReal ? Pal.alpha(this.badgeColor(d), 0.14) : Color.Transparent)
+      .border({ width: d.badgeReal ? 0 : 1, color: Pal.alpha(this.badgeColor(d), 0.42) })
+      .margin({ top: 5 })
+      .accessibilityText('接入方式 ' + d.badge);
 
       Blank();
 

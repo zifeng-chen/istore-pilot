@@ -12,7 +12,7 @@ const PRIVACY: string = `iStore Pilot 隐私政策
 
 生效日期：2026 年 11 月 6 日
 适用版本：0.1.7 及以后
-开发者：chaof（个人开发者）
+开发者：陈_子疯（个人开发者）
 
 一句话概括：本应用不收集、不上传、不共享你的任何个人信息。所有数据只在你手机和你在设置里填写的路由器之间传输。
 
@@ -59,13 +59,13 @@ const PRIVACY: string = `iStore Pilot 隐私政策
 
 八、变更与联系
 条款如有变更，会随应用更新一并发布，并在本页更新生效日期。
-开发者：chaof  邮箱：chaofeng09@live.cn`;
+开发者：陈_子疯  邮箱：chaofeng09@live.cn`;
 
 const TERMS: string = `iStore Pilot 用户协议
 
 生效日期：2026 年 11 月 6 日
 适用版本：0.1.7 及以后
-开发者：chaof（个人开发者）
+开发者：陈_子疯（个人开发者）
 
 在使用本应用前，请阅读并同意本协议。你开始使用本应用，即表示已阅读并同意以下条款。
 
@@ -94,7 +94,7 @@ iStoreOS、OpenClash、Passwall、AdGuard Home 等名称与商标归各自权利
 条款如有变更，会随应用更新一并发布，并在本页更新生效日期。变更后继续使用即视为接受新条款。
 
 七、联系方式
-开发者：chaof  邮箱：chaofeng09@live.cn`;
+开发者：陈_子疯  邮箱：chaofeng09@live.cn`;
 
 export class Agreements {
   static privacy(): string {
