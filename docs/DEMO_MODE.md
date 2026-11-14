@@ -1,7 +1,10 @@
-# 演示模式（应用商店审核用）
+# 演示模式（鸿蒙 · 应用商店审核用）
 
 审核员没有你的路由器 —— 打开 App 就停在登录页，进不去就驳回。
-演示模式把**真机录下来的接口返回**打包进 App，审核员点一次就能把五个页签看完。
+演示模式把**真机录下来的接口返回**打包进 App，审核员点一次就能把四个页签看完。
+
+> 只做鸿蒙。Android / iOS 没有这个入口，包里也不带 `demo.json`
+> —— 那两个平台按各自的审核流程走，不为此多背 140 KB。
 
 ## 一、审核员怎么用
 
@@ -38,13 +41,12 @@ Agent 才能使用，因此审核时无法连接真实设备。
 ROUTER_PW=口令 python scripts/record_demo.py
 ```
 
-一条命令做三件事：登录路由器 → 逐接口录制 → 脱敏后写出三端资源：
+一条命令做三件事：登录路由器 → 逐接口录制 → 脱敏后写出鸿蒙资源：
 
 | 端 | 落点 |
 |---|---|
 | 鸿蒙 | `harmony/entry/src/main/resources/rawfile/demo.json` |
-| Android | `android/app/src/main/assets/demo.json` |
-| iOS | `ios/IStorePilot/demo.json`（`gen_project.py` 会自动挂进 Resources） |
+| Android / iOS | 不生成 |
 
 录制内容：36 个只读接口（概览 / 设备 / 代理 / 拦截 / 硬件 / 网络 / 存储 /
 更新 / 订阅 / 节点分组 / 拦截日志与热门域名 / 设备详情 ×3）。写接口不录。
@@ -70,22 +72,24 @@ ROUTER_PW=口令 python scripts/record_demo.py
 保留原样的：协议内置策略名（`DIRECT` / `REJECT` / `GLOBAL`）、品牌域名
 （`istoreos.com` / `github.com`）、规则表名（`anti-AD` 等公开规则集）。
 
-## 五、三端实现
+## 五、鸿蒙实现
 
-三端各有一个极简的 `Demo` 类，形状完全一致：
+| 文件 | 职责 |
+|---|---|
+| `core/Demo.ets` | 读 rawfile、按路径取数、开关落盘 |
+| `api/Api.ets` | GET 走包内数据，POST / 上传直接拒绝 |
+| `pages/LoginPage.ets` | 「没有路由器？先看看演示 →」入口（要先勾协议） |
+| `pages/Index.ets` | 冷启动恢复演示态 |
+| `ui/tabs/OverviewPage.ets` | 版本胶囊显示「演示数据」 |
+| `ui/tabs/SettingsPage.ets` | 地址显示「本地示例数据」、「退出演示」 |
 
-| 端 | 文件 | 取数 | 只读拦截 |
-|---|---|---|---|
-| 鸿蒙 | `core/Demo.ets` | `Demo.data(path)` | `Api.post` / `uploadPkg` |
-| Android | `core/Demo.java` | `Demo.data(ctx, path)` | `Api.call` 的 POST 分支 |
-| iOS | `Core/Demo.swift` | `Demo.data(path)` | `Api.post` |
+要点：
 
-共同点：
-
-- 路径 → key 的规则一致（非字母数字压成下划线），和录制脚本的 `_key()` 对齐；
+- 路径 → key 的规则和录制脚本的 `_key()` 对齐（非字母数字压成下划线）；
 - 精确 key 没命中时按路径前缀回退（`devices/detail?mac=xx` 只录了 3 台）；
 - 演示模式下**不读也不写真实快照**，避免先闪一下上次连真机的数据；
-- 数据懒加载：正常连接的用户不解析那 130 KB。
+- 数据懒加载：只有真的是演示态才解析那 140 KB，正常连接的用户不付这个启动开销；
+- 演示态的 `Session.base` 是占位符 `demo`，请求在 `Api` 层就拦掉了，一个包都不会发。
 
 ## 六、重录时机
 

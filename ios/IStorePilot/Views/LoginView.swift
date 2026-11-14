@@ -67,15 +67,6 @@ struct LoginView: View {
                         }
                     }
 
-                    // 演示入口：没有路由器的人（评审、朋友、想先看看的人）不用卡在登录页。
-                    // 数据打包在 demo.json 里，只读、不联网
-                    Button(action: openDemo) {
-                        Text("没有路由器？先看看演示 →")
-                            .font(F.caption)
-                            .foregroundStyle(C.textSecondary)
-                    }
-                    .buttonStyle(.plain)
-
                     Text("地址只写 \(Session.defaultHost) 也行，http:// 会自己补。\n口令与路由器后台、SSH 是同一个。")
                         .font(F.tiny)
                         .foregroundStyle(C.textSecondary)
@@ -139,20 +130,6 @@ struct LoginView: View {
                 }
             }
         }
-    }
-
-    /// 进演示模式：不需要地址和密码，数据全部来自包内的示例。
-    ///
-    /// 演示态照样写一个「假令牌」：RootContainer 用 Session.isLoggedIn 判断
-    /// 进不进主界面，真正的请求一个都不会发出去（Api 层先拦了）。
-    private func openDemo() {
-        Demo.isOn = true
-        Session.base = "http://demo.local:8443"
-        Session.save(token: "demo-mode",
-                     expires: Date().timeIntervalSince1970 + 365 * 86400,
-                     user: "演示模式")
-        err = ""; okTip = ""
-        app.signIn()
     }
 
     private func submit(_ forced: String? = nil) {

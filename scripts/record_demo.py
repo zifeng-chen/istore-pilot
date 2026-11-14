@@ -13,8 +13,8 @@
     ROUTER_PW=xxx python scripts/record_demo.py
     # 产物：
     #   harmony/entry/src/main/resources/rawfile/demo.json
-    #   android/app/src/main/assets/demo.json
-    #   ios/IStorePilot/demo.json（和 Info.plist 同级，随 App 组一起进包）
+    #
+    # 只给鸿蒙做演示：Android / iOS 没有这个入口，别往它们的包里塞 140 KB。
 
 脱敏由 `agent/demo.py` 的 Store 负责：MAC / 内网地址 / 主机名 / 订阅链接
 全部换成示例值，同一台设备在不同接口里保持同一个假 MAC。
@@ -192,8 +192,6 @@ def main() -> int:
     text = json.dumps(out, ensure_ascii=False, separators=(",", ":"))
     targets = [
         os.path.join(ROOT, "harmony/entry/src/main/resources/rawfile/demo.json"),
-        os.path.join(ROOT, "android/app/src/main/assets/demo.json"),
-        os.path.join(ROOT, "ios/IStorePilot/demo.json"),
     ]
     for t in targets:
         os.makedirs(os.path.dirname(t), exist_ok=True)

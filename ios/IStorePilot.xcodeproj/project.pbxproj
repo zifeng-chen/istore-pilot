@@ -10,7 +10,6 @@
 		78507155C8DF724638E16435 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB034A81837C7D41A104C093 /* App.swift */; };
 		F171994678125D4B9722C444 /* Api.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7D6BAE4A8DD650C0BFDE91E /* Api.swift */; };
 		95E71888A4F5B3ABC26250FB /* AppIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D96DBFAA5E0C0FB3A21395E /* AppIcons.swift */; };
-		A1F297EE37A82AB29043D9B2 /* Demo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DC24AEE34A8FB56E3DFB2E3 /* Demo.swift */; };
 		37689F8250779585B70D110D /* Fmt.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC0759E6ADF16C177FE3A74E /* Fmt.swift */; };
 		D7A4FDB839D6574A49C6F7B3 /* J.swift in Sources */ = {isa = PBXBuildFile; fileRef = E78C88DAFACFED4B88EA0C91 /* J.swift */; };
 		A84CBE825075D52A851A387A /* Mask.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFD99C4DC4DD821501C64195 /* Mask.swift */; };
@@ -39,14 +38,12 @@
 		DD070E13F7A4E7EEE750AC30 /* WanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9DA8F1F8A1A03A3383D5AC7 /* WanView.swift */; };
 		D4692AF28EDA53986B652E4D /* WebScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D263E9A99AA24127CB8D05B /* WebScreen.swift */; };
 		2755BBBD5E5A921DF8DF8205 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D109F37748E7ABA8A24F6CE2 /* Assets.xcassets */; };
-		92264D7B45467374D9B26558 /* demo.json in Resources */ = {isa = PBXBuildFile; fileRef = 456DFBFE7BDB9263D4C639CA /* demo.json */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		FB034A81837C7D41A104C093 /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
 		F7D6BAE4A8DD650C0BFDE91E /* Api.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Api.swift; sourceTree = "<group>"; };
 		2D96DBFAA5E0C0FB3A21395E /* AppIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIcons.swift; sourceTree = "<group>"; };
-		3DC24AEE34A8FB56E3DFB2E3 /* Demo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Demo.swift; sourceTree = "<group>"; };
 		DC0759E6ADF16C177FE3A74E /* Fmt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fmt.swift; sourceTree = "<group>"; };
 		E78C88DAFACFED4B88EA0C91 /* J.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = J.swift; sourceTree = "<group>"; };
 		BFD99C4DC4DD821501C64195 /* Mask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Mask.swift; sourceTree = "<group>"; };
@@ -75,7 +72,6 @@
 		C9DA8F1F8A1A03A3383D5AC7 /* WanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WanView.swift; sourceTree = "<group>"; };
 		9D263E9A99AA24127CB8D05B /* WebScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebScreen.swift; sourceTree = "<group>"; };
 		D109F37748E7ABA8A24F6CE2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		456DFBFE7BDB9263D4C639CA /* demo.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = demo.json; sourceTree = "<group>"; };
 		7F924B3C9E0A1C06AE4FBE0A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		92D098F8A1930D887B48048F /* IStorePilot.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = IStorePilot.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -116,7 +112,6 @@
 				38DF21AEF4612506D6BE5CBE /* Views */,
 				D109F37748E7ABA8A24F6CE2 /* Assets.xcassets */,
 				7F924B3C9E0A1C06AE4FBE0A /* Info.plist */,
-				456DFBFE7BDB9263D4C639CA /* demo.json */,
 			);
 			path = IStorePilot;
 			sourceTree = "<group>";
@@ -126,7 +121,6 @@
 			children = (
 				F7D6BAE4A8DD650C0BFDE91E /* Api.swift */,
 				2D96DBFAA5E0C0FB3A21395E /* AppIcons.swift */,
-				3DC24AEE34A8FB56E3DFB2E3 /* Demo.swift */,
 				DC0759E6ADF16C177FE3A74E /* Fmt.swift */,
 				E78C88DAFACFED4B88EA0C91 /* J.swift */,
 				BFD99C4DC4DD821501C64195 /* Mask.swift */,
@@ -231,7 +225,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				2755BBBD5E5A921DF8DF8205 /* Assets.xcassets in Resources */,
-				92264D7B45467374D9B26558 /* demo.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -245,7 +238,6 @@
 				78507155C8DF724638E16435 /* App.swift in Sources */,
 				F171994678125D4B9722C444 /* Api.swift in Sources */,
 				95E71888A4F5B3ABC26250FB /* AppIcons.swift in Sources */,
-				A1F297EE37A82AB29043D9B2 /* Demo.swift in Sources */,
 				37689F8250779585B70D110D /* Fmt.swift in Sources */,
 				D7A4FDB839D6574A49C6F7B3 /* J.swift in Sources */,
 				A84CBE825075D52A851A387A /* Mask.swift in Sources */,

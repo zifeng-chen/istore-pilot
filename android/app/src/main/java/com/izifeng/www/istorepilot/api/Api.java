@@ -4,7 +4,6 @@ import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 
-import com.izifeng.www.istorepilot.core.Demo;
 import com.izifeng.www.istorepilot.core.Session;
 import com.izifeng.www.istorepilot.core.Snap;
 
@@ -76,22 +75,6 @@ public final class Api {
     private static void call(Context c, String method, String path, JSONObject body,
                              boolean useCache, Cb cb, int readTimeoutMs) {
         final Context app = c.getApplicationContext();
-
-        // 演示模式：不碰网络，也不读写真实快照（否则会先闪一下上次连真机的数据）。
-        // 写操作直接拒绝并说明原因 —— 假装成功会让人以为真的生效了
-        if (Demo.isOn(app)) {
-            if ("POST".equals(method)) {
-                UI.post(() -> cb.onError(Demo.READ_ONLY));
-                return;
-            }
-            // 第一次取数要解析 130 KB 的 demo.json，别压在主线程上
-            POOL.execute(() -> {
-                final JSONObject d = Demo.data(app, path);
-                UI.post(() -> cb.onData(d, false));
-            });
-            return;
-        }
-
         final String base = Session.base(app);
         final String token = Session.token(app);
 
