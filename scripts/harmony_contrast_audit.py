@@ -115,7 +115,7 @@ def main():
             got = colors_of(img, box)
             if got is None:
                 continue
-            bg, fg, rt = got
+            rt = got[2]
             need = MIN_LARGE if (box[3] - box[1]) >= LARGE_PX else MIN_NORMAL
             if rt < need:
                 bad += 1

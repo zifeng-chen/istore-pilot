@@ -1708,7 +1708,7 @@ export struct ProxyPage {
         }
       }
       .width('100%')
-      .padding(3)
+      .padding(4)
       .borderRadius(15)
       .backgroundColor($r('app.color.surface_hi'))
       .margin({ top: 12 });
@@ -1913,7 +1913,7 @@ export struct ProxyPage {
             this.comboChip('passwall', 'PassWall');
           }
           .width('100%')
-          .padding(3)
+          .padding(4)
           .borderRadius(15)
           .backgroundColor($r('app.color.surface_hi'))
           .margin({ bottom: 6 });
@@ -1966,7 +1966,7 @@ export struct ProxyPage {
         : $r('app.color.text_secondary'))
       .textAlign(TextAlign.Center)
       .layoutWeight(1)
-      .height(30)
+      .height(36)
       .borderRadius(T.R_SM)
       .backgroundColor(this.comboBackend() === id
         ? $r('app.color.segment_thumb')
@@ -2924,7 +2924,7 @@ export struct ProxyPage {
         : $r('app.color.text_secondary'))
       .textAlign(TextAlign.Center)
       .layoutWeight(1)
-      .height(32)
+      .height(36)
       .borderRadius(T.R_SM)
       .backgroundColor(this.mode === value
         ? $r('app.color.segment_thumb')
