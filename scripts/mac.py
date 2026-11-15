@@ -6,6 +6,7 @@
     python scripts/mac.py get  远端文件 本地路径      # 下载单文件
     python scripts/mac.py sync 本地目录 远端目录      # 递归上传（自动跳过构建产物）
     python scripts/mac.py ping                       # 连通性 + 环境自检
+    python scripts/mac.py find [网段]                # 扫 LAN 上开 22 端口的机器（IP 变了先跑这个）
 
 认证优先级：SSH 密钥（~/.ssh/id_ed25519_mac）> 环境变量 MAC_PW。
 IP 变了就用 MAC_HOST=192.168.100.x 覆盖，不要改代码里的默认值猜。
@@ -42,12 +43,13 @@ BASE_PATH = (
 )
 
 
-def connect() -> paramiko.SSHClient:
+def connect_for(host: str) -> paramiko.SSHClient:
+    """连指定主机（find 用它逐台试），凭据仍是同一套。"""
     c = paramiko.SSHClient()
     c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     kw = dict(
-        hostname=HOST, port=PORT, username=USER,
-        timeout=12, banner_timeout=12, auth_timeout=12,
+        hostname=host, port=PORT, username=USER,
+        timeout=4, banner_timeout=4, auth_timeout=4,
         allow_agent=False,
     )
     if os.path.exists(KEY):
@@ -60,6 +62,10 @@ def connect() -> paramiko.SSHClient:
         kw["look_for_keys"] = False
     c.connect(**kw)
     return c
+
+
+def connect() -> paramiko.SSHClient:
+    return connect_for(HOST)
 
 
 def _exec(c: paramiko.SSHClient, cmd: str, timeout: int = 3600):
@@ -186,6 +192,46 @@ def ping() -> int:
     return run(probe)
 
 
+def find(prefix: str = "192.168.100") -> int:
+    """扫网段里开了 22 端口、并且能用当前凭据登进去的主机。
+
+    DHCP 一换 IP，`MAC_HOST=` 就得重猜 —— 直接扫一遍比猜快。
+    只连 22 端口，不扫全端口；命中后再用 SSH 跑一句 whoami/hostname 认机器。
+    """
+    import socket
+    from concurrent.futures import ThreadPoolExecutor
+
+    def open22(n: int) -> str | None:
+        ip = f"{prefix}.{n}"
+        s = socket.socket()
+        s.settimeout(0.25)
+        try:
+            return ip if s.connect_ex((ip, PORT)) == 0 else None
+        finally:
+            s.close()
+
+    print(f"扫 {prefix}.1-254 的 {PORT} 端口 …")
+    with ThreadPoolExecutor(max_workers=96) as pool:
+        hits = [ip for ip in pool.map(open22, range(1, 255)) if ip]
+    if not hits:
+        print("没有开 SSH 的主机。确认 Mac 醒着、和这台机器在同一网段。")
+        return 1
+    print(f"发现 {len(hits)} 台：")
+    for ip in sorted(hits, key=lambda x: int(x.rsplit(".", 1)[1])):
+        who = "?"
+        try:
+            c = connect_for(ip)
+            _, out, _ = c.exec_command("hostname; sw_vers -productVersion 2>/dev/null")
+            info = [x.strip() for x in out.read().decode("utf-8", "replace").splitlines() if x.strip()]
+            c.close()
+            who = " / ".join(info[:2])
+        except Exception as e:                      # 不是我们的机器，或凭据不对
+            who = f"（登不上：{type(e).__name__}）"
+        mark = "  <= 当前默认" if ip == HOST else ""
+        print(f"  {ip:<15} {who}{mark}")
+    return 0
+
+
 def main() -> int:
     if len(sys.argv) < 2:
         print(__doc__)
@@ -201,6 +247,8 @@ def main() -> int:
         return sync(sys.argv[2], sys.argv[3])
     if mode == "ping":
         return ping()
+    if mode == "find":
+        return find(sys.argv[2] if len(sys.argv) > 2 else "192.168.100")
     print(__doc__)
     return 2
 
