@@ -6,7 +6,8 @@ export DEVECO_SDK_HOME=$D/sdk
 export PATH=$D/tools/node/bin:$D/tools/ohpm/bin:$D/tools/hvigor/bin:/opt/homebrew/bin:/usr/bin:/bin  # style-ok
 cd /Users/chen/istore-build/harmony || exit 1
 
-hvigorw --mode module -p product=default -p buildMode=release assembleHap --no-daemon 2>&1 | grep -E "ERROR|BUILD" | head -5
+hvigorw --mode module -p product=default -p buildMode=release assembleHap --no-daemon 2>&1 \
+  | grep -E "ERROR|BUILD" | head -5
 echo "--- hap 里的版本 ---"
 python3 - <<'PY'
 import zipfile, json
