@@ -12,9 +12,9 @@ import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import (adblock, apps, auth, cfgbak, clash, demo as demo_mod, devices,
-               hardware, lanedit, luci, mask, netapply, netcfg, power, proxy,
-               subscriptions, sysinfo, system)
+from . import (adblock, appfilter, apps, auth, cfgbak, clash, demo as demo_mod,
+               devices, hardware, lanedit, luci, mask, netapply, netcfg, power,
+               proxy, subscriptions, sysinfo, system)
 from .config import get as cfg, load as load_cfg, save as save_cfg
 
 START_TS = time.time()
@@ -192,6 +192,24 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             length = 0
         result = system.receive_upload(self.rfile, length, name)
+        self._json(result, 200 if result.get("ok") else 400)
+
+    def _handle_feature_upload(self):
+        """特征库上传：原始字节 + X-Filename，边收边进内存（12 MB 上限，够小）。
+
+        不走 system.receive_upload 是因为它按安装包落盘到固定目录；
+        特征库要自己解包校验，直接读进 memory 更简单。
+        """
+        name = urllib.parse.unquote(self.headers.get("X-Filename", ""))
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            length = 0
+        if length <= 0 or length > appfilter.MAX_BYTES:
+            self._error(400, "文件大小不合法")
+            return
+        data = self.rfile.read(length)
+        result = appfilter.upgrade(data, name)
         self._json(result, 200 if result.get("ok") else 400)
 
     def _authed(self) -> bool:
@@ -457,6 +475,9 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         # ---- 上传安装包：必须在 _body() 之前处理，否则请求体被当成 JSON 读走
+        if path == "/api/v1/appfilter/upgrade":
+            self._handle_feature_upload()
+            return
         if path == "/api/v1/system/upload":
             self._handle_upload()
             return
@@ -464,7 +485,9 @@ class Handler(BaseHTTPRequestHandler):
         body = self._body()
 
         try:
-            if path == "/api/v1/clash/mode":
+            if path == "/api/v1/appfilter/toggle":
+                self._json(appfilter.set_enable(bool(body.get("enable"))))
+            elif path == "/api/v1/clash/mode":
                 self._json(clash.set_mode(str(body.get("mode", ""))))
             elif path == "/api/v1/clash/service":
                 self._json(clash.service(str(body.get("action", ""))))
@@ -762,6 +785,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(mask.devices(devices.detail(query.get("mac", [""])[0])))
             elif path == "/api/v1/storage":
                 self._json({"storage": cached("storage", 10.0, sysinfo.storage)})
+            elif path == "/api/v1/appfilter":
+                self._json(cached("appfilter", 5.0, appfilter.status))
             elif path == "/api/v1/clash":
                 self._json(cached("clash_status", 3.0, clash.status))
             elif path == "/api/v1/clash/proxies":

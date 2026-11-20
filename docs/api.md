@@ -545,3 +545,18 @@ curl -s -X POST $BASE/proxy/delays \
 
 仓库内的 `scripts/check_*.py` 是这些接口的实测校验脚本，
 可以直接对照字段名 —— 界面上每个数字都靠字段名对齐，写错不会报错，只会安静地显示成「—」。
+
+## 应用过滤（OAF）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/v1/appfilter` | 状态：是否安装、是否启用、特征库版本/格式/规则数、HNAT 提示 |
+| POST | `/api/v1/appfilter/toggle` | body `{enable: bool}`，改 uci 并重启 `appfilter` 服务 |
+| POST | `/api/v1/appfilter/upgrade` | 原始字节 + `X-Filename`，上传统计库 tar.gz |
+
+`upgrade` 的处理：校验 gzip/tar → 只取 `feature.cfg` 与 `app_icons/`（挡掉越界路径）
+→ 校验 `#version` / `#format` 与当前插件一致、规则数 ≥100 → 备份旧库（留 2 份）
+→ 覆盖 `/etc/appfilter/feature.cfg` → 同步图标 → `killall -SIGUSR1 oafd` 热重载 → 回读版本确认。
+
+注意：特征库是 OAF 会员私有授权，**不进仓库、不进安装包**，只能由用户上传。
+开启过滤会关闭硬件加速（`disable_hnat=1`），大流量场景速率会下降，客户端必须提示。
