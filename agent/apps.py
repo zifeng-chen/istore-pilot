@@ -32,7 +32,7 @@ import re
 import threading
 import time
 
-from . import asn, clash
+from . import appnames, asn, clash
 
 POLL_SECONDS = 3.0
 MAX_APPS = 60
@@ -674,6 +674,11 @@ def _match(host: str) -> tuple[str, str]:
         for key in keys:
             if key in low:
                 return name, category
+    # OAF 特征库（560 个应用）：手写规则没覆盖到的，先让它认
+    hit = appnames.identify(low)
+    if hit:
+        _NAME_CATEGORY.setdefault(hit[0], hit[1])
+        return hit
     hit = _geo_lookup(low)
     if hit:
         # 账本只存流量不存分类，这里顺手把名字→分类补进表，

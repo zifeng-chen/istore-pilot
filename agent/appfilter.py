@@ -84,6 +84,14 @@ def _feature_meta(path: str) -> dict:
     return meta
 
 
+def _lib_info() -> dict:
+    from . import appnames          # 局部导入：没装插件时也不影响本模块
+    try:
+        return appnames.info()
+    except Exception:
+        return {"available": False, "patterns": 0, "apps": 0}
+
+
 def status() -> dict:
     """给客户端的一份快照。没装也要能正常返回，客户端据此显示「未安装」。"""
     if not _installed():
@@ -112,6 +120,8 @@ def status() -> dict:
             "size": size,
             "updated": mtime,
         },
+        # 特征库同时被应用流量用来做识别（appnames.py），这里顺带报一下覆盖量
+        "identify": _lib_info(),
         # 开过滤会关硬件加速，千兆可能掉到几百兆 —— 客户端必须把这条提示出去
         "note": "开启后关闭硬件加速（HNAT），大流量场景速率会下降",
     }

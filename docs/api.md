@@ -550,13 +550,24 @@ curl -s -X POST $BASE/proxy/delays \
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/v1/appfilter` | 状态：是否安装、是否启用、特征库版本/格式/规则数、HNAT 提示 |
+| GET | `/api/v1/appfilter` | 状态：是否安装、是否启用、特征库版本/格式/规则数、可识别应用数、HNAT 提示 |
 | POST | `/api/v1/appfilter/toggle` | body `{enable: bool}`，改 uci 并重启 `appfilter` 服务 |
 | POST | `/api/v1/appfilter/upgrade` | 原始字节 + `X-Filename`，上传统计库 tar.gz |
 
 `upgrade` 的处理：校验 gzip/tar → 只取 `feature.cfg` 与 `app_icons/`（挡掉越界路径）
 → 校验 `#version` / `#format` 与当前插件一致、规则数 ≥100 → 备份旧库（留 2 份）
 → 覆盖 `/etc/appfilter/feature.cfg` → 同步图标 → `killall -SIGUSR1 oafd` 热重载 → 回读版本确认。
+
+## 应用识别（appnames）
+
+`/api/v1/apps` 的归类顺序是**分层**的，越靠前越具体：
+
+1. `apps.py` 的 `_RULES`：广告联盟 / 推送 / 遥测（必须最先判，不然 `pangolin-sdk-toutiao` 会被算成抖音）
+2. **OAF 特征库**（`appnames.py`，读 `/etc/appfilter/feature.cfg`）：560 个应用、715 条域名特征
+3. geosite 地理库
+4. 退化成主域名
+
+第 2 层只读文件、不做过滤，插件没装就自动跳过。特征库更新后按 mtime 自动重载。
 
 注意：特征库是 OAF 会员私有授权，**不进仓库、不进安装包**，只能由用户上传。
 开启过滤会关闭硬件加速（`disable_hnat=1`），大流量场景速率会下降，客户端必须提示。
