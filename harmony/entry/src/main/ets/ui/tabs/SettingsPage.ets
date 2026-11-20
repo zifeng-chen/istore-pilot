@@ -15,7 +15,6 @@ import { Appearance } from '../Appearance';
 import { Bp } from '../Breakpoint';
 import { Pal, T } from '../Theme';
 import { Card, CardTitle, Comp, GlyphIcon, Hairline, Note, RowCard, SettingRow } from '../Comp';
-import { AppFilterCard } from '../comp/AppFilterCard';
 import { Glyph } from '../comp/Icons';
 import { BackupsPage } from './BackupsPage';
 import { HardwarePage } from './HardwarePage';
@@ -301,7 +300,6 @@ export struct SettingsPage {
                       this.powerCard();
                       this.hardwareCard();
                       this.securityCard();
-                      AppFilterCard();
                       this.aboutCard();
                     }
                     .layoutWeight(1)
@@ -317,7 +315,6 @@ export struct SettingsPage {
                     this.powerCard();
                     this.hardwareCard();
                     this.securityCard();
-                    AppFilterCard();
                     this.aboutCard();
                   }
                   .width('100%');

@@ -29,7 +29,7 @@ export struct SideNav {
   // 四个页签，和手机端、Android、iOS 保持一致
   private items: RailItem[] = [
     { label: '概览', kind: 'system-load', hint: '状态与速率' },
-    { label: '设备', kind: 'devices', hint: '在线与拦截' },
+    { label: '局域网', kind: 'devices', hint: '设备 · 流量 · 拦截' },
     { label: '代理', kind: 'proxy', hint: '节点与分流' },
     { label: '设置', kind: 'system-settings', hint: '连接与维护' }
   ];

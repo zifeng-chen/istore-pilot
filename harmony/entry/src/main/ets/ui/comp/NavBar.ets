@@ -23,7 +23,7 @@ export struct NavBar {
   // 和 Android / iOS 一致：四个页签。「网络」并进了概览 →「网络设置」二级页
   private items: NavItem[] = [
     { label: '概览', kind: 'system-load' },
-    { label: '设备', kind: 'devices' },
+    { label: '局域网', kind: 'devices' },
     { label: '代理', kind: 'proxy' },
     { label: '设置', kind: 'system-settings' }
   ];

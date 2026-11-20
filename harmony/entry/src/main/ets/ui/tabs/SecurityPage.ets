@@ -11,6 +11,7 @@ import { Bp } from '../Breakpoint';
 import { Card, CardTitle, Comp, GlyphIcon, Hairline, HeroStat, Pill } from '../Comp';
 import { Glyph } from '../comp/Icons';
 import { AppIcon } from '../comp/AppIcon';
+import { AppFilterCard } from '../comp/AppFilterCard';
 import { DevicesPage } from './DevicesPage';
 import { ShieldPage } from './ShieldPage';
 
@@ -1212,7 +1213,7 @@ export struct SecurityPage {
       Column() {
         // 大标题固定在滚动区外，跟着列表滚走的话划到下面就不知道在哪一页了
         Row() {
-          Text('设备')
+          Text('局域网')
             .fontSize(T.F_TITLE)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'))
@@ -1248,6 +1249,7 @@ export struct SecurityPage {
                   Column({ space: T.GAP }) {
                     this.appsCard();
                     this.adCard();
+                    AppFilterCard();
                   }
                   .layoutWeight(1)
                   .alignItems(HorizontalAlign.Start);
@@ -1260,6 +1262,7 @@ export struct SecurityPage {
                   this.deviceCard();
                   this.appsCard();
                   this.adCard();
+                  AppFilterCard();
                 }
                 .width('100%');
               }
