@@ -1806,11 +1806,11 @@ def install(confirm: str = "") -> dict:
     return {"ok": True, "accepted": True, "state": install_status()}
 
 
-def log(limit: int = 120, client: str = "") -> dict:
+def log(limit: int = 120, client: str = "", only_blocked: bool = False) -> dict:
     """拦截日志（AGH 的 querylog）。
 
-    为什么只取最近的：AGH 的 querylog 是环形缓冲，全量几百 MB，
-    手机端要的是「刚刚发生了什么」，翻历史交给 AGH 自己的界面。
+    字段名对齐三端已有的客户端：``time`` / ``domain`` / ``client`` / ``blocked``
+    （再加 action / rule / ms 作为补充）。AGH 全量几百 MB，这里只取最近的。
     """
     if not _installed():
         return _not_installed()
@@ -1833,14 +1833,19 @@ def log(limit: int = 120, client: str = "") -> dict:
             # AGH 的 rules[].text 有时是字符串、有时是 {name:...}，两种都见过
             t0 = r0.get("text")
             rule = (t0.get("name") if isinstance(t0, dict) else str(t0 or "")).strip()
+        action = str(it.get("status") or "")
+        blocked = "block" in action.lower()
+        if only_blocked and not blocked:
+            continue
         out.append({
-            "t": it.get("time") or "",
+            "time": it.get("time") or "",
             "domain": q1.get("name") or "",
             "type": q1.get("type") or "",
-            "action": it.get("status") or "",
             "client": it.get("client") or "",
-            "ms": it.get("elapsedMs") or 0,
+            "blocked": blocked,
+            "action": action,
             "rule": rule,
+            "ms": it.get("elapsedMs") or 0,
         })
-    blocked = sum(1 for x in out if "block" in str(x["action"]).lower())
-    return {"ok": True, "total": len(out), "blocked": blocked, "items": out}
+    return {"ok": True, "total": len(out),
+            "blocked": sum(1 for x in out if x["blocked"]), "items": out}

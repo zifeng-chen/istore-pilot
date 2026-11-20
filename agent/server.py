@@ -786,8 +786,10 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/v1/storage":
                 self._json({"storage": cached("storage", 10.0, sysinfo.storage)})
             elif path == "/api/v1/adblock/log":
-                self._json(adblock.log(int(query.get("limit", ["120"])[0]),
-                                      query.get("client", [""])[0]))
+                self._json(adblock.log(
+                    int(query.get("limit", ["120"])[0]),
+                    query.get("client", [""])[0],
+                    query.get("only_blocked", ["0"])[0] in ("1", "true", "yes")))
             elif path == "/api/v1/appfilter":
                 self._json(cached("appfilter", 5.0, appfilter.status))
             elif path == "/api/v1/clash":
