@@ -14,6 +14,9 @@ const SUFFIX_TS: string = '__ts';
  * 解析交给上层，缓存层只管搬运。
  */
 export class Snap {
+  /** meta 键：全部快照的字符数合计 */
+  private static readonly SIZE_KEY: string = '__bytes';
+
   private static pref: preferences.Preferences | null = null;
 
   /** 路径里带 ? & 这类字符不能直接当 preferences 的键，统一压成下划线 */
@@ -37,8 +40,14 @@ export class Snap {
     }
     const p = await Snap.ready(ctx);
     const k = Snap.key(path);
+    const prev = await p.get(k, '');
     await p.put(k, body);
     await p.put(k + SUFFIX_TS, Date.now());
+    // 增量维护占用字节：写入新内容时把旧内容的长度扣掉
+    const used = await p.get(SIZE_KEY, 0);
+    const base = typeof used === 'number' ? used : 0;
+    const oldLen = typeof prev === 'string' ? prev.length : 0;
+    await p.put(SIZE_KEY, Math.max(0, base - oldLen + body.length));
     await p.flush();
   }
 
@@ -46,6 +55,17 @@ export class Snap {
     const p = await Snap.ready(ctx);
     const v = await p.get(Snap.key(path), '');
     return v as string;
+  }
+
+  /** 快照占用的字节数。写入时累计到一个 meta 键里，读的时候不用遍历整本存储 */
+  static async size(ctx: common.Context): Promise<number> {
+    try {
+      const p = await Snap.ready(ctx);
+      const v = await p.get(SIZE_KEY, 0);
+      return typeof v === 'number' ? v : 0;
+    } catch (e) {
+      return 0;
+    }
   }
 
   static async clear(ctx: common.Context): Promise<void> {

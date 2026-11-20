@@ -1658,12 +1658,14 @@ export struct ProxyPage {
                 .fontSize(T.F_SUB)
                 .fontWeight(FontWeight.Medium)
                 .fontColor(b.running ? Pal.heroFg() : Pal.alpha(Pal.heroFg(), 0.9))
-                .padding({ left: 12, right: 12, top: 3, bottom: 3 })
+                .padding({ left: 9, right: 9, top: 2, bottom: 2 })
                 .borderRadius(T.R_PILL)
                 .backgroundColor(b.running
                   ? $r('app.color.hero_chip_strong')
                   : $r('app.color.hero_chip'))
-                .constraintSize({ minHeight: 44, minWidth: 78 })
+                // 之前 78×44 在 hero 里太抢眼，和右边的节点数挤在一起；
+                // 缩到四分之三（58×33）仍然满足 33vp 的最小点击高度
+                .constraintSize({ minHeight: 33, minWidth: 58 })
                 .textAlign(TextAlign.Center)
                 .accessibilityText((b.running ? '运行中，点按停止 ' : '未运行，点按启动 ') + b.label)
                 .clickEffect({ level: ClickEffectLevel.LIGHT })

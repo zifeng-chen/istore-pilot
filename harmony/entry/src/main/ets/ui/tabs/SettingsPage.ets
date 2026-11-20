@@ -79,6 +79,7 @@ export struct SettingsPage {
   @Local f2: string = '';
   @Local busy: boolean = false;
   @Local toast: string = '';
+  @Local cacheText: string = '—';
 
   @Local winW: number = 360;
   /** 下拉刷新：Refresh 组件要求绑一个布尔，松手后由代码收回去 */
@@ -93,6 +94,7 @@ export struct SettingsPage {
   @Local tab: number = UI.tab;
 
   aboutToAppear(): void {
+    this.loadCacheSize();
     this.winW = this.ui.winW;
     // 演示模式的 base 是占位符 'demo'，直接显示会让人以为是坏了的地址
     this.server = Demo.isOn() ? '本地示例数据' : Session.base();
@@ -942,7 +944,7 @@ export struct SettingsPage {
         glyph: Glyph.CLEAR_CACHE,
         title: '清缓存',
         subtitle: '只清手机上的快照，不动路由器',
-        value: '',
+        value: this.cacheText,
         valueSize: 0,
         first: false,
         danger: false,
@@ -986,6 +988,13 @@ export struct SettingsPage {
       Session.signOut(ctx).then(() => {
         router.replaceUrl({ url: 'pages/LoginPage' });
       });
+    });
+  }
+
+  /** 进设置页就量一次缓存大小，右侧直接显示，不用点进去才知道占多少 */
+  private loadCacheSize(): void {
+    Snap.size(this.ctx()).then((n: number) => {
+      this.cacheText = n > 0 ? Fmt.bytes(n) : '0 B';
     });
   }
 
