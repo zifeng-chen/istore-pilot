@@ -14,7 +14,7 @@
 import { picker } from '@kit.CoreFileKit';
 import { fileIo as fs } from '@kit.CoreFileKit';
 import { BusinessError } from '@kit.BasicServicesKit';
-import { promptAction } from '@kit.ArkUI';
+import { common } from '@kit.AbilityKit';
 import { CardTitle, Note, RowCard } from '../Comp';
 import { Glyph } from './Icons';
 import { T, Pal } from '../Theme';
@@ -34,6 +34,10 @@ interface IdentifyInfo {
   available: boolean;
   patterns: number;
   apps: number;
+}
+
+interface EnableBody {
+  enable: boolean;
 }
 
 interface UpgradeResult {
@@ -59,7 +63,7 @@ export struct AppFilterCard {
   @Local loading: boolean = true;
   @Local busy: boolean = false;
   @Local installed: boolean = false;
-  @Local enabled: boolean = false;
+  @Local filterOn: boolean = false;
   @Local running: boolean = false;
   @Local version: string = '';
   @Local rules: number = 0;
@@ -89,7 +93,7 @@ export struct AppFilterCard {
     try {
       const d = JSON.parse(res.body) as FilterState;
       this.installed = d.installed === true;
-      this.enabled = d.enabled === true;
+      this.filterOn = d.enabled === true;
       this.running = d.running === true;
       if (d.feature) {
         this.version = d.feature.version === undefined ? '' : d.feature.version;
@@ -109,13 +113,14 @@ export struct AppFilterCard {
       return;
     }
     this.busy = true;
-    const body: string = JSON.stringify({ enable: on } as Record<string, boolean>);
+    const payload: EnableBody = { enable: on };
+    const body: string = JSON.stringify(payload);
     const res = await Http.send(Session.base(), Session.token(), 'POST', '/api/v1/appfilter/toggle', body);
     this.busy = false;
     if (res.ok) {
-      promptAction.showToast({ message: on ? '应用过滤已开启' : '应用过滤已关闭', duration: 3000 });
+      this.getUIContext().getPromptAction().showToast({ message: on ? '应用过滤已开启' : '应用过滤已关闭', duration: 3000 });
     } else {
-      promptAction.showToast({ message: '切换失败，请稍后重试', duration: 3000 });
+      this.getUIContext().getPromptAction().showToast({ message: '切换失败，请稍后重试', duration: 3000 });
     }
     this.load();
   }
@@ -127,7 +132,7 @@ export struct AppFilterCard {
     }
     let uris: string[] = [];
     try {
-      const dp = new picker.DocumentViewPicker(getContext(this));
+      const dp = new picker.DocumentViewPicker(this.getUIContext().getHostContext() as common.Context);
       const opt = new picker.DocumentSelectOptions();
       opt.maxSelectNumber = 1;
       uris = await dp.select(opt);
@@ -139,14 +144,14 @@ export struct AppFilterCard {
     }
     const uri: string = uris[0];
     this.busy = true;
-    promptAction.showToast({ message: '正在上传，请稍候', duration: 3000 });
+    this.getUIContext().getPromptAction().showToast({ message: '正在上传，请稍候', duration: 3000 });
     try {
       const f = fs.openSync(uri, fs.OpenMode.READ_ONLY);
       const size = fs.statSync(f.fd).size;
       if (size <= 0 || size > 12 * 1024 * 1024) {
         fs.closeSync(f);
         this.busy = false;
-        promptAction.showToast({ message: '文件大小不合规', duration: 3000 });
+        this.getUIContext().getPromptAction().showToast({ message: '文件大小不合规', duration: 3000 });
         return;
       }
       const buf = new ArrayBuffer(size);
@@ -166,7 +171,7 @@ export struct AppFilterCard {
         } catch (e) {
           msg = '特征库已更新';
         }
-        promptAction.showToast({ message: msg, duration: 3000 });
+        this.getUIContext().getPromptAction().showToast({ message: msg, duration: 3000 });
       } else {
         let why: string = '上传失败';
         try {
@@ -177,12 +182,12 @@ export struct AppFilterCard {
         } catch (e) {
           why = '上传失败';
         }
-        promptAction.showToast({ message: why, duration: 3000 });
+        this.getUIContext().getPromptAction().showToast({ message: why, duration: 3000 });
       }
     } catch (e) {
       this.busy = false;
       const err = e as BusinessError;
-      promptAction.showToast({ message: '读取文件失败：' + (err.message ?? ''), duration: 3000 });
+      this.getUIContext().getPromptAction().showToast({ message: '读取文件失败：' + (err.message ?? ''), duration: 3000 });
     }
     this.load();
   }
@@ -192,19 +197,19 @@ export struct AppFilterCard {
       CardTitle({ pad: 16, glyph: Glyph.SECURITY, title: '应用过滤', sub: '按应用识别与拦截' });
 
       if (this.loading) {
-        Text('读取中…').fontSize(T.F_SUB).fontColor(Pal.text_tertiary())
+        Text('读取中…').fontSize(T.F_SUB).fontColor($r('app.color.text_tertiary'))
           .padding({ left: 16, right: 16, top: 6, bottom: 10 });
       } else if (!this.installed) {
         Note({ text: this.err.length > 0 ? this.err : '路由器未安装 OpenAppFilter 插件' });
       } else {
         Row() {
           Column() {
-            Text('开启应用过滤').fontSize(T.F_BODY).fontColor(Pal.text_primary());
+            Text('开启应用过滤').fontSize(T.F_BODY).fontColor($r('app.color.text_primary'));
             Text(this.running ? '内核已在运行' : '内核未运行')
-              .fontSize(T.F_TINY).fontColor(Pal.text_tertiary()).margin({ top: 2 });
+              .fontSize(T.F_TINY).fontColor($r('app.color.text_tertiary')).margin({ top: 2 });
           }.alignItems(HorizontalAlign.Start).layoutWeight(1);
 
-          Toggle({ type: ToggleType.Switch, isOn: this.enabled })
+          Toggle({ type: ToggleType.Switch, isOn: this.filterOn })
             .selectedColor(Pal.primary())
             .enabled(!this.busy)
             .onChange((v: boolean) => {
@@ -214,21 +219,21 @@ export struct AppFilterCard {
         .width('100%')
         .padding({ left: 16, right: 16, top: 4, bottom: 10 });
 
-        Divider().color(Pal.stroke()).margin({ left: 16, right: 16 });
+        Divider().color($r('app.color.divider')).margin({ left: 16, right: 16 });
 
         Row() {
           Column() {
-            Text('特征库').fontSize(T.F_BODY).fontColor(Pal.text_primary());
+            Text('特征库').fontSize(T.F_BODY).fontColor($r('app.color.text_primary'));
             Text(this.version.length > 0
               ? this.version + ' · ' + this.rules + ' 条规则' + (this.apps > 0 ? ' · ' + this.apps + ' 个应用' : '')
               : '未读取到版本')
-              .fontSize(T.F_TINY).fontColor(Pal.text_tertiary()).margin({ top: 2 });
+              .fontSize(T.F_TINY).fontColor($r('app.color.text_tertiary')).margin({ top: 2 });
           }.alignItems(HorizontalAlign.Start).layoutWeight(1);
 
           Button(this.busy ? '上传中…' : '升级')
             .fontSize(T.F_SUB)
             .fontColor(Pal.primary())
-            .backgroundColor(Pal.accent_soft())
+            .backgroundColor($r('app.color.accent_soft'))
             .height(36)
             .constraintSize({ minWidth: 78 })
             .borderRadius(T.R_PILL)
