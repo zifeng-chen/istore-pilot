@@ -201,6 +201,13 @@ _RULES: list[tuple[tuple[str, ...], str, str]] = [
 
 # 应用名 → 分类。账本里只存流量不存分类，历史条目（尤其被 _canonical 重新
 # 归类的）要靠这张表补回分类，否则界面上的图标只能拿到「其他」。
+# 广告/推送/遥测不是「应用」，而是寄生在应用流量里的噪声。
+# 特征库会把 pangolin-sdk-toutiao 认成抖音、把 tencent 系广告认成腾讯，
+# 所以这一小撮必须抢在特征库之前判；其余手写规则退到特征库之后当补充。
+_PRE_NAMES = {"广告联盟", "应用推送"}
+_RULES_PRE = [r for r in _RULES if r[1] in _PRE_NAMES or r[2] in ("统计", "推送")]
+_RULES_POST = [r for r in _RULES if r not in _RULES_PRE]
+
 _NAME_CATEGORY = {name: cat for _, name, cat in _RULES}
 # 应用名 → 识别来源（rule/lib/geo/ip/domain），前端标「怎么认出来的」
 _SOURCE: dict[str, str] = {}
