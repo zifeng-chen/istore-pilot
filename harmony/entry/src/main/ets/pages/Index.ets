@@ -269,7 +269,7 @@ struct Index {
               })
                 .width('100%')
                 .padding({ left: 14, right: 14 })
-                .margin({ top: 4, bottom: this.safeBottom + 12 })
+                .margin({ top: 4, bottom: this.safeBottom + 4 })
                 .transition(TransitionEffect.OPACITY
                   .combine(TransitionEffect.translate({ y: 24 })));
             }

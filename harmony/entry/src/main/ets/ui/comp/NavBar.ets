@@ -38,6 +38,12 @@ export struct NavBar {
     .height(T.NAV_H)
     .padding({ left: 4, right: 4 })
     .backgroundColor($r('app.color.surface_glass'))
+    // backdropBlur 只模糊自己的背景，透不出底下的内容；真正的磨砂要用
+    // backgroundBlurStyle —— 它把导航栏后面那一层内容做高斯模糊再着色
+    .backgroundBlurStyle(BlurStyle.COMPONENT_ULTRA_THICK, {
+      colorMode: ThemeColorMode.LIGHT,
+      adaptiveColor: AdaptiveColor.DEFAULT
+    })
     .backdropBlur(24)
     // 悬浮胶囊，不是贴边通栏条：安卓那边是圆角 26 + 0.7 描边 + 投影，
     // 外面还留 14 的边。原来这里是一条通栏 + 顶部细线，两个 App 一眼就不像。
