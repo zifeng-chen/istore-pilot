@@ -157,6 +157,21 @@ public class AppsCard {
         tlp.leftMargin = Ui.dp(c, 11);
         line.addView(title, tlp);
 
+        // 认出来的是哪一层：只标特征库/规则，域名兜底太多不标
+        String src = a.optString("src", "domain");
+        if ("lib".equals(src) || "rule".equals(src)) {
+            TextView tag = Ui.text(c, "lib".equals(src) ? "特征库" : "规则", 10f,
+                    R.color.text_tertiary);
+            tag.setBackgroundResource(R.drawable.tag_bg);
+            int p = Ui.dp(c, 4);
+            tag.setPadding(p, 0, p, Ui.dp(c, 1));
+            LinearLayout.LayoutParams glp =
+                    new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT);
+            glp.leftMargin = Ui.dp(c, 6);
+            line.addView(tag, glp);
+        }
+
         if (bps >= 1024) {
             TextView rate = Ui.text(c, Fmt.bps(bps), 11f, R.color.primary);
             rate.setPadding(Ui.dp(c, 6), 0, Ui.dp(c, 6), 0);
