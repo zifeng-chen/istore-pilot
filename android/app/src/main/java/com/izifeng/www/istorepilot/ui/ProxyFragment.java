@@ -708,7 +708,7 @@ public class ProxyFragment extends BaseFragment {
             pkgPicker.launch(new String[]{"*/*"});
         } catch (Exception e) {
             Toast.makeText(ctx(), "打不开文件选择器：" + e.getMessage(),
-                    Toast.LENGTH_LONG).show();
+                    Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -926,14 +926,14 @@ public class ProxyFragment extends BaseFragment {
                                 return;
                             }
                             Toast.makeText(ctx(), "装好了 · 导入订阅后再启动",
-                                    Toast.LENGTH_LONG).show();
+                                    Toast.LENGTH_SHORT).show();
                             return;
                         }
                         closePkgDialog();
                         if (!installQueue.isEmpty()) {
                             installQueue.clear();
                             Toast.makeText(ctx(), "全部安装已中断",
-                                    Toast.LENGTH_LONG).show();
+                                    Toast.LENGTH_SHORT).show();
                         }
                         // 同一个失败只提示一次。轮询可能被重复挂上（连点、切页签回来），
                         // 每次都弹的话，用户关掉一个又冒一个
@@ -1556,7 +1556,7 @@ public class ProxyFragment extends BaseFragment {
                             Toast.makeText(ctx(), ok
                                             ? label + " 已启动"
                                             : data.optString("reason", "启动失败，看日志确认"),
-                                    ok ? Toast.LENGTH_SHORT : Toast.LENGTH_LONG).show();
+                                    ok ? Toast.LENGTH_SHORT : Toast.LENGTH_SHORT).show();
                             load(true);
                         }
 
@@ -1603,7 +1603,7 @@ public class ProxyFragment extends BaseFragment {
                                 comboPick = "";
                             }
                             Toast.makeText(ctx(), ok ? label + " 已停止" : "停止失败，看日志确认",
-                                    ok ? Toast.LENGTH_SHORT : Toast.LENGTH_LONG).show();
+                                    ok ? Toast.LENGTH_SHORT : Toast.LENGTH_SHORT).show();
                             load(true);
                         }
 

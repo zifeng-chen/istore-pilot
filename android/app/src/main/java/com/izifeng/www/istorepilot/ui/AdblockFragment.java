@@ -309,7 +309,7 @@ public class AdblockFragment extends BaseFragment {
                 }
                 if (data.optBoolean("ok", false)) {
                     Toast.makeText(ctx(), data.optString("message", "已卸载"),
-                            Toast.LENGTH_LONG).show();
+                            Toast.LENGTH_SHORT).show();
                     load(true);
                 } else {
                     Sheet.message(ctx(), "卸载失败",
@@ -1084,7 +1084,7 @@ public class AdblockFragment extends BaseFragment {
                 if (!data.optBoolean("ok", false)) {
                     installBusy = false;
                     Toast.makeText(c, data.optString("error", "安装没被受理"),
-                            Toast.LENGTH_LONG).show();
+                            Toast.LENGTH_SHORT).show();
                     return;
                 }
                 tickInstall();
@@ -1094,7 +1094,7 @@ public class AdblockFragment extends BaseFragment {
             public void onError(String message) {
                 installBusy = false;
                 if (isAdded()) {
-                    Toast.makeText(c, "安装请求失败：" + message, Toast.LENGTH_LONG).show();
+                    Toast.makeText(c, "安装请求失败：" + message, Toast.LENGTH_SHORT).show();
                 }
             }
         });
@@ -1132,7 +1132,7 @@ public class AdblockFragment extends BaseFragment {
                 if (done && !running) {
                     installBusy = false;
                     Toast.makeText(c, ok ? "装好了，这一页已经可用" : "安装失败：" + err,
-                            Toast.LENGTH_LONG).show();
+                            Toast.LENGTH_SHORT).show();
                     // /adblock 有 2 秒缓存，稍等一下再拉，避免又读到 installed=false
                     ui.postDelayed(() -> {
                         if (isAdded()) {

@@ -725,7 +725,7 @@ public class SettingsFragment extends BaseFragment {
                 }
                 if (data.optBoolean("ok", false)) {
                     Session.logout(ctx());
-                    Toast.makeText(ctx(), "密码已修改，请重新登录", Toast.LENGTH_LONG).show();
+                    Toast.makeText(ctx(), "密码已修改，请重新登录", Toast.LENGTH_SHORT).show();
                     startActivity(new Intent(ctx(), LoginActivity.class));
                     requireActivity().finish();
                 } else {
@@ -752,7 +752,7 @@ public class SettingsFragment extends BaseFragment {
             filePicker.launch(new String[]{"*/*"});
         } catch (Exception e) {
             Toast.makeText(ctx(), "打不开文件选择器：" + e.getMessage(),
-                    Toast.LENGTH_LONG).show();
+                    Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -824,7 +824,7 @@ public class SettingsFragment extends BaseFragment {
                 // 后端认为还需要确认（类型没对上）：不装，提示一下就退回
                 if (!data.optString("need_confirm", "").isEmpty()) {
                     Toast.makeText(ctx(), data.optString("error", "需要确认后才能安装"),
-                            Toast.LENGTH_LONG).show();
+                            Toast.LENGTH_SHORT).show();
                     return;
                 }
 
@@ -922,14 +922,14 @@ public class SettingsFragment extends BaseFragment {
                             data.optString("note", "路由器密码已更新。"));
                 } else {
                     Toast.makeText(ctx(), data.optString("error", "修改失败"),
-                            Toast.LENGTH_LONG).show();
+                            Toast.LENGTH_SHORT).show();
                 }
             }
 
             @Override
             public void onError(String message) {
                 if (isAdded()) {
-                    Toast.makeText(ctx(), message, Toast.LENGTH_LONG).show();
+                    Toast.makeText(ctx(), message, Toast.LENGTH_SHORT).show();
                 }
             }
         });
