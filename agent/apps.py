@@ -202,6 +202,8 @@ _RULES: list[tuple[tuple[str, ...], str, str]] = [
 # 应用名 → 分类。账本里只存流量不存分类，历史条目（尤其被 _canonical 重新
 # 归类的）要靠这张表补回分类，否则界面上的图标只能拿到「其他」。
 _NAME_CATEGORY = {name: cat for _, name, cat in _RULES}
+# 应用名 → 识别来源（rule/lib/geo/ip/domain），前端标「怎么认出来的」
+_SOURCE: dict[str, str] = {}
 
 # 运营商的 AS 名不是「应用」。裸 IP 反查回来的「中国移动」「中国电信」
 # 会把真正的应用挤下去（一台手机光「中国移动」就能占几百 MB 的榜首），
@@ -673,24 +675,30 @@ def _match(host: str) -> tuple[str, str]:
     for keys, name, category in _RULES:
         for key in keys:
             if key in low:
+                _SOURCE[name] = "rule"
                 return name, category
     # OAF 特征库（560 个应用）：手写规则没覆盖到的，先让它认
     hit = appnames.identify(low)
     if hit:
         _NAME_CATEGORY.setdefault(hit[0], hit[1])
+        _SOURCE.setdefault(hit[0], "lib")
         return hit
     hit = _geo_lookup(low)
     if hit:
         # 账本只存流量不存分类，这里顺手把名字→分类补进表，
         # 否则设备详情页里从 geosite 认出来的应用分类全是「其他」
         _NAME_CATEGORY.setdefault(hit[0], hit[1])
+        _SOURCE.setdefault(hit[0], "geo")
         return hit
     # 退化成主域名：api.foo.example.com → example.com
     parts = [p for p in low.split(".") if p]
     if len(parts) >= 2:
         if len(parts) >= 3 and parts[-2] in {"com", "net", "org", "gov", "edu", "co"}:
             return ".".join(parts[-3:]), "其他"
-        return ".".join(parts[-2:]), "其他"
+        label = ".".join(parts[-2:])
+        _SOURCE.setdefault(label, "domain")
+        return label, "其他"
+    _SOURCE.setdefault(host, "domain")
     return host, "其他"
 
 
@@ -972,6 +980,7 @@ def snapshot() -> dict:
             {
                 "name": name,
                 "category": item.get("category") or _NAME_CATEGORY.get(name, "其他"),
+                "src": _SOURCE.get(name, "domain"),
                 "up": int(item.get("up", 0)),
                 "down": int(item.get("down", 0)),
                 "total": int(item.get("up", 0) + item.get("down", 0)),
