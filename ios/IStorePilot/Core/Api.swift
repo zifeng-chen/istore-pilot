@@ -62,8 +62,9 @@ enum Api {
                        method: "GET", path: "/api/v1/ping", body: nil, timeout: 6)
     }
 
-    static func upload(data: Data, filename: String) async throws -> J {
-        var req = URLRequest(url: URL(string: Session.base + "/api/v1/system/upload")!)
+    static func upload(data: Data, filename: String,
+                       path: String = "/api/v1/system/upload") async throws -> J {
+        var req = URLRequest(url: URL(string: Session.base + path)!)
         req.httpMethod = "POST"
         req.timeoutInterval = 180
         req.setValue("Bearer \(Session.token)", forHTTPHeaderField: "Authorization")

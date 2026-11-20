@@ -59,6 +59,10 @@ public class SettingsFragment extends BaseFragment {
     private TextView tvDevMem;
     private TextView tvDevDisk;
     private TextView tvTheme;
+    private TextView tvAfState;
+    private TextView tvAfFeature;
+    private boolean pickingFeature = false;
+    private boolean afBusy = false;
 
     /**
      * 选安装包。必须用字段初始化注册 —— 放到 build() 里会抛
@@ -68,7 +72,14 @@ public class SettingsFragment extends BaseFragment {
             registerForActivityResult(
                     new androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
                     uri -> {
-                        if (uri != null) {
+                        if (uri == null) {
+                            return;
+                        }
+                        // 同一个选择器两用：装固件 / 传特征库，按谁先把标记竖起来分流
+                        if (pickingFeature) {
+                            pickingFeature = false;
+                            uploadFeature(uri);
+                        } else {
                             uploadInstaller(uri);
                         }
                     });
@@ -275,6 +286,30 @@ public class SettingsFragment extends BaseFragment {
         security.addView(note);
         root.addView(security);
 
+        // ---------------------------------------------------------------- 应用过滤（OAF）
+        // 手机上只做「看状态 + 开关 + 传特征库」三件事。完整的规则管理在路由器
+        // 后台（LuCI → 服务 → App Filter → 应用特征），这里是连不上电脑时的备用入口。
+        Ui.Card af = Ui.card(c);
+        Ui.cardPadding(af, 11);
+        Ui.cardTitle(c, af, com.izifeng.www.istorepilot.widget.Glyph.SECURITY,
+                "应用过滤", "按应用识别与拦截");
+        tvAfState = Ui.settingRow(c, af, com.izifeng.www.istorepilot.widget.Glyph.POWER,
+                "开启应用过滤", "会关闭硬件加速，大流量降速", "—", true, false,
+                () -> toggleAppFilter());
+        tvAfFeature = Ui.settingRow(c, af, com.izifeng.www.istorepilot.widget.Glyph.DEVICE_INFO,
+                "特征库", "点一下选 .bin 文件上传", "—", false, false,
+                () -> {
+                    pickingFeature = true;
+                    filePicker.launch(new String[]{"*/*"});
+                });
+        TextView afNote = Ui.text(c,
+                "特征库是会员私有授权，不随 App 分发；完整的应用开关请到路由器后台管理。",
+                11.5f, R.color.text_secondary);
+        afNote.setLineSpacing(Ui.dp(c, 2), 1f);
+        afNote.setPadding(Ui.dp(c, 16), Ui.dp(c, 10), Ui.dp(c, 16), Ui.dp(c, 10));
+        af.addView(afNote);
+        root.addView(af);
+
         // ---------------------------------------------------------------- 关于 + 操作
         // 合成一张卡（与鸿蒙 0.3.3 / iOS 对齐）：上面是「这是什么 App」，
         // 下面是真正要点的三行。分成两张时「关于」只有图标和几行字，自己占一张卡很空。
@@ -320,6 +355,9 @@ public class SettingsFragment extends BaseFragment {
         Ui.settingRow(c, about, com.izifeng.www.istorepilot.widget.Glyph.LOGOUT,
                 "退出登录", "清除凭证并返回登录页", "", false, false, this::relogin);
         root.addView(about);
+
+        // 应用过滤的状态在卡片加进树之后拉一次（这时 tvAfState 才有值）
+        loadAppFilter();
     }
 
     /** hero 底部的一格读数：上面小标签，下面数值，均分一行 */
@@ -1116,5 +1154,81 @@ public class SettingsFragment extends BaseFragment {
         } catch (Exception e) {
             return "—";
         }
+    }
+
+    // ================================================================ 应用过滤
+
+    private void loadAppFilter() {
+        if (tvAfState == null) {
+            return;
+        }
+        Api.get(ctx(), "/api/v1/appfilter", new Cb() {
+            @Override
+            public void onData(JSONObject d, boolean fromCache) {
+                if (!d.optBoolean("installed")) {
+                    tvAfState.setText("未安装");
+                    tvAfFeature.setText("—");
+                    return;
+                }
+                tvAfState.setText(d.optBoolean("enabled") ? "已开启" : "已关闭");
+                JSONObject f = d.optJSONObject("feature");
+                if (f != null) {
+                    String v = f.optString("version", "");
+                    int rules = f.optInt("rules");
+                    tvAfFeature.setText(v.length() > 0 ? v + " · " + rules + " 条" : "—");
+                }
+            }
+
+            @Override
+            public void onError(String msg) {
+                tvAfState.setText("读取失败");
+            }
+        });
+    }
+
+    private void toggleAppFilter() {
+        if (afBusy) {
+            return;
+        }
+        boolean on = !"已开启".equals(String.valueOf(tvAfState.getText()));
+        afBusy = true;
+        JSONObject body = new JSONObject();
+        try {
+            body.put("enable", on);
+        } catch (Exception ignored) {
+        }
+        Api.post(ctx(), "/api/v1/appfilter/toggle", body, new Cb() {
+            @Override
+            public void onData(JSONObject d, boolean fromCache) {
+                afBusy = false;
+                Toast.makeText(ctx(), on ? "应用过滤已开启" : "应用过滤已关闭",
+                        Toast.LENGTH_SHORT).show();
+                loadAppFilter();
+            }
+
+            @Override
+            public void onError(String msg) {
+                afBusy = false;
+                Toast.makeText(ctx(), "切换失败：" + msg, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void uploadFeature(android.net.Uri uri) {
+        Toast.makeText(ctx(), "正在上传，请稍候", Toast.LENGTH_SHORT).show();
+        Api.uploadTo(ctx(), "/api/v1/appfilter/upgrade", uri, new Cb() {
+            @Override
+            public void onData(JSONObject d, boolean fromCache) {
+                String after = d.optString("after", "");
+                Toast.makeText(ctx(), after.length() > 0 ? "特征库已更新到 " + after : "特征库已更新",
+                        Toast.LENGTH_SHORT).show();
+                loadAppFilter();
+            }
+
+            @Override
+            public void onError(String msg) {
+                Toast.makeText(ctx(), msg, Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 }

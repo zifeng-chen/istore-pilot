@@ -59,6 +59,7 @@ struct SettingsView: View {
                         maintainCard
                         uploadCard
                         powerCard
+                        appFilterCard
                         securityCard
                         aboutCard
                     }
@@ -471,6 +472,109 @@ struct SettingsView: View {
                     note: "关机后只能到设备跟前手动开机", danger: true) {
                     confirmPower = "poweroff"
                 }
+            }
+        }
+    }
+
+    /// 应用过滤（OAF）：手机端只是备用入口，完整管理在路由器后台
+    @State private var afEnabled = false
+    @State private var afVersion = ""
+    @State private var showFeaturePicker = false
+
+    private var appFilterCard: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 0) {
+                CardHead(icon: "security", title: "应用过滤", sub: "按应用识别与拦截")
+
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("开启应用过滤")
+                            .font(F.body)
+                            .foregroundStyle(Color("text_primary"))
+                        Text("会关闭硬件加速，大流量降速")
+                            .font(F.tiny)
+                            .foregroundStyle(Color("text_tertiary"))
+                    }
+                    Spacer()
+                    Toggle("", isOn: Binding(
+                        get: { afEnabled },
+                        set: { v in toggleAppFilter(v) }
+                    ))
+                    .labelsHidden()
+                    .tint(Color("primary"))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+
+                Hairline(inset: 62)
+
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("特征库")
+                            .font(F.body)
+                            .foregroundStyle(Color("text_primary"))
+                        Text(afVersion.isEmpty ? "—" : afVersion)
+                            .font(F.tiny)
+                            .foregroundStyle(Color("text_tertiary"))
+                    }
+                    Spacer()
+                    Button("升级") { showFeaturePicker = true }
+                        .font(F.caption)
+                        .padding(.horizontal, 14)
+                        .frame(height: 36)
+                        .background(Color("accent_soft"))
+                        .foregroundStyle(Color("primary"))
+                        .clipShape(Capsule())
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+
+                Text("特征库是会员私有授权，不随 App 分发；完整的应用开关请到路由器后台管理。")
+                    .font(F.tiny)
+                    .foregroundStyle(Color("text_secondary"))
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+            }
+        }
+        .fileImporter(isPresented: $showFeaturePicker,
+                      allowedContentTypes: [.data], allowsMultipleSelection: false) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                uploadFeature(url)
+            }
+        }
+        .task { await loadAppFilter() }
+    }
+
+    private func loadAppFilter() async {
+        guard let d = try? await Api.get("/api/v1/appfilter", cache: false) else { return }
+        afEnabled = d.bool("enabled")
+        if let f = d.obj("feature") {
+            let v = f.str("version")
+            let rules = f.int("rules")
+            afVersion = v.isEmpty ? "" : "\(v) · \(rules) 条"
+        }
+    }
+
+    private func toggleAppFilter(_ on: Bool) {
+        Task {
+            _ = try? await Api.post("/api/v1/appfilter/toggle", ["enable": on])
+            await loadAppFilter()
+        }
+    }
+
+    private func uploadFeature(_ url: URL) {
+        let ok = url.startAccessingSecurityScopedResource()
+        defer { if ok { url.stopAccessingSecurityScopedResource() } }
+        guard let data = try? Data(contentsOf: url) else { return }
+        Task {
+            do {
+                let r = try await Api.upload(data: data, filename: url.lastPathComponent,
+                                             path: "/api/v1/appfilter/upgrade")
+                let after = r.str("after")
+                popup = Popup(title: "特征库已更新", body: after.isEmpty ? "" : after)
+                await loadAppFilter()
+            } catch {
+                popup = Popup(title: "上传失败", body: error.localizedDescription)
             }
         }
     }

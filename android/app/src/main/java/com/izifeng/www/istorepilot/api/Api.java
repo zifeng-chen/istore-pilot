@@ -150,7 +150,12 @@ public final class Api {
      * 文件名放在头里而不是 URL 里，是因为 .ipk / .run 的名字可能带空格和中文。
      */
     public static void upload(Context c, android.net.Uri uri, Cb cb) {
-        upload(c, uri, cb, null);
+        uploadTo(c, "/api/v1/system/upload", uri, cb);
+    }
+
+    /** 传到指定端点。特征库升级复用同一套原始字节流逻辑，只是路径不同。 */
+    public static void uploadTo(Context c, String path, android.net.Uri uri, Cb cb) {
+        uploadTo(c, path, uri, cb, null);
     }
 
     /** 上传进度回调。在主线程回调，可以直接改控件 */
@@ -162,6 +167,11 @@ public final class Api {
      * 带进度的上传。安装包动辄七八十 MB，没有进度的话用户只能盯着转圈猜。
      */
     public static void upload(Context c, android.net.Uri uri, Cb cb, Prog prog) {
+        uploadTo(c, "/api/v1/system/upload", uri, cb, prog);
+    }
+
+    /** 带进度的指定端点上传 */
+    public static void uploadTo(Context c, String path, android.net.Uri uri, Cb cb, Prog prog) {
         final Context app = c.getApplicationContext();
         final String base = Session.base(app);
         final String token = Session.token(app);
@@ -174,7 +184,7 @@ public final class Api {
                 if (size <= 0) {
                     throw new ApiError(0, "读不到文件大小，换一个文件管理器选试试");
                 }
-                URL url = new URL(base + "/api/v1/system/upload");
+                URL url = new URL(base + path);
                 conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
                 conn.setConnectTimeout(8000);
