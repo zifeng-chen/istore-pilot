@@ -163,6 +163,10 @@
     {
       "name": "shadow_3",
       "value": "#1A000000"
+    },
+    {
+      "name": "start_bg",
+      "value": "#00553E"
     }
   ]
 }

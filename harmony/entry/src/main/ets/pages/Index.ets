@@ -78,11 +78,11 @@ struct Index {
     await Session.init(ctx);
     // 演示态从本地恢复：上次停在演示模式的话，这一屏的数据不能去连路由器
     await Demo.init(ctx);
+    // 先把状态栏图标转白再去 await：放到后面会让首帧带着深色图标压在深绿底上
+    this.tintSystemBars(true);
     Pal.bind(ctx.getApplicationContext());
     // 深浅色要在第一帧之前定下来，否则会先闪一下系统色再跳到用户选的
     await Appearance.init(ctx);
-    // 启动页是深绿底：状态栏/导航条图标得转白，否则深底上根本看不见
-    this.tintSystemBars(true);
 
     // 入场：图标放大淡入，名字晚 120ms、标语晚 220ms
     animateTo({ duration: Motion.ms(420), curve: Curve.EaseOut }, () => {
@@ -302,7 +302,7 @@ struct Index {
   @Builder
   splashLayer() {
     Column() {
-      Image($r('app.media.app_icon'))
+      Image($r('app.media.start_logo'))
         .width(88)
         .height(88)
         .borderRadius(T.R_LG)
