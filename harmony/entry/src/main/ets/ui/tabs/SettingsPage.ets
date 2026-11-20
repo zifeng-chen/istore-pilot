@@ -1140,10 +1140,12 @@ export struct SettingsPage {
   @Builder
   sheetOverlay() {
     Column() {
-      // 遮罩：点一下关掉，不用非得去够右上角的叉
+      // 遮罩：点一下关掉，不用非得去够右上角的叉。
+      // hitTestBehavior 必须 Block：否则侧滑手势会穿透到父级，弹窗还开着就跳到概览
       Column()
         .width('100%')
         .layoutWeight(1)
+        .hitTestBehavior(HitTestMode.Block)
         .onClick(() => {
           this.closeSheet();
         });
