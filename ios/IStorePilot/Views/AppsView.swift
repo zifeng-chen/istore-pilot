@@ -160,6 +160,17 @@ struct AppsView: View {
                             .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(C.textPrimary)
                             .lineLimit(1)
+                        // 认出来的是哪一层：只标特征库/规则，域名兜底太多不标
+                        let src = a.str("src")
+                        if src == "lib" || src == "rule" {
+                            Text(src == "lib" ? "特征库" : "规则")
+                                .font(.system(size: 10))
+                                .foregroundStyle(C.textTertiary)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(C.surfaceSunken)
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                        }
                         if bps >= 1024 {
                             Text(F.rate(bps))
                                 .font(F.num(11.5, .medium))
