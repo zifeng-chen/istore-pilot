@@ -1139,12 +1139,14 @@ export struct SettingsPage {
 
   @Builder
   sheetOverlay() {
-    Column() {
+    // 改成 Stack 居中：原来贴底弹，长表单在小屏上顶到状态栏，
+    // 而且底部弹出的手势区域和父级 Swipe 打架
+    Stack({ alignContent: Alignment.Center }) {
       // 遮罩：点一下关掉，不用非得去够右上角的叉。
       // hitTestBehavior 必须 Block：否则侧滑手势会穿透到父级，弹窗还开着就跳到概览
       Column()
         .width('100%')
-        .layoutWeight(1)
+        .height('100%')
         .hitTestBehavior(HitTestMode.Block)
         .onClick(() => {
           this.closeSheet();
@@ -1266,7 +1268,7 @@ export struct SettingsPage {
       .width('100%')
       .constraintSize({ maxWidth: 520 })
       .padding({ left: T.PAD_WIDE, right: T.PAD_WIDE, top: 18, bottom: 22 })
-      .borderRadius({ topLeft: 26, topRight: 26 })
+      .borderRadius(T.R_LG)
       .backgroundColor($r('app.color.surface'))
       .border({ width: 0.7, color: $r('app.color.glass_stroke') });
     }
