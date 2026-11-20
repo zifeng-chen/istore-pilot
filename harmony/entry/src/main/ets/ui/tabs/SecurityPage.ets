@@ -17,6 +17,8 @@ import { ShieldPage } from './ShieldPage';
 interface AppRow {
   name: string;
   category: string;
+  /** 认出来的是哪一层：rule 手写规则 / lib 特征库 / geo geosite / domain 兜底 */
+  src: string;
   total: number;
   share: number;
   bps: number;
@@ -202,6 +204,7 @@ export struct SecurityPage {
       rows.push({
         name: x.str('name', ''),
         category: x.str('category', ''),
+        src: x.str('src', 'domain'),
         total: x.num('all_total', 0),
         share: x.num('share', 0),
         bps: x.num('down_bps', 0) + x.num('up_bps', 0),
@@ -209,6 +212,13 @@ export struct SecurityPage {
         up: x.num('all_up', 0)
       } as AppRow);
     }
+    // 按分类聚在一起：同类应用挨着排，比按用量混排更好扫
+    rows.sort((a: AppRow, b2: AppRow) => {
+      if (a.category !== b2.category) {
+        return a.category < b2.category ? -1 : 1;
+      }
+      return b2.total - a.total;
+    });
     this.appRows = rows;
   }
 
@@ -730,6 +740,15 @@ export struct SecurityPage {
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
               .layoutWeight(1);
+            if (a.src === 'lib' || a.src === 'rule') {
+              Text(a.src === 'lib' ? '特征库' : '规则')
+                .fontSize(10)
+                .fontColor($r('app.color.text_tertiary'))
+                .backgroundColor($r('app.color.surface_sunken'))
+                .borderRadius(4)
+                .padding({ left: 4, right: 4, top: 1, bottom: 1 })
+                .margin({ left: 6 });
+            }
             if (a.bps >= 1024) {
               Text(Fmt.bps(a.bps))
                 .fontSize(T.F_TINY)
