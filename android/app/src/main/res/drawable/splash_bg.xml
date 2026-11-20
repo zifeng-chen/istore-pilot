@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 启动窗口：品牌绿底 + 居中白色字标（与 iOS / 鸿蒙同一张图） -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/hero_from" />
+    <item>
+        <bitmap
+            android:src="@drawable/splash_logo"
+            android:gravity="center"
+            android:width="132dp"
+            android:height="132dp" />
+    </item>
+</layer-list>
