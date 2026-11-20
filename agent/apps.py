@@ -93,6 +93,15 @@ _RULES: list[tuple[tuple[str, ...], str, str]] = [
     # ugnas.com 是绿联 NAS 的远程直连域名，早期只认 ug.link / ugreen，
     # 结果应用榜上多出一行「ugnas.com」，图标也匹配不上
     (("ug.link", "ugreen", "ugnas"), "绿联 NAS", "局域网"),
+    # ---- CDN 与私有分发域：特征库只有「入口域名」，实际流量走这些，必须手写 ----
+    (("aweme", "snssdk", "amemv", "douyincdn"), "抖音", "视频"),
+    (("xhscdn", "xhslink"), "小红书", "社交"),
+    (("hdslb", "bilivideo", "biliapi"), "哔哩哔哩", "视频"),
+    (("kwaicdn", "gifshow"), "快手", "视频"),
+    (("qpic", "gtimg"), "腾讯", "社交"),
+    (("bdstatic", "bcebos"), "百度", "搜索"),
+    (("alicdn", "tmall"), "淘宝 / 支付宝", "购物"),
+    (("360buyimg", "jdpay"), "京东", "购物"),
     (("synology", "quickconnect"), "群晖 NAS", "局域网"),
     # ---------------------------------------------------------- 社交
     # 企业微信的域名里带 weixin，必须排在微信前面，否则永远被归到微信
