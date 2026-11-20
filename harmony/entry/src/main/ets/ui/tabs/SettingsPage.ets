@@ -626,34 +626,35 @@ export struct SettingsPage {
     if (this.powerBusy) {
       return;
     }
-    // 关机是不可逆操作：关掉之后远程再也连不上，只能到现场按电源键。
-    // 原来用「再点一次确认」的文字提示，误触一次就够呛 —— 改成弹窗，
-    // 主按钮是危险色，文案把后果说死。
-    if (action === 'poweroff') {
-      this.getUIContext().showAlertDialog({
-        title: '确认关机？',
-        message: '关机后设备完全断电，只能到现场按电源键开机。远程将无法再连接，'
-          + '除非有人在设备旁边，否则不要关机。',
-        primaryButton: {
-          value: '确认关机',
-          fontColor: Pal.danger(),
-          action: () => {
-            this.execPower('poweroff');
-          }
-        },
-        secondaryButton: {
-          value: '取消',
-          fontColor: Pal.textSecondary(),
-          action: () => {
-          }
+    // 三个动作都要确认：重启和重拨同样会断网，误触一次全家掉线。
+    // 之前是非关机走「再点一次」的文字提示，容易误触，也不统一。
+    const isOff: boolean = action === 'poweroff';
+    const title: string = isOff ? '确认关机？'
+      : (action === 'reboot' ? '确认重启路由器？' : '确认重启网络服务？');
+    const body: string = isOff
+      ? '关机后设备完全断电，只能到现场按电源键开机。远程将无法再连接，'
+        + '除非有人在设备旁边，否则不要关机。'
+      : (action === 'reboot'
+        ? '整机重启，所有设备断网约 1 分钟。重启期间无法修改设置。'
+        : '只重拨 WAN，局域网不掉线，通常 10 秒内恢复。');
+    this.getUIContext().showAlertDialog({
+      title: title,
+      message: body,
+      primaryButton: {
+        value: isOff ? '确认关机' : '确认执行',
+        fontColor: Pal.danger(),
+        action: () => {
+          this.execPower(action);
         }
-      });
-      return;
-    }
-    if (this.pendingPower !== action) {
-      this.pendingPower = action;
-      return;
-    }
+      },
+      secondaryButton: {
+        value: '取消',
+        fontColor: Pal.textSecondary(),
+        action: () => {
+        }
+      }
+    });
+    return;
     this.execPower(action);
   }
 
