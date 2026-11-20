@@ -1,4 +1,5 @@
 import { common } from '@kit.AbilityKit';
+import { hilog } from '@kit.PerformanceAnalysisKit';
 import { display, router, window } from '@kit.ArkUI';
 import { Api, ApiResult } from '../api/Api';
 import { Session } from '../core/Session';
@@ -63,6 +64,16 @@ struct Index {
   private async boot(): Promise<void> {
     const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
     const started: number = Date.now();
+    // 看门狗：boot 里任何一步卡住（preferences 初始化失败、探测不返回…），
+    // 4 秒后都要把启动页撤掉。之前模拟器上就出现过冷启动停在启动页不动，
+    // 用户只能杀进程 —— 宁可少一次动画，也不能把人挡在门外。
+    setTimeout(() => {
+      if (this.splash) {
+        hilog.warn(0x0001, 'Index', 'boot watchdog fired, drop splash');
+        this.splash = false;
+        SystemBar.sync(ctx);
+      }
+    }, 4000);
 
     await Session.init(ctx);
     // 演示态从本地恢复：上次停在演示模式的话，这一屏的数据不能去连路由器
