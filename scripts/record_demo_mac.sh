@@ -83,3 +83,8 @@ ffmpeg -y -framerate "$FPS" -pattern_type glob -i "$LOCAL/f*.jpeg" \
   -vf "scale=720:-2" -c:v libx264 -pix_fmt yuv420p -crf 23 "$OUT" 2>&1 | tail -2
 ls -lh "$OUT"
 python3 -c "import subprocess;print('时长',subprocess.run(['ffprobe','-v','error','-show_entries','format=duration','-of','csv=p=0','$OUT'],capture_output=True,text=True).stdout.strip(),'秒')"
+
+# 帧和 tar 都是中间产物，合成完就删，别堆在 /tmp
+rm -rf "$LOCAL" /tmp/vid.tar 2>/dev/null
+$H shell "rm -rf $DIR /data/local/tmp/vid.tar" >/dev/null 2>&1
+echo "已清：$LOCAL 与设备端 $DIR"

@@ -51,3 +51,11 @@ java -jar "$DEVECO_SDK_HOME/default/openharmony/toolchains/lib/hap-sign-tool.jar
 
 echo "=== 验签 ==="
 python3 /Users/chen/istore-build/harmony_pkg_verify.py "${OUT%.app}-signed.app" --expect-type release 2>&1 | tail -10
+
+# ---- 收尾清理：中间件默认删，PRUNE=all 连构建产物一起删
+rm -rf /tmp/appkit "$OUT" 2>/dev/null
+if [ "${PRUNE:-mid}" = "all" ]; then
+  rm -rf entry/build build .hvigor 2>/dev/null && echo "已清：构建缓存（下次全量编译）"
+else
+  echo "已清：打包中间件（保留 entry/build 以便增量）"
+fi
