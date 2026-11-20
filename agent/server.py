@@ -789,7 +789,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(adblock.log(
                     int(query.get("limit", ["120"])[0]),
                     query.get("client", [""])[0],
-                    query.get("only_blocked", ["0"])[0] in ("1", "true", "yes")))
+                    query.get("only_blocked", ["0"])[0] in ("1", "true", "yes"),
+                    query.get("search", [""])[0]))
             elif path == "/api/v1/appfilter":
                 self._json(cached("appfilter", 5.0, appfilter.status))
             elif path == "/api/v1/clash":

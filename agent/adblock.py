@@ -1806,7 +1806,8 @@ def install(confirm: str = "") -> dict:
     return {"ok": True, "accepted": True, "state": install_status()}
 
 
-def log(limit: int = 120, client: str = "", only_blocked: bool = False) -> dict:
+def log(limit: int = 120, client: str = "", only_blocked: bool = False,
+        search: str = "") -> dict:
     """拦截日志（AGH 的 querylog）。
 
     字段名对齐三端已有的客户端：``time`` / ``domain`` / ``client`` / ``blocked``
@@ -1818,8 +1819,9 @@ def log(limit: int = 120, client: str = "", only_blocked: bool = False) -> dict:
         return {"ok": False, "error": "拦截服务未运行"}
     n = max(20, min(int(limit or 120), 500))
     q = "/querylog?limit=%d" % n
-    if client:
-        q += "&search=" + urllib.parse.quote(client)
+    kw = search or client          # 客户端有的传 search、有的传 client，AGH 都是同一个参数
+    if kw:
+        q += "&search=" + urllib.parse.quote(kw)
     raw = _api(q)
     if "__error" in raw:
         return {"ok": False, "error": "读取拦截日志失败"}
@@ -1845,6 +1847,7 @@ def log(limit: int = 120, client: str = "", only_blocked: bool = False) -> dict:
             "blocked": blocked,
             "action": action,
             "rule": rule,
+            "list": "",                 # Android 的日志行会显示「命中哪张表」，暂不解析
             "ms": it.get("elapsedMs") or 0,
         })
     return {"ok": True, "total": len(out),
