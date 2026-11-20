@@ -950,7 +950,7 @@ export struct ProxyPage {
       { 'hide_timeout': on });
     if (!r.ok) {
       this.hideTimeout = !on;
-      promptAction.showToast({ message: r.error.length > 0 ? r.error : '设置没保存' });
+      promptAction.showToast({ message: r.error.length > 0 ? r.error : '设置没保存', duration: 3000 });
       return;
     }
     this.hideTimeout = r.data.bool('hide_timeout', on);

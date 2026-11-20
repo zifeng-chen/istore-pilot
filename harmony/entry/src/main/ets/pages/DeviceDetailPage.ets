@@ -72,10 +72,10 @@ struct DeviceDetailPage {
     const r: ApiResult = await Api.post(this.ctx(), path, body);
     this.busy = false;
     if (r.ok) {
-      promptAction.showToast({ message: done });
+      promptAction.showToast({ message: done, duration: 3000 });
       await this.load();
     } else {
-      promptAction.showToast({ message: r.error.length > 0 ? r.error : '操作失败' });
+      promptAction.showToast({ message: r.error.length > 0 ? r.error : '操作失败', duration: 3000 });
     }
   }
 

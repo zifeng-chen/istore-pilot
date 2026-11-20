@@ -170,7 +170,7 @@ struct SubscriptionPage {
     const r: ApiResult = await Api.get(this.ctx(), path);
     this.loading = false;
     if (!r.ok) {
-      promptAction.showToast({ message: r.error.length > 0 ? r.error : '读取失败' });
+      promptAction.showToast({ message: r.error.length > 0 ? r.error : '读取失败', duration: 3000 });
       return;
     }
     const list: J[] = r.data.arr('items');
@@ -191,7 +191,7 @@ struct SubscriptionPage {
   }
 
   private toast(s: string): void {
-    promptAction.showToast({ message: s });
+    promptAction.showToast({ message: s, duration: 3000 });
   }
 
   /** 删除这类「对某一条」的动作 */

@@ -218,14 +218,13 @@ struct PackageUpdatePage {
     this.starting = false;
     if (!r.ok || !r.data.bool('ok', false)) {
       promptAction.showToast({
-        message: r.data.str('error', r.ok ? '升级没被受理' : r.error)
-      });
+        message: r.data.str('error', r.ok ? '升级没被受理' : r.error), duration: 3000 });
       return;
     }
     this.running = true;
     this.logTail = '';
     this.startPoll();
-    promptAction.showToast({ message: '已开始升级，进度在下面' });
+    promptAction.showToast({ message: '已开始升级，进度在下面', duration: 3000 });
   }
 
   private startPoll(): void {
@@ -261,7 +260,7 @@ struct PackageUpdatePage {
     if (!r.data.bool('running', false)) {
       this.running = false;
       this.stopPoll();
-      promptAction.showToast({ message: '升级结束，正在重新检查' });
+      promptAction.showToast({ message: '升级结束，正在重新检查', duration: 3000 });
       await this.load(false);
     }
   }

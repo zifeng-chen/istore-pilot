@@ -760,18 +760,18 @@ public class DeviceDetailActivity extends BaseActivity {
                 String error = data.optString("error", "");
                 if (!ok) {
                     Toast.makeText(DeviceDetailActivity.this, error.isEmpty() ? "操作失败" : error,
-                            Toast.LENGTH_LONG).show();
+                            Toast.LENGTH_SHORT).show();
                     return;
                 }
                 Toast.makeText(DeviceDetailActivity.this,
                         warning.isEmpty() ? okText : okText + "（" + warning + "）",
-                        Toast.LENGTH_LONG).show();
+                        Toast.LENGTH_SHORT).show();
                 load(false);
             }
 
             @Override
             public void onError(String message) {
-                Toast.makeText(DeviceDetailActivity.this, message, Toast.LENGTH_LONG).show();
+                Toast.makeText(DeviceDetailActivity.this, message, Toast.LENGTH_SHORT).show();
             }
         });
     }

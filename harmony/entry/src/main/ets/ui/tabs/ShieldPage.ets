@@ -657,7 +657,7 @@ export struct ShieldPage {
     this.uninstalling = false;
     if (r.ok && r.data.bool('ok', true)) {
       this.showUninstall = false;
-      promptAction.showToast({ message: r.data.str('message', '已卸载') });
+      promptAction.showToast({ message: r.data.str('message', '已卸载'), duration: 3000 });
       await this.load(false);
     } else {
       this.uninstallErr = r.ok

@@ -624,8 +624,40 @@ export struct SettingsPage {
     if (this.powerBusy) {
       return;
     }
+    // 关机是不可逆操作：关掉之后远程再也连不上，只能到现场按电源键。
+    // 原来用「再点一次确认」的文字提示，误触一次就够呛 —— 改成弹窗，
+    // 主按钮是危险色，文案把后果说死。
+    if (action === 'poweroff') {
+      this.getUIContext().showAlertDialog({
+        title: '确认关机？',
+        message: '关机后设备完全断电，只能到现场按电源键开机。远程将无法再连接，'
+          + '除非有人在设备旁边，否则不要关机。',
+        primaryButton: {
+          value: '确认关机',
+          fontColor: Pal.danger(),
+          action: () => {
+            this.execPower('poweroff');
+          }
+        },
+        secondaryButton: {
+          value: '取消',
+          fontColor: Pal.textSecondary(),
+          action: () => {
+          }
+        }
+      });
+      return;
+    }
     if (this.pendingPower !== action) {
       this.pendingPower = action;
+      return;
+    }
+    this.execPower(action);
+  }
+
+  /** 真正发请求的那一步。抽出来是因为「弹窗确认」和「再点一次」都要走到这里。 */
+  private async execPower(action: string): Promise<void> {
+    if (this.powerBusy) {
       return;
     }
     this.powerBusy = true;
@@ -633,8 +665,10 @@ export struct SettingsPage {
     const r: ApiResult = await Api.post(this.ctx(), '/api/v1/power', body);
     this.powerBusy = false;
     this.pendingPower = '';
-    this.toast = r.ok ? (action === 'poweroff' ? '正在关机' : '已重启')
-      : ('失败：' + (r.error.length > 0 ? r.error : '未知错误'));
+    // 必须走 flash()：直接赋值给 this.toast 没有人清它，
+    // 结果这条提示会一直挂在页面上（之前的 bug）
+    this.flash(r.ok ? (action === 'poweroff' ? '正在关机' : '已重启')
+      : ('失败：' + (r.error.length > 0 ? r.error : '未知错误')));
   }
 
   /**

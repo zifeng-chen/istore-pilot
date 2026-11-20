@@ -113,9 +113,9 @@ export struct AppFilterCard {
     const res = await Http.send(Session.base(), Session.token(), 'POST', '/api/v1/appfilter/toggle', body);
     this.busy = false;
     if (res.ok) {
-      promptAction.showToast({ message: on ? '应用过滤已开启' : '应用过滤已关闭' });
+      promptAction.showToast({ message: on ? '应用过滤已开启' : '应用过滤已关闭', duration: 3000 });
     } else {
-      promptAction.showToast({ message: '切换失败，请稍后重试' });
+      promptAction.showToast({ message: '切换失败，请稍后重试', duration: 3000 });
     }
     this.load();
   }
@@ -139,14 +139,14 @@ export struct AppFilterCard {
     }
     const uri: string = uris[0];
     this.busy = true;
-    promptAction.showToast({ message: '正在上传，请稍候' });
+    promptAction.showToast({ message: '正在上传，请稍候', duration: 3000 });
     try {
       const f = fs.openSync(uri, fs.OpenMode.READ_ONLY);
       const size = fs.statSync(f.fd).size;
       if (size <= 0 || size > 12 * 1024 * 1024) {
         fs.closeSync(f);
         this.busy = false;
-        promptAction.showToast({ message: '文件大小不合规' });
+        promptAction.showToast({ message: '文件大小不合规', duration: 3000 });
         return;
       }
       const buf = new ArrayBuffer(size);
@@ -166,7 +166,7 @@ export struct AppFilterCard {
         } catch (e) {
           msg = '特征库已更新';
         }
-        promptAction.showToast({ message: msg });
+        promptAction.showToast({ message: msg, duration: 3000 });
       } else {
         let why: string = '上传失败';
         try {
@@ -177,12 +177,12 @@ export struct AppFilterCard {
         } catch (e) {
           why = '上传失败';
         }
-        promptAction.showToast({ message: why });
+        promptAction.showToast({ message: why, duration: 3000 });
       }
     } catch (e) {
       this.busy = false;
       const err = e as BusinessError;
-      promptAction.showToast({ message: '读取文件失败：' + (err.message ?? '') });
+      promptAction.showToast({ message: '读取文件失败：' + (err.message ?? ''), duration: 3000 });
     }
     this.load();
   }
