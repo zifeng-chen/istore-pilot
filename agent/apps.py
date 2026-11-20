@@ -80,18 +80,8 @@ _RULES: list[tuple[tuple[str, ...], str, str]] = [
     # 就是番茄小说的 CDN —— 早期把 novelfm 归成了「阅读 / 小说」，
     # 结果用户边看视频边刷应用榜，番茄小说那一行几乎不动，流量全跑到
     # 别的桶里去了。
-    (("fanqienovel", "fanqie", "fqnovel", "fqimg", "qznovel", "novelvod",
-      "novelfm", "novelfmvod", "novelfmpic", "novelfm-sign",
-      "reading-video", "novelpic"), "番茄小说", "视频"),
-    (("v.qq.com", "vv.video.qq", "video.qq.com", "tc.qq.com"), "腾讯视频", "视频"),
-    (("iqiyi", "qiyipic", "71.am", "iqiyiimg"), "爱奇艺", "视频"),
-    (("bilivideo", "biliapi", "hdslb", "bilibili"), "哔哩哔哩", "视频"),
-    (("douyincdn", "douyin", "amemv", "snssdk", "bytedance", "pstatp", "toutiaoimg",
-      "byteimg", "volces.com", "ibytedtos"), "抖音", "视频"),
     (("youku", "ykimg", "tudou"), "优酷", "视频"),
     (("mgtv", "hitv", "hunantv"), "芒果 TV", "视频"),
-    (("ixigua", "xigua"), "西瓜视频", "视频"),
-    (("kuaishou", "gifshow", "kwai"), "快手", "视频"),
     (("vrs.sohu", "sohu", "itc.cn"), "搜狐视频", "视频"),
     (("wasu", "cntv", "cibntv", "ott.cibntv", "tv.cctv"), "电视 / 直播", "视频"),
     (("googlevideo", "youtube", "ytimg", "ggpht"), "YouTube", "视频"),
@@ -107,28 +97,19 @@ _RULES: list[tuple[tuple[str, ...], str, str]] = [
     # ---------------------------------------------------------- 社交
     # 企业微信的域名里带 weixin，必须排在微信前面，否则永远被归到微信
     (("wework", "work.weixin"), "企业微信", "办公"),
-    (("dingtalk", "dingtalkapps", "dingtalk.net"), "钉钉", "办公"),
     (("feishu", "larksuite", "larkoffice", "feishucdn"), "飞书", "办公"),
     (("wemeet", "meeting.tencent"), "腾讯会议", "办公"),
     (("weixin", "wechat", "wx.qq.com", "mmbiz", "qpic", "qlogo", "wetype"), "微信", "社交"),
     (("telegram", "t.me", "telesco.pe"), "Telegram", "社交"),
-    (("whatsapp", "wa.me"), "WhatsApp", "社交"),
-    (("xiaohongshu", "xhscdn", "xhs."), "小红书", "社交"),
-    (("weibo", "sinaimg", "wbimg"), "微博", "社交"),
-    (("zhihu", "zhimg"), "知乎", "社交"),
-    (("douban",), "豆瓣", "社交"),
-    (("discord", "discordapp"), "Discord", "社交"),
     (("qzone", "qqmail", "exmail", "sginput"), "QQ / 邮箱", "社交"),
     # ---------------------------------------------------------- 音频 / 阅读
     (("ximalaya", "xmcdn", "tingmall"), "喜马拉雅", "音频"),
-    (("music.163", "163music"), "网易云音乐", "音频"),
     (("qqmusic", "y.qq.com", "i.y.qq.com"), "QQ 音乐", "音频"),
     (("kugou", "kuwo"), "酷狗 / 酷我", "音频"),
     (("migu",), "咪咕", "音频"),
     (("spotify", "scdn.co"), "Spotify", "音频"),
     (("qidian", "zongheng", "qimao"), "起点 / 七猫", "阅读"),
     # ---------------------------------------------------------- 游戏
-    (("steamcontent", "steamstatic", "steampowered", "steamcommunity"), "Steam", "游戏"),
     (("epicgames", "unrealengine"), "Epic", "游戏"),
     (("mihoyo", "hoyoverse", "yuanshen", "starrail"), "米哈游", "游戏"),
     (("battle.net", "blizzard", "blzstatic"), "暴雪", "游戏"),
@@ -137,7 +118,6 @@ _RULES: list[tuple[tuple[str, ...], str, str]] = [
     # ---------------------------------------------------------- AI / 开发
     (("openai", "chatgpt", "oaistatic", "oaiusercontent"), "ChatGPT", "AI"),
     (("anthropic", "claude.ai"), "Claude", "AI"),
-    (("deepseek",), "DeepSeek", "AI"),
     (("gemini.google", "bard.google"), "Gemini", "AI"),
     (("codebuddy", "workbuddy"), "AI 编程助手", "AI"),
     (("github", "githubusercontent", "ghcr.io"), "GitHub", "开发"),
@@ -146,18 +126,13 @@ _RULES: list[tuple[tuple[str, ...], str, str]] = [
     # 这里不能带 alibaba：带了之后 alibaba.com 会被算成淘宝，图标也变橙色
     # 购物袋。集团域名交给下面的「阿里巴巴」那条。
     (("alicdn", "taobao", "tmall", "alipay"), "淘宝 / 支付宝", "购物"),
-    (("360buyimg", "jd.com", "jdpay", "jdcloud", "jdurl"), "京东", "购物"),
-    (("pinduoduo", "yangkeduo", "pddpic"), "拼多多", "购物"),
-    (("meituan", "dianping", "sankuai"), "美团", "购物"),
     (("ele.me", "elemecdn"), "饿了么", "购物"),
     (("suning", "vip.com"), "苏宁 / 唯品会", "购物"),
     (("ctrip", "trip.com", "qunar"), "携程", "出行"),
-    (("amap", "autonavi", "dispatcher.is.autonavi"), "高德地图", "出行"),
     (("baidumap", "map.baidu"), "百度地图", "出行"),
     (("12306",), "12306", "出行"),
     (("didiglobal", "didichuxing"), "滴滴", "出行"),
     (("todesk",), "ToDesk", "工具"),
-    (("oray", "sunlogin"), "向日葵", "工具"),
     (("teamviewer", "allawntech"), "远程控制", "工具"),
     # ---------------------------------------------------------- 手机厂商 / 智能家居
     (("vivo.com", "iqoo"), "vivo 手机服务", "智能家居"),
@@ -185,7 +160,6 @@ _RULES: list[tuple[tuple[str, ...], str, str]] = [
       "cdntip", "qiniudns", "qcloudcdn"), "CDN 加速", "网络"),
     (("ntp.org", "time.nist", "pool.ntp"), "时间同步", "系统"),
     (("pan.baidu", "baidupcs", "baiduyun"), "百度网盘", "工具"),
-    (("aliyundrive", "alipan"), "阿里云盘", "工具"),
     (("xunlei", "xluser"), "迅雷", "工具"),
     # 下面几个是「域名成了应用名」的典型：没命中规则就素面朝天挂一行
     # 「kiro.dev」「qiaohuapp.com」在榜上，既看不懂也配不到图标
@@ -193,7 +167,6 @@ _RULES: list[tuple[tuple[str, ...], str, str]] = [
     (("qiaohuapp", "qiaohu.com", "qiaohu"), "巧虎", "教育"),
     (("alibaba.com", "alibabacloud", "alicdn", "alipayobjects", "alibaba"),
      "阿里巴巴", "商务"),
-    (("bdstatic", "baidu.com", "bdurl"), "百度", "搜索"),
     (("quark", "uc.cn", "ucweb"), "夸克 / UC", "搜索"),
     (("tencent.com", "myqcloud", "tencent-cloud", "gtimg"), "腾讯", "系统"),
     (("163.com", "126.net", "netease", "youdao"), "网易", "系统"),
@@ -987,7 +960,7 @@ def snapshot() -> dict:
             {
                 "name": name,
                 "category": item.get("category") or _NAME_CATEGORY.get(name, "其他"),
-                "src": _SOURCE.get(name, "domain"),
+                "src": _SOURCE.get(name, ""),
                 "up": int(item.get("up", 0)),
                 "down": int(item.get("down", 0)),
                 "total": int(item.get("up", 0) + item.get("down", 0)),
