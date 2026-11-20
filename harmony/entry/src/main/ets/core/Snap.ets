@@ -44,10 +44,10 @@ export class Snap {
     await p.put(k, body);
     await p.put(k + SUFFIX_TS, Date.now());
     // 增量维护占用字节：写入新内容时把旧内容的长度扣掉
-    const used = await p.get(SIZE_KEY, 0);
+    const used = await p.get(Snap.SIZE_KEY, 0);
     const base = typeof used === 'number' ? used : 0;
     const oldLen = typeof prev === 'string' ? prev.length : 0;
-    await p.put(SIZE_KEY, Math.max(0, base - oldLen + body.length));
+    await p.put(Snap.SIZE_KEY, Math.max(0, base - oldLen + body.length));
     await p.flush();
   }
 
@@ -61,7 +61,7 @@ export class Snap {
   static async size(ctx: common.Context): Promise<number> {
     try {
       const p = await Snap.ready(ctx);
-      const v = await p.get(SIZE_KEY, 0);
+      const v = await p.get(Snap.SIZE_KEY, 0);
       return typeof v === 'number' ? v : 0;
     } catch (e) {
       return 0;
