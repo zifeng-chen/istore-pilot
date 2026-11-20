@@ -719,8 +719,10 @@ export struct SecurityPage {
     }
     .width('100%')
     .padding({ left: 16, right: 16, top: 15, bottom: 14 })
-    .margin({ left: T.PAD, right: T.PAD, bottom: 10 })
-    .borderRadius(T.R_CARD)
+    .margin({ left: T.PAD, right: T.PAD, top: 6, bottom: 10 })
+    // 顶部汇总卡：圆角加大到 20 并补一层浅投影，避免和页面底色糊成一片（看着像没圆角）
+    .borderRadius(T.R_LG)
+    .shadow({ radius: 12, color: $r('app.color.shadow_1'), offsetY: 4 })
     .backgroundColor($r('app.color.surface'))
     .border({ width: 0.7, color: $r('app.color.glass_stroke') });
   }
