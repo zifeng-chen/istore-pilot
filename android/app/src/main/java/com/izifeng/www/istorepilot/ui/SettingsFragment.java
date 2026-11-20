@@ -1195,7 +1195,11 @@ public class SettingsFragment extends BaseFragment {
         JSONObject body = new JSONObject();
         try {
             body.put("enable", on);
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            // put 只在 key 为 null 时抛，这里不可能发生；包一层只为不把异常抛到 UI 线程
+            Toast.makeText(ctx(), "参数错误", Toast.LENGTH_SHORT).show();
+            afBusy = false;
+            return;
         }
         Api.post(ctx(), "/api/v1/appfilter/toggle", body, new Cb() {
             @Override
