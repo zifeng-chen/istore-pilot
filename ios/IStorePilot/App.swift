@@ -174,12 +174,29 @@ struct SplashView: View {
                 .padding(.top, 46)
             }
         }
-        .task { await run() }
+        .task {
+            // 看门狗：run() 里任何一步不返回（Session 恢复、探测超时没兜住），
+            // 启动页就会一直盖着 —— 4 秒后强制收尾，宁可少一次动画
+            Task {
+                try? await Task.sleep(nanoseconds: 4_000_000_000)
+                finishOnce()
+            }
+            await run()
+        }
     }
 
     // MARK: - 流程
 
     @MainActor
+    @State private var finished = false
+
+    /// 只允许收尾一次：正常路径和看门狗可能同时到
+    private func finishOnce() {
+        if finished { return }
+        finished = true
+        onDone()
+    }
+
     private func run() async {
         let started = Date()
 
@@ -211,7 +228,7 @@ struct SplashView: View {
         if spent < Self.minStay {
             try? await Task.sleep(nanoseconds: UInt64((Self.minStay - spent) * 1e9))
         }
-        onDone()
+        finishOnce()
     }
 
     /// 推进到某个比例。`text` 为 nil 表示保留当前文案。

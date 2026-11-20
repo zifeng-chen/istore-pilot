@@ -54,6 +54,13 @@ export default class EntryAbility extends UIAbility {
     }
 
     windowStage.loadContent('pages/Index', (err) => {
+      // 内容起来之后再设一次系统栏：建窗阶段设的那次在某些版本上会被首帧覆盖，
+      // 表现就是深绿启动页上压着黑色状态栏图标
+      try {
+        SystemBar.syncWin(windowStage.getMainWindowSync(), true);
+      } catch (e) {
+        hilog.warn(DOMAIN, TAG, 'resync system bar failed');
+      }
       if (err !== null && err !== undefined && err.code !== 0) {
         hilog.error(DOMAIN, TAG, 'loadContent failed: %{public}s', JSON.stringify(err));
         return;
