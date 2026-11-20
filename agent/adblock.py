@@ -1804,3 +1804,43 @@ def install(confirm: str = "") -> dict:
                      step="准备中", error="", log=[], ts=time.time())
     threading.Thread(target=_install_worker, name="agh-install", daemon=True).start()
     return {"ok": True, "accepted": True, "state": install_status()}
+
+
+def log(limit: int = 120, client: str = "") -> dict:
+    """拦截日志（AGH 的 querylog）。
+
+    为什么只取最近的：AGH 的 querylog 是环形缓冲，全量几百 MB，
+    手机端要的是「刚刚发生了什么」，翻历史交给 AGH 自己的界面。
+    """
+    if not _installed():
+        return _not_installed()
+    if not _running():
+        return {"ok": False, "error": "拦截服务未运行"}
+    n = max(20, min(int(limit or 120), 500))
+    q = "/querylog?limit=%d" % n
+    if client:
+        q += "&search=" + urllib.parse.quote(client)
+    raw = _api(q)
+    if "__error" in raw:
+        return {"ok": False, "error": "读取拦截日志失败"}
+    out = []
+    for it in (raw.get("data") or []):
+        q1 = it.get("question") or {}
+        rules = it.get("rules") or []
+        rule = ""
+        if rules:
+            r0 = rules[0] or {}
+            # AGH 的 rules[].text 有时是字符串、有时是 {name:...}，两种都见过
+            t0 = r0.get("text")
+            rule = (t0.get("name") if isinstance(t0, dict) else str(t0 or "")).strip()
+        out.append({
+            "t": it.get("time") or "",
+            "domain": q1.get("name") or "",
+            "type": q1.get("type") or "",
+            "action": it.get("status") or "",
+            "client": it.get("client") or "",
+            "ms": it.get("elapsedMs") or 0,
+            "rule": rule,
+        })
+    blocked = sum(1 for x in out if "block" in str(x["action"]).lower())
+    return {"ok": True, "total": len(out), "blocked": blocked, "items": out}

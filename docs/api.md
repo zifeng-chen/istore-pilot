@@ -578,3 +578,20 @@ curl -s -X POST $BASE/proxy/delays \
 
 注意：特征库是 OAF 会员私有授权，**不进仓库、不进安装包**，只能由用户上传。
 开启过滤会关闭硬件加速（`disable_hnat=1`），大流量场景速率会下降，客户端必须提示。
+
+## 拦截日志
+
+`GET /api/v1/adblock/log?limit=120&client=<可选>`
+
+读 AGH 的 `/control/querylog`，返回最近 N 条解析记录：
+
+| 字段 | 含义 |
+|---|---|
+| `t` | RFC3339 时间 |
+| `domain` / `type` | 域名 / 记录类型 |
+| `action` | AGH 的 status，含 `block` 表示被拦 |
+| `client` | 发起查询的客户端 IP |
+| `ms` | 耗时 |
+| `rule` | 命中的过滤规则名（AGH 有时给字符串、有时给对象，两种都兼容） |
+
+响应还带 `total` 与 `blocked` 两个汇总，客户端不用自己数。全量历史请交给 AGH 自己的界面。
