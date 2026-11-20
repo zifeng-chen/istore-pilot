@@ -24,7 +24,7 @@ export struct AppIcon {
         Image(this.icon)
           .width('100%')
           .height('100%')
-          .objectFit(ImageFit.Cover);
+          .objectFit(ImageFit.Contain);
       } else {
         Text(this.glyph())
           .fontSize(this.side * 0.42)
@@ -38,7 +38,9 @@ export struct AppIcon {
     .height(this.side)
     .borderRadius(this.side * 0.24)
     .clip(true)
-    .backgroundColor(this.tint());
+    // 有官方图标时不要铺色：原来无条件铺 tint() 调色板里的颜色，
+    // 华为那张 SVG 一放上去就多出一块蓝底（调色板首色）
+    .backgroundColor(this.icon !== undefined ? Color.Transparent : this.tint());
   }
 
   /** 没有官方图时的首字：中文取第一个字，英文取前两个单词首字母 */
