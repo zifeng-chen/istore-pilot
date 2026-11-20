@@ -21,6 +21,50 @@ export class Http {
   private static readonly CONNECT_TIMEOUT: number = 6000;
   private static readonly READ_TIMEOUT: number = 12000;
 
+  /**
+   * 二进制上传（特征库这类 2~3 MB 的文件）。
+   *
+   * 不走 send 的原因：它把 body 当字符串发，二进制只能 base64，体积涨 33%，
+   * 路由器那点内存经不起。这里直接把 ArrayBuffer 塞进 extraData，
+   * 文件名放 X-Filename 头 —— 和后端 `/api/v1/appfilter/upgrade` 对齐。
+   */
+  static async sendRaw(base: string, token: string, path: string,
+    filename: string, data: ArrayBuffer): Promise<HttpResult> {
+    const url: string = Http.join(base, path);
+    if (url.length === 0) {
+      return { ok: false, code: -1, body: '', error: '服务器地址为空' };
+    }
+    const req = http.createHttp();
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/octet-stream',
+        'X-Filename': encodeURIComponent(filename)
+      };
+      if (token.length > 0) {
+        headers['Authorization'] = 'Bearer ' + token;
+      }
+      const options: http.HttpRequestOptions = {
+        method: http.RequestMethod.POST,
+        header: headers,
+        connectTimeout: Http.CONNECT_TIMEOUT,
+        readTimeout: 60000,
+        expectDataType: http.HttpDataType.STRING,
+        extraData: data
+      };
+      const res = await req.request(url, options);
+      const text: string = typeof res.result === 'string'
+        ? res.result as string
+        : JSON.stringify(res.result);
+      const code: number = res.responseCode;
+      return { ok: code >= 200 && code < 300, code: code, body: text, error: '' };
+    } catch (e) {
+      const err = e as BusinessError;
+      return { ok: false, code: -1, body: '', error: err.message ?? '网络异常' };
+    } finally {
+      req.destroy();
+    }
+  }
+
   static async send(base: string, token: string, method: string, path: string,
     body: string): Promise<HttpResult> {
     const url: string = Http.join(base, path);
