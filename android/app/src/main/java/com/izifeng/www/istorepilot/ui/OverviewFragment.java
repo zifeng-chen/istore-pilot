@@ -12,6 +12,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.izifeng.www.istorepilot.R;
+import com.izifeng.www.istorepilot.SpeedActivity;
 import com.izifeng.www.istorepilot.api.Api;
 import com.izifeng.www.istorepilot.api.Cb;
 import com.izifeng.www.istorepilot.util.Fmt;
@@ -62,6 +63,10 @@ public class OverviewFragment extends BaseFragment {
     private TextView tvHeroBadge;
     private TextView tvHeroDown;
     private TextView tvHeroUp;
+    private TextView spPill;
+    private TextView spDown;
+    private TextView spUp;
+    private TextView spPing;
     private TextView tvHeroDevices;
 
     // 趋势
@@ -303,6 +308,39 @@ public class OverviewFragment extends BaseFragment {
         ports.addView(portBox);
         root.addView(ports);
 
+        // ---------------------------------------------------------- 7. 网络测速
+        Ui.Card spCard = Ui.card(c);
+        Ui.CardHead spHead = Ui.cardTitleLive(c, spCard,
+                com.izifeng.www.istorepilot.widget.Glyph.DOWNLOAD_SPEED, "网络测速", "FastNet · Ookla");
+        spPill = Ui.pill(c, "可用", R.color.ok);
+        spHead.right.addView(spPill);
+
+        LinearLayout spVals = Ui.row(c);
+        spVals.setPadding(Ui.dp(c, 16), Ui.dp(c, 10), Ui.dp(c, 16), 0);
+        spDown = (TextView) spMetric(c, spVals, "下行");
+        spUp = (TextView) spMetric(c, spVals, "上行");
+        spPing = (TextView) spMetric(c, spVals, "延迟");
+        spCard.addView(spVals);
+
+        Ui.settingRow(c, spCard, com.izifeng.www.istorepilot.widget.Glyph.DOWNLOAD_SPEED,
+                "打开测速", "测速与历史记录", "", true, false, () -> openSpeed());
+        root.addView(spCard);
+
+    }
+
+    private TextView spMetric(android.content.Context c, LinearLayout parent,
+                              String label) {
+        LinearLayout col = Ui.column(c);
+        TextView num = Ui.num(c, "—", 22, R.color.text_primary);
+        col.addView(num);
+        col.addView(Ui.text(c, label, 11, R.color.text_secondary));
+        parent.addView(col, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        return num;
+    }
+
+    private void openSpeed() {
+        startActivity(new android.content.Intent(ctx(), SpeedActivity.class));
     }
 
     /** hero 卡上的一个指标：小标签 + 大数字 */
@@ -353,8 +391,40 @@ public class OverviewFragment extends BaseFragment {
         return row;
     }
 
+    private void loadSpeed() {
+        Api.get(ctx(), "/api/v1/speedtest/history", new Cb() {
+            @Override
+            public void onData(JSONObject body, boolean fromCache) {
+                if (!isAdded() || spDown == null) {
+                    return;
+                }
+                JSONArray rows = body.optJSONArray("rows");
+                if (rows != null && rows.length() > 0) {
+                    JSONObject r = rows.optJSONObject(0);
+                    spDown.setText(r.optDouble("down", 0) > 0
+                            ? String.format(java.util.Locale.US, "%.1f", r.optDouble("down")) : "—");
+                    spUp.setText(r.optDouble("up", 0) > 0
+                            ? String.format(java.util.Locale.US, "%.1f", r.optDouble("up")) : "—");
+                    spPing.setText(r.optDouble("ping", 0) > 0
+                            ? String.valueOf(Math.round(r.optDouble("ping"))) : "—");
+                }
+            }
+        });
+        Api.get(ctx(), "/api/v1/speedtest/status", new Cb() {
+            @Override
+            public void onData(JSONObject body, boolean fromCache) {
+                if (!isAdded() || spPill == null) {
+                    return;
+                }
+                String state = body.optString("state", "");
+                spPill.setText("absent".equals(state) ? "未安装" : "可用");
+            }
+        });
+    }
+
     @Override
     protected void load(boolean quiet) {
+        loadSpeed();
         Api.get(ctx(), "/api/v1/overview", new Cb() {
             @Override
             public void onData(JSONObject body, boolean fromCache) {
