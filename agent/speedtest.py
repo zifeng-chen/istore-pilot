@@ -133,16 +133,23 @@ class _Sampler(threading.Thread):
             live_in = (rx - last_rx) * 8.0 / span / 1e6
             live_out = (tx - last_tx) * 8.0 / span / 1e6
             last_rx, last_tx, last_t = rx, tx, now
-            _LIVE["liveDown"] = round(max(0.0, live_in), 1)
-            _LIVE["liveUp"] = round(max(0.0, live_out), 1)
+
             cur = _read(STATE_PATH, {})
             if cur.get("state") != "running":
                 break
             stage = cur.get("stage", "")
+            # 只记当前这一段的方向：测下行时上行数字不该跟着跳
             if stage == "download":
+                _LIVE["liveDown"] = round(max(0.0, live_in), 1)
+                _LIVE["liveUp"] = 0.0
                 _PEAK["down"] = max(_PEAK["down"], _LIVE["liveDown"])
             elif stage == "upload":
+                _LIVE["liveUp"] = round(max(0.0, live_out), 1)
+                _LIVE["liveDown"] = 0.0
                 _PEAK["up"] = max(_PEAK["up"], _LIVE["liveUp"])
+            else:
+                _LIVE["liveDown"] = 0.0
+                _LIVE["liveUp"] = 0.0
             cur.update(_LIVE)
             _write(STATE_PATH, cur)
 
@@ -263,15 +270,25 @@ def _probe_live() -> None:
     """status 被调用时顺手补一次采样。
 
     采样线程万一没起来（旧进程、线程异常），这里也能让数字动起来，
-    不至于整轮都是 0.0。
+    不至于整轮都是 0.0。同样只算当前阶段的方向。
     """
+    cur = _read(STATE_PATH, {})
+    stage = cur.get("stage", "")
+    if stage not in ("download", "upload"):
+        _LIVE["liveDown"] = 0.0
+        _LIVE["liveUp"] = 0.0
+        return
     rx, tx = _wan_bytes()
     now = time.time()
     if _PROBE["t"] > 0:
         span = now - _PROBE["t"]
         if span >= 0.6:
-            _LIVE["liveDown"] = round(max(0.0, (rx - _PROBE["rx"]) * 8.0 / span / 1e6), 1)
-            _LIVE["liveUp"] = round(max(0.0, (tx - _PROBE["tx"]) * 8.0 / span / 1e6), 1)
+            if stage == "download":
+                _LIVE["liveDown"] = round(max(0.0, (rx - _PROBE["rx"]) * 8.0 / span / 1e6), 1)
+                _LIVE["liveUp"] = 0.0
+            else:
+                _LIVE["liveUp"] = round(max(0.0, (tx - _PROBE["tx"]) * 8.0 / span / 1e6), 1)
+                _LIVE["liveDown"] = 0.0
     _PROBE["rx"], _PROBE["tx"], _PROBE["t"] = rx, tx, now
 
 

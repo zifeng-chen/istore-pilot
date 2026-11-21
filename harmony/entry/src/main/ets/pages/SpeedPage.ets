@@ -514,7 +514,7 @@ struct SpeedPage {
             .fontSize(T.F_TINY)
             .fontColor(this.stage === 'download' ? $r('app.color.primary') : $r('app.color.text_secondary'));
           Row() {
-            Text(this.liveDown.toFixed(1))
+            Text(this.stage === 'download' ? this.liveDown.toFixed(1) : '—')
               .fontSize(T.F_TITLE * 0.72)
               .fontWeight(FontWeight.Medium)
               .fontColor(this.stage === 'download' ? $r('app.color.primary') : $r('app.color.text_primary'));
@@ -533,7 +533,7 @@ struct SpeedPage {
             .fontSize(T.F_TINY)
             .fontColor(this.stage === 'upload' ? $r('app.color.primary') : $r('app.color.text_secondary'));
           Row() {
-            Text(this.liveUp.toFixed(1))
+            Text(this.stage === 'upload' ? this.liveUp.toFixed(1) : '—')
               .fontSize(T.F_TITLE * 0.72)
               .fontWeight(FontWeight.Medium)
               .fontColor(this.stage === 'upload' ? $r('app.color.primary') : $r('app.color.text_primary'));
