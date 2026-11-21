@@ -171,11 +171,15 @@ export class Api {
       };
     }
     // 缓存是锦上添花：写失败（存储满、键太多）不能连累这次请求，
-    // 否则一个 await 抛出就会让整页数据静默停更
-    try {
-      await Snap.put(ctx, path, r.body);
-    } catch (e) {
-      // 忽略：本次结果照常返回
+    // 否则一个 await 抛出就会让整页数据静默停更。
+    // 测速类接口是秒级刷新的实时数据，缓存没有意义，还会因为带时间戳参数
+    // 在 preferences 里堆出成百上千个键 —— 直接跳过。
+    if (path.indexOf('/speedtest/') < 0) {
+      try {
+        await Snap.put(ctx, path, r.body);
+      } catch (e) {
+        // 忽略：本次结果照常返回
+      }
     }
     return {
       ok: true, fromCache: false, code: r.code, data: J.parse(r.body), error: ''

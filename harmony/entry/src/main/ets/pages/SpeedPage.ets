@@ -127,7 +127,7 @@ struct SpeedPage {
   }
 
   async refresh(): Promise<void> {
-    const r: ApiResult = await Api.getFresh(this.ctx(), '/api/v1/speedtest/status');
+    const r: ApiResult = await Api.getFresh(this.ctx(), '/api/v1/speedtest/status?t=' + Date.now().toString());
     if (!r.ok) {
       this.err = r.data.str('error', '读取失败');
       this.stopTimer();
@@ -216,7 +216,7 @@ struct SpeedPage {
   }
 
   async loadHistory(): Promise<void> {
-    const r: ApiResult = await Api.getFresh(this.ctx(), '/api/v1/speedtest/history');
+    const r: ApiResult = await Api.getFresh(this.ctx(), '/api/v1/speedtest/history?t=' + Date.now().toString());
     if (!r.ok) {
       return;
     }
