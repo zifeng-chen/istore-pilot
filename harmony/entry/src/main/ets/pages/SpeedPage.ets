@@ -82,7 +82,7 @@ struct SpeedPage {
         this.topPad = pad;
       }
     } catch (e) {
-      this.topPad = UI.safeTop > 0 ? UI.safeTop + 2 : 24;
+      this.topPad = UI.safeTop > 0 ? UI.safeTop + 2 : 48;
     }
   }
 
