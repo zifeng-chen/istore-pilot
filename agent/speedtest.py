@@ -291,22 +291,25 @@ def status() -> dict:
             out[key] = cur.get(key)
         out["elapsed"] = int(time.time()) - int(cur.get("started", 0))
     elif cur:
+        if st != "ready" and cur.get("state") == "done":
+            # 端口探测偶尔抖动，但上一轮结果是真的，不能因此把界面清空
+            out["state"] = "done"
+        for key in ("state", "stage", "msg", "started", "finished", "error"):
+            if key in cur:
+                out[key] = cur.get(key)
+        # 数值以历史为准，且必须放在 cur 之后 ——
+        # 之前写在前面，被 cur 里的 0 覆盖掉，界面就永远是「—」
         rows = _sane(_read(HISTORY_PATH, []))
         if rows:
-            # 历史是唯一可信来源：状态文件里的数值可能被中途写坏，
-            # 但每次完成的记录都会进历史
             out["ping"] = rows[0].get("ping", 0)
             out["down"] = rows[0].get("down", 0)
             out["up"] = rows[0].get("up", 0)
             out["server"] = rows[0].get("server", "")
             out["finished"] = rows[0].get("time", 0)
-        if st != "ready" and cur.get("state") == "done":
-            # 端口探测偶尔抖动，但上一轮结果是真的，不能因此把界面清空
-            out["state"] = "done"
-        for key in ("state", "stage", "msg", "ping", "down", "up", "server",
-                    "started", "finished", "error"):
-            if key in cur:
-                out[key] = cur.get(key)
+        else:
+            for key in ("ping", "down", "up", "server"):
+                if key in cur:
+                    out[key] = cur.get(key)
         if cur.get("state") == "running" and st != "ready":
             out["state"] = st
     inst = _read(INSTALL_PATH, {})
