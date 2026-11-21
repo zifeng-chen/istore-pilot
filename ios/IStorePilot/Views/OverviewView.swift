@@ -29,6 +29,85 @@ struct OverviewView: View {
     @State private var rxHist: [Double] = []
     @State private var txHist: [Double] = []
 
+    @State private var showSpeed = false
+    @State private var spDown: Double = 0
+    @State private var spUp: Double = 0
+    @State private var spPing: Double = 0
+    @State private var spState = "unknown"
+
+    /// 网络测速入口卡：和鸿蒙/Android 同结构 —— 三数值浅底块 + 分割线 + 入口行
+    private var speedCard: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 0) {
+                CardHead(icon: "download-speed", title: "网络测速",
+                         sub: spDown > 0 ? "最近一次 · \(Int(spPing)) ms" : "FastNet · 还没测过") {
+                    Pill(text: spState == "absent" ? "未安装" : "可用",
+                         color: spState == "absent" ? C.textTertiary : C.ok)
+                }
+
+                HStack(spacing: 8) {
+                    spMetric("下行", value: spDown)
+                    spMetric("上行", value: spUp)
+                    spMetric("延迟", value: spPing)
+                }
+                .padding(12)
+                .background(C.surfaceHi)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .padding(.top, 12)
+
+                Divider().padding(.vertical, 14)
+
+                Button {
+                    showSpeed = true
+                } label: {
+                    HStack(spacing: 10) {
+                        LineIcon(name: "download-speed", size: 16, color: C.primary, weight: 1.6)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("打开测速").font(.subheadline).foregroundStyle(C.textPrimary)
+                            Text("测速与历史记录").font(.caption2).foregroundStyle(C.textTertiary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption2)
+                            .foregroundStyle(C.textTertiary)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .sheet(isPresented: $showSpeed) {
+            SpeedView()
+        }
+        .task { await loadSpeed() }
+    }
+
+    private func spMetric(_ label: String, value: Double) -> some View {
+        VStack(alignment: .center, spacing: 2) {
+            Text(label).font(.caption2).foregroundStyle(C.textSecondary)
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text(value > 0 ? String(format: "%.1f", value) : "—")
+                    .font(.title3.weight(.medium))
+                    .foregroundStyle(C.textPrimary)
+                Text(label == "延迟" ? "ms" : "Mbps")
+                    .font(.caption2)
+                    .foregroundStyle(C.textSecondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    private func loadSpeed() async {
+        if let b = try? await Api.get("/api/v1/speedtest/history", cache: false),
+           let first = b.objs("rows").first {
+            spPing = first.dbl("ping")
+            spDown = first.dbl("down")
+            spUp = first.dbl("up")
+        }
+        if let b = try? await Api.get("/api/v1/speedtest/status", cache: false) {
+            spState = b.str("state")
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -45,12 +124,14 @@ struct OverviewView: View {
                         systemCard
                         wanCard
                         portCard(tileMin: 120)
+                        speedCard
                     } else {
                         // 窄屏维持原来的单列顺序。156 是手机上排两张的下限：
                         // 402pt 的机器内容宽 334，再大就只能排一张，六个口要滑六屏
                         systemCard
                         wanCard
                         portCard(tileMin: 156)
+                        speedCard
                     }
 
                     if !err.isEmpty {
@@ -530,6 +611,85 @@ struct PortDetailSheet: View {
         累计接收　\(F.bytes(p.dbl("rx_total")))
         累计发送　\(F.bytes(p.dbl("tx_total")))
         """
+    }
+
+    @State private var showSpeed = false
+    @State private var spDown: Double = 0
+    @State private var spUp: Double = 0
+    @State private var spPing: Double = 0
+    @State private var spState = "unknown"
+
+    /// 网络测速入口卡：和鸿蒙/Android 同结构 —— 三数值浅底块 + 分割线 + 入口行
+    private var speedCard: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 0) {
+                CardHead(icon: "download-speed", title: "网络测速",
+                         sub: spDown > 0 ? "最近一次 · \(Int(spPing)) ms" : "FastNet · 还没测过") {
+                    Pill(text: spState == "absent" ? "未安装" : "可用",
+                         color: spState == "absent" ? C.textTertiary : C.ok)
+                }
+
+                HStack(spacing: 8) {
+                    spMetric("下行", value: spDown)
+                    spMetric("上行", value: spUp)
+                    spMetric("延迟", value: spPing)
+                }
+                .padding(12)
+                .background(C.surfaceHi)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .padding(.top, 12)
+
+                Divider().padding(.vertical, 14)
+
+                Button {
+                    showSpeed = true
+                } label: {
+                    HStack(spacing: 10) {
+                        LineIcon(name: "download-speed", size: 16, color: C.primary, weight: 1.6)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("打开测速").font(.subheadline).foregroundStyle(C.textPrimary)
+                            Text("测速与历史记录").font(.caption2).foregroundStyle(C.textTertiary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption2)
+                            .foregroundStyle(C.textTertiary)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .sheet(isPresented: $showSpeed) {
+            SpeedView()
+        }
+        .task { await loadSpeed() }
+    }
+
+    private func spMetric(_ label: String, value: Double) -> some View {
+        VStack(alignment: .center, spacing: 2) {
+            Text(label).font(.caption2).foregroundStyle(C.textSecondary)
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text(value > 0 ? String(format: "%.1f", value) : "—")
+                    .font(.title3.weight(.medium))
+                    .foregroundStyle(C.textPrimary)
+                Text(label == "延迟" ? "ms" : "Mbps")
+                    .font(.caption2)
+                    .foregroundStyle(C.textSecondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    private func loadSpeed() async {
+        if let b = try? await Api.get("/api/v1/speedtest/history", cache: false),
+           let first = b.objs("rows").first {
+            spPing = first.dbl("ping")
+            spDown = first.dbl("down")
+            spUp = first.dbl("up")
+        }
+        if let b = try? await Api.get("/api/v1/speedtest/status", cache: false) {
+            spState = b.str("state")
+        }
     }
 
     var body: some View {

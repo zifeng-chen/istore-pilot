@@ -45,6 +45,7 @@ public class SpeedActivity extends BaseActivity {
     private TextView tvHint;
     private TextView btnStart;
     private LinearLayout bars;
+    private TextView[] stateLabels;
     private LinearLayout histBox;
 
     private JSONArray servers = new JSONArray();
@@ -121,18 +122,23 @@ public class SpeedActivity extends BaseActivity {
         bars.setVisibility(View.GONE);
         card.addView(bars);
 
-        // 三个数值：延迟 / 下行 / 上行
+        // 三段状态字：和进度条一一对应，各自居中
+        LinearLayout states = Ui.row(this);
+        states.setPadding(0, Ui.dp(this, 5), 0, 0);
+        stateLabels = new TextView[3];
+        for (int i = 0; i < 3; i++) {
+            stateLabels[i] = Ui.text(this, "", 11, R.color.text_tertiary);
+            stateLabels[i].setGravity(Gravity.CENTER);
+            states.addView(stateLabels[i], weighted());
+        }
+        card.addView(states);
+
+        // 三个数值：延迟 / 下行 / 上行，标签在上、数字在下，整列居中
         LinearLayout vals = Ui.row(this);
         vals.setPadding(0, Ui.dp(this, 10), 0, 0);
-        LinearLayout m1 = metric("延迟", "ms");
-        tvPing = (TextView) m1.getChildAt(0);
-        vals.addView(m1, weighted());
-        LinearLayout m2 = metric("下行 ↓", "Mbps");
-        tvDown = (TextView) m2.getChildAt(0);
-        vals.addView(m2, weighted());
-        LinearLayout m3 = metric("上行 ↑", "Mbps");
-        tvUp = (TextView) m3.getChildAt(0);
-        vals.addView(m3, weighted());
+        tvPing = metric(vals, "延迟");
+        tvDown = metric(vals, "下行 ↓");
+        tvUp = metric(vals, "上行 ↑");
         card.addView(vals);
 
         tvHint = Ui.text(this, "还没有测过", 12, R.color.text_tertiary);
@@ -159,12 +165,15 @@ public class SpeedActivity extends BaseActivity {
         return sc;
     }
 
-    /** 一列数值：大号数字 + 单位说明。返回的容器第 0 个子 View 是数字 */
-    private LinearLayout metric(String label, String unit) {
+    /** 一列数值：标签在上、数字在下，整列水平居中，返回数字本身 */
+    private TextView metric(LinearLayout parent, String label) {
         LinearLayout col = Ui.column(this);
-        col.addView(Ui.num(this, "—", 24, R.color.text_primary));
-        col.addView(Ui.text(this, label + " " + unit, 11, R.color.text_secondary));
-        return col;
+        col.setGravity(Gravity.CENTER_HORIZONTAL);
+        col.addView(Ui.text(this, label, 11, R.color.text_secondary));
+        TextView num = Ui.num(this, "—", 24, R.color.text_primary);
+        col.addView(num);
+        parent.addView(col, weighted());
+        return num;
     }
 
     private LinearLayout.LayoutParams weighted() {
@@ -241,6 +250,7 @@ public class SpeedActivity extends BaseActivity {
 
         if (running) {
             paintBars(stage);
+            paintStates(stage);
             tvHint.setText(hint(stage));
             ticker.postDelayed(this::onTick, POLL_MS);
         } else {
@@ -258,6 +268,40 @@ public class SpeedActivity extends BaseActivity {
         elapsed += 1;
         btnStart.setText("测速中… " + elapsed + "s");
         refresh();
+    }
+
+    private void paintStates(String stage) {
+        if (stateLabels == null) {
+            return;
+        }
+        String[] txt = new String[3];
+        int[] color = new int[3];
+        txt[0] = "speedtest".equals(stage) ? "延迟 · 测速中" : "延迟 · 完成";
+        color[0] = "speedtest".equals(stage) ? R.color.primary : R.color.text_tertiary;
+        if ("download".equals(stage)) {
+            txt[1] = "下行 · 测速中";
+            color[1] = R.color.primary;
+        } else if ("upload".equals(stage) || !running) {
+            txt[1] = "下行 · 完成";
+            color[1] = R.color.text_tertiary;
+        } else {
+            txt[1] = "下行 · 等待";
+            color[1] = R.color.text_tertiary;
+        }
+        if ("upload".equals(stage)) {
+            txt[2] = "上行 · 测速中";
+            color[2] = R.color.primary;
+        } else if (!running) {
+            txt[2] = "上行 · 完成";
+            color[2] = R.color.text_tertiary;
+        } else {
+            txt[2] = "上行 · 等待";
+            color[2] = R.color.text_tertiary;
+        }
+        for (int i = 0; i < 3; i++) {
+            stateLabels[i].setText(txt[i]);
+            stateLabels[i].setTextColor(Ui.color(this, color[i]));
+        }
     }
 
     private void paintBars(String stage) {

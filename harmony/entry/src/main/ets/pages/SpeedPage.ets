@@ -520,11 +520,11 @@ struct SpeedPage {
       .width('100%');
 
       Row() {
-        Text(this.segState(0)).layoutWeight(1).fontSize(T.F_TINY)
+        Text(this.segState(0)).layoutWeight(1).fontSize(T.F_TINY).textAlign(TextAlign.Center)
           .fontColor(this.stage === 'speedtest' ? $r('app.color.primary') : $r('app.color.text_tertiary'));
         Text(this.segState(1)).layoutWeight(1).fontSize(T.F_TINY).textAlign(TextAlign.Center)
           .fontColor(this.stage === 'download' ? $r('app.color.primary') : $r('app.color.text_tertiary'));
-        Text(this.segState(2)).layoutWeight(1).fontSize(T.F_TINY).textAlign(TextAlign.End)
+        Text(this.segState(2)).layoutWeight(1).fontSize(T.F_TINY).textAlign(TextAlign.Center)
           .fontColor(this.stage === 'upload' ? $r('app.color.primary') : $r('app.color.text_tertiary'));
       }
       .width('100%');
@@ -547,7 +547,7 @@ struct SpeedPage {
           .alignItems(VerticalAlign.Bottom);
         }
         .layoutWeight(1)
-        .alignItems(HorizontalAlign.Start);
+        .alignItems(HorizontalAlign.Center);
 
         Column({ space: 2 }) {
           Text('下行 ↓')
@@ -566,7 +566,7 @@ struct SpeedPage {
           .alignItems(VerticalAlign.Bottom);
         }
         .layoutWeight(1)
-        .alignItems(HorizontalAlign.Start);
+        .alignItems(HorizontalAlign.Center);
 
         Column({ space: 2 }) {
           Text('上行 ↑')
@@ -585,7 +585,7 @@ struct SpeedPage {
           .alignItems(VerticalAlign.Bottom);
         }
         .layoutWeight(1)
-        .alignItems(HorizontalAlign.Start);
+        .alignItems(HorizontalAlign.Center);
       }
       .width('100%')
       .margin({ top: 2 });
@@ -699,7 +699,7 @@ struct SpeedPage {
           .alignItems(VerticalAlign.Bottom);
         }
         .layoutWeight(1)
-        .alignItems(HorizontalAlign.Start);
+        .alignItems(HorizontalAlign.Center);
 
         Column({ space: 2 }) {
           Text('下行 ↓')
@@ -718,7 +718,7 @@ struct SpeedPage {
           .alignItems(VerticalAlign.Bottom);
         }
         .layoutWeight(1)
-        .alignItems(HorizontalAlign.Start);
+        .alignItems(HorizontalAlign.Center);
 
         Column({ space: 2 }) {
           Text('上行 ↑')
