@@ -32,6 +32,8 @@ _lock = threading.Lock()
 _thread = None
 #: 采样线程写到这儿，SSE 线程写状态文件时一起带上（各自写各自的会把对方覆盖掉）
 _LIVE = {"liveDown": 0.0, "liveUp": 0.0}
+#: 各阶段的采样峰值，用于最终结果（FastNet 自报值不可靠）
+_PEAK = {"down": 0.0, "up": 0.0}
 
 
 def _read(path: str, default):
@@ -136,6 +138,11 @@ class _Sampler(threading.Thread):
             cur = _read(STATE_PATH, {})
             if cur.get("state") != "running":
                 break
+            stage = cur.get("stage", "")
+            if stage == "download":
+                _PEAK["down"] = max(_PEAK["down"], _LIVE["liveDown"])
+            elif stage == "upload":
+                _PEAK["up"] = max(_PEAK["up"], _LIVE["liveUp"])
             cur.update(_LIVE)
             _write(STATE_PATH, cur)
 
@@ -156,6 +163,8 @@ def _bench_worker(server_id: str) -> None:
     result = {"state": "running", "stage": "speedtest", "msg": "准备测速",
               "ping": 0.0, "down": 0.0, "up": 0.0, "serverId": server_id,
               "server": "", "started": int(time.time()), "error": ""}
+    _PEAK["down"] = 0.0
+    _PEAK["up"] = 0.0
     _write(STATE_PATH, result)
     sampler = _Sampler()
     sampler.start()
@@ -202,6 +211,12 @@ def _bench_worker(server_id: str) -> None:
                         result["log"] = []
                     result["log"] = (result.get("log") or [])[-8:] + [payload[:200]]
                     _write(STATE_PATH, result)
+        # FastNet 自报的下行偶尔会出现远超链路能力的数字（实测报过 7148 Mbps），
+        # 它自己的字节统计有问题；用我们采到的网口峰值更可信
+        if _PEAK["down"] > 0:
+            result["down"] = round(_PEAK["down"], 2)
+        if _PEAK["up"] > 0:
+            result["up"] = round(_PEAK["up"], 2)
         result["state"] = "done"
         result["msg"] = "完成"
         result["finished"] = int(time.time())
@@ -276,7 +291,7 @@ def status() -> dict:
             out[key] = cur.get(key)
         out["elapsed"] = int(time.time()) - int(cur.get("started", 0))
     elif cur:
-        rows = _read(HISTORY_PATH, [])
+        rows = _sane(_read(HISTORY_PATH, []))
         if rows:
             # 历史是唯一可信来源：状态文件里的数值可能被中途写坏，
             # 但每次完成的记录都会进历史
@@ -308,8 +323,13 @@ def servers() -> dict:
         return {"servers": [], "error": str(e)[:120]}
 
 
+def _sane(rows: list) -> list:
+    """剔除明显不靠谱的记录：单播 5 Gbps 以上在普通宽带上不可能出现。"""
+    return [r for r in rows if (r.get("down") or 0) <= 5000 and (r.get("up") or 0) <= 5000]
+
+
 def history() -> dict:
-    return {"rows": _read(HISTORY_PATH, [])}
+    return {"rows": _sane(_read(HISTORY_PATH, []))}
 
 
 # ---------------- 安装 ----------------
