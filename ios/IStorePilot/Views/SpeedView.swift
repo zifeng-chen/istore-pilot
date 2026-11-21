@@ -195,7 +195,8 @@ struct SpeedView: View {
                 metric("下行 ↓", text: lastDown > 0 ? String(format: "%.1f", lastDown) : "—",
                        unit: "Mbps", hot: false).frame(maxWidth: .infinity)
                 metric("上行 ↑", text: lastUp > 0 ? String(format: "%.1f", lastUp) : "—",
-                       unit: "Mbps", hot: false).frame(maxWidth: .infinity)
+                       unit: "Mbps", hot: false)
+                    .frame(maxWidth: .infinity)
             }
             .padding(.top, 8)
         }
@@ -245,8 +246,12 @@ struct SpeedView: View {
                 HStack {
                     Text("时间 / 节点").font(.caption2).foregroundStyle(C.textTertiary)
                     Spacer()
-                    Text("下行 ↓").font(.caption2).foregroundStyle(C.textTertiary).frame(width: 62, alignment: .trailing)
-                    Text("上行 ↑").font(.caption2).foregroundStyle(C.textTertiary).frame(width: 62, alignment: .trailing)
+                    Text("下行 ↓")
+                        .font(.caption2).foregroundStyle(C.textTertiary)
+                        .frame(width: 62, alignment: .trailing)
+                    Text("上行 ↑")
+                        .font(.caption2).foregroundStyle(C.textTertiary)
+                        .frame(width: 62, alignment: .trailing)
                 }
                 .padding(.top, 8)
 
@@ -351,8 +356,8 @@ struct SpeedView: View {
 
     private func refresh() async {
         do {
-            let b = try await Api.get("/api/v1/speedtest/status?t=\(Int(Date().timeIntervalSince1970 * 1000))",
-                                      cache: false)
+            let path = "/api/v1/speedtest/status?t=\(Int(Date().timeIntervalSince1970 * 1000))"
+            let b = try await Api.get(path, cache: false)
             state = b.str("state")
             let wasRunning = running
             running = b.bool("running")
@@ -379,8 +384,8 @@ struct SpeedView: View {
     }
 
     private func loadHistory() async {
-        guard let b = try? await Api.get("/api/v1/speedtest/history?t=\(Int(Date().timeIntervalSince1970 * 1000))",
-                                         cache: false) else { return }
+        let path = "/api/v1/speedtest/history?t=\(Int(Date().timeIntervalSince1970 * 1000))"
+        guard let b = try? await Api.get(path, cache: false) else { return }
         rows = b.objs("rows").map {
             SpeedRow(id: $0.int("time"), time: $0.int("time"), ping: $0.dbl("ping"),
                      down: $0.dbl("down"), up: $0.dbl("up"), server: $0.str("server"))
