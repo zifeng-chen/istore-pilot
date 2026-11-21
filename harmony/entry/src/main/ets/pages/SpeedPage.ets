@@ -127,6 +127,17 @@ struct SpeedPage {
   }
 
   async refresh(): Promise<void> {
+    try {
+      await this.doRefresh();
+    } catch (e) {
+      // 之前这里不兜异常：轮询里一旦抛出，定时器继续跑但数据永远停在旧值，
+      // 页面上只看到秒表在跳、数字不动。现在把原因显示出来
+      this.err = '状态读取异常：' + (e === undefined ? '未知' : String(e)).slice(0, 80);
+      this.stopTimer();
+    }
+  }
+
+  private async doRefresh(): Promise<void> {
     const r: ApiResult = await Api.getFresh(this.ctx(), '/api/v1/speedtest/status?t=' + Date.now().toString());
     if (!r.ok) {
       this.err = r.data.str('error', '读取失败');
