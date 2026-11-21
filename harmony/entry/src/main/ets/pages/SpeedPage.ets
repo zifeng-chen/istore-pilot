@@ -477,85 +477,151 @@ struct SpeedPage {
     }
   }
 
-  /** 测速中：上下行实时数字每秒跳，不是等最后才出结果 */
+  /** 测速中：三段进度条 + 三个数值，延迟一有就显示 */
   @Builder
   liveBlock() {
     Column({ space: 10 }) {
-      Row({ space: 6 }) {
-        Text('延迟')
-          .fontSize(T.F_TINY)
-          .fontColor(this.stage === 'speedtest' ? $r('app.color.on_primary') : $r('app.color.text_secondary'))
-          .backgroundColor(this.stage === 'speedtest' ? $r('app.color.primary') : $r('app.color.surface_hi'))
-          .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-          .borderRadius(T.R_PILL);
-        Text('下行')
-          .fontSize(T.F_TINY)
-          .fontColor(this.stage === 'download' ? $r('app.color.on_primary') : $r('app.color.text_secondary'))
-          .backgroundColor(this.stage === 'download' ? $r('app.color.primary') : $r('app.color.surface_hi'))
-          .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-          .borderRadius(T.R_PILL);
-        Text('上行')
-          .fontSize(T.F_TINY)
-          .fontColor(this.stage === 'upload' ? $r('app.color.on_primary') : $r('app.color.text_secondary'))
-          .backgroundColor(this.stage === 'upload' ? $r('app.color.primary') : $r('app.color.surface_hi'))
-          .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-          .borderRadius(T.R_PILL);
-        Text(this.elapsed.toString() + 's')
-          .fontSize(T.F_TINY)
-          .fontColor($r('app.color.text_tertiary'))
-          .layoutWeight(1)
-          .textAlign(TextAlign.End);
+      Row({ space: 4 }) {
+        Stack({ alignContent: Alignment.Start }) {
+          Row().width('100%').height(6).borderRadius(3)
+            .backgroundColor($r('app.color.surface_hi'));
+          Row().width(this.segPct(0).toString() + '%').height(6).borderRadius(3)
+            .backgroundColor($r('app.color.primary'));
+        }
+        .layoutWeight(1);
+
+        Stack({ alignContent: Alignment.Start }) {
+          Row().width('100%').height(6).borderRadius(3)
+            .backgroundColor($r('app.color.surface_hi'));
+          Row().width(this.segPct(1).toString() + '%').height(6).borderRadius(3)
+            .backgroundColor($r('app.color.primary'));
+        }
+        .layoutWeight(1);
+
+        Stack({ alignContent: Alignment.Start }) {
+          Row().width('100%').height(6).borderRadius(3)
+            .backgroundColor($r('app.color.surface_hi'));
+          Row().width(this.segPct(2).toString() + '%').height(6).borderRadius(3)
+            .backgroundColor($r('app.color.primary'));
+        }
+        .layoutWeight(1);
       }
       .width('100%');
 
-      Row({ space: 10 }) {
-        Column({ space: 0 }) {
-          Text('下行 ↓')
+      Row() {
+        Text('延迟').layoutWeight(1).fontSize(T.F_TINY)
+          .fontColor(this.stage === 'speedtest' ? $r('app.color.primary') : $r('app.color.text_tertiary'));
+        Text('下行').layoutWeight(1).fontSize(T.F_TINY).textAlign(TextAlign.Center)
+          .fontColor(this.stage === 'download' ? $r('app.color.primary') : $r('app.color.text_tertiary'));
+        Text('上行').layoutWeight(1).fontSize(T.F_TINY).textAlign(TextAlign.End)
+          .fontColor(this.stage === 'upload' ? $r('app.color.primary') : $r('app.color.text_tertiary'));
+      }
+      .width('100%');
+
+      Row({ space: 12 }) {
+        Column({ space: 2 }) {
+          Text(this.ping > 0 ? this.ping.toFixed(0) : '—')
+            .fontSize(T.F_H2)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(this.ping > 0 ? $r('app.color.text_primary') : $r('app.color.text_tertiary'));
+          Text('延迟 ms')
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_secondary'));
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start);
+
+        Column({ space: 2 }) {
+          Text(this.downLiveText())
+            .fontSize(T.F_H2)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(this.stage === 'download' ? $r('app.color.primary') : $r('app.color.text_primary'));
+          Text('下行 Mbps')
             .fontSize(T.F_TINY)
             .fontColor(this.stage === 'download' ? $r('app.color.primary') : $r('app.color.text_secondary'));
-          Row() {
-            Text(this.stage === 'download' ? this.liveDown.toFixed(1) : '—')
-              .fontSize(T.F_TITLE * 0.72)
-              .fontWeight(FontWeight.Medium)
-              .fontColor(this.stage === 'download' ? $r('app.color.primary') : $r('app.color.text_primary'));
-            Text(' Mbps')
-              .fontSize(T.F_TINY)
-              .fontColor($r('app.color.text_secondary'))
-              .margin({ left: 2, bottom: 6 });
-          }
-          .alignItems(VerticalAlign.Bottom);
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start);
 
-        Column({ space: 0 }) {
-          Text('上行 ↑')
+        Column({ space: 2 }) {
+          Text(this.upLiveText())
+            .fontSize(T.F_H2)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(this.stage === 'upload' ? $r('app.color.primary') : $r('app.color.text_primary'));
+          Text('上行 Mbps')
             .fontSize(T.F_TINY)
             .fontColor(this.stage === 'upload' ? $r('app.color.primary') : $r('app.color.text_secondary'));
-          Row() {
-            Text(this.stage === 'upload' ? this.liveUp.toFixed(1) : '—')
-              .fontSize(T.F_TITLE * 0.72)
-              .fontWeight(FontWeight.Medium)
-              .fontColor(this.stage === 'upload' ? $r('app.color.primary') : $r('app.color.text_primary'));
-            Text(' Mbps')
-              .fontSize(T.F_TINY)
-              .fontColor($r('app.color.text_secondary'))
-              .margin({ left: 2, bottom: 6 });
-          }
-          .alignItems(VerticalAlign.Bottom);
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start);
       }
-      .width('100%');
+      .width('100%')
+      .margin({ top: 2 });
 
-      Text(this.msg.length > 0 ? this.msg : '正在与测速服务器握手…')
+      Text(this.progressHint())
         .fontSize(T.F_TINY)
-        .fontColor($r('app.color.text_secondary'))
+        .fontColor($r('app.color.text_tertiary'))
         .width('100%');
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start);
+  }
+
+  /** 段进度：0 延迟 / 1 下行 / 2 上行。没有真实进度，按秒数估个像样的值 */
+  private segPct(i: number): number {
+    const t: number = this.elapsed;
+    if (i === 0) {
+      if (this.stage !== 'speedtest') {
+        return 100;
+      }
+      return Math.min(90, t * 18);
+    }
+    if (i === 1) {
+      if (this.stage === 'upload' || !this.running) {
+        return 100;
+      }
+      if (this.stage === 'download') {
+        return Math.min(95, (t - 3) * 9);
+      }
+      return 0;
+    }
+    if (!this.running) {
+      return 100;
+    }
+    if (this.stage === 'upload') {
+      return Math.min(95, (t - 12) * 9);
+    }
+    return 0;
+  }
+
+  private downLiveText(): string {
+    if (this.stage === 'download') {
+      return this.liveDown.toFixed(1);
+    }
+    if (this.down > 0) {
+      return this.down.toFixed(1);
+    }
+    return '—';
+  }
+
+  private upLiveText(): string {
+    if (this.stage === 'upload') {
+      return this.liveUp.toFixed(1);
+    }
+    return '—';
+  }
+
+  private progressHint(): string {
+    if (this.stage === 'speedtest') {
+      return '正在测延迟 · ' + this.elapsed.toString() + ' 秒';
+    }
+    if (this.stage === 'download') {
+      return '正在测下行 · ' + this.elapsed.toString() + ' 秒';
+    }
+    if (this.stage === 'upload') {
+      return '正在测上行 · ' + this.elapsed.toString() + ' 秒';
+    }
+    return this.msg.length > 0 ? this.msg : '准备中';
   }
 
   @Builder
