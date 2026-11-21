@@ -72,6 +72,9 @@ struct SpeedPage {
 
   aboutToDisappear(): void {
     this.stopTimer();
+    // 二级页是 router 页，返回时不会走 Shell.leave，
+    // 这里手动敲一下 backTick，让概览页立刻刷新测速卡
+    UI.backTick += 1;
   }
 
   private async measureTop(): Promise<void> {

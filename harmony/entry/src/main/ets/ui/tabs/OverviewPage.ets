@@ -184,6 +184,12 @@ export struct OverviewPage {
   }
 
   /** 测速状态：只是一次本地 socket 探测，5 秒一次不会有负担 */
+  /** 从测速页返回：立刻重取一次，不用等 5 秒轮询 */
+  @Monitor('ui.backTick')
+  onBackTick(): void {
+    this.refreshSpeed(this.ctx());
+  }
+
   private async refreshSpeed(ctx: Context): Promise<void> {
     const t: string = Date.now().toString();
     const r: ApiResult = await Api.getFresh(ctx, '/api/v1/speedtest/status?t=' + t);
