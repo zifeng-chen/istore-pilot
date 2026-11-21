@@ -30,6 +30,8 @@ HISTORY_MAX = 20
 
 _lock = threading.Lock()
 _thread = None
+#: 采样线程写到这儿，SSE 线程写状态文件时一起带上（各自写各自的会把对方覆盖掉）
+_LIVE = {"liveDown": 0.0, "liveUp": 0.0}
 
 
 def _read(path: str, default):
@@ -129,11 +131,12 @@ class _Sampler(threading.Thread):
             live_in = (rx - last_rx) * 8.0 / span / 1e6
             live_out = (tx - last_tx) * 8.0 / span / 1e6
             last_rx, last_tx, last_t = rx, tx, now
+            _LIVE["liveDown"] = round(max(0.0, live_in), 1)
+            _LIVE["liveUp"] = round(max(0.0, live_out), 1)
             cur = _read(STATE_PATH, {})
             if cur.get("state") != "running":
                 break
-            cur["liveDown"] = round(max(0.0, live_in), 1)
-            cur["liveUp"] = round(max(0.0, live_out), 1)
+            cur.update(_LIVE)
             _write(STATE_PATH, cur)
 
 
@@ -192,6 +195,7 @@ def _bench_worker(server_id: str) -> None:
                             result["up"] = value
                     if stage == "speedtest" and ("服务器" in msg or "server " in msg):
                         result["server"] = msg.replace("服务器", "").replace("server ", "").strip()
+                    result.update(_LIVE)
                     _write(STATE_PATH, result)
                 elif event == "log":
                     if not result.get("log"):
@@ -214,6 +218,8 @@ def _bench_worker(server_id: str) -> None:
         _write(STATE_PATH, result)
     finally:
         sampler.stop_flag = True
+        _LIVE["liveDown"] = 0.0
+        _LIVE["liveUp"] = 0.0
         result.pop("liveDown", None)
         result.pop("liveUp", None)
         with _lock:

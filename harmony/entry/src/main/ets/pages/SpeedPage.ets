@@ -2,6 +2,7 @@ import { router } from '@kit.ArkUI';
 import { promptAction } from '@kit.ArkUI';
 import { Api, ApiResult } from '../api/Api';
 import { J } from '../core/Json';
+import { UI } from '../core/UIState';
 import { Pal, T } from '../ui/Theme';
 import { Card, CardTitle, GlyphIcon, Hairline, Note } from '../ui/Comp';
 import { Glyph } from '../ui/comp/Icons';
@@ -363,7 +364,7 @@ struct SpeedPage {
       .margin({ left: 2 });
     }
     .width('100%')
-    .padding({ left: T.PAD, right: T.PAD, top: 4, bottom: 2 })
+    .padding({ left: T.PAD, right: T.PAD, top: UI.safeTop + 2, bottom: 2 })
     .alignItems(VerticalAlign.Center);
   }
 

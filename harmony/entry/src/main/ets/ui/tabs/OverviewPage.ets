@@ -185,14 +185,29 @@ export struct OverviewPage {
 
   /** 测速状态：只是一次本地 socket 探测，5 秒一次不会有负担 */
   private async refreshSpeed(ctx: Context): Promise<void> {
-    const r: ApiResult = await Api.getFresh(ctx, '/api/v1/speedtest/status?t=' + Date.now().toString());
-    if (!r.ok) {
-      return;
+    const t: string = Date.now().toString();
+    const r: ApiResult = await Api.getFresh(ctx, '/api/v1/speedtest/status?t=' + t);
+    if (r.ok) {
+      this.spState = r.data.str('state', 'unknown');
+      this.spPing = r.data.num('ping', 0);
+      this.spDown = r.data.num('down', 0);
+      this.spUp = r.data.num('up', 0);
     }
-    this.spState = r.data.str('state', 'unknown');
-    this.spPing = r.data.num('ping', 0);
-    this.spDown = r.data.num('down', 0);
-    this.spUp = r.data.num('up', 0);
+    // 从测速页返回时，状态接口可能还停在上一拍（数值为 0），用历史第一条兜底，
+    // 否则卡片会一直显示「— Mbps」
+    if (this.spDown <= 0 && this.spUp <= 0) {
+      const h: ApiResult = await Api.getFresh(ctx, '/api/v1/speedtest/history?t=' + t);
+      if (h.ok) {
+        const rows: J[] = h.data.arr('rows');
+        if (rows.length > 0) {
+          const first: J = rows[0];
+          this.spPing = first.num('ping', 0);
+          this.spDown = first.num('down', 0);
+          this.spUp = first.num('up', 0);
+          this.spState = 'ready';
+        }
+      }
+    }
   }
 
   private async refreshAll(withCache: boolean): Promise<void> {
