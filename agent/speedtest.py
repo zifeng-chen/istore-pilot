@@ -241,16 +241,50 @@ def start(server_id: str = "") -> dict:
     return {"ok": True}
 
 
+_PROBE = {"rx": 0, "tx": 0, "t": 0.0}
+
+
+def _probe_live() -> None:
+    """status 被调用时顺手补一次采样。
+
+    采样线程万一没起来（旧进程、线程异常），这里也能让数字动起来，
+    不至于整轮都是 0.0。
+    """
+    rx, tx = _wan_bytes()
+    now = time.time()
+    if _PROBE["t"] > 0:
+        span = now - _PROBE["t"]
+        if span >= 0.6:
+            _LIVE["liveDown"] = round(max(0.0, (rx - _PROBE["rx"]) * 8.0 / span / 1e6), 1)
+            _LIVE["liveUp"] = round(max(0.0, (tx - _PROBE["tx"]) * 8.0 / span / 1e6), 1)
+    _PROBE["rx"], _PROBE["tx"], _PROBE["t"] = rx, tx, now
+
+
 def status() -> dict:
     st = state()
-    out = {"ok": True, "state": st, "running": False}
     cur = _read(STATE_PATH, {})
-    if st == "ready" and cur.get("state") == "running":
+    if cur.get("state") == "running":
+        _probe_live()
+    out = {"ok": True, "state": st, "running": False}
+    if cur.get("state") == "running":
+        # 先把实时值并进去，再读出来，否则读到的是上一拍（甚至 0）
+        cur.update(_LIVE)
+        _write(STATE_PATH, cur)
         out["running"] = True
+        out["state"] = "ready" if st == "ready" else "running"
         for key in ("stage", "msg", "ping", "down", "up", "server", "liveDown", "liveUp"):
             out[key] = cur.get(key)
         out["elapsed"] = int(time.time()) - int(cur.get("started", 0))
     elif cur:
+        rows = _read(HISTORY_PATH, [])
+        if rows:
+            # 历史是唯一可信来源：状态文件里的数值可能被中途写坏，
+            # 但每次完成的记录都会进历史
+            out["ping"] = rows[0].get("ping", 0)
+            out["down"] = rows[0].get("down", 0)
+            out["up"] = rows[0].get("up", 0)
+            out["server"] = rows[0].get("server", "")
+            out["finished"] = rows[0].get("time", 0)
         if st != "ready" and cur.get("state") == "done":
             # 端口探测偶尔抖动，但上一轮结果是真的，不能因此把界面清空
             out["state"] = "done"

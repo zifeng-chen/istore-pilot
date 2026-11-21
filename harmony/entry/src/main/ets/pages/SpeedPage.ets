@@ -181,8 +181,8 @@ struct SpeedPage {
       if (wasRunning) {
         this.loadHistory();
       }
-      // 兜底：状态接口偶尔只回 state 不回数值，历史里一定有上一轮的结果
-      if (this.down <= 0 && this.up <= 0 && this.rows.length > 0) {
+      // 结果卡以历史为准：/status 的数值偶发取不到，但历史列表一直是对的
+      if (this.rows.length > 0) {
         this.applyRow(this.rows[0]);
       }
     }
@@ -220,7 +220,7 @@ struct SpeedPage {
       });
     });
     this.rows = arr;
-    if (this.down <= 0 && arr.length > 0) {
+    if (arr.length > 0) {
       this.applyRow(arr[0]);
     }
   }
