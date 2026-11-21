@@ -1806,8 +1806,8 @@ def install(confirm: str = "") -> dict:
     return {"ok": True, "accepted": True, "state": install_status()}
 
 
-def log(limit: int = 120, client: str = "", only_blocked: bool = False,
-        search: str = "") -> dict:
+def query_log(limit: int = 120, client: str = "", only_blocked: bool = False,
+              search: str = "") -> dict:
     """拦截日志（AGH 的 querylog）。
 
     字段名对齐三端已有的客户端：``time`` / ``domain`` / ``client`` / ``blocked``
