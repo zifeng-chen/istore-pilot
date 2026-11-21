@@ -161,6 +161,26 @@ struct SpeedPage {
       if (wasRunning) {
         this.loadHistory();
       }
+      // 兜底：状态接口偶尔只回 state 不回数值，历史里一定有上一轮的结果
+      if (this.down <= 0 && this.up <= 0 && this.rows.length > 0) {
+        this.applyRow(this.rows[0]);
+      }
+    }
+  }
+
+  /** 用一条历史记录填充「最近一次结果」 */
+  private applyRow(r: SpeedRow): void {
+    if (r.ping > 0) {
+      this.ping = r.ping;
+    }
+    if (r.down > 0) {
+      this.down = r.down;
+    }
+    if (r.up > 0) {
+      this.up = r.up;
+    }
+    if (r.server.length > 0 && this.server.length === 0) {
+      this.server = r.server;
     }
   }
 
@@ -180,6 +200,9 @@ struct SpeedPage {
       });
     });
     this.rows = arr;
+    if (this.down <= 0 && arr.length > 0) {
+      this.applyRow(arr[0]);
+    }
   }
 
   async loadServers(): Promise<void> {
@@ -329,7 +352,8 @@ struct SpeedPage {
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'));
         Text(this.running ? '测速中 · 已 ' + this.elapsed.toString() + ' 秒'
-          : (this.state === 'ready' || this.state === 'done' ? 'FastNet · Ookla 节点' : '读取中…'))
+          : (this.state === 'ready' || this.state === 'done' || this.down > 0
+            ? 'FastNet · Ookla 节点' : '读取中…'))
           .fontSize(T.F_TINY)
           .fontColor($r('app.color.text_secondary'))
           .margin({ top: 2 });

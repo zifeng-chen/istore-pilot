@@ -51,12 +51,16 @@ def _write(path: str, data) -> None:
         pass
 
 
-def _port_open(host: str = "127.0.0.1", port: int = PORT, timeout: float = 0.6) -> bool:
-    try:
-        with socket.create_connection((host, port), timeout=timeout):
-            return True
-    except OSError:
-        return False
+def _port_open(port: int = PORT, timeout: float = 0.6) -> bool:
+    """FastNet 监听的是 :::3200（IPv6 通配），某些内核上 127.0.0.1 连不进去，
+    所以 IPv4 失败后再试一次 ::1，否则状态会在 ready / stopped 之间乱跳。"""
+    for host in ("127.0.0.1", "::1"):
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                return True
+        except OSError:
+            continue
+    return False
 
 
 def _installed() -> bool:
@@ -241,6 +245,9 @@ def status() -> dict:
             out[key] = cur.get(key)
         out["elapsed"] = int(time.time()) - int(cur.get("started", 0))
     elif cur:
+        if st != "ready" and cur.get("state") == "done":
+            # 端口探测偶尔抖动，但上一轮结果是真的，不能因此把界面清空
+            out["state"] = "done"
         for key in ("state", "stage", "msg", "ping", "down", "up", "server",
                     "started", "finished", "error"):
             if key in cur:
