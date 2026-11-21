@@ -2,9 +2,8 @@ import { router } from '@kit.ArkUI';
 import { promptAction } from '@kit.ArkUI';
 import { Api, ApiResult } from '../api/Api';
 import { J } from '../core/Json';
-import { UI } from '../core/UIState';
 import { Pal, T } from '../ui/Theme';
-import { Card, CardTitle, GlyphIcon, Note } from '../ui/Comp';
+import { Card, CardTitle, GlyphIcon, Hairline, Note } from '../ui/Comp';
 import { Glyph } from '../ui/comp/Icons';
 
 /** 一次历史记录 */
@@ -26,11 +25,12 @@ interface Srv {
 /**
  * 网络测速。
  *
- * 测速本身不是我们实现的：路由器上的 FastNet 提供 SSE 接口，agent 把它转成
- * 「后台任务 + 状态落盘」，这里轮询展示。
+ * 一张卡搞定「选节点 + 开始 + 进度 + 结果」：之前拆成三张卡，点一下测速，
+ * 节点卡、进度卡、结果卡同时出现，屏幕上全是框，用户以为按错了。
+ * 现在同一张卡里切换内容，卡片总数始终不变。
  *
- * 布局顺序是刻意的：**操作卡在最上面**（选节点 + 开始），结果其次，历史最后。
- * 之前把结果卡放第一位、按钮塞在卡底，手指要滑一下才够得到。
+ * 实时数值来自 agent 侧对 WAN 网口字节数的采样 —— FastNet 的 SSE 只在每段
+ * 结束时给一个最终值，中间过程是黑的，只能自己算瞬时速率。
  */
 @Entry
 @ComponentV2
@@ -42,6 +42,8 @@ struct SpeedPage {
   @Local ping: number = 0;
   @Local down: number = 0;
   @Local up: number = 0;
+  @Local liveDown: number = 0;
+  @Local liveUp: number = 0;
   @Local server: string = '';
   @Local err: string = '';
   @Local installing: boolean = false;
@@ -87,10 +89,9 @@ struct SpeedPage {
     if (this.timer < 0) {
       this.timer = setInterval(() => {
         this.refresh();
-      }, 1200);
+      }, 1000);
     }
     if (this.clock < 0) {
-      // 秒表单独走：状态接口 1.2 秒才回来一次，秒数要每秒都动才有在跑的感觉
       this.clock = setInterval(() => {
         if (this.running) {
           this.elapsed += 1;
@@ -100,7 +101,7 @@ struct SpeedPage {
   }
 
   async refresh(): Promise<void> {
-    const r: ApiResult = await Api.getFresh(this.ctx(), '/api/v1/speedtest/status');
+    const r: ApiResult = await Api.getFresh(this.ctx(), '/api/v1/speedtest/status?t=' + Date.now().toString());
     if (!r.ok) {
       this.err = r.data.str('error', '读取失败');
       this.stopTimer();
@@ -110,12 +111,36 @@ struct SpeedPage {
     const wasRunning: boolean = this.running;
     this.state = r.data.str('state', 'unknown');
     this.running = r.data.bool('running', false);
-    this.stage = r.data.str('stage', '');
-    this.msg = r.data.str('msg', '');
-    this.ping = r.data.num('ping', 0);
-    this.down = r.data.num('down', 0);
-    this.up = r.data.num('up', 0);
-    this.server = r.data.str('server', '');
+    const st: string = r.data.str('stage', '');
+    if (st.length > 0) {
+      this.stage = st;
+    }
+    const mg: string = r.data.str('msg', '');
+    if (mg.length > 0) {
+      this.msg = mg;
+    }
+    // 数值只在拿到正数时覆盖：接口偶尔先回 0（上一轮清零或刚启动），
+    // 直接用会把界面上已有的结果擦成「—」
+    const p: number = r.data.num('ping', 0);
+    const d: number = r.data.num('down', 0);
+    const u: number = r.data.num('up', 0);
+    if (p > 0) {
+      this.ping = p;
+    }
+    if (d > 0) {
+      this.down = d;
+    }
+    if (u > 0) {
+      this.up = u;
+    }
+    const ld: number = r.data.num('liveDown', 0);
+    const lu: number = r.data.num('liveUp', 0);
+    this.liveDown = this.running ? ld : 0;
+    this.liveUp = this.running ? lu : 0;
+    const sv: string = r.data.str('server', '');
+    if (sv.length > 0) {
+      this.server = sv;
+    }
     if (this.running && !wasRunning) {
       this.elapsed = r.data.num('elapsed', 0);
     }
@@ -140,7 +165,7 @@ struct SpeedPage {
   }
 
   async loadHistory(): Promise<void> {
-    const r: ApiResult = await Api.getFresh(this.ctx(), '/api/v1/speedtest/history');
+    const r: ApiResult = await Api.getFresh(this.ctx(), '/api/v1/speedtest/history?t=' + Date.now().toString());
     if (!r.ok) {
       return;
     }
@@ -158,7 +183,7 @@ struct SpeedPage {
   }
 
   async loadServers(): Promise<void> {
-    const r: ApiResult = await Api.getFresh(this.ctx(), '/api/v1/speedtest/servers');
+    const r: ApiResult = await Api.getFresh(this.ctx(), '/api/v1/speedtest/servers?t=' + Date.now().toString());
     if (!r.ok) {
       return;
     }
@@ -179,9 +204,8 @@ struct SpeedPage {
     }
     this.stage = '';
     this.msg = '准备测速';
-    this.ping = 0;
-    this.down = 0;
-    this.up = 0;
+    this.liveDown = 0;
+    this.liveUp = 0;
     this.elapsed = 0;
     const payload: Record<string, Object> = { 'serverId': this.serverId };
     const r: ApiResult = await Api.post(this.ctx(), '/api/v1/speedtest/start', payload);
@@ -223,12 +247,6 @@ struct SpeedPage {
     this.tick();
   }
 
-  async startService(): Promise<void> {
-    const r: ApiResult = await Api.post(this.ctx(), '/api/v1/speedtest/service', this.body({}));
-    this.toast(r.data.str('msg', r.data.str('error', '已发送启动指令')));
-    this.refresh();
-  }
-
   private toast(text: string): void {
     promptAction.showToast({ message: text, duration: 2200 });
   }
@@ -261,14 +279,11 @@ struct SpeedPage {
             } else if (this.state === 'absent') {
               this.absentCard();
             } else {
-              this.actionCard();
-              if (this.running) {
-                this.progressCard();
-              }
-              this.resultCard();
-              if (this.rows.length > 0) {
-                this.historyCard();
-              }
+              this.speedCard();
+            }
+
+            if (this.rows.length > 0) {
+              this.historyCard();
             }
 
             Note({ text: '测速会占满带宽约 20 秒，期间的下载和视频通话会变慢。' });
@@ -314,7 +329,7 @@ struct SpeedPage {
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'));
         Text(this.running ? '测速中 · 已 ' + this.elapsed.toString() + ' 秒'
-          : (this.state === 'ready' ? 'FastNet · Ookla 节点' : '读取中…'))
+          : (this.state === 'ready' || this.state === 'done' ? 'FastNet · Ookla 节点' : '读取中…'))
           .fontSize(T.F_TINY)
           .fontColor($r('app.color.text_secondary'))
           .margin({ top: 2 });
@@ -324,13 +339,13 @@ struct SpeedPage {
       .margin({ left: 2 });
     }
     .width('100%')
-    .padding({ left: T.PAD, right: T.PAD, top: UI.safeTop + 6, bottom: 6 })
+    .padding({ left: T.PAD, right: T.PAD, top: 4, bottom: 2 })
     .alignItems(VerticalAlign.Center);
   }
 
-  /** 操作卡：选节点 + 开始。放最上面，别让用户先划过结果卡才够到按钮 */
+  /** 唯一的主卡：节点、按钮、进度、结果都在这里，卡片总数不变 */
   @Builder
-  actionCard() {
+  speedCard() {
     Card() {
       Column({ space: 12 }) {
         Row() {
@@ -361,6 +376,14 @@ struct SpeedPage {
         .width('100%')
         .alignItems(VerticalAlign.Center);
 
+        Hairline({ indent: 0 });
+
+        if (this.running) {
+          this.liveBlock();
+        } else {
+          this.resultBlock();
+        }
+
         Button(this.running ? '测速中… ' + this.elapsed.toString() + 's' : '开始测速')
           .type(ButtonType.Normal)
           .borderRadius(T.R_PILL)
@@ -381,72 +404,84 @@ struct SpeedPage {
     }
   }
 
+  /** 测速中：阶段 + 实时速率 + 秒表 */
   @Builder
-  progressCard() {
-    Card() {
-      Column({ space: 9 }) {
-        Text(this.stageTitle())
-          .fontSize(T.F_BODY)
-          .fontColor($r('app.color.text_primary'))
-          .width('100%');
-        Text(this.msg.length > 0 ? this.msg : '正在与测速服务器握手…')
+  liveBlock() {
+    Column({ space: 10 }) {
+      Row({ space: 6 }) {
+        this.segment('延迟', this.stage === 'speedtest');
+        this.segment('下行', this.stage === 'download');
+        this.segment('上行', this.stage === 'upload');
+        Text(this.elapsed.toString() + 's')
+          .fontSize(T.F_TINY)
+          .fontColor($r('app.color.text_tertiary'))
+          .layoutWeight(1)
+          .textAlign(TextAlign.End);
+      }
+      .width('100%');
+
+      Row({ space: 8 }) {
+        this.liveMetric('实时下行 ↓', this.liveDown, 'Mbps');
+        this.liveMetric('实时上行 ↑', this.liveUp, 'Mbps');
+      }
+      .width('100%');
+
+      Text(this.msg.length > 0 ? this.msg : '正在与测速服务器握手…')
+        .fontSize(T.F_TINY)
+        .fontColor($r('app.color.text_secondary'))
+        .width('100%');
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start);
+  }
+
+  @Builder
+  liveMetric(label: string, value: number, unit: string) {
+    Column({ space: 2 }) {
+      Text(label)
+        .fontSize(T.F_TINY)
+        .fontColor($r('app.color.text_secondary'));
+      Row() {
+        Text(value.toFixed(1))
+          .fontSize(T.F_H1)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.primary'));
+        Text(' ' + unit)
           .fontSize(T.F_TINY)
           .fontColor($r('app.color.text_secondary'))
-          .width('100%');
-        Row({ space: 6 }) {
-          this.segment('延迟', this.stage === 'speedtest');
-          this.segment('下行', this.stage === 'download');
-          this.segment('上行', this.stage === 'upload');
-        }
+          .margin({ left: 2, bottom: 3 });
+      }
+      .alignItems(VerticalAlign.Bottom);
+    }
+    .layoutWeight(1)
+    .alignItems(HorizontalAlign.Start);
+  }
+
+  /** 空闲：最近一次结果 */
+  @Builder
+  resultBlock() {
+    Column({ space: 6 }) {
+      Text(this.down > 0 || this.up > 0 ? '最近一次结果' : '还没有测过')
+        .fontSize(T.F_TINY)
+        .fontColor($r('app.color.text_secondary'))
         .width('100%');
-        Text(this.elapsed.toString() + ' 秒')
+
+      Row({ space: 8 }) {
+        this.metric('延迟', this.ping > 0 ? this.ping.toFixed(0) : '—', 'ms');
+        this.metric('下行 ↓', this.down > 0 ? this.down.toFixed(1) : '—', 'Mbps');
+        this.metric('上行 ↑', this.up > 0 ? this.up.toFixed(1) : '—', 'Mbps');
+      }
+      .width('100%');
+
+      if (this.server.length > 0) {
+        Text('服务器 ' + this.server)
           .fontSize(T.F_TINY)
           .fontColor($r('app.color.text_tertiary'))
           .width('100%');
       }
-      .width('100%')
-      .alignItems(HorizontalAlign.Start);
     }
-  }
-
-  @Builder
-  segment(label: string, active: boolean) {
-    Text(label)
-      .fontSize(T.F_TINY)
-      .fontColor(active ? $r('app.color.on_primary') : $r('app.color.text_secondary'))
-      .backgroundColor(active ? $r('app.color.primary') : $r('app.color.surface_hi'))
-      .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-      .borderRadius(T.R_PILL);
-  }
-
-  @Builder
-  resultCard() {
-    Card() {
-      Column({ space: 4 }) {
-        Text(this.down > 0 || this.up > 0 ? '最近一次结果' : '还没有测过')
-          .fontSize(T.F_TINY)
-          .fontColor($r('app.color.text_secondary'))
-          .width('100%');
-
-        Row({ space: 8 }) {
-          this.metric('延迟', this.ping > 0 ? this.ping.toFixed(0) : '—', 'ms');
-          this.metric('下行 ↓', this.down > 0 ? this.down.toFixed(1) : '—', 'Mbps');
-          this.metric('上行 ↑', this.up > 0 ? this.up.toFixed(1) : '—', 'Mbps');
-        }
-        .width('100%')
-        .margin({ top: 6 });
-
-        if (this.server.length > 0) {
-          Text('服务器 ' + this.server)
-            .fontSize(T.F_TINY)
-            .fontColor($r('app.color.text_tertiary'))
-            .width('100%')
-            .margin({ top: 4 });
-        }
-      }
-      .width('100%')
-      .alignItems(HorizontalAlign.Start);
-    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start);
   }
 
   @Builder
@@ -469,6 +504,16 @@ struct SpeedPage {
     }
     .layoutWeight(1)
     .alignItems(HorizontalAlign.Start);
+  }
+
+  @Builder
+  segment(label: string, active: boolean) {
+    Text(label)
+      .fontSize(T.F_TINY)
+      .fontColor(active ? $r('app.color.on_primary') : $r('app.color.text_secondary'))
+      .backgroundColor(active ? $r('app.color.primary') : $r('app.color.surface_hi'))
+      .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+      .borderRadius(T.R_PILL);
   }
 
   @Builder
@@ -530,7 +575,6 @@ struct SpeedPage {
     }
   }
 
-  /** 节点选择：盖在页面上的一层，选完立刻回到测速 */
   @Builder
   pickerSheet() {
     Column() {
@@ -674,18 +718,5 @@ struct SpeedPage {
     const hh: string = d.getHours().toString().padStart(2, '0');
     const mi: string = d.getMinutes().toString().padStart(2, '0');
     return mm + '-' + dd + ' ' + hh + ':' + mi;
-  }
-
-  private stageTitle(): string {
-    if (this.stage === 'download') {
-      return '正在测下行';
-    }
-    if (this.stage === 'upload') {
-      return '正在测上行';
-    }
-    if (this.stage === 'speedtest') {
-      return '正在测延迟';
-    }
-    return '准备中';
   }
 }

@@ -81,6 +81,58 @@ def _run(cmd: str, timeout: int = 90) -> tuple:
         return 1, str(e)
 
 
+def _wan_dev() -> str:
+    """WAN 的逻辑设备。PPPoE 拨号时是 pppoe-wan，DHCP 时是 eth0。"""
+    for dev in ("pppoe-wan", "eth0", "wan"):
+        if os.path.exists("/sys/class/net/%s/statistics/rx_bytes" % dev):
+            return dev
+    return ""
+
+
+def _wan_bytes() -> tuple:
+    dev = _wan_dev()
+    if not dev:
+        return 0, 0
+    try:
+        with open("/sys/class/net/%s/statistics/rx_bytes" % dev) as f:
+            rx = int(f.read().strip())
+        with open("/sys/class/net/%s/statistics/tx_bytes" % dev) as f:
+            tx = int(f.read().strip())
+        return rx, tx
+    except (OSError, ValueError):
+        return 0, 0
+
+
+class _Sampler(threading.Thread):
+    """测速期间每秒采样一次，把瞬时速率写进状态文件。
+
+    FastNet 的 SSE 只在每一段结束时给一个最终值，中间过程什么都没有 ——
+    界面要显示「正在跑」，只能自己从网口字节数算。
+    """
+
+    def __init__(self):
+        super().__init__(daemon=True)
+        self.stop_flag = False
+
+    def run(self) -> None:
+        last_rx, last_tx = _wan_bytes()
+        last_t = time.time()
+        while not self.stop_flag:
+            time.sleep(1.0)
+            rx, tx = _wan_bytes()
+            now = time.time()
+            span = max(0.2, now - last_t)
+            live_in = (rx - last_rx) * 8.0 / span / 1e6
+            live_out = (tx - last_tx) * 8.0 / span / 1e6
+            last_rx, last_tx, last_t = rx, tx, now
+            cur = _read(STATE_PATH, {})
+            if cur.get("state") != "running":
+                break
+            cur["liveDown"] = round(max(0.0, live_in), 1)
+            cur["liveUp"] = round(max(0.0, live_out), 1)
+            _write(STATE_PATH, cur)
+
+
 def state() -> str:
     if _port_open():
         return "ready"
@@ -98,6 +150,8 @@ def _bench_worker(server_id: str) -> None:
               "ping": 0.0, "down": 0.0, "up": 0.0, "serverId": server_id,
               "server": "", "started": int(time.time()), "error": ""}
     _write(STATE_PATH, result)
+    sampler = _Sampler()
+    sampler.start()
     try:
         with urllib.request.urlopen(url, timeout=180) as resp:
             event = ""
@@ -155,6 +209,9 @@ def _bench_worker(server_id: str) -> None:
         result["error"] = str(e)[:200]
         _write(STATE_PATH, result)
     finally:
+        sampler.stop_flag = True
+        result.pop("liveDown", None)
+        result.pop("liveUp", None)
         with _lock:
             _thread = None
 
@@ -180,7 +237,7 @@ def status() -> dict:
     cur = _read(STATE_PATH, {})
     if st == "ready" and cur.get("state") == "running":
         out["running"] = True
-        for key in ("stage", "msg", "ping", "down", "up", "server"):
+        for key in ("stage", "msg", "ping", "down", "up", "server", "liveDown", "liveUp"):
             out[key] = cur.get(key)
         out["elapsed"] = int(time.time()) - int(cur.get("started", 0))
     elif cur:

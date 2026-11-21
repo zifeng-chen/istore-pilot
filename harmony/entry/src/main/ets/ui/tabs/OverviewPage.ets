@@ -185,7 +185,7 @@ export struct OverviewPage {
 
   /** 测速状态：只是一次本地 socket 探测，5 秒一次不会有负担 */
   private async refreshSpeed(ctx: Context): Promise<void> {
-    const r: ApiResult = await Api.get(ctx, '/api/v1/speedtest/status');
+    const r: ApiResult = await Api.getFresh(ctx, '/api/v1/speedtest/status?t=' + Date.now().toString());
     if (!r.ok) {
       return;
     }
