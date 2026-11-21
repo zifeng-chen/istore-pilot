@@ -16,7 +16,7 @@
     --bg:#F4F9F6; --card:#fff; --ink:#10221C; --muted:#5C6B64; --faint:#8A9992;
     --line:rgba(16,34,28,.10); --brand:#00553E; --brand-2:#0B7A57; --soft:#E3F1EA;
     --warn-bg:#FBF0D9; --warn-fg:#8A5A12;
-    --radius:16px; --maxw:980px;
+    --radius:16px; --maxw:1120px;
   }
   @media (prefers-color-scheme: dark){
     :root{ --bg:#0E1613; --card:#141F1B; --ink:#EAF3EF; --muted:#A5B5AE; --faint:#7C8C85;
@@ -31,7 +31,7 @@
     -webkit-font-smoothing:antialiased;
   }
   a{color:inherit;text-decoration:none}
-  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 20px}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px}
   /* 注意：不能用裸的 .en —— body 切换语言时自己也会带上 en 类，
      那样连 body 一起被隐藏，整页白屏。用后代选择器把它排除在外。 */
   body .en{display:none}
@@ -122,8 +122,8 @@
   <div class="hero">
     <h1><span class="zh">路由器上发生的事，<br>手机上就能看清。</span><span class="en">See what your router<br>is actually doing.</span></h1>
     <p class="lead">
-      <span class="zh">实时速率、设备清单、应用流量识别、代理切换、DNS 拦截日志 —— 不用开电脑，也不用记 LuCI 的路径。</span>
-      <span class="en">Live throughput, device list, per-app traffic, proxy switching and DNS block logs — no laptop, no LuCI digging.</span>
+      <span class="zh">先在路由器装一次插件，再在手机上装 App —— 之后实时速率、设备清单、应用流量、代理切换、拦截日志都在手机里看。</span>
+      <span class="en">Install the plugin on your router once, then the app on your phone. Live throughput, devices, per-app traffic, proxy switching and block logs — all in your pocket.</span>
     </p>
     <div class="tags">
       <span class="tag">iStoreOS 24.10+</span>
@@ -132,6 +132,32 @@
       <span class="tag">OpenClash / Passwall</span>
     </div>
   </div>
+
+  <section>
+    <h3><span class="zh">第一步 · 装路由器插件</span><span class="en">Step 1 · Router plugin</span></h3>
+    <div class="plug">
+      <div class="top">
+        <b>iStore Agent</b>
+        <i>v<span data-version>0.4.4</span> · <span class="zh">只装一次，之后在 App 内升级</span><span class="en">install once, update from the app</span></i>
+      </div>
+      <p class="meta" style="margin:0"><span class="zh">装在路由器上，手机才连得上。按路由器架构选一个，不确定就用通用包。</span>
+        <span class="en">Runs on the router — pick your architecture, or use the universal package if unsure.</span></p>
+      <div class="links">
+        <a href="https://github.com/zifeng-chen/istore-pilot/releases/latest/download/luci-app-istore-agent.ipk">.ipk<span>4.25 MB</span></a>
+        <a href="https://github.com/zifeng-chen/istore-pilot/releases/latest/download/istore-agent-x86_64.run">x86_64<span>4.27 MB</span></a>
+        <a href="https://github.com/zifeng-chen/istore-pilot/releases/latest/download/istore-agent-arm64.run">ARM64<span>4.27 MB</span></a>
+        <a href="https://github.com/zifeng-chen/istore-pilot/releases/latest/download/istore-agent-armv7.run">ARMv7<span>4.27 MB</span></a>
+        <a href="https://github.com/zifeng-chen/istore-pilot/releases/latest/download/istore-agent-universal.run"><span class="zh">通用 .run</span><span class="en">Universal .run</span><span>4.27 MB</span></a>
+      </div>
+      <p class="hint" style="margin-top:10px">
+        <span class="zh">iStoreOS 24.10：系统 → 软件包 → 上传 .ipk。或把 .run 传到路由器，先 <code>sh 包名 --check</code> 再执行。</span>
+        <span class="en">iStoreOS 24.10: System → Software → upload the .ipk. Or copy a .run to the router and run <code>sh file --check</code> first.</span>
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h3><span class="zh">第二步 · 装手机 App</span><span class="en">Step 2 · Phone app</span></h3>
 
   <div class="dl">
     <div class="card">
@@ -168,28 +194,6 @@
       </div>
     </div>
   </div>
-
-  <section>
-    <h3><span class="zh">路由器插件</span><span class="en">Router plugin</span></h3>
-    <div class="plug">
-      <div class="top">
-        <b>iStore Agent</b>
-        <i>v<span data-version>0.4.4</span> · <span class="zh">只装一次，之后在 App 内升级</span><span class="en">install once, update from the app</span></i>
-      </div>
-      <p class="meta" style="margin:0"><span class="zh">装在路由器上，手机才连得上。按路由器架构选一个，不确定就用通用包。</span>
-        <span class="en">Runs on the router — pick your architecture, or use the universal package if unsure.</span></p>
-      <div class="links">
-        <a href="https://github.com/zifeng-chen/istore-pilot/releases/latest/download/luci-app-istore-agent.ipk">.ipk<span>4.25 MB</span></a>
-        <a href="https://github.com/zifeng-chen/istore-pilot/releases/latest/download/istore-agent-x86_64.run">x86_64<span>4.27 MB</span></a>
-        <a href="https://github.com/zifeng-chen/istore-pilot/releases/latest/download/istore-agent-arm64.run">ARM64<span>4.27 MB</span></a>
-        <a href="https://github.com/zifeng-chen/istore-pilot/releases/latest/download/istore-agent-armv7.run">ARMv7<span>4.27 MB</span></a>
-        <a href="https://github.com/zifeng-chen/istore-pilot/releases/latest/download/istore-agent-universal.run"><span class="zh">通用 .run</span><span class="en">Universal .run</span><span>4.27 MB</span></a>
-      </div>
-      <p class="hint" style="margin-top:10px">
-        <span class="zh">iStoreOS 24.10：系统 → 软件包 → 上传 .ipk。或把 .run 传到路由器，先 <code>sh 包名 --check</code> 再执行。</span>
-        <span class="en">iStoreOS 24.10: System → Software → upload the .ipk. Or copy a .run to the router and run <code>sh file --check</code> first.</span>
-      </p>
-    </div>
   </section>
 
   <section>
