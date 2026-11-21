@@ -14,7 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import (adblock, appfilter, apps, auth, cfgbak, clash, demo as demo_mod,
                devices, hardware, lanedit, luci, mask, netapply, netcfg, power,
-               proxy, subscriptions, sysinfo, system)
+               proxy, speedtest, subscriptions, sysinfo, system)
 from .config import get as cfg, load as load_cfg, save as save_cfg
 
 START_TS = time.time()
@@ -485,7 +485,13 @@ class Handler(BaseHTTPRequestHandler):
         body = self._body()
 
         try:
-            if path == "/api/v1/appfilter/toggle":
+            if path == "/api/v1/speedtest/start":
+                self._json(speedtest.start(str(body.get("serverId", ""))))
+            elif path == "/api/v1/speedtest/install":
+                self._json(speedtest.install())
+            elif path == "/api/v1/speedtest/service":
+                self._json(speedtest.start_service())
+            elif path == "/api/v1/appfilter/toggle":
                 self._json(appfilter.set_enable(bool(body.get("enable"))))
             elif path == "/api/v1/clash/mode":
                 self._json(clash.set_mode(str(body.get("mode", ""))))
@@ -838,6 +844,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(cached("proxy_configs", 6.0, proxy.configs))
 
             # ---- 系统维护
+            # ---- 网络测速（FastNet）
+            elif path == "/api/v1/speedtest/status":
+                self._json(speedtest.status())
+            elif path == "/api/v1/speedtest/servers":
+                self._json(speedtest.servers())
+            elif path == "/api/v1/speedtest/history":
+                self._json(speedtest.history())
+
             elif path == "/api/v1/system/update":
                 self._json(system.update_status())
             elif path == "/api/v1/system/firmware":

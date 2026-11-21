@@ -8,6 +8,7 @@
     "pages/DeviceDetailPage",
     "pages/SubscriptionPage",
     "pages/AgreementPage",
-    "pages/PackageUpdatePage"
+    "pages/PackageUpdatePage",
+    "pages/SpeedPage"
   ]
 }

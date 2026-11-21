@@ -81,6 +81,11 @@ export struct OverviewPage {
   /** 最近一次 overview 取数失败：界面上的数字是缓存，要如实告诉用户 */
   @Local stale: boolean = false;
   @Local winW: number = 360;
+  /** 测速组件状态：absent / stopped / ready / unknown */
+  @Local spState: string = 'unknown';
+  @Local spPing: number = 0;
+  @Local spDown: number = 0;
+  @Local spUp: number = 0;
   /** 下拉刷新：Refresh 组件要求绑一个布尔，松手后由代码收回去 */
   @Local pulling: boolean = false;
   /** 网口详情弹层：点某个口看累计收发与 MAC */
@@ -178,8 +183,21 @@ export struct OverviewPage {
     return Bp.rail(this.winW);
   }
 
+  /** 测速状态：只是一次本地 socket 探测，5 秒一次不会有负担 */
+  private async refreshSpeed(ctx: Context): Promise<void> {
+    const r: ApiResult = await Api.peek(ctx, '/api/v1/speedtest/status');
+    if (!r.ok) {
+      return;
+    }
+    this.spState = r.data.str('state', 'unknown');
+    this.spPing = r.data.num('ping', 0);
+    this.spDown = r.data.num('down', 0);
+    this.spUp = r.data.num('up', 0);
+  }
+
   private async refreshAll(withCache: boolean): Promise<void> {
     const ctx = this.ctx();
+    this.refreshSpeed(ctx);
     if (withCache) {
       const c: ApiResult = await Api.peek(ctx, '/api/v1/overview');
       if (c.ok) {
@@ -476,6 +494,7 @@ export struct OverviewPage {
                   this.ringCard();
                   this.wanCard();
                   this.portCard();
+                  this.speedCard();
                 }
                 .layoutWeight(1)
                 .alignItems(HorizontalAlign.Start);
@@ -488,6 +507,7 @@ export struct OverviewPage {
                 this.ringCard();
                 this.wanCard();
                 this.portCard();
+                this.speedCard();
               }
               .width('100%');
             }
@@ -751,6 +771,76 @@ export struct OverviewPage {
   }
 
   /** 宽带连接：四项关键信息 + 网络设置入口（安卓概览里也是独立一张） */
+  @Builder
+  speedCard() {
+    Card({ gapTop: 0, gapBottom: this.rail() ? Bp.gap(this.winW) : T.GAP }) {
+      CardTitle({ glyph: Glyph.DOWNLOAD_SPEED, title: '网络测速',
+        sub: this.spState === 'absent' ? '未安装测速组件'
+          : (this.spState === 'stopped' ? '已安装，未运行'
+            : (this.spDown > 0 ? '延迟 ' + this.spPing.toFixed(0) + ' ms' : 'FastNet · Ookla 节点')) }) {
+        Pill({
+          text: this.spState === 'ready' ? '可用' : (this.spState === 'absent' ? '未安装' : '待启动'),
+          tone: this.spState === 'ready' ? Pal.ok() : Pal.textSecondary()
+        });
+      }
+
+      Row({ space: 8 }) {
+        this.spMetric('下行', this.spDown > 0 ? this.spDown.toFixed(1) : '—', 'Mbps');
+        this.spMetric('上行', this.spUp > 0 ? this.spUp.toFixed(1) : '—', 'Mbps');
+        this.spMetric('延迟', this.spPing > 0 ? this.spPing.toFixed(0) : '—', 'ms');
+      }
+      .width('100%')
+      .margin({ top: 10 });
+
+      Hairline({ indent: 0 });
+
+      Row() {
+        GlyphIcon({ kind: Glyph.DOWNLOAD_SPEED, color: Pal.primary(), side: 16, lineWidth: 1.9 });
+        Column() {
+          Text(this.spState === 'absent' ? '安装测速组件' : '打开测速')
+            .fontSize(T.F_BODY)
+            .fontColor($r('app.color.text_primary'));
+          Text(this.spState === 'absent' ? '约 8 MB，装完即可测' : '测速与历史记录')
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_secondary'))
+            .margin({ top: 2 });
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        .margin({ left: 10 });
+        GlyphIcon({ kind: Glyph.CHEVRON, color: Pal.textTertiary(), side: 14, lineWidth: 1.8 });
+      }
+      .width('100%')
+      .padding({ top: 11, bottom: 3 })
+      .alignItems(VerticalAlign.Center)
+      .onClick(() => {
+        router.pushUrl({ url: 'pages/SpeedPage' });
+      });
+    }
+  }
+
+  @Builder
+  spMetric(label: string, value: string, unit: string) {
+    Column({ space: 1 }) {
+      Text(label)
+        .fontSize(T.F_TINY)
+        .fontColor($r('app.color.text_secondary'));
+      Row() {
+        Text(value)
+          .fontSize(T.F_H2)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'));
+        Text(' ' + unit)
+          .fontSize(T.F_TINY)
+          .fontColor($r('app.color.text_secondary'))
+          .margin({ left: 2, bottom: 2 });
+      }
+      .alignItems(VerticalAlign.Bottom);
+    }
+    .layoutWeight(1)
+    .alignItems(HorizontalAlign.Start);
+  }
+
   @Builder
   wanCard() {
     Card({ gapTop: 0, gapBottom: this.rail() ? Bp.gap(this.winW) : T.GAP }) {
