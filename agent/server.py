@@ -157,6 +157,16 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self.wfile.write(head + body)
 
+    def _access(self, path: str, code: int, size: int) -> None:
+        """把每次请求记一行。排查「界面没数据」时，先看有没有请求过来、
+        返回了多大，比盯着客户端猜强。"""
+        try:
+            line = "%d %s %d %d\n" % (int(time.time()), path[:120], code, size)
+            with open("/etc/istore-agent/data/access.log", "a", encoding="utf-8") as fp:
+                fp.write(line)
+        except OSError:
+            pass
+
     def _json(self, data, code: int = 200):
         # 录制模式：只收 200 的 GET 响应，错误响应不落盘（回放时也不该复现错误）
         key = getattr(self, "_demo_key", None)
@@ -165,7 +175,9 @@ class Handler(BaseHTTPRequestHandler):
                 _DEMO.save(key[0], key[1], data)
             except OSError as exc:
                 _log("演示录制 %s 失败: %r" % (key[0], exc))
-        self._send(code, json.dumps(data, ensure_ascii=False).encode("utf-8"))
+        body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+        self._access(getattr(self, "path", ""), code, len(body))
+        self._send(code, body)
 
     def _error(self, code: int, message: str):
         self._json({"ok": False, "error": message}, code)
@@ -852,6 +864,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(speedtest.status())
             elif path == "/api/v1/speedtest/servers":
                 self._json(speedtest.servers())
+            elif path == "/api/v1/_access":
+                n = int(query.get("n", ["30"])[0]) if query else 30
+                try:
+                    with open("/etc/istore-agent/data/access.log", encoding="utf-8") as fp:
+                        lines = fp.readlines()[-n:]
+                except OSError:
+                    lines = []
+                self._json({"ok": True, "lines": [x.rstrip("\n") for x in lines]})
             elif path == "/api/v1/speedtest/history":
                 self._json(speedtest.history())
 
