@@ -307,6 +307,7 @@ public class SpeedActivity extends BaseActivity {
         try {
             body.put("serverId", serverId);
         } catch (Exception ignored) {
+            // serverId 只是个字符串，put 不会失败，忽略即可
         }
         elapsed = 0;
         Api.post(this, "/api/v1/speedtest/start", body, new Cb() {
