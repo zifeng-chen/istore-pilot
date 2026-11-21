@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -152,8 +153,22 @@ def patch_body(release_id: int, body: str, tok: str) -> int:
     return status
 
 
-def upload(release_id: int, path: str, tok: str) -> tuple[int, dict]:
-    name = os.path.basename(path)
+def update_site(ver: str) -> None:
+    """把落地页里的版本号替换成本次发布版本，避免页面写着旧版本。"""
+    page = os.path.join(ROOT, "docs", "index.html")
+    if not os.path.exists(page):
+        return
+    text = open(page, encoding="utf-8").read()
+    new = re.sub(r'(<span data-version>)[^<]*(</span>)', r"\g<1>%s\g<2>" % ver, text)
+    if new != text:
+        open(page, "w", encoding="utf-8", newline="\n").write(new)
+        print("  站点版本号已更新为 %s（记得提交 docs/index.html）" % ver)
+
+
+def upload(release_id: int, path: str, tok: str, name: str = "") -> tuple[int, dict]:
+    # 站点下载必须用固定文件名：releases/latest/download/<name> 只认资产名，
+    # 带版本号的资产名每次发版都变，网页链接就会 404
+    name = name or os.path.basename(path)
     size = os.path.getsize(path)
     url = "%s/repos/%s/releases/%d/assets?name=%s" % (
         UPLOAD, REPO, release_id, urllib.parse.quote(name))
@@ -426,6 +441,15 @@ def main() -> int:
                                           os.path.getsize(path) / 1048576))
         else:
             print("    ✗ %s：%s" % (os.path.basename(path), info.get("message")))
+
+    # 同一份 APK 再传一份固定别名，供落地页 / 二维码使用
+    code, info = upload(rel["id"], apk, tok, name="iStorePilot-android.apk")
+    if code in (200, 201):
+        print("    ✓ iStorePilot-android.apk（固定别名，站点下载用）")
+    else:
+        print("    ✗ 别名上传失败：%s" % info.get("message"))
+
+    update_site(ver)
 
     print("\n完成：上传 %d/%d，Release %s\n" % (ok, len(assets), rel.get("html_url")))
     return 0 if ok == len(assets) else 6

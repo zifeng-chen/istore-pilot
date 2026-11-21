@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>iStore Pilot — 软路由的手机端控制台</title>
+<meta name="description" content="iStore Pilot 是 iStoreOS 软路由的手机控制台：实时速率、设备清单、应用识别、代理切换、拦截日志。支持 Android 与 HarmonyOS。">
+<meta property="og:title" content="iStore Pilot — 软路由的手机端控制台">
+<meta property="og:description" content="实时速率、设备清单、应用识别、代理切换、拦截日志，不用开电脑。">
+<meta property="og:image" content="shot-overview.webp">
+<meta property="og:type" content="website">
+<link rel="alternate" hreflang="en" href="?lang=en">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300553E'/%3E%3Ctext x='16' y='22' font-size='17' font-family='sans-serif' fill='%23fff' text-anchor='middle'%3EiS%3C/text%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#F4F9F6; --card:#fff; --ink:#10221C; --muted:#5C6B64; --faint:#8A9992;
+    --line:rgba(16,34,28,.10); --brand:#00553E; --brand-2:#0B7A57; --soft:#E3F1EA;
+    --radius:16px; --maxw:980px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0E1613; --card:#141F1B; --ink:#EAF3EF; --muted:#A5B5AE; --faint:#7C8C85;
+           --line:rgba(234,243,239,.12); --soft:#16302799; --brand:#3FBF92; --brand-2:#2FA377; }
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:400 15px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 20px}
+  .en{display:none}
+  body.en .zh{display:none}
+  body.en .en{display:inline}
+
+  header{padding:18px 0}
+  .bar{display:flex;align-items:center;gap:12px}
+  .logo{width:40px;height:40px;border-radius:11px;background:var(--brand);color:#fff;
+        display:flex;align-items:center;justify-content:center;font-weight:600;font-size:15px;letter-spacing:.3px}
+  .name{font-weight:600;font-size:16px;line-height:1.2}
+  .sub{font-size:12.5px;color:var(--muted)}
+  .lang{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+  .lang button{border:0;background:none;color:var(--muted);padding:6px 12px;font-size:12.5px;cursor:pointer}
+  .lang button[aria-pressed="true"]{background:var(--brand);color:#fff}
+
+  .hero{padding:26px 0 8px}
+  h1{font-size:30px;line-height:1.25;margin:0 0 10px;font-weight:600;letter-spacing:-.4px}
+  .lead{margin:0;color:var(--muted);font-size:15px;max-width:34em}
+  .tags{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 0}
+  .tag{font-size:12px;color:var(--brand);background:var(--soft);border-radius:999px;padding:4px 10px}
+
+  .dl{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:26px 0 8px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
+  .card h2{margin:0;font-size:15px;font-weight:600}
+  .card .meta{margin:2px 0 14px;font-size:12.5px;color:var(--faint)}
+  .row{display:flex;align-items:center;gap:14px}
+  .qr{width:92px;height:92px;flex:0 0 92px;border-radius:10px;background:#fff;padding:6px;border:1px solid var(--line)}
+  .qr img{width:100%;height:100%;display:block}
+  .btn{display:block;text-align:center;padding:11px 14px;border-radius:11px;font-weight:600;font-size:14px;
+       background:var(--brand);color:#fff;border:1px solid transparent}
+  .btn.ghost{background:none;color:var(--ink);border-color:var(--line)}
+  .hint{margin:7px 0 0;font-size:11.5px;color:var(--faint)}
+
+  section{margin:34px 0}
+  h3{font-size:13px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--faint);margin:0 0 14px}
+  .shots{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .shots img{width:100%;border-radius:14px;border:1px solid var(--line);display:block}
+  .feat{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .feat div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .feat b{display:block;font-size:14px;font-weight:600;margin-bottom:3px}
+  .feat span{font-size:12.5px;color:var(--muted)}
+  .req{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+  .req ul{margin:0;padding-left:18px;color:var(--muted);font-size:13.5px}
+  .req li{margin:4px 0}
+  footer{border-top:1px solid var(--line);padding:22px 0 40px;color:var(--faint);font-size:12.5px}
+  footer .links{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:8px}
+  footer a{color:var(--muted)}
+  footer a:hover{color:var(--brand)}
+  @media (max-width:720px){
+    h1{font-size:24px}
+    .dl{grid-template-columns:1fr}
+    .shots{grid-template-columns:1fr;gap:10px}
+    .feat{grid-template-columns:1fr 1fr}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="bar">
+      <div class="logo">iS</div>
+      <div>
+        <div class="name">iStore Pilot</div>
+        <div class="sub"><span class="zh">软路由的手机端控制台</span><span class="en">Router control, on your phone</span></div>
+      </div>
+      <div class="lang">
+        <button id="zh" aria-pressed="true">中文</button>
+        <button id="en" aria-pressed="false">EN</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="hero">
+    <h1><span class="zh">路由器上发生的事，<br>手机上就能看清。</span><span class="en">See what your router<br>is actually doing.</span></h1>
+    <p class="lead">
+      <span class="zh">实时速率、设备清单、应用流量识别、代理切换、DNS 拦截日志 —— 不用开电脑，也不用记 LuCI 的路径。</span>
+      <span class="en">Live throughput, device list, per-app traffic, proxy switching and DNS block logs — no laptop, no LuCI digging.</span>
+    </p>
+    <div class="tags">
+      <span class="tag">iStoreOS 24.10+</span>
+      <span class="tag">Android 8.0+</span>
+      <span class="tag">HarmonyOS 5.0+</span>
+      <span class="tag">OpenClash / Passwall</span>
+    </div>
+  </div>
+
+  <div class="dl">
+    <div class="card">
+      <h2>Android</h2>
+      <p class="meta"><span class="zh">APK 直装 · 版本 <span data-version>0.4.4</span></span>
+         <span class="en">Direct APK · v<span data-version>0.4.4</span></span></p>
+      <div class="row">
+        <div class="qr"><img src="qr-android.svg" alt="Android 下载二维码 / QR for Android"></div>
+        <div style="flex:1">
+          <a class="btn" id="dl-android" href="https://github.com/zifeng-chen/istore-pilot/releases/latest/download/iStorePilot-android.apk">
+            <span class="zh">下载 APK</span><span class="en">Download APK</span>
+          </a>
+          <p class="hint"><span class="zh">扫码或点按，约 2.7 MB</span><span class="en">Scan or tap · 2.7 MB</span></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>HarmonyOS</h2>
+      <p class="meta"><span class="zh">华为应用市场 · 版本 <span data-version>0.4.4</span></span>
+         <span class="en">AppGallery · v<span data-version>0.4.4</span></span></p>
+      <div class="row">
+        <div class="qr"><img src="qr-harmony.svg" alt="鸿蒙应用市场二维码 / QR for AppGallery"></div>
+        <div style="flex:1">
+          <a class="btn ghost" id="dl-harmony" href="https://appgallery.huawei.com/app/C6917621503870113751">
+            <span class="zh">前往应用市场</span><span class="en">Open AppGallery</span>
+          </a>
+          <p class="hint"><span class="zh">仅鸿蒙手机可扫</span><span class="en">HarmonyOS devices only</span></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section>
+    <h3><span class="zh">界面</span><span class="en">Screens</span></h3>
+    <div class="shots">
+      <img src="shot-overview.webp" alt="概览页 / Overview">
+      <img src="shot-lan.webp" alt="局域网页 / LAN">
+      <img src="shot-settings.webp" alt="设置页 / Settings">
+    </div>
+  </section>
+
+  <section>
+    <h3><span class="zh">能做什么</span><span class="en">Features</span></h3>
+    <div class="feat">
+      <div><b><span class="zh">实时速率</span><span class="en">Live throughput</span></b>
+        <span class="zh">上下行与每个网口的速率，5 秒刷新</span><span class="en">Up/down and per-port rates, refreshed every 5s</span></div>
+      <div><b><span class="zh">设备清单</span><span class="en">Devices</span></b>
+        <span class="zh">在线状态、IP、MAC，可看单机流量</span><span class="en">Online state, IP, MAC, per-device traffic</span></div>
+      <div><b><span class="zh">应用识别</span><span class="en">App traffic</span></b>
+        <span class="zh">按特征库识别应用，标出识别来源</span><span class="en">App-level traffic with match source labels</span></div>
+      <div><b><span class="zh">代理切换</span><span class="en">Proxy</span></b>
+        <span class="zh">OpenClash / Passwall 启停与节点选择</span><span class="en">Start/stop and pick nodes for OpenClash or Passwall</span></div>
+      <div><b><span class="zh">拦截日志</span><span class="en">Block logs</span></b>
+        <span class="zh">DNS 查询与拦截记录，可只看被拦的</span><span class="en">DNS queries and blocks, filter to blocked only</span></div>
+      <div><b><span class="zh">远程访问</span><span class="en">Remote access</span></b>
+        <span class="zh">填域名或 IPv6，在外网也能连回家</span><span class="en">Connect home over IPv6 or a domain</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h3><span class="zh">运行条件</span><span class="en">Requirements</span></h3>
+    <div class="req">
+      <ul>
+        <li><span class="zh">路由器：iStoreOS 24.10.8 及以上（x86_64 / ARM64 / ARMv7）</span>
+            <span class="en">Router: iStoreOS 24.10.8 or newer (x86_64 / ARM64 / ARMv7)</span></li>
+        <li><span class="zh">路由器端需安装 <code>luci-app-istore-agent</code>，可在 Release 里下载 .ipk 或 .run</span>
+            <span class="en">Install <code>luci-app-istore-agent</code> on the router — grab the .ipk or .run from Releases</span></li>
+        <li><span class="zh">手机与路由器需在同一局域网，或通过 IPv6 / 域名远程连接</span>
+            <span class="en">Phone and router on the same LAN, or reachable over IPv6 / a domain</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    <div class="links">
+      <a href="https://github.com/zifeng-chen/istore-pilot">GitHub</a>
+      <a href="https://github.com/zifeng-chen/istore-pilot/releases"><span class="zh">所有版本</span><span class="en">All releases</span></a>
+      <a href="https://github.com/zifeng-chen/istore-pilot/releases/latest"><span class="zh">路由器固件</span><span class="en">Router package</span></a>
+      <a href="https://github.com/zifeng-chen/istore-pilot/issues"><span class="zh">反馈</span><span class="en">Issues</span></a>
+    </div>
+    <div><span class="zh">iStore Pilot · 版本 </span><span class="en">iStore Pilot · version </span><span data-version>0.4.4</span></div>
+  </footer>
+</div>
+
+<script>
+(function(){
+  var KEY = 'istore-lang';
+  function apply(lang){
+    document.body.classList.toggle('en', lang === 'en');
+    document.documentElement.lang = lang === 'en' ? 'en' : 'zh-CN';
+    document.getElementById('zh').setAttribute('aria-pressed', lang !== 'en');
+    document.getElementById('en').setAttribute('aria-pressed', lang === 'en');
+    try { localStorage.setItem(KEY, lang); } catch (e) {}
+  }
+  var saved = null;
+  try { saved = localStorage.getItem(KEY); } catch (e) {}
+  var initial = saved || (new URLSearchParams(location.search).get('lang'))
+      || ((navigator.language || 'zh').toLowerCase().indexOf('zh') === 0 ? 'zh' : 'en');
+  apply(initial);
+  document.getElementById('zh').onclick = function(){ apply('zh'); };
+  document.getElementById('en').onclick = function(){ apply('en'); };
+
+  var ua = navigator.userAgent || '';
+  var isHarmony = /HarmonyOS|OpenHarmony/i.test(ua);
+  var isAndroid = /Android/i.test(ua);
+  if (isHarmony) {
+    document.getElementById('dl-harmony').classList.remove('ghost');
+    document.getElementById('dl-android').classList.add('ghost');
+  } else if (isAndroid) {
+    document.getElementById('dl-android').classList.add('ghost');
+  }
+})();
+</script>
+</body>
+</html>
