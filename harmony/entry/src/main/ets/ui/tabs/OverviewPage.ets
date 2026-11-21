@@ -870,7 +870,10 @@ export struct OverviewPage {
         .alignItems(HorizontalAlign.Start);
       }
       .width('100%')
-      .margin({ top: 10 });
+      .padding({ left: 12, right: 12, top: 12, bottom: 12 })
+      .backgroundColor($r('app.color.surface_hi'))
+      .borderRadius(10)
+      .margin({ top: 12, bottom: 14 });
 
       Hairline({ indent: 0 });
 
@@ -899,7 +902,7 @@ export struct OverviewPage {
         GlyphIcon({ kind: Glyph.CHEVRON, color: Pal.textTertiary(), side: 14, lineWidth: 1.8 });
       }
       .width('100%')
-      .padding({ top: 11, bottom: 3 })
+      .padding({ top: 13, bottom: 5 })
       .alignItems(VerticalAlign.Center)
       .onClick(() => {
         router.pushUrl({ url: 'pages/SpeedPage' });

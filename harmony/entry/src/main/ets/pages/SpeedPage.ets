@@ -316,6 +316,14 @@ struct SpeedPage {
     promptAction.showToast({ message: text, duration: 2200 });
   }
 
+  /** 节点下面那行小字：最近一次用的是哪台服务器 */
+  private serverSub(): string {
+    if (this.server.length > 0) {
+      return '上次服务器 ' + this.server;
+    }
+    return this.servers.length > 0 ? '共 ' + this.servers.length.toString() + ' 个节点可选' : '';
+  }
+
   private serverLabel(): string {
     if (this.serverId.length === 0) {
       return '自动选择';
@@ -429,6 +437,10 @@ struct SpeedPage {
             Text(this.serverLabel())
               .fontSize(T.F_BODY)
               .fontColor($r('app.color.text_primary'));
+            Text(this.serverSub())
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_tertiary'))
+              .margin({ top: 2 });
           }
           .alignItems(HorizontalAlign.Start)
           .layoutWeight(1);
@@ -692,12 +704,6 @@ struct SpeedPage {
       }
       .width('100%');
 
-      if (this.lastServer().length > 0) {
-        Text('服务器 ' + this.lastServer())
-          .fontSize(T.F_TINY)
-          .fontColor($r('app.color.text_tertiary'))
-          .width('100%');
-      }
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start);
