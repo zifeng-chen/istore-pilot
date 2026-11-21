@@ -442,12 +442,20 @@ def main() -> int:
         else:
             print("    ✗ %s：%s" % (os.path.basename(path), info.get("message")))
 
-    # 同一份 APK 再传一份固定别名，供落地页 / 二维码使用
-    code, info = upload(rel["id"], apk, tok, name="iStorePilot-android.apk")
-    if code in (200, 201):
-        print("    ✓ iStorePilot-android.apk（固定别名，站点下载用）")
-    else:
-        print("    ✗ 别名上传失败：%s" % info.get("message"))
+    # 再传一份固定别名：站点下载和二维码只认资产名，带版本号的名字每次发版都会变
+    aliases = [("istoreos-%s.apk" % ver, "iStorePilot-android.apk")]
+    for sfx, tag in (("_x86_64", "x86_64"), ("_arm64", "arm64"),
+                     ("_armv7", "armv7"), ("", "universal")):
+        aliases.append(("istore-pilot_%s%s.run" % (full, sfx), "istore-agent-%s.run" % tag))
+    if os.path.exists(ipk):
+        aliases.append(("luci-app-istore-agent_%s_all.ipk" % full, "luci-app-istore-agent.ipk"))
+    for src, alias in aliases:
+        path = os.path.join(DIST, src)
+        if not os.path.exists(path):
+            print("    ! 别名缺源文件：%s" % src)
+            continue
+        code, info = upload(rel["id"], path, tok, name=alias)
+        print("    %s %s（固定别名）" % ("✓" if code in (200, 201) else "✗", alias))
 
     update_site(ver)
 
