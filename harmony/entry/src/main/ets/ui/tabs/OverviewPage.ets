@@ -86,6 +86,8 @@ export struct OverviewPage {
   @Local spPing: number = 0;
   @Local spDown: number = 0;
   @Local spUp: number = 0;
+  /** 取不到数时显示的一行诊断信息（正常有数时不显示） */
+  @Local spDiag: string = '';
   /** 下拉刷新：Refresh 组件要求绑一个布尔，松手后由代码收回去 */
   @Local pulling: boolean = false;
   /** 网口详情弹层：点某个口看累计收发与 MAC */
@@ -192,28 +194,39 @@ export struct OverviewPage {
 
   private async refreshSpeed(ctx: Context): Promise<void> {
     const t: string = Date.now().toString();
+    let diag: string = '';
+
+    // 先读历史：历史列表在测速页是能正常渲染的，说明这条路一定通
+    const h: ApiResult = await Api.getFresh(ctx, '/api/v1/speedtest/history?t=' + t);
+    if (h.ok) {
+      const rows: J[] = h.data.arr('rows');
+      diag += 'h' + rows.length.toString();
+      if (rows.length > 0) {
+        this.spPing = rows[0].num('ping', 0);
+        this.spDown = rows[0].num('down', 0);
+        this.spUp = rows[0].num('up', 0);
+      }
+    } else {
+      diag += 'h!' + h.code.toString();
+    }
+
     const r: ApiResult = await Api.getFresh(ctx, '/api/v1/speedtest/status?t=' + t);
     if (r.ok) {
       this.spState = r.data.str('state', 'unknown');
-      this.spPing = r.data.num('ping', 0);
-      this.spDown = r.data.num('down', 0);
-      this.spUp = r.data.num('up', 0);
-    }
-    // 从测速页返回时，状态接口可能还停在上一拍（数值为 0），用历史第一条兜底，
-    // 否则卡片会一直显示「— Mbps」
-    if (this.spDown <= 0 && this.spUp <= 0) {
-      const h: ApiResult = await Api.getFresh(ctx, '/api/v1/speedtest/history?t=' + t);
-      if (h.ok) {
-        const rows: J[] = h.data.arr('rows');
-        if (rows.length > 0) {
-          const first: J = rows[0];
-          this.spPing = first.num('ping', 0);
-          this.spDown = first.num('down', 0);
-          this.spUp = first.num('up', 0);
-          this.spState = 'ready';
-        }
+      diag += ' s' + this.spState;
+      // 状态里有数就用状态里的（更新），没有就保留历史那份
+      const d: number = r.data.num('down', 0);
+      if (d > 0) {
+        this.spPing = r.data.num('ping', 0);
+        this.spDown = d;
+        this.spUp = r.data.num('up', 0);
       }
+    } else {
+      diag += ' s!' + r.code.toString();
     }
+    const dd: Date = new Date();
+    this.spDiag = diag + ' ' + dd.getHours().toString().padStart(2, '0')
+      + ':' + dd.getMinutes().toString().padStart(2, '0');
   }
 
   private async refreshAll(withCache: boolean): Promise<void> {
@@ -814,6 +827,14 @@ export struct OverviewPage {
       .margin({ top: 10 });
 
       Hairline({ indent: 0 });
+
+      if (this.spDown <= 0 && this.spDiag.length > 0) {
+        Text('诊断 ' + this.spDiag)
+          .fontSize(T.F_TINY)
+          .fontColor($r('app.color.text_tertiary'))
+          .width('100%')
+          .margin({ top: 6 });
+      }
 
       Row() {
         GlyphIcon({ kind: Glyph.DOWNLOAD_SPEED, color: Pal.primary(), side: 16, lineWidth: 1.9 });
