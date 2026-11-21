@@ -30,7 +30,9 @@
   }
   a{color:inherit;text-decoration:none}
   .wrap{max-width:var(--maxw);margin:0 auto;padding:0 20px}
-  .en{display:none}
+  /* 注意：不能用裸的 .en —— body 切换语言时自己也会带上 en 类，
+     那样连 body 一起被隐藏，整页白屏。用后代选择器把它排除在外。 */
+  body .en{display:none}
   body.en .zh{display:none}
   body.en .en{display:inline}
 
