@@ -10,7 +10,8 @@
 <meta property="og:image" content="shot-overview.webp">
 <meta property="og:type" content="website">
 <link rel="alternate" hreflang="en" href="?lang=en">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300553E'/%3E%3Ctext x='16' y='22' font-size='17' font-family='sans-serif' fill='%23fff' text-anchor='middle'%3EiS%3C/text%3E%3C/svg%3E">
+<link rel="icon" type="image/png" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
 <style>
   :root{
     --bg:#F4F9F6; --card:#fff; --ink:#10221C; --muted:#5C6B64; --faint:#8A9992;
@@ -40,8 +41,7 @@
 
   header{padding:18px 0}
   .bar{display:flex;align-items:center;gap:12px}
-  .logo{width:40px;height:40px;border-radius:11px;background:var(--brand);color:#fff;
-        display:flex;align-items:center;justify-content:center;font-weight:600;font-size:15px;letter-spacing:.3px}
+  .logo{width:40px;height:40px;border-radius:11px;display:block;flex:0 0 40px}
   .name{font-weight:600;font-size:16px;line-height:1.2}
   .sub{font-size:12.5px;color:var(--muted)}
   .lang{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
@@ -50,7 +50,10 @@
 
   .hero{padding:26px 0 8px}
   h1{font-size:30px;line-height:1.25;margin:0 0 10px;font-weight:600;letter-spacing:-.4px}
-  .lead{margin:0;color:var(--muted);font-size:15px;max-width:34em}
+  @media (min-width:721px){
+    h1 .zh, .lead .zh{white-space:nowrap}
+  }
+  .lead{margin:0;color:var(--muted);font-size:15px}
   .tags{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 0}
   .tag{font-size:12px;color:var(--brand);background:var(--soft);border-radius:999px;padding:4px 10px}
 
@@ -134,7 +137,7 @@
 
   <header>
     <div class="bar">
-      <div class="logo">iS</div>
+      <img class="logo" src="icon.png" width="40" height="40" alt="iStore Pilot">
       <div>
         <div class="name">iStore Pilot</div>
         <div class="sub"><span class="zh">软路由的手机端控制台</span><span class="en">Router control, on your phone</span></div>
@@ -147,7 +150,7 @@
   </header>
 
   <div class="hero">
-    <h1><span class="zh">路由器上发生的事，<br>手机上就能看清。</span><span class="en">See what your router<br>is actually doing.</span></h1>
+    <h1><span class="zh">路由器上发生的事，手机上就能看清。</span><span class="en">See what your router<br>is actually doing.</span></h1>
     <p class="lead">
       <span class="zh">先在路由器装一次插件，再在手机上装 App —— 之后实时速率、设备清单、应用流量、代理切换、拦截日志都在手机里看。</span>
       <span class="en">Install the plugin on your router once, then the app on your phone. Live throughput, devices, per-app traffic, proxy switching and block logs — all in your pocket.</span>
