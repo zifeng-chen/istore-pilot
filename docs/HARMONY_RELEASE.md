@@ -4,6 +4,28 @@
 > 配套：`docs/harmony-metadata-audit.md`（元数据预审）、`docs/HARMONY_SKILLS_SETUP.md`（编译期坑）。
 > 本文不含任何账号口令、开发者 ID、内网地址 —— 那些只留在你本机。
 
+
+## 0. 两条容易搞混的规则
+
+**签名分两种，用途不同**
+
+| 用途 | 签名 | 判定 |
+|---|---|---|
+| 正式上架 / 提商店审核 | 发布证书 + release Profile | `verify` 输出 `type=release`、**设备数 0** |
+| 修 bug 自测 / 邀请测试 | 调试证书 | `type=debug`、设备数 > 0 |
+
+```bash
+python scripts/harmony_pkg_verify.py --expect-type release dist/xxx.app   # 上架前必须过
+python scripts/harmony_pkg_verify.py --expect-type debug   dist/xxx.app   # 自测用
+```
+
+**版本说明必须写，且只写本端**
+
+- 提审填写的「本次更新」要有 **更新内容 + 修复内容** 两段，
+  从 `git log v<上一个tag>..HEAD` 归纳，不能只写「若干优化」
+- **不要再提 Android / iOS**：审核员看到跨端描述会问「这个包里有没有」，
+  白增加一轮问答。三端一致这类话只放在网站文案里
+
 ## 0. 现在到哪一步了
 
 | 环节 | 状态 | 缺什么 |
