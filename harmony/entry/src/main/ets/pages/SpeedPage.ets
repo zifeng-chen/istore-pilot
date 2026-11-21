@@ -520,48 +520,69 @@ struct SpeedPage {
       .width('100%');
 
       Row() {
-        Text('延迟').layoutWeight(1).fontSize(T.F_TINY)
+        Text(this.segState(0)).layoutWeight(1).fontSize(T.F_TINY)
           .fontColor(this.stage === 'speedtest' ? $r('app.color.primary') : $r('app.color.text_tertiary'));
-        Text('下行').layoutWeight(1).fontSize(T.F_TINY).textAlign(TextAlign.Center)
+        Text(this.segState(1)).layoutWeight(1).fontSize(T.F_TINY).textAlign(TextAlign.Center)
           .fontColor(this.stage === 'download' ? $r('app.color.primary') : $r('app.color.text_tertiary'));
-        Text('上行').layoutWeight(1).fontSize(T.F_TINY).textAlign(TextAlign.End)
+        Text(this.segState(2)).layoutWeight(1).fontSize(T.F_TINY).textAlign(TextAlign.End)
           .fontColor(this.stage === 'upload' ? $r('app.color.primary') : $r('app.color.text_tertiary'));
       }
       .width('100%');
 
       Row({ space: 12 }) {
         Column({ space: 2 }) {
-          Text(this.ping > 0 ? this.ping.toFixed(0) : '—')
-            .fontSize(T.F_H2)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(this.ping > 0 ? $r('app.color.text_primary') : $r('app.color.text_tertiary'));
-          Text('延迟 ms')
+          Text('延迟')
             .fontSize(T.F_TINY)
             .fontColor($r('app.color.text_secondary'));
+          Row() {
+            Text(this.ping > 0 ? this.ping.toFixed(0) : '—')
+              .fontSize(T.F_H2)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(this.ping > 0 ? $r('app.color.text_primary') : $r('app.color.text_tertiary'));
+            Text(' ms')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_secondary'))
+              .margin({ bottom: 2 });
+          }
+          .alignItems(VerticalAlign.Bottom);
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start);
 
         Column({ space: 2 }) {
-          Text(this.downLiveText())
-            .fontSize(T.F_H2)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(this.stage === 'download' ? $r('app.color.primary') : $r('app.color.text_primary'));
-          Text('下行 Mbps')
+          Text('下行 ↓')
             .fontSize(T.F_TINY)
             .fontColor(this.stage === 'download' ? $r('app.color.primary') : $r('app.color.text_secondary'));
+          Row() {
+            Text(this.downLiveText())
+              .fontSize(T.F_H2)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(this.stage === 'download' ? $r('app.color.primary') : $r('app.color.text_primary'));
+            Text(' Mbps')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_secondary'))
+              .margin({ bottom: 2 });
+          }
+          .alignItems(VerticalAlign.Bottom);
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start);
 
         Column({ space: 2 }) {
-          Text(this.upLiveText())
-            .fontSize(T.F_H2)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(this.stage === 'upload' ? $r('app.color.primary') : $r('app.color.text_primary'));
-          Text('上行 Mbps')
+          Text('上行 ↑')
             .fontSize(T.F_TINY)
             .fontColor(this.stage === 'upload' ? $r('app.color.primary') : $r('app.color.text_secondary'));
+          Row() {
+            Text(this.upLiveText())
+              .fontSize(T.F_H2)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(this.stage === 'upload' ? $r('app.color.primary') : $r('app.color.text_primary'));
+            Text(' Mbps')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_secondary'))
+              .margin({ bottom: 2 });
+          }
+          .alignItems(VerticalAlign.Bottom);
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start);
@@ -603,6 +624,23 @@ struct SpeedPage {
       return Math.min(95, (t - 12) * 9);
     }
     return 0;
+  }
+
+  /** 每段下方那行状态字 */
+  private segState(i: number): string {
+    if (i === 0) {
+      return this.stage === 'speedtest' ? '延迟 · 测速中' : '延迟 · 完成';
+    }
+    if (i === 1) {
+      if (this.stage === 'download') {
+        return '下行 · 测速中';
+      }
+      return this.stage === 'upload' || !this.running ? '下行 · 完成' : '下行 · 等待';
+    }
+    if (this.stage === 'upload') {
+      return '上行 · 测速中';
+    }
+    return this.running ? '上行 · 等待' : '上行 · 完成';
   }
 
   private downLiveText(): string {
