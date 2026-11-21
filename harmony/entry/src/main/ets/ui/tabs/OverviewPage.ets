@@ -185,7 +185,7 @@ export struct OverviewPage {
 
   /** 测速状态：只是一次本地 socket 探测，5 秒一次不会有负担 */
   private async refreshSpeed(ctx: Context): Promise<void> {
-    const r: ApiResult = await Api.peek(ctx, '/api/v1/speedtest/status');
+    const r: ApiResult = await Api.get(ctx, '/api/v1/speedtest/status');
     if (!r.ok) {
       return;
     }
@@ -776,11 +776,11 @@ export struct OverviewPage {
     Card({ gapTop: 0, gapBottom: this.rail() ? Bp.gap(this.winW) : T.GAP }) {
       CardTitle({ glyph: Glyph.DOWNLOAD_SPEED, title: '网络测速',
         sub: this.spState === 'absent' ? '未安装测速组件'
-          : (this.spState === 'stopped' ? '已安装，未运行'
-            : (this.spDown > 0 ? '延迟 ' + this.spPing.toFixed(0) + ' ms' : 'FastNet · Ookla 节点')) }) {
+          : (this.spDown > 0 ? '最近一次 · ' + this.spPing.toFixed(0) + ' ms'
+            : 'FastNet · 还没测过') }) {
         Pill({
-          text: this.spState === 'ready' ? '可用' : (this.spState === 'absent' ? '未安装' : '待启动'),
-          tone: this.spState === 'ready' ? Pal.ok() : Pal.textSecondary()
+          text: this.spState === 'absent' ? '未安装' : '可用',
+          tone: this.spState === 'absent' ? Pal.textSecondary() : Pal.ok()
         });
       }
 

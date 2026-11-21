@@ -164,6 +164,9 @@ def start(server_id: str = "") -> dict:
     with _lock:
         if _thread is not None and _thread.is_alive():
             return {"ok": False, "error": "测速进行中", "status": status()}
+        if state() == "stopped":
+            # 装好了但服务没跑：直接拉起来，别让用户去点「启动」
+            start_service()
         if state() != "ready":
             return {"ok": False, "error": "FastNet 未就绪", "status": status()}
         _thread = threading.Thread(target=_bench_worker, args=(server_id,), daemon=True)

@@ -1,9 +1,8 @@
-import { LengthMetrics, router } from '@kit.ArkUI';
+import { router } from '@kit.ArkUI';
 import { promptAction } from '@kit.ArkUI';
 import { Api, ApiResult } from '../api/Api';
 import { J } from '../core/Json';
 import { UI } from '../core/UIState';
-import { Fmt } from '../util/Fmt';
 import { Pal, T } from '../ui/Theme';
 import { Card, CardTitle, GlyphIcon, Note } from '../ui/Comp';
 import { Glyph } from '../ui/comp/Icons';
@@ -17,14 +16,21 @@ interface SpeedRow {
   server: string;
 }
 
+/** 可选的 Ookla 节点 */
+interface Srv {
+  id: string;
+  name: string;
+  isp: string;
+}
+
 /**
  * 网络测速。
  *
- * 测速本身不是我们实现的：路由器上的 FastNet 插件提供 SSE 接口，agent 把它
- * 转成「后台任务 + 状态落盘」，这里只负责轮询和展示。
+ * 测速本身不是我们实现的：路由器上的 FastNet 提供 SSE 接口，agent 把它转成
+ * 「后台任务 + 状态落盘」，这里轮询展示。
  *
- * 三种前置状态必须在界面上说清，否则用户点「测速」没反应会以为坏了：
- * absent（没装）/ stopped（装了没起）/ ready（可用）。
+ * 布局顺序是刻意的：**操作卡在最上面**（选节点 + 开始），结果其次，历史最后。
+ * 之前把结果卡放第一位、按钮塞在卡底，手指要滑一下才够得到。
  */
 @Entry
 @ComponentV2
@@ -41,24 +47,29 @@ struct SpeedPage {
   @Local installing: boolean = false;
   @Local installMsg: string = '';
   @Local rows: SpeedRow[] = [];
+  @Local servers: Srv[] = [];
+  @Local serverId: string = '';
+  @Local picking: boolean = false;
+  @Local elapsed: number = 0;
   @Local timer: number = -1;
+  @Local clock: number = -1;
 
   aboutToAppear(): void {
     this.refresh();
     this.loadHistory();
+    this.loadServers();
   }
 
   aboutToDisappear(): void {
     this.stopTimer();
   }
 
-  /** Api.post 要求 Record<string, Object>，空对象也要显式构造 */
-  private body(extra: Record<string, Object>): Record<string, Object> {
-    return extra;
-  }
-
   private ctx(): Context {
     return this.getUIContext().getHostContext() as Context;
+  }
+
+  private body(extra: Record<string, Object>): Record<string, Object> {
+    return extra;
   }
 
   private stopTimer(): void {
@@ -66,15 +77,26 @@ struct SpeedPage {
       clearInterval(this.timer);
       this.timer = -1;
     }
+    if (this.clock >= 0) {
+      clearInterval(this.clock);
+      this.clock = -1;
+    }
   }
 
   private tick(): void {
-    if (this.timer >= 0) {
-      return;
+    if (this.timer < 0) {
+      this.timer = setInterval(() => {
+        this.refresh();
+      }, 1200);
     }
-    this.timer = setInterval(() => {
-      this.refresh();
-    }, 1500);
+    if (this.clock < 0) {
+      // 秒表单独走：状态接口 1.2 秒才回来一次，秒数要每秒都动才有在跑的感觉
+      this.clock = setInterval(() => {
+        if (this.running) {
+          this.elapsed += 1;
+        }
+      }, 1000);
+    }
   }
 
   async refresh(): Promise<void> {
@@ -85,6 +107,7 @@ struct SpeedPage {
       return;
     }
     this.err = '';
+    const wasRunning: boolean = this.running;
     this.state = r.data.str('state', 'unknown');
     this.running = r.data.bool('running', false);
     this.stage = r.data.str('stage', '');
@@ -93,6 +116,9 @@ struct SpeedPage {
     this.down = r.data.num('down', 0);
     this.up = r.data.num('up', 0);
     this.server = r.data.str('server', '');
+    if (this.running && !wasRunning) {
+      this.elapsed = r.data.num('elapsed', 0);
+    }
     const inst: J = r.data.obj('install');
     this.installing = inst.has('state')
       && (inst.str('state', '') === 'installing' || inst.str('state', '') === 'starting');
@@ -107,7 +133,7 @@ struct SpeedPage {
       this.tick();
     } else {
       this.stopTimer();
-      if (this.state === 'ready' && this.stage.length > 0) {
+      if (wasRunning) {
         this.loadHistory();
       }
     }
@@ -131,15 +157,34 @@ struct SpeedPage {
     this.rows = arr;
   }
 
+  async loadServers(): Promise<void> {
+    const r: ApiResult = await Api.getFresh(this.ctx(), '/api/v1/speedtest/servers');
+    if (!r.ok) {
+      return;
+    }
+    const arr: Srv[] = [];
+    r.data.arr('servers').forEach((it: J) => {
+      const name: string = it.str('name', '');
+      if (name.length === 0) {
+        return;
+      }
+      arr.push({ id: it.str('id', ''), name: name, isp: it.str('isp', '') });
+    });
+    this.servers = arr;
+  }
+
   async startTest(): Promise<void> {
     if (this.running) {
       return;
     }
     this.stage = '';
+    this.msg = '准备测速';
     this.ping = 0;
     this.down = 0;
     this.up = 0;
-    const r: ApiResult = await Api.post(this.ctx(), '/api/v1/speedtest/start', this.body({}));
+    this.elapsed = 0;
+    const payload: Record<string, Object> = { 'serverId': this.serverId };
+    const r: ApiResult = await Api.post(this.ctx(), '/api/v1/speedtest/start', payload);
     if (!r.ok || !r.data.bool('ok', false)) {
       this.toast(r.data.str('error', '启动失败'));
       return;
@@ -188,44 +233,61 @@ struct SpeedPage {
     promptAction.showToast({ message: text, duration: 2200 });
   }
 
-  build() {
-    Column() {
-      this.head();
-
-      Scroll() {
-        Column({ space: T.GAP }) {
-          if (this.err.length > 0) {
-            this.errCard();
-          }
-
-          if (this.installing) {
-            this.stateCard('正在安装测速组件…', this.installMsg, false);
-          } else if (this.state === 'absent') {
-            this.stateCard('路由器上没有装测速组件',
-              'FastNet 提供测速服务，约 8 MB，从软件源安装。', true);
-          } else if (this.state === 'stopped') {
-            this.stateCard('测速组件已安装但没有运行', '启动服务后即可使用。', false);
-          } else {
-            this.resultCard();
-            if (this.running) {
-              this.progressCard();
-            }
-          }
-
-          if (this.rows.length > 0) {
-            this.historyCard();
-          }
-
-          Note({ text: '测速会占满带宽约 20 秒，期间的下载和视频通话会变慢。' });
-          Row().height(24);
-        }
-        .width('100%')
-        .padding({ left: T.PAD, right: T.PAD });
+  private serverLabel(): string {
+    if (this.serverId.length === 0) {
+      return '自动选择';
+    }
+    for (let i = 0; i < this.servers.length; i += 1) {
+      if (this.servers[i].id === this.serverId) {
+        return this.servers[i].name;
       }
-      .layoutWeight(1)
+    }
+    return '自动选择';
+  }
+
+  build() {
+    Stack({ alignContent: Alignment.TopStart }) {
+      Column() {
+        this.head();
+
+        Scroll() {
+          Column({ space: T.GAP }) {
+            if (this.err.length > 0) {
+              this.errCard();
+            }
+
+            if (this.installing) {
+              this.installCard();
+            } else if (this.state === 'absent') {
+              this.absentCard();
+            } else {
+              this.actionCard();
+              if (this.running) {
+                this.progressCard();
+              }
+              this.resultCard();
+              if (this.rows.length > 0) {
+                this.historyCard();
+              }
+            }
+
+            Note({ text: '测速会占满带宽约 20 秒，期间的下载和视频通话会变慢。' });
+            Row().height(24);
+          }
+          .width('100%')
+          .padding({ left: T.PAD, right: T.PAD });
+        }
+        .layoutWeight(1)
+        .width('100%')
+        .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.Spring);
+      }
       .width('100%')
-      .scrollBar(BarState.Off)
-      .edgeEffect(EdgeEffect.Spring);
+      .height('100%');
+
+      if (this.picking) {
+        this.pickerSheet();
+      }
     }
     .width('100%')
     .height('100%')
@@ -251,7 +313,8 @@ struct SpeedPage {
           .fontSize(T.F_H1)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'));
-        Text(this.running ? '测速中，请勿关闭' : 'FastNet · Ookla 节点')
+        Text(this.running ? '测速中 · 已 ' + this.elapsed.toString() + ' 秒'
+          : (this.state === 'ready' ? 'FastNet · Ookla 节点' : '读取中…'))
           .fontSize(T.F_TINY)
           .fontColor($r('app.color.text_secondary'))
           .margin({ top: 2 });
@@ -265,88 +328,50 @@ struct SpeedPage {
     .alignItems(VerticalAlign.Center);
   }
 
+  /** 操作卡：选节点 + 开始。放最上面，别让用户先划过结果卡才够到按钮 */
   @Builder
-  stateCard(title: string, sub: string, needInstall: boolean) {
+  actionCard() {
     Card() {
-      Column({ space: 10 }) {
-        Text(title)
-          .fontSize(T.F_BODY)
-          .fontColor($r('app.color.text_primary'))
-          .width('100%');
-        Text(sub)
-          .fontSize(T.F_SUB)
-          .fontColor($r('app.color.text_secondary'))
-          .width('100%');
+      Column({ space: 12 }) {
         Row() {
-          if (needInstall) {
-            Button('安装测速组件')
-              .type(ButtonType.Normal)
-              .borderRadius(T.R_PILL)
-              .height(38)
-              .fontSize(T.F_SUB)
-              .backgroundColor($r('app.color.primary'))
-              .fontColor($r('app.color.on_primary'))
-              .onClick(() => {
-                this.installFastnet();
-              });
-          } else if (this.state === 'stopped') {
-            Button('启动服务')
-              .type(ButtonType.Normal)
-              .borderRadius(T.R_PILL)
-              .height(38)
-              .fontSize(T.F_SUB)
-              .backgroundColor($r('app.color.primary'))
-              .fontColor($r('app.color.on_primary'))
-              .onClick(() => {
-                this.startService();
-              });
+          Column({ space: 2 }) {
+            Text('测速节点')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_secondary'));
+            Text(this.serverLabel())
+              .fontSize(T.F_BODY)
+              .fontColor($r('app.color.text_primary'));
           }
+          .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1);
+
+          Row() {
+            Text(this.picking ? '收起' : '选择')
+              .fontSize(T.F_TINY)
+              .fontColor(Pal.primary());
+            GlyphIcon({ kind: Glyph.CHEVRON, color: Pal.primary(), side: 12, lineWidth: 1.9 });
+          }
+          .padding({ left: 10, right: 8, top: 5, bottom: 5 })
+          .borderRadius(T.R_PILL)
+          .backgroundColor($r('app.color.accent_soft2'))
+          .onClick(() => {
+            this.picking = !this.picking;
+          });
         }
         .width('100%')
-        .justifyContent(FlexAlign.Start);
-      }
-      .width('100%')
-      .alignItems(HorizontalAlign.Start);
-    }
-  }
+        .alignItems(VerticalAlign.Center);
 
-  @Builder
-  resultCard() {
-    Card() {
-      Column({ space: 4 }) {
-        Text(this.stage.length === 0 ? '还没测过' : '最近一次结果')
-          .fontSize(T.F_TINY)
-          .fontColor($r('app.color.text_secondary'))
-          .width('100%');
-
-        Row({ space: 8 }) {
-          this.metric('延迟', this.ping > 0 ? this.ping.toFixed(0) : '—', 'ms');
-          this.metric('下行', this.down > 0 ? this.down.toFixed(1) : '—', 'Mbps');
-          this.metric('上行', this.up > 0 ? this.up.toFixed(1) : '—', 'Mbps');
-        }
-        .width('100%')
-        .margin({ top: 6 });
-
-        if (this.server.length > 0) {
-          Text('服务器 ' + this.server)
-            .fontSize(T.F_TINY)
-            .fontColor($r('app.color.text_tertiary'))
-            .width('100%')
-            .margin({ top: 4 });
-        }
-
-        Button(this.running ? '测速中…' : '开始测速')
+        Button(this.running ? '测速中… ' + this.elapsed.toString() + 's' : '开始测速')
           .type(ButtonType.Normal)
           .borderRadius(T.R_PILL)
-          .height(42)
+          .height(46)
           .width('100%')
           .fontSize(T.F_BODY)
           .fontWeight(FontWeight.Medium)
           .backgroundColor($r('app.color.primary'))
           .fontColor($r('app.color.on_primary'))
           .enabled(!this.running)
-          .opacity(this.running ? 0.55 : 1)
-          .margin({ top: 12 })
+          .opacity(this.running ? 0.6 : 1)
           .onClick(() => {
             this.startTest();
           });
@@ -357,33 +382,11 @@ struct SpeedPage {
   }
 
   @Builder
-  metric(label: string, value: string, unit: string) {
-    Column({ space: 2 }) {
-      Text(label)
-        .fontSize(T.F_TINY)
-        .fontColor($r('app.color.text_secondary'));
-      Row() {
-        Text(value)
-          .fontSize(T.F_HERO)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.text_primary'));
-        Text(' ' + unit)
-          .fontSize(T.F_TINY)
-          .fontColor($r('app.color.text_secondary'))
-          .margin({ left: 2, bottom: 4 });
-      }
-      .alignItems(VerticalAlign.Bottom);
-    }
-    .layoutWeight(1)
-    .alignItems(HorizontalAlign.Start);
-  }
-
-  @Builder
   progressCard() {
     Card() {
-      Column({ space: 8 }) {
+      Column({ space: 9 }) {
         Text(this.stageTitle())
-          .fontSize(T.F_SUB)
+          .fontSize(T.F_BODY)
           .fontColor($r('app.color.text_primary'))
           .width('100%');
         Text(this.msg.length > 0 ? this.msg : '正在与测速服务器握手…')
@@ -395,8 +398,11 @@ struct SpeedPage {
           this.segment('下行', this.stage === 'download');
           this.segment('上行', this.stage === 'upload');
         }
-        .width('100%')
-        .margin({ top: 2 });
+        .width('100%');
+        Text(this.elapsed.toString() + ' 秒')
+          .fontSize(T.F_TINY)
+          .fontColor($r('app.color.text_tertiary'))
+          .width('100%');
       }
       .width('100%')
       .alignItems(HorizontalAlign.Start);
@@ -411,6 +417,251 @@ struct SpeedPage {
       .backgroundColor(active ? $r('app.color.primary') : $r('app.color.surface_hi'))
       .padding({ left: 10, right: 10, top: 4, bottom: 4 })
       .borderRadius(T.R_PILL);
+  }
+
+  @Builder
+  resultCard() {
+    Card() {
+      Column({ space: 4 }) {
+        Text(this.down > 0 || this.up > 0 ? '最近一次结果' : '还没有测过')
+          .fontSize(T.F_TINY)
+          .fontColor($r('app.color.text_secondary'))
+          .width('100%');
+
+        Row({ space: 8 }) {
+          this.metric('延迟', this.ping > 0 ? this.ping.toFixed(0) : '—', 'ms');
+          this.metric('下行 ↓', this.down > 0 ? this.down.toFixed(1) : '—', 'Mbps');
+          this.metric('上行 ↑', this.up > 0 ? this.up.toFixed(1) : '—', 'Mbps');
+        }
+        .width('100%')
+        .margin({ top: 6 });
+
+        if (this.server.length > 0) {
+          Text('服务器 ' + this.server)
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_tertiary'))
+            .width('100%')
+            .margin({ top: 4 });
+        }
+      }
+      .width('100%')
+      .alignItems(HorizontalAlign.Start);
+    }
+  }
+
+  @Builder
+  metric(label: string, value: string, unit: string) {
+    Column({ space: 2 }) {
+      Text(label)
+        .fontSize(T.F_TINY)
+        .fontColor($r('app.color.text_secondary'));
+      Row() {
+        Text(value)
+          .fontSize(T.F_H2)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'));
+        Text(' ' + unit)
+          .fontSize(T.F_TINY)
+          .fontColor($r('app.color.text_secondary'))
+          .margin({ left: 2, bottom: 2 });
+      }
+      .alignItems(VerticalAlign.Bottom);
+    }
+    .layoutWeight(1)
+    .alignItems(HorizontalAlign.Start);
+  }
+
+  @Builder
+  historyCard() {
+    Card() {
+      Column() {
+        CardTitle({ glyph: Glyph.DOWNLOAD_SPEED, title: '历史记录',
+          sub: '最近 ' + this.rows.length.toString() + ' 次' });
+
+        Row() {
+          Text('时间 / 节点 / 延迟')
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_tertiary'))
+            .layoutWeight(1);
+          Text('下行 ↓')
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_tertiary'))
+            .width(66)
+            .textAlign(TextAlign.End);
+          Text('上行 ↑')
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_tertiary'))
+            .width(66)
+            .textAlign(TextAlign.End);
+        }
+        .width('100%')
+        .padding({ top: 6, bottom: 4 });
+
+        ForEach(this.rows, (r: SpeedRow) => {
+          Row() {
+            Column({ space: 1 }) {
+              Text(this.timeText(r.time))
+                .fontSize(T.F_SUB)
+                .fontColor($r('app.color.text_primary'));
+              Text((r.server.length > 0 ? r.server : '自动') + ' · ' + r.ping.toFixed(0) + ' ms')
+                .fontSize(T.F_TINY)
+                .fontColor($r('app.color.text_tertiary'));
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1);
+            Text(r.down.toFixed(1))
+              .fontSize(T.F_SUB)
+              .fontColor($r('app.color.text_primary'))
+              .width(66)
+              .textAlign(TextAlign.End);
+            Text(r.up.toFixed(1))
+              .fontSize(T.F_SUB)
+              .fontColor($r('app.color.text_primary'))
+              .width(66)
+              .textAlign(TextAlign.End);
+          }
+          .width('100%')
+          .padding({ top: 9, bottom: 9 })
+          .alignItems(VerticalAlign.Center);
+        }, (r: SpeedRow) => r.time.toString());
+      }
+      .width('100%')
+      .alignItems(HorizontalAlign.Start);
+    }
+  }
+
+  /** 节点选择：盖在页面上的一层，选完立刻回到测速 */
+  @Builder
+  pickerSheet() {
+    Column() {
+      Column()
+        .width('100%')
+        .layoutWeight(1)
+        .backgroundColor('#33000000')
+        .hitTestBehavior(HitTestMode.Block)
+        .onClick(() => {
+          this.picking = false;
+        });
+
+      Column() {
+        Row() {
+          Text('选择测速节点')
+            .fontSize(T.F_BODY)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.text_primary'))
+            .layoutWeight(1);
+          Text('关闭')
+            .fontSize(T.F_SUB)
+            .fontColor(Pal.textSecondary())
+            .onClick(() => {
+              this.picking = false;
+            });
+        }
+        .width('100%')
+        .padding({ bottom: 8 });
+
+        this.serverRow('', '自动选择', '按延迟就近挑选');
+
+        List({ space: 2 }) {
+          ForEach(this.servers, (s: Srv) => {
+            ListItem() {
+              this.serverRow(s.id, s.name, s.isp);
+            }
+          }, (s: Srv) => s.id);
+        }
+        .layoutWeight(1)
+        .scrollBar(BarState.Off);
+      }
+      .width('100%')
+      .height('62%')
+      .padding({ left: T.PAD, right: T.PAD, top: 14, bottom: 8 })
+      .backgroundColor($r('app.color.surface'))
+      .borderRadius({ topLeft: 20, topRight: 20 });
+    }
+    .width('100%')
+    .height('100%');
+  }
+
+  @Builder
+  serverRow(id: string, name: string, sub: string) {
+    Row() {
+      Column({ space: 1 }) {
+        Text(name)
+          .fontSize(T.F_BODY)
+          .fontColor($r('app.color.text_primary'));
+        Text(sub)
+          .fontSize(T.F_TINY)
+          .fontColor($r('app.color.text_tertiary'));
+      }
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1);
+      if (this.serverId === id) {
+        GlyphIcon({ kind: Glyph.CHECK, color: Pal.primary(), side: 16, lineWidth: 2.2 });
+      }
+    }
+    .width('100%')
+    .padding({ top: 10, bottom: 10 })
+    .alignItems(VerticalAlign.Center)
+    .onClick(() => {
+      this.serverId = id;
+      this.picking = false;
+    });
+  }
+
+  @Builder
+  absentCard() {
+    Card() {
+      Column({ space: 10 }) {
+        Text('路由器上没有装测速组件')
+          .fontSize(T.F_BODY)
+          .fontColor($r('app.color.text_primary'))
+          .width('100%');
+        Text('FastNet 提供测速服务，约 8 MB，从软件源安装，装完自动启动。')
+          .fontSize(T.F_SUB)
+          .fontColor($r('app.color.text_secondary'))
+          .width('100%');
+        Button('安装测速组件')
+          .type(ButtonType.Normal)
+          .borderRadius(T.R_PILL)
+          .height(40)
+          .fontSize(T.F_SUB)
+          .backgroundColor($r('app.color.primary'))
+          .fontColor($r('app.color.on_primary'))
+          .onClick(() => {
+            this.installFastnet();
+          });
+      }
+      .width('100%')
+      .alignItems(HorizontalAlign.Start);
+    }
+  }
+
+  @Builder
+  installCard() {
+    Card() {
+      Column({ space: 8 }) {
+        Text('正在安装测速组件…')
+          .fontSize(T.F_BODY)
+          .fontColor($r('app.color.text_primary'))
+          .width('100%');
+        Text(this.installMsg.length > 0 ? this.installMsg : '更新软件源并安装')
+          .fontSize(T.F_SUB)
+          .fontColor($r('app.color.text_secondary'))
+          .width('100%');
+      }
+      .width('100%')
+      .alignItems(HorizontalAlign.Start);
+    }
+  }
+
+  @Builder
+  errCard() {
+    Card() {
+      Text(this.err)
+        .fontSize(T.F_SUB)
+        .fontColor($r('app.color.danger'))
+        .width('100%');
+    }
   }
 
   private timeText(ts: number): string {
@@ -436,46 +687,5 @@ struct SpeedPage {
       return '正在测延迟';
     }
     return '准备中';
-  }
-
-  @Builder
-  historyCard() {
-    Card() {
-      Column({ space: 0 }) {
-        CardTitle({ glyph: Glyph.DOWNLOAD_SPEED, title: '历史记录', sub: '最近 ' + this.rows.length.toString() + ' 次' });
-        ForEach(this.rows, (r: SpeedRow) => {
-          Row() {
-            Column({ space: 1 }) {
-              Text(this.timeText(r.time))
-                .fontSize(T.F_SUB)
-                .fontColor($r('app.color.text_primary'));
-              Text(r.server.length > 0 ? r.server : '自动选择')
-                .fontSize(T.F_TINY)
-                .fontColor($r('app.color.text_tertiary'));
-            }
-            .alignItems(HorizontalAlign.Start)
-            .layoutWeight(1);
-            Text(r.down.toFixed(1) + ' / ' + r.up.toFixed(1) + ' Mbps')
-              .fontSize(T.F_TINY)
-              .fontColor($r('app.color.text_secondary'));
-          }
-          .width('100%')
-          .padding({ top: 9, bottom: 9 })
-          .alignItems(VerticalAlign.Center);
-        }, (r: SpeedRow) => r.time.toString());
-      }
-      .width('100%')
-      .alignItems(HorizontalAlign.Start);
-    }
-  }
-
-  @Builder
-  errCard() {
-    Card() {
-      Text(this.err)
-        .fontSize(T.F_SUB)
-        .fontColor($r('app.color.danger'))
-        .width('100%');
-    }
   }
 }
