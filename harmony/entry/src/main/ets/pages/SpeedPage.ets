@@ -428,7 +428,7 @@ struct SpeedPage {
     }
   }
 
-  /** 测速中：阶段 + 实时速率 + 秒表 */
+  /** 测速中：上下行实时数字每秒跳，不是等最后才出结果 */
   @Builder
   liveBlock() {
     Column({ space: 10 }) {
@@ -444,9 +444,9 @@ struct SpeedPage {
       }
       .width('100%');
 
-      Row({ space: 8 }) {
-        this.liveMetric('实时下行 ↓', this.liveDown, 'Mbps');
-        this.liveMetric('实时上行 ↑', this.liveUp, 'Mbps');
+      Row({ space: 10 }) {
+        this.liveMetric('下行 ↓', this.liveDown, this.stage === 'download');
+        this.liveMetric('上行 ↑', this.liveUp, this.stage === 'upload');
       }
       .width('100%');
 
@@ -460,20 +460,20 @@ struct SpeedPage {
   }
 
   @Builder
-  liveMetric(label: string, value: number, unit: string) {
-    Column({ space: 2 }) {
+  liveMetric(label: string, value: number, hot: boolean) {
+    Column({ space: 0 }) {
       Text(label)
         .fontSize(T.F_TINY)
-        .fontColor($r('app.color.text_secondary'));
+        .fontColor(hot ? $r('app.color.primary') : $r('app.color.text_secondary'));
       Row() {
         Text(value.toFixed(1))
-          .fontSize(T.F_H1)
+          .fontSize(T.F_TITLE * 0.72)
           .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.primary'));
-        Text(' ' + unit)
+          .fontColor(hot ? $r('app.color.primary') : $r('app.color.text_primary'));
+        Text(' Mbps')
           .fontSize(T.F_TINY)
           .fontColor($r('app.color.text_secondary'))
-          .margin({ left: 2, bottom: 3 });
+          .margin({ left: 2, bottom: 6 });
       }
       .alignItems(VerticalAlign.Bottom);
     }
