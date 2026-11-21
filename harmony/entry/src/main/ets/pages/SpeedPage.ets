@@ -759,12 +759,6 @@ struct SpeedPage {
     return this.rows.length > 0 ? this.rows[0].up : this.up;
   }
 
-  private lastServer(): string {
-    if (this.rows.length > 0 && this.rows[0].server.length > 0) {
-      return this.rows[0].server;
-    }
-    return this.server;
-  }
 
   @Builder
   historyCard() {
