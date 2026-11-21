@@ -57,6 +57,9 @@ struct SpeedPage {
   /** 状态栏高度（vp）。这里自己量一次：只依赖 UI.safeTop 时，
    *  冷启动/子窗口场景拿到的可能是 0，标题就会顶进状态栏 */
   @Local topPad: number = 24;
+  /** 服务端时间戳：和上一条相同说明响应被中间层缓存了 */
+  @Local dataTs: number = 0;
+  @Local staleHint: boolean = false;
   @Local timer: number = -1;
   @Local clock: number = -1;
 
@@ -129,6 +132,11 @@ struct SpeedPage {
     }
     this.err = '';
     const wasRunning: boolean = this.running;
+    const newTs: number = r.data.num('ts', 0);
+    if (newTs > 0) {
+      this.staleHint = wasRunning && newTs === this.dataTs;
+      this.dataTs = newTs;
+    }
     this.state = r.data.str('state', 'unknown');
     this.running = r.data.bool('running', false);
     const st: string = r.data.str('stage', '');
@@ -329,6 +337,13 @@ struct SpeedPage {
               this.historyCard();
             }
 
+            if (this.dataTs > 0) {
+              Text('数据时间 ' + this.clockText(this.dataTs)
+                + (this.staleHint ? ' · 未刷新（疑似被代理缓存）' : ''))
+                .fontSize(T.F_TINY)
+                .fontColor(this.staleHint ? $r('app.color.danger') : $r('app.color.text_tertiary'))
+                .width('100%');
+            }
             Note({ text: '测速会占满带宽约 20 秒，期间的下载和视频通话会变慢。' });
             Row().height(24);
           }
@@ -750,6 +765,14 @@ struct SpeedPage {
         .fontColor($r('app.color.danger'))
         .width('100%');
     }
+  }
+
+  private clockText(ts: number): string {
+    const d: Date = new Date(ts * 1000);
+    const hh: string = d.getHours().toString().padStart(2, '0');
+    const mi: string = d.getMinutes().toString().padStart(2, '0');
+    const ss: string = d.getSeconds().toString().padStart(2, '0');
+    return hh + ':' + mi + ':' + ss;
   }
 
   private timeText(ts: number): string {

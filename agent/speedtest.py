@@ -265,7 +265,7 @@ def status() -> dict:
     cur = _read(STATE_PATH, {})
     if cur.get("state") == "running":
         _probe_live()
-    out = {"ok": True, "state": st, "running": False}
+    out = {"ok": True, "state": st, "running": False, "ts": int(time.time())}
     if cur.get("state") == "running":
         # 先把实时值并进去，再读出来，否则读到的是上一拍（甚至 0）
         cur.update(_LIVE)

@@ -134,6 +134,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", origin)
         # 无论有没有 Origin 都要带 Vary，否则中间缓存可能把 A 站的结果发给 B 站
         self.send_header("Vary", "Origin")
+        # 走群晖反代 / CDN 时不希望任何中间层缓存这类实时数据
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
+        self.send_header("Pragma", "no-cache")
         if self.command == "OPTIONS":
             self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
             self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, OPTIONS")
