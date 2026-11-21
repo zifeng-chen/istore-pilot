@@ -1,4 +1,4 @@
-import { router } from '@kit.ArkUI';
+import { display, router, window } from '@kit.ArkUI';
 import { promptAction } from '@kit.ArkUI';
 import { Api, ApiResult } from '../api/Api';
 import { J } from '../core/Json';
@@ -54,10 +54,14 @@ struct SpeedPage {
   @Local serverId: string = '';
   @Local picking: boolean = false;
   @Local elapsed: number = 0;
+  /** 状态栏高度（vp）。这里自己量一次：只依赖 UI.safeTop 时，
+   *  冷启动/子窗口场景拿到的可能是 0，标题就会顶进状态栏 */
+  @Local topPad: number = 24;
   @Local timer: number = -1;
   @Local clock: number = -1;
 
   aboutToAppear(): void {
+    this.measureTop();
     this.refresh();
     this.loadHistory();
     this.loadServers();
@@ -65,6 +69,21 @@ struct SpeedPage {
 
   aboutToDisappear(): void {
     this.stopTimer();
+  }
+
+  private async measureTop(): Promise<void> {
+    try {
+      const win = await window.getLastWindow(this.ctx());
+      const sys = win.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM);
+      const d: number = display.getDefaultDisplaySync().densityPixels;
+      const h: number = d > 0 ? sys.topRect.height / d : 0;
+      const pad: number = (h > 0 ? h : UI.safeTop) + 2;
+      if (pad > 0) {
+        this.topPad = pad;
+      }
+    } catch (e) {
+      this.topPad = UI.safeTop > 0 ? UI.safeTop + 2 : 24;
+    }
   }
 
   private ctx(): Context {
@@ -364,7 +383,7 @@ struct SpeedPage {
       .margin({ left: 2 });
     }
     .width('100%')
-    .padding({ left: T.PAD, right: T.PAD, top: UI.safeTop + 2, bottom: 2 })
+    .padding({ left: T.PAD, right: T.PAD, top: this.topPad, bottom: 2 })
     .alignItems(VerticalAlign.Center);
   }
 
