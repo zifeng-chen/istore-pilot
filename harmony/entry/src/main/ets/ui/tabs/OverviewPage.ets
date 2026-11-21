@@ -197,7 +197,7 @@ export struct OverviewPage {
     let diag: string = '';
 
     // 先读历史：历史列表在测速页是能正常渲染的，说明这条路一定通
-    const h: ApiResult = await Api.getFresh(ctx, '/api/v1/speedtest/history?t=' + t);
+    const h: ApiResult = await Api.getFresh(ctx, '/api/v1/speedtest/history');
     if (h.ok) {
       const rows: J[] = h.data.arr('rows');
       diag += 'h' + rows.length.toString();
@@ -210,7 +210,7 @@ export struct OverviewPage {
       diag += 'h!' + h.code.toString();
     }
 
-    const r: ApiResult = await Api.getFresh(ctx, '/api/v1/speedtest/status?t=' + t);
+    const r: ApiResult = await Api.getFresh(ctx, '/api/v1/speedtest/status');
     if (r.ok) {
       this.spState = r.data.str('state', 'unknown');
       diag += ' s' + this.spState;

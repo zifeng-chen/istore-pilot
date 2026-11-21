@@ -170,7 +170,13 @@ export class Api {
         error: r.error.length > 0 ? r.error : ('HTTP ' + r.code)
       };
     }
-    await Snap.put(ctx, path, r.body);
+    // 缓存是锦上添花：写失败（存储满、键太多）不能连累这次请求，
+    // 否则一个 await 抛出就会让整页数据静默停更
+    try {
+      await Snap.put(ctx, path, r.body);
+    } catch (e) {
+      // 忽略：本次结果照常返回
+    }
     return {
       ok: true, fromCache: false, code: r.code, data: J.parse(r.body), error: ''
     };
