@@ -15,11 +15,13 @@
   :root{
     --bg:#F4F9F6; --card:#fff; --ink:#10221C; --muted:#5C6B64; --faint:#8A9992;
     --line:rgba(16,34,28,.10); --brand:#00553E; --brand-2:#0B7A57; --soft:#E3F1EA;
+    --warn-bg:#FBF0D9; --warn-fg:#8A5A12;
     --radius:16px; --maxw:980px;
   }
   @media (prefers-color-scheme: dark){
     :root{ --bg:#0E1613; --card:#141F1B; --ink:#EAF3EF; --muted:#A5B5AE; --faint:#7C8C85;
-           --line:rgba(234,243,239,.12); --soft:#16302799; --brand:#3FBF92; --brand-2:#2FA377; }
+           --line:rgba(234,243,239,.12); --soft:#16302799; --brand:#3FBF92; --brand-2:#2FA377;
+           --warn-bg:#3A2E12; --warn-fg:#E8C77A; }
   }
   *{box-sizing:border-box}
   html{-webkit-text-size-adjust:100%}
@@ -55,6 +57,9 @@
   .dl{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:26px 0 8px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
   .card h2{margin:0;font-size:15px;font-weight:600}
+  .head{display:flex;align-items:center;gap:8px}
+  .badge{font-size:11px;line-height:1;padding:4px 7px;border-radius:999px;
+         background:var(--warn-bg);color:var(--warn-fg);font-weight:500}
   .card .meta{margin:2px 0 14px;font-size:12.5px;color:var(--faint)}
   .row{display:flex;align-items:center;gap:14px}
   .qr{width:92px;height:92px;flex:0 0 92px;border-radius:10px;background:#fff;padding:6px;border:1px solid var(--line)}
@@ -135,16 +140,20 @@
     </div>
 
     <div class="card">
-      <h2>HarmonyOS</h2>
-      <p class="meta"><span class="zh">华为应用市场 · 版本 <span data-version>0.4.4</span></span>
-         <span class="en">AppGallery · v<span data-version>0.4.4</span></span></p>
+      <div class="head">
+        <h2>HarmonyOS</h2>
+        <span class="badge"><span class="zh">0.4.4 审核中</span><span class="en">0.4.4 in review</span></span>
+      </div>
+      <p class="meta"><span class="zh">华为应用市场 · 线上版本 0.4.3</span>
+         <span class="en">AppGallery · live 0.4.3</span></p>
       <div class="row">
         <div class="qr"><img src="qr-harmony.svg" alt="鸿蒙应用市场二维码 / QR for AppGallery"></div>
         <div style="flex:1">
           <a class="btn ghost" id="dl-harmony" href="https://appgallery.huawei.com/app/detail?id=com.izifeng.www.istorepilot&amp;channelId=SHARE&amp;source=appshare">
             <span class="zh">前往应用市场</span><span class="en">Open AppGallery</span>
           </a>
-          <p class="hint"><span class="zh">仅鸿蒙手机可扫</span><span class="en">HarmonyOS devices only</span></p>
+          <p class="hint"><span class="zh">先装 0.4.3，新版本通过后自动更新</span>
+             <span class="en">Install 0.4.3 now — updates itself once approved</span></p>
         </div>
       </div>
     </div>
