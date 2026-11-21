@@ -482,9 +482,24 @@ struct SpeedPage {
   liveBlock() {
     Column({ space: 10 }) {
       Row({ space: 6 }) {
-        this.segment('延迟', this.stage === 'speedtest');
-        this.segment('下行', this.stage === 'download');
-        this.segment('上行', this.stage === 'upload');
+        Text('延迟')
+          .fontSize(T.F_TINY)
+          .fontColor(this.stage === 'speedtest' ? $r('app.color.on_primary') : $r('app.color.text_secondary'))
+          .backgroundColor(this.stage === 'speedtest' ? $r('app.color.primary') : $r('app.color.surface_hi'))
+          .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+          .borderRadius(T.R_PILL);
+        Text('下行')
+          .fontSize(T.F_TINY)
+          .fontColor(this.stage === 'download' ? $r('app.color.on_primary') : $r('app.color.text_secondary'))
+          .backgroundColor(this.stage === 'download' ? $r('app.color.primary') : $r('app.color.surface_hi'))
+          .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+          .borderRadius(T.R_PILL);
+        Text('上行')
+          .fontSize(T.F_TINY)
+          .fontColor(this.stage === 'upload' ? $r('app.color.on_primary') : $r('app.color.text_secondary'))
+          .backgroundColor(this.stage === 'upload' ? $r('app.color.primary') : $r('app.color.surface_hi'))
+          .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+          .borderRadius(T.R_PILL);
         Text(this.elapsed.toString() + 's')
           .fontSize(T.F_TINY)
           .fontColor($r('app.color.text_tertiary'))
@@ -494,8 +509,43 @@ struct SpeedPage {
       .width('100%');
 
       Row({ space: 10 }) {
-        this.liveMetric('下行 ↓', this.liveDown, this.stage === 'download');
-        this.liveMetric('上行 ↑', this.liveUp, this.stage === 'upload');
+        Column({ space: 0 }) {
+          Text('下行 ↓')
+            .fontSize(T.F_TINY)
+            .fontColor(this.stage === 'download' ? $r('app.color.primary') : $r('app.color.text_secondary'));
+          Row() {
+            Text(this.liveDown.toFixed(1))
+              .fontSize(T.F_TITLE * 0.72)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(this.stage === 'download' ? $r('app.color.primary') : $r('app.color.text_primary'));
+            Text(' Mbps')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_secondary'))
+              .margin({ left: 2, bottom: 6 });
+          }
+          .alignItems(VerticalAlign.Bottom);
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start);
+
+        Column({ space: 0 }) {
+          Text('上行 ↑')
+            .fontSize(T.F_TINY)
+            .fontColor(this.stage === 'upload' ? $r('app.color.primary') : $r('app.color.text_secondary'));
+          Row() {
+            Text(this.liveUp.toFixed(1))
+              .fontSize(T.F_TITLE * 0.72)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(this.stage === 'upload' ? $r('app.color.primary') : $r('app.color.text_primary'));
+            Text(' Mbps')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_secondary'))
+              .margin({ left: 2, bottom: 6 });
+          }
+          .alignItems(VerticalAlign.Bottom);
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start);
       }
       .width('100%');
 
@@ -509,29 +559,6 @@ struct SpeedPage {
   }
 
   @Builder
-  liveMetric(label: string, value: number, hot: boolean) {
-    Column({ space: 0 }) {
-      Text(label)
-        .fontSize(T.F_TINY)
-        .fontColor(hot ? $r('app.color.primary') : $r('app.color.text_secondary'));
-      Row() {
-        Text(value.toFixed(1))
-          .fontSize(T.F_TITLE * 0.72)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(hot ? $r('app.color.primary') : $r('app.color.text_primary'));
-        Text(' Mbps')
-          .fontSize(T.F_TINY)
-          .fontColor($r('app.color.text_secondary'))
-          .margin({ left: 2, bottom: 6 });
-      }
-      .alignItems(VerticalAlign.Bottom);
-    }
-    .layoutWeight(1)
-    .alignItems(HorizontalAlign.Start);
-  }
-
-  /** 空闲：最近一次结果 */
-  @Builder
   resultBlock() {
     Column({ space: 6 }) {
       Text(this.lastDown() > 0 || this.lastUp() > 0 ? '最近一次结果' : '还没有测过')
@@ -540,9 +567,62 @@ struct SpeedPage {
         .width('100%');
 
       Row({ space: 8 }) {
-        this.metric('延迟', this.lastPing() > 0 ? this.lastPing().toFixed(0) : '—', 'ms');
-        this.metric('下行 ↓', this.lastDown() > 0 ? this.lastDown().toFixed(1) : '—', 'Mbps');
-        this.metric('上行 ↑', this.lastUp() > 0 ? this.lastUp().toFixed(1) : '—', 'Mbps');
+        Column({ space: 2 }) {
+          Text('延迟')
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_secondary'));
+          Row() {
+            Text(this.lastPing() > 0 ? this.lastPing().toFixed(0) : '—')
+              .fontSize(T.F_H2)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.text_primary'));
+            Text(' ms')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_secondary'))
+              .margin({ bottom: 2 });
+          }
+          .alignItems(VerticalAlign.Bottom);
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start);
+
+        Column({ space: 2 }) {
+          Text('下行 ↓')
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_secondary'));
+          Row() {
+            Text(this.lastDown() > 0 ? this.lastDown().toFixed(1) : '—')
+              .fontSize(T.F_H2)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.text_primary'));
+            Text(' Mbps')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_secondary'))
+              .margin({ bottom: 2 });
+          }
+          .alignItems(VerticalAlign.Bottom);
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start);
+
+        Column({ space: 2 }) {
+          Text('上行 ↑')
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_secondary'));
+          Row() {
+            Text(this.lastUp() > 0 ? this.lastUp().toFixed(1) : '—')
+              .fontSize(T.F_H2)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.text_primary'));
+            Text(' Mbps')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_secondary'))
+              .margin({ bottom: 2 });
+          }
+          .alignItems(VerticalAlign.Bottom);
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start);
       }
       .width('100%');
 
@@ -575,38 +655,6 @@ struct SpeedPage {
       return this.rows[0].server;
     }
     return this.server;
-  }
-
-  @Builder
-  metric(label: string, value: string, unit: string) {
-    Column({ space: 2 }) {
-      Text(label)
-        .fontSize(T.F_TINY)
-        .fontColor($r('app.color.text_secondary'));
-      Row() {
-        Text(value)
-          .fontSize(T.F_H2)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.text_primary'));
-        Text(' ' + unit)
-          .fontSize(T.F_TINY)
-          .fontColor($r('app.color.text_secondary'))
-          .margin({ left: 2, bottom: 2 });
-      }
-      .alignItems(VerticalAlign.Bottom);
-    }
-    .layoutWeight(1)
-    .alignItems(HorizontalAlign.Start);
-  }
-
-  @Builder
-  segment(label: string, active: boolean) {
-    Text(label)
-      .fontSize(T.F_TINY)
-      .fontColor(active ? $r('app.color.on_primary') : $r('app.color.text_secondary'))
-      .backgroundColor(active ? $r('app.color.primary') : $r('app.color.surface_hi'))
-      .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-      .borderRadius(T.R_PILL);
   }
 
   @Builder

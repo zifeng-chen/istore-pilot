@@ -812,9 +812,62 @@ export struct OverviewPage {
       }
 
       Row({ space: 8 }) {
-        this.spMetric('下行', this.spDown > 0 ? this.spDown.toFixed(1) : '—', 'Mbps');
-        this.spMetric('上行', this.spUp > 0 ? this.spUp.toFixed(1) : '—', 'Mbps');
-        this.spMetric('延迟', this.spPing > 0 ? this.spPing.toFixed(0) : '—', 'ms');
+        Column({ space: 1 }) {
+          Text('下行')
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_secondary'));
+          Row() {
+            Text(this.spDown > 0 ? this.spDown.toFixed(1) : '—')
+              .fontSize(T.F_H2)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.text_primary'));
+            Text(' Mbps')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_secondary'))
+              .margin({ bottom: 2 });
+          }
+          .alignItems(VerticalAlign.Bottom);
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start);
+
+        Column({ space: 1 }) {
+          Text('上行')
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_secondary'));
+          Row() {
+            Text(this.spUp > 0 ? this.spUp.toFixed(1) : '—')
+              .fontSize(T.F_H2)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.text_primary'));
+            Text(' Mbps')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_secondary'))
+              .margin({ bottom: 2 });
+          }
+          .alignItems(VerticalAlign.Bottom);
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start);
+
+        Column({ space: 1 }) {
+          Text('延迟')
+            .fontSize(T.F_TINY)
+            .fontColor($r('app.color.text_secondary'));
+          Row() {
+            Text(this.spPing > 0 ? this.spPing.toFixed(0) : '—')
+              .fontSize(T.F_H2)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('app.color.text_primary'));
+            Text(' ms')
+              .fontSize(T.F_TINY)
+              .fontColor($r('app.color.text_secondary'))
+              .margin({ bottom: 2 });
+          }
+          .alignItems(VerticalAlign.Bottom);
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start);
       }
       .width('100%')
       .margin({ top: 10 });
@@ -852,28 +905,6 @@ export struct OverviewPage {
         router.pushUrl({ url: 'pages/SpeedPage' });
       });
     }
-  }
-
-  @Builder
-  spMetric(label: string, value: string, unit: string) {
-    Column({ space: 1 }) {
-      Text(label)
-        .fontSize(T.F_TINY)
-        .fontColor($r('app.color.text_secondary'));
-      Row() {
-        Text(value)
-          .fontSize(T.F_H2)
-          .fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.text_primary'));
-        Text(' ' + unit)
-          .fontSize(T.F_TINY)
-          .fontColor($r('app.color.text_secondary'))
-          .margin({ left: 2, bottom: 2 });
-      }
-      .alignItems(VerticalAlign.Bottom);
-    }
-    .layoutWeight(1)
-    .alignItems(HorizontalAlign.Start);
   }
 
   @Builder
