@@ -523,20 +523,20 @@ struct SpeedPage {
   @Builder
   resultBlock() {
     Column({ space: 6 }) {
-      Text(this.down > 0 || this.up > 0 ? '最近一次结果' : '还没有测过')
+      Text(this.lastDown() > 0 || this.lastUp() > 0 ? '最近一次结果' : '还没有测过')
         .fontSize(T.F_TINY)
         .fontColor($r('app.color.text_secondary'))
         .width('100%');
 
       Row({ space: 8 }) {
-        this.metric('延迟', this.ping > 0 ? this.ping.toFixed(0) : '—', 'ms');
-        this.metric('下行 ↓', this.down > 0 ? this.down.toFixed(1) : '—', 'Mbps');
-        this.metric('上行 ↑', this.up > 0 ? this.up.toFixed(1) : '—', 'Mbps');
+        this.metric('延迟', this.lastPing() > 0 ? this.lastPing().toFixed(0) : '—', 'ms');
+        this.metric('下行 ↓', this.lastDown() > 0 ? this.lastDown().toFixed(1) : '—', 'Mbps');
+        this.metric('上行 ↑', this.lastUp() > 0 ? this.lastUp().toFixed(1) : '—', 'Mbps');
       }
       .width('100%');
 
-      if (this.server.length > 0) {
-        Text('服务器 ' + this.server)
+      if (this.lastServer().length > 0) {
+        Text('服务器 ' + this.lastServer())
           .fontSize(T.F_TINY)
           .fontColor($r('app.color.text_tertiary'))
           .width('100%');
@@ -544,6 +544,26 @@ struct SpeedPage {
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start);
+  }
+
+  /** 结果一律先看历史第一条：列表能渲染出来，这几个数就一定在 */
+  private lastPing(): number {
+    return this.rows.length > 0 ? this.rows[0].ping : this.ping;
+  }
+
+  private lastDown(): number {
+    return this.rows.length > 0 ? this.rows[0].down : this.down;
+  }
+
+  private lastUp(): number {
+    return this.rows.length > 0 ? this.rows[0].up : this.up;
+  }
+
+  private lastServer(): string {
+    if (this.rows.length > 0 && this.rows[0].server.length > 0) {
+      return this.rows[0].server;
+    }
+    return this.server;
   }
 
   @Builder

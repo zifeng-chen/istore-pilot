@@ -214,13 +214,6 @@ export struct OverviewPage {
     if (r.ok) {
       this.spState = r.data.str('state', 'unknown');
       diag += ' s' + this.spState;
-      // 状态里有数就用状态里的（更新），没有就保留历史那份
-      const d: number = r.data.num('down', 0);
-      if (d > 0) {
-        this.spPing = r.data.num('ping', 0);
-        this.spDown = d;
-        this.spUp = r.data.num('up', 0);
-      }
     } else {
       diag += ' s!' + r.code.toString();
     }
