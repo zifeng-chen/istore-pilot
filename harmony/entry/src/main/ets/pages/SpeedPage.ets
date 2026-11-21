@@ -316,12 +316,13 @@ struct SpeedPage {
     promptAction.showToast({ message: text, duration: 2200 });
   }
 
-  /** 节点下面那行小字：最近一次用的是哪台服务器 */
-  private serverSub(): string {
+  /** 节点一行显示完：自动选择：上次服务器 Shanghai */
+  private nodeLine(): string {
+    const base: string = this.serverLabel();
     if (this.server.length > 0) {
-      return '上次服务器 ' + this.server;
+      return base + '：上次服务器 ' + this.server;
     }
-    return this.servers.length > 0 ? '共 ' + this.servers.length.toString() + ' 个节点可选' : '';
+    return base;
   }
 
   private serverLabel(): string {
@@ -434,13 +435,11 @@ struct SpeedPage {
             Text('测速节点')
               .fontSize(T.F_TINY)
               .fontColor($r('app.color.text_secondary'));
-            Text(this.serverLabel())
+            Text(this.nodeLine())
               .fontSize(T.F_BODY)
-              .fontColor($r('app.color.text_primary'));
-            Text(this.serverSub())
-              .fontSize(T.F_TINY)
-              .fontColor($r('app.color.text_tertiary'))
-              .margin({ top: 2 });
+              .fontColor($r('app.color.text_primary'))
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis });
           }
           .alignItems(HorizontalAlign.Start)
           .layoutWeight(1);
