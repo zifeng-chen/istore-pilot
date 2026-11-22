@@ -65,6 +65,33 @@ def run(client: paramiko.SSHClient, cmd: str, timeout: float = 60) -> tuple[int,
     return stdout.channel.recv_exit_status(), out
 
 
+def sync_apk(client, sftp) -> None:
+    """把 dist 里最新的 APK 放到 /www/istore-agent/，并清掉旧版本。
+
+    这一页「下载 App 安装包」是直接列目录的，文件没人管就会一直挂着几个月前
+    装插件时带进来的那个包 —— 实测有台机器上还躺着 0.1.4。
+    只部署代码不更新这里，用户下到的就是旧 App。
+    """
+    import glob
+    dist = os.path.join(ROOT, "dist")
+    cands = sorted(glob.glob(os.path.join(dist, "istoreos-*.apk")), key=os.path.getmtime)
+    if not cands:
+        return
+    newest = cands[-1]
+    name = os.path.basename(newest)
+    remote = "/www/istore-agent/" + name
+    try:
+        sftp.put(newest, remote)
+    except OSError as exc:
+        print(f"! APK 上传失败：{exc}")
+        return
+    code, out = run(client, "ls /www/istore-agent/*.apk 2>/dev/null")
+    for path in out.split():
+        if os.path.basename(path) != name:
+            run(client, f"rm -f {path}")
+    print(f"安装包已同步：{name}")
+
+
 def main() -> int:
     # 不内置口令：AGENT_PASSWORD 是装好后 Agent 的登录口令，
     # 没单独给就沿用 SSH 口令（用户习惯全站一个密码）。
@@ -184,6 +211,7 @@ def main() -> int:
     code, listening = run(client, f"netstat -lnt 2>/dev/null | awk '/:{port} /{{print $4; exit}}'")
     addr = listening.strip() or f"{bind}:{port}"
 
+    sync_apk(client, sftp)
     sftp.close()
     client.close()
     # 不打印口令：CI 日志、终端回滚区、共享屏幕都会把它带走
