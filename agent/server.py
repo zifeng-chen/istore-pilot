@@ -161,8 +161,16 @@ class Handler(BaseHTTPRequestHandler):
         """把每次请求记一行。排查「界面没数据」时，先看有没有请求过来、
         返回了多大，比盯着客户端猜强。"""
         try:
+            log_path = "/etc/istore-agent/data/access.log"
+            # 轮转：超过 512 KB 就滚一份，只留一代。
+            # 不轮转的话，单设备 5 秒一次轮询 ≈ 1.2 MB/天，半年就写满闪存
+            try:
+                if os.path.getsize(log_path) > 512 * 1024:
+                    os.replace(log_path, log_path + ".1")
+            except OSError:
+                pass
             line = "%d %s %d %d\n" % (int(time.time()), path[:120], code, size)
-            with open("/etc/istore-agent/data/access.log", "a", encoding="utf-8") as fp:
+            with open(log_path, "a", encoding="utf-8") as fp:
                 fp.write(line)
         except OSError:
             pass
@@ -418,7 +426,10 @@ class Handler(BaseHTTPRequestHandler):
             # 而 /health 报的是真版本，两个接口自相矛盾
             # 不回 listen.host：探活只需要 ok/version，监听地址属于内部信息
             self._json({"ok": True, "service": "istore-agent", "version": VERSION,
-                        "ts": int(time.time())})
+                        "ts": int(time.time()),
+                        # 链路是否加密，客户端据此可以提示「当前明文，建议启用 HTTPS」
+                        "tls": self.request.getpeercert() is not None
+                               if hasattr(self.request, "getpeercert") else False})
             return
 
         if path.startswith("/api/"):
@@ -1082,6 +1093,19 @@ def _watch_bind(httpd, host: str) -> None:
         return
 
 
+def _tls_enabled() -> bool:
+    """配置里有 tls.enabled 且证书密钥真实存在才算开启。
+
+    默认关闭：三端当前都用 http，贸然打开会让所有客户端连不上。
+    开启方式见 docs/HARDENING.md。
+    """
+    c = cfg("tls", {}) or {}
+    if not c.get("enabled"):
+        return False
+    cert, key = c.get("cert"), c.get("key")
+    return bool(cert and key and os.path.exists(cert) and os.path.exists(key))
+
+
 def serve(record: bool = False, demo: bool = False, demo_dir: str = "") -> None:
     global _DEMO, _REPLAY, _RECORD, _DEMO_PWD
 
@@ -1129,6 +1153,13 @@ def serve(record: bool = False, demo: bool = False, demo_dir: str = "") -> None:
         first = False
         httpd = ThreadingHTTPServer((host, port), Handler)
         httpd.daemon_threads = True  # noqa ThreadingHTTPServer 的开关
+        if _tls_enabled():
+            # 可选 TLS：配了证书就上 HTTPS。默认关闭 —— 三端现在都用 http，
+            # 贸然打开会让所有客户端连不上。开启方式见 docs/HARDENING.md
+            import ssl
+            ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            ctx.load_cert_chain(cfg("tls", {}).get("cert"), cfg("tls", {}).get("key"))
+            httpd.socket = ctx.wrap_socket(httpd.socket, server_side=True)
         print(f"[istore-agent] listening on {host}:{port}", flush=True)
         threading.Thread(target=_watch_bind, args=(httpd, host), daemon=True).start()
         try:

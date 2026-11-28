@@ -2,6 +2,8 @@ package com.izifeng.www.istorepilot.ui;
 
 import android.content.Context;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -33,6 +35,21 @@ import com.izifeng.www.istorepilot.widget.Skeleton;
  * 滚出视野后导航栏的小标题淡入补位。
  */
 public abstract class BaseFragment extends Fragment implements Refreshable {
+
+    /**
+     * 页面内的延时任务统一走这个 Handler。
+     *
+     * 以前都用 view.postDelayed：页面切走以后回调还挂在 View 的消息队列里，
+     * 只能靠 `isAdded()` 兜住不崩，但对象一路被引用着不释放。
+     * 现在集中到一个 Handler，onDestroyView 一次清干净。
+     */
+    protected final Handler uiHandler = new Handler(Looper.getMainLooper());
+
+    @Override
+    public void onDestroyView() {
+        uiHandler.removeCallbacksAndMessages(null);
+        super.onDestroyView();
+    }
 
     protected SwipeRefreshLayout swipe;
     protected LinearLayout content;
@@ -248,7 +265,7 @@ public abstract class BaseFragment extends Fragment implements Refreshable {
 
         // 兜底：Agent 挂掉时请求可能一直不回来，骨架不能永远转下去。
         // 8 秒后直接放出真实内容 —— 卡片里全是「—」也比一直看灰块强
-        content.postDelayed(() -> {
+        uiHandler.postDelayed(() -> {
             if (!loaded && isAdded()) {
                 loaded = true;
                 reveal(false);
@@ -269,7 +286,7 @@ public abstract class BaseFragment extends Fragment implements Refreshable {
         long elapsed = android.os.SystemClock.uptimeMillis() - skeletonAt;
         long wait = Math.max(0L, 420L - elapsed);
         if (wait > 0L && skeleton != null) {
-            content.postDelayed(() -> {
+            uiHandler.postDelayed(() -> {
                 if (isAdded()) {
                     reveal(true);
                 }
@@ -346,7 +363,7 @@ public abstract class BaseFragment extends Fragment implements Refreshable {
             force.setDampingRatio(0.78f);
             force.setStiffness(SpringForce.STIFFNESS_LOW);
             spring.setStartValue(step);
-            v.postDelayed(spring::start, i * 40L);
+            uiHandler.postDelayed(spring::start, i * 40L);
         }
     }
 

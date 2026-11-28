@@ -652,7 +652,7 @@ public final class Ui {
         LinearLayout line = row(c);
         LinearLayout left = column(c);
 
-        TextView t = text(c, title, 16.5f, R.color.text_primary);
+        TextView t = text(c, title, 16f, R.color.text_primary);
         t.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         t.setIncludeFontPadding(false);
         left.addView(t);
@@ -869,7 +869,7 @@ public final class Ui {
         row.addView(iconWrap, ilp);
 
         LinearLayout left = column(c);
-        TextView t = text(c, title, 16.5f, R.color.text_primary);
+        TextView t = text(c, title, 16f, R.color.text_primary);
         t.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         t.setIncludeFontPadding(false);
         left.addView(t);

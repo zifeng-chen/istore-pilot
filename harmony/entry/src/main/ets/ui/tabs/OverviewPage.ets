@@ -88,6 +88,9 @@ export struct OverviewPage {
   @Local spUp: number = 0;
   /** 取不到数时显示的一行诊断信息（正常有数时不显示） */
   @Local spDiag: string = '';
+  /** 轮询退避：失败后间隔翻倍（最多 60 秒），成功立刻复位 */
+  private pollDelay: number = 5000;
+  private nextPollAt: number = 0;
   /** 下拉刷新：Refresh 组件要求绑一个布尔，松手后由代码收回去 */
   @Local pulling: boolean = false;
   /** 网口详情弹层：点某个口看累计收发与 MAC */
@@ -136,6 +139,10 @@ export struct OverviewPage {
     this.stopPoll();
     // 概览 5 秒、流量 3 秒：流量要够密曲线才有意义，系统指标没必要那么勤
     this.timer = setInterval(() => {
+      // 退避期间什么都不做：定时器照跑，但请求不发
+      if (Date.now() < this.nextPollAt) {
+        return;
+      }
       this.refreshAll(false);
     }, 5000);
     this.liveTimer = setInterval(() => {
@@ -239,7 +246,12 @@ export struct OverviewPage {
     if (r.ok) {
       this.applyOverview(r.data);
       this.stale = false;
+      // 成功即复位：避免一次抖动把轮询永久拖慢
+      this.pollDelay = 5000;
+      this.nextPollAt = 0;
     } else {
+      this.pollDelay = Math.min(this.pollDelay * 2, 60000);
+      this.nextPollAt = Date.now() + this.pollDelay;
       // 断网/路由器挂了时，下面这些数字全是上一次的快照 —— 顶部必须说清楚，
       // 否则用户看到「运行正常 + 3 天在线」会以为是真的。
       // 注意 verdict 只在 applyOverview 里算，失败分支必须自己重算一次，

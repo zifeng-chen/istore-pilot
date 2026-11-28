@@ -38,13 +38,30 @@ export class T {
   private static fontCap: number = 1;
 
   static setFontScale(scale?: number): void {
+    T.resolved = true;
     const s: number = scale !== undefined && scale > 0 ? scale : 1;
     T.fontCap = Math.min(s, 1.2) / s;
   }
 
   /** 所有字号都要经过这里，别直接用 F_* 常量 */
   static fs(v: number): number {
+    if (!T.resolved) {
+      T.resolveOnce();
+    }
     return v * T.fontCap;
+  }
+
+  private static resolved: boolean = false;
+
+  /** 兜底：EntryAbility 没来得及注入时，从 AppStorage 取（由 ability 写入）。
+   *  否则首帧会按 1.0 排一次再跳变。
+   *  不用 getContext().config —— 在非组件模块里 Context 没有 config 字段。 */
+  private static resolveOnce(): void {
+    T.resolved = true;
+    const s: number | undefined = AppStorage.get<number>('fontScale');
+    if (s !== undefined && s > 0) {
+      T.setFontScale(s);
+    }
   }
 
   static readonly F_DISPLAY: number = 44; // 极少数主数字（拦截率）

@@ -844,7 +844,8 @@ public class SettingsFragment extends BaseFragment {
                     box.show();
                     setRefreshing(true);
                     new android.os.Handler(android.os.Looper.getMainLooper())
-                            .postDelayed(new Runnable() {
+                            ;
+                            uiHandler.postDelayed(new Runnable() {
                                 @Override
                                 public void run() {
                                     if (isAdded()) {

@@ -84,6 +84,12 @@ public class AdblockFragment extends BaseFragment {
     private final Handler ui = new Handler(Looper.getMainLooper());
 
     @Override
+    public void onDestroyView() {
+        ui.removeCallbacksAndMessages(null);
+        super.onDestroyView();
+    }
+
+    @Override
     protected String title() {
         return "广告拦截";
     }

@@ -45,6 +45,13 @@ public class SubscriptionActivity extends BaseActivity {
     /** 订阅刷新是异步的，60 秒后自动重拉一次列表看结果 */
     private final Handler handler = new Handler(Looper.getMainLooper());
 
+    @Override
+    protected void onDestroy() {
+        // 1 分钟一次的自动刷新，页面退出后必须停，否则一直持有 Activity
+        handler.removeCallbacksAndMessages(null);
+        super.onDestroy();
+    }
+
     // 最近一次「更新」的结果（时间 / 成败 / 耗时 / 日志尾部）
     private LinearLayout logCard;
     private TextView logState;

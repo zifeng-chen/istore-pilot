@@ -718,7 +718,7 @@ public class SecurityFragment extends BaseFragment {
                     load(true);
                     return;
                 }
-                tvAdInstall.postDelayed(SecurityFragment.this::tickInstallHere, 1200);
+                uiHandler.postDelayed(SecurityFragment.this::tickInstallHere, 1200);
             }
         });
     }

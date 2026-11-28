@@ -1,0 +1,15 @@
+#!/bin/sh
+# 推送前跑一次体检，拦住「版本号没同步」「三端字号漂移」这类低级问题。
+# 安装：git config core.hooksPath .githooks
+set -e
+python scripts/check_version.py >/dev/null || {
+    echo "[pre-push] 版本号 6 处不一致，先跑 python scripts/bump_version.py --set X.Y.Z"
+    python scripts/check_version.py | grep -v '^$' | tail -8
+    exit 1
+}
+python scripts/ui_spec_check.py >/dev/null || {
+    echo "[pre-push] 三端字号不一致，对照 docs/UI_SPEC.md"
+    python scripts/ui_spec_check.py | tail -10
+    exit 1
+}
+exit 0

@@ -77,14 +77,17 @@ def _installed() -> bool:
         return False
 
 
-def _run(cmd: str, timeout: int = 90) -> tuple:
-    """跑一条 shell 命令，返回 (退出码, 输出尾部)。"""
+def _run(argv: list, timeout: int = 90) -> tuple:
+    """跑一条命令（列表参数，不走 shell），返回 (退出码, 输出尾部)。
+
+    不用 shell=True：这里只有常量命令，但列表形式能从根上杜绝将来拼接注入。
+    """
     try:
-        p = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
+        p = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
         text = (p.stdout or "") + (p.stderr or "")
         return p.returncode, text.strip()[-1200:]
     except subprocess.TimeoutExpired:
-        return 124, "超时：%s" % cmd
+        return 124, "超时：%s" % " ".join(argv)
     except OSError as e:
         return 1, str(e)
 
@@ -357,9 +360,10 @@ def history() -> dict:
 def _install_worker() -> None:
     global _thread
     steps = [
-        ("update", "更新软件源", "opkg update", 120),
-        ("install", "下载并安装 FastNet", "opkg install fastnet luci-app-fastnet", 180),
-        ("start", "启动服务", "/etc/init.d/fastnet enable; /etc/init.d/fastnet start", 40),
+        ("update", "更新软件源", ["opkg", "update"], 120),
+        ("install", "下载并安装 FastNet", ["opkg", "install", "fastnet", "luci-app-fastnet"], 180),
+        ("enable", "设置开机自启", ["/etc/init.d/fastnet", "enable"], 20),
+        ("start", "启动服务", ["/etc/init.d/fastnet", "start"], 40),
     ]
     st = {"state": "installing", "step": "", "msg": "", "log": [], "started": int(time.time())}
     _write(INSTALL_PATH, st)
@@ -414,7 +418,8 @@ def start_service() -> dict:
     """已安装但没运行：只起服务，不重新装包。"""
     if state() == "ready":
         return {"ok": True, "msg": "已在运行"}
-    _run("/etc/init.d/fastnet enable; /etc/init.d/fastnet start", 40)
+    (_run(["/etc/init.d/fastnet", "enable"], 20),
+     _run(["/etc/init.d/fastnet", "start"], 40))
     for _ in range(15):
         if _port_open():
             return {"ok": True, "msg": "已启动"}

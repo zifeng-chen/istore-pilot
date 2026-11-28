@@ -39,17 +39,21 @@ MAX_BYTES = 12 * 1024 * 1024        # 特征库实际 2 MB 左右，留足余量
 KEEP_BACKUPS = 2
 
 
-def _sh(cmd: str, timeout: int = 15) -> str:
-    """跑一条命令，失败返回空串（调用方用返回值判断，不抛异常）。"""
+def _sh(argv: list, timeout: int = 15) -> str:
+    """跑一条命令，失败返回空串（调用方用返回值判断，不抛异常）。
+
+    参数是**列表**，不是字符串：这个函数是整个 agent 里唯一能执行外部程序的地方，
+    一旦允许拼接字符串，将来谁把变量拼进来就是 RCE。列表形式从根上消掉 shell 解析。
+    """
     try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, timeout=timeout)
+        r = subprocess.run(argv, capture_output=True, timeout=timeout)
         return (r.stdout or b"").decode("utf-8", "replace").strip()
     except (subprocess.TimeoutExpired, OSError):
         return ""
 
 
 def _uci_get(key: str) -> str:
-    return _sh("%s -q get %s" % (UCI, key))
+    return _sh([UCI, "-q", "get", key])
 
 
 def _installed() -> bool:
@@ -57,7 +61,7 @@ def _installed() -> bool:
 
 
 def _running() -> bool:
-    return bool(_sh("pidof oafd"))
+    return bool(_sh(["pidof", "oafd"]))
 
 
 def _feature_meta(path: str) -> dict:
@@ -131,9 +135,9 @@ def set_enable(on: bool) -> dict:
     if not _installed():
         return {"ok": False, "error": "路由器未安装应用过滤插件"}
     val = "1" if on else "0"
-    _sh("%s set appfilter.global.enable=%s" % (UCI, val))
-    _sh("%s commit appfilter" % UCI)
-    _sh("%s restart" % INIT, timeout=30)
+    _sh([UCI, "set", "appfilter.global.enable=%s" % val])
+    _sh([UCI, "commit", "appfilter"])
+    _sh([INIT, "restart"], timeout=30)
     time.sleep(1)
     st = status()
     if st.get("enabled") != on:
@@ -234,7 +238,7 @@ def upgrade(data: bytes, filename: str = "") -> dict:
                 except OSError:
                     icon_count = 0
             if _running():
-                _sh("killall -SIGUSR1 oafd")      # 热重载，等同插件自己的做法
+                _sh(["killall", "-SIGUSR1", "oafd"])      # 热重载，等同插件自己的做法
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
 
