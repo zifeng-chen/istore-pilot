@@ -178,7 +178,7 @@ export struct PortTile {
             .borderRadius(3)
             .backgroundColor(this.up ? Pal.ok() : Pal.textTertiary());
           Text(this.up ? this.speedText : '—')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontWeight(FontWeight.Medium)
             .fontColor(this.up ? $r('app.color.primary') : $r('app.color.text_tertiary'))
             .fontFeature("\"tnum\" on");
@@ -191,7 +191,7 @@ export struct PortTile {
       .alignItems(VerticalAlign.Center);
 
       Text(this.name)
-        .fontSize(T.F_BODY)
+        .fontSize(T.fs(T.F_BODY))
         .fontWeight(FontWeight.Medium)
         .fontColor(this.up ? $r('app.color.text_primary') : $r('app.color.text_secondary'))
         .margin({ top: 9 })
@@ -199,7 +199,7 @@ export struct PortTile {
         .textOverflow({ overflow: TextOverflow.Ellipsis });
 
       Text(this.stateText())
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_secondary'))
         .margin({ top: 3 })
         .maxLines(1)
@@ -215,13 +215,13 @@ export struct PortTile {
 
       Row() {
         Text(this.up ? '↓ ' + this.rxText : '↓ —')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontWeight(FontWeight.Medium)
           .fontColor(this.up ? $r('app.color.primary') : $r('app.color.text_tertiary'))
           .fontFeature("\"tnum\" on")
           .layoutWeight(1);
         Text(this.up ? '↑ ' + this.txText : '↑ —')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontWeight(FontWeight.Medium)
           .fontColor(this.up ? $r('app.color.warn') : $r('app.color.text_tertiary'))
           .fontFeature("\"tnum\" on")

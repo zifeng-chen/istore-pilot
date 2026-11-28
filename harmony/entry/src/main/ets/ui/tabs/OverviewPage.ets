@@ -495,7 +495,7 @@ export struct OverviewPage {
     Column() {
       // 大标题固定在滚动区外：跟着列表一起滚走的话，划到下面就没有「这是哪一页」了
       Text('概览')
-        .fontSize(T.F_TITLE)
+        .fontSize(T.fs(T.F_TITLE))
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.text_primary'))
         .width('100%')
@@ -583,11 +583,11 @@ export struct OverviewPage {
         Column() {
           Text(this.portIdx >= 0 && this.portIdx < this.ports.length
             ? this.ports[this.portIdx].name : '网口')
-            .fontSize(T.F_H1)
+            .fontSize(T.fs(T.F_H1))
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'));
           Text(this.portIndexText())
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'))
             .margin({ top: 3 });
         }
@@ -663,7 +663,7 @@ export struct OverviewPage {
           .backgroundColor(this.stale ? Pal.warn() : $r('app.color.hero_fg'))
           .margin({ right: 7 });
         Text(this.verdict.length > 0 ? this.verdict : '正在读取…')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.hero_fg'))
           .maxLines(1);
@@ -671,7 +671,7 @@ export struct OverviewPage {
         // 演示模式下这里换成「演示数据」：审核员第一眼就知道不是真机，
         // 也不会去追「为什么版本号和我的路由器不一样」
         Text(Demo.isOn() ? '演示数据' : 'iStoreOS ' + Fmt.orDash(this.osVersion))
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.hero_fg'))
           .padding({ left: 8, right: 8, top: 3, bottom: 3 })
           .borderRadius(T.R_PILL)
@@ -684,7 +684,7 @@ export struct OverviewPage {
       // Column 默认 alignItems 是 Center，不写 width/textAlign 就会整行居中 ——
       // 截图里主机名和内核那行就是飘在中间的
       Text(this.hostname)
-        .fontSize(T.F_HERO)
+        .fontSize(T.fs(T.F_HERO))
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.hero_fg'))
         .maxLines(1)
@@ -694,7 +694,7 @@ export struct OverviewPage {
         .margin({ top: 12 });
 
       Text('内核 ' + Fmt.orDash(this.kernel) + ' · 在线 ' + this.uptime)
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontColor($r('app.color.hero_fg_soft'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -723,11 +723,11 @@ export struct OverviewPage {
       Column() {
         Row() {
           Text('流量趋势 · 最近 2 分钟')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.hero_fg_soft'))
             .layoutWeight(1);
           Text('峰值 ' + this.peakText)
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.hero_fg_soft'));
         }
         .width('100%');
@@ -771,7 +771,7 @@ export struct OverviewPage {
         .borderRadius(4)
         .backgroundColor(color);
       Text(label)
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.hero_fg_soft'));
     }
     .alignItems(VerticalAlign.Center);
@@ -782,7 +782,7 @@ export struct OverviewPage {
     Card({ gapTop: 0, gapBottom: this.rail() ? Bp.gap(this.winW) : T.GAP }) {
       CardTitle({ glyph: Glyph.SYSTEM_LOAD, title: '系统负载', sub: 'CPU · 内存 · 磁盘' }) {
         Text('负载 ' + this.load1)
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_secondary'));
       }
       MeterRow({
@@ -814,15 +814,15 @@ export struct OverviewPage {
       Row({ space: 8 }) {
         Column({ space: 1 }) {
           Text('下行')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'));
           Row() {
             Text(this.spDown > 0 ? this.spDown.toFixed(1) : '—')
-              .fontSize(T.F_H2)
+              .fontSize(T.fs(T.F_H2))
               .fontWeight(FontWeight.Medium)
               .fontColor($r('app.color.text_primary'));
             Text(' Mbps')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.text_secondary'))
               .margin({ bottom: 2 });
           }
@@ -833,15 +833,15 @@ export struct OverviewPage {
 
         Column({ space: 1 }) {
           Text('上行')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'));
           Row() {
             Text(this.spUp > 0 ? this.spUp.toFixed(1) : '—')
-              .fontSize(T.F_H2)
+              .fontSize(T.fs(T.F_H2))
               .fontWeight(FontWeight.Medium)
               .fontColor($r('app.color.text_primary'));
             Text(' Mbps')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.text_secondary'))
               .margin({ bottom: 2 });
           }
@@ -852,15 +852,15 @@ export struct OverviewPage {
 
         Column({ space: 1 }) {
           Text('延迟')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'));
           Row() {
             Text(this.spPing > 0 ? this.spPing.toFixed(0) : '—')
-              .fontSize(T.F_H2)
+              .fontSize(T.fs(T.F_H2))
               .fontWeight(FontWeight.Medium)
               .fontColor($r('app.color.text_primary'));
             Text(' ms')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.text_secondary'))
               .margin({ bottom: 2 });
           }
@@ -879,7 +879,7 @@ export struct OverviewPage {
 
       if (this.spDown <= 0 && this.spDiag.length > 0) {
         Text('诊断 ' + this.spDiag)
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_tertiary'))
           .width('100%')
           .margin({ top: 6 });
@@ -889,10 +889,10 @@ export struct OverviewPage {
         GlyphIcon({ kind: Glyph.DOWNLOAD_SPEED, color: Pal.primary(), side: 16, lineWidth: 1.9 });
         Column() {
           Text(this.spState === 'absent' ? '安装测速组件' : '打开测速')
-            .fontSize(T.F_BODY)
+            .fontSize(T.fs(T.F_BODY))
             .fontColor($r('app.color.text_primary'));
           Text(this.spState === 'absent' ? '约 8 MB，装完即可测' : '测速与历史记录')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'))
             .margin({ top: 2 });
         }
@@ -940,10 +940,10 @@ export struct OverviewPage {
         GlyphIcon({ kind: Glyph.NETWORK_SETTINGS, color: Pal.primary(), side: 16, lineWidth: 1.9 });
         Column() {
           Text('网络设置')
-            .fontSize(T.F_BODY)
+            .fontSize(T.fs(T.F_BODY))
             .fontColor($r('app.color.text_primary'));
           Text('WAN / LAN / 无线 / 端口转发')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'))
             .margin({ top: 2 });
         }
@@ -982,7 +982,7 @@ export struct OverviewPage {
 
       if (this.ports.length === 0) {
         Text('没有检测到物理网口')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.text_secondary'))
           .margin({ top: 12, bottom: 6 });
       } else {
@@ -1045,17 +1045,17 @@ struct MeterRow {
     Column() {
       Row() {
         Text(this.label)
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .fontColor($r('app.color.text_primary'));
         if (this.detail.length > 0) {
           Text(this.detail)
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'))
             .margin({ left: 8 });
         }
         Blank();
         Text(this.value)
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .fontColor($r('app.color.text_primary'));
       }
       .width('100%')

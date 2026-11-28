@@ -100,7 +100,7 @@ struct DeviceDetailPage {
       // 顶栏：返回 + 标题 + 在线状态
       Row({ space: 6 }) {
         Text('‹')
-          .fontSize(T.F_HERO)
+          .fontSize(T.fs(T.F_HERO))
           .fontColor($r('app.color.primary'))
           .width(44)
           .height(44)
@@ -111,14 +111,14 @@ struct DeviceDetailPage {
             router.back();
           });
         Text(this.title())
-          .fontSize(T.F_H1)
+          .fontSize(T.fs(T.F_H1))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .layoutWeight(1);
         Text(this.dev.bool('online', false) ? '在线' : '离线')
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor(this.dev.bool('online', false)
             ? $r('app.color.primary')
             : $r('app.color.text_tertiary'));
@@ -130,14 +130,14 @@ struct DeviceDetailPage {
       if (this.loading) {
         Column() {
           Text('读取中…')
-            .fontSize(T.F_SUB)
+            .fontSize(T.fs(T.F_SUB))
             .fontColor($r('app.color.text_secondary'));
         }
         .width('100%')
         .padding({ top: 40 });
       } else if (this.err.length > 0) {
         Text('读取失败：' + this.err)
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.danger'))
           .width('100%')
           .padding(T.PAD);
@@ -170,13 +170,13 @@ struct DeviceDetailPage {
       Column() {
         Row() {
           Text('基本信息')
-            .fontSize(T.F_H2)
+            .fontSize(T.fs(T.F_H2))
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'))
             .layoutWeight(1);
           if (this.blocked()) {
             Text('已禁网')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.danger'))
               .padding({ left: 8, right: 8, top: 2, bottom: 2 })
               .borderRadius(T.R_PILL)
@@ -226,7 +226,7 @@ struct DeviceDetailPage {
     Card({ gapTop: T.GAP }) {
       Column() {
         Text('流量')
-          .fontSize(T.F_H2)
+          .fontSize(T.fs(T.F_H2))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .width('100%')
@@ -247,14 +247,14 @@ struct DeviceDetailPage {
 
         Row() {
           Text('当前速率')
-            .fontSize(T.F_SUB)
+            .fontSize(T.fs(T.F_SUB))
             .fontColor($r('app.color.text_secondary'));
           Blank();
           Text(this.dev.bool('online', false)
             ? ('↓ ' + Fmt.bps(this.dev.obj('net').num('rx_bps', 0))
               + '  ↑ ' + Fmt.bps(this.dev.obj('net').num('tx_bps', 0)))
             : '—')
-            .fontSize(T.F_SUB)
+            .fontSize(T.fs(T.F_SUB))
             .fontColor($r('app.color.text_primary'))
             .fontFeature("\"tnum\" on");
         }
@@ -269,13 +269,13 @@ struct DeviceDetailPage {
   stat(label: string, value: string) {
     Column() {
       Text(value)
-        .fontSize(T.F_H2)
+        .fontSize(T.fs(T.F_H2))
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.text_primary'))
         .fontFeature("\"tnum\" on")
         .maxLines(1);
       Text(label)
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_secondary'))
         .margin({ top: 2 });
     }
@@ -292,7 +292,7 @@ struct DeviceDetailPage {
       Card({ gapTop: T.GAP }) {
         Column() {
           Text('应用占用')
-            .fontSize(T.F_H2)
+            .fontSize(T.fs(T.F_H2))
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'))
             .width('100%')
@@ -301,17 +301,17 @@ struct DeviceDetailPage {
           ForEach(this.apps.slice(0, 6), (a: J, i: number) => {
             Row({ space: 8 }) {
               Text(a.str('name', '未知'))
-                .fontSize(T.F_BODY)
+                .fontSize(T.fs(T.F_BODY))
                 .fontColor($r('app.color.text_primary'))
                 .maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
                 .layoutWeight(1);
               Text(a.num('share', 0).toFixed(1) + '%')
-                .fontSize(T.F_TINY)
+                .fontSize(T.fs(T.F_TINY))
                 .fontColor($r('app.color.text_secondary'))
                 .fontFeature("\"tnum\" on");
               Text(Fmt.bytes(a.num('total', 0)))
-                .fontSize(T.F_TINY)
+                .fontSize(T.fs(T.F_TINY))
                 .fontColor($r('app.color.text_tertiary'))
                 .fontFeature("\"tnum\" on")
                 .width(70)
@@ -335,13 +335,13 @@ struct DeviceDetailPage {
       Column() {
         Row() {
           Text('操作')
-            .fontSize(T.F_H2)
+            .fontSize(T.fs(T.F_H2))
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'))
             .layoutWeight(1);
           if (this.busy) {
             Text('处理中…')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.text_secondary'));
           }
         }
@@ -353,14 +353,14 @@ struct DeviceDetailPage {
             TextInput({ text: this.nameDraft, placeholder: '给这台设备起个名字' })
               .layoutWeight(1)
               .height(38)
-              .fontSize(T.F_BODY)
+              .fontSize(T.fs(T.F_BODY))
               .borderRadius(T.R_INNER)
               .backgroundColor($r('app.color.surface_sunken'))
               .onChange((v: string) => {
                 this.nameDraft = v;
               });
             Text('保存')
-              .fontSize(T.F_SUB)
+              .fontSize(T.fs(T.F_SUB))
               .fontColor($r('app.color.primary'))
               .padding({ left: 10, right: 10, top: 6, bottom: 6 })
               .onClick(() => {
@@ -370,7 +370,7 @@ struct DeviceDetailPage {
                 });
               });
             Text('取消')
-              .fontSize(T.F_SUB)
+              .fontSize(T.fs(T.F_SUB))
               .fontColor($r('app.color.text_secondary'))
               .padding({ left: 6, right: 2, top: 6, bottom: 6 })
               .onClick(() => {
@@ -427,10 +427,10 @@ struct DeviceDetailPage {
     Row() {
       Column() {
         Text(title)
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .fontColor(color);
         Text(sub)
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_tertiary'))
           .margin({ top: 2 });
       }
@@ -438,7 +438,7 @@ struct DeviceDetailPage {
       .layoutWeight(1);
 
       Text('›')
-        .fontSize(T.F_H1)
+        .fontSize(T.fs(T.F_H1))
         .fontColor($r('app.color.text_tertiary'));
     }
     .width('100%')

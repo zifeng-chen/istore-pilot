@@ -291,13 +291,13 @@ export struct NetworkPage {
           .margin({ right: 7 });
 
         Text(this.wanUp ? '已拨通' : (this.wanNote.length > 0 ? this.wanNote : '未连接'))
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.hero_fg'))
           .layoutWeight(1);
 
         Text(this.proto.length > 0 ? this.proto : '未配置')
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.hero_fg'))
           .opacity(0.86)
           .padding({ left: 9, right: 9, top: 4, bottom: 4 })
@@ -317,7 +317,7 @@ export struct NetworkPage {
         .margin({ top: 12 });
 
       Text(this.subLine())
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontColor($r('app.color.hero_fg'))
         .opacity(0.8)
         .width('100%')
@@ -342,7 +342,7 @@ export struct NetworkPage {
         Button(this.acting ? '执行中…' : '重拨')
           .layoutWeight(1)
           .height(38)
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .fontColor($r('app.color.on_primary'))
           .backgroundColor($r('app.color.primary'))
           .borderRadius(T.R_PILL)
@@ -352,7 +352,7 @@ export struct NetworkPage {
         Button(this.wanUp ? '断开' : '连接')
           .layoutWeight(1)
           .height(38)
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .fontColor($r('app.color.text_primary'))
           .backgroundColor($r('app.color.surface_sunken'))
           .borderRadius(T.R_PILL)
@@ -362,7 +362,7 @@ export struct NetworkPage {
       .width('100%');
 
       Text(this.actNote)
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_secondary'))
         .width('100%')
         .margin({ top: 10 });
@@ -437,13 +437,13 @@ export struct NetworkPage {
            onChange: (v: string) => void) {
     Row({ space: 12 }) {
       Text(label)
-        .fontSize(T.F_BODY)
+        .fontSize(T.fs(T.F_BODY))
         .fontColor($r('app.color.text_primary'))
         .width(84)
         .textAlign(TextAlign.Start);
       TextInput({ text: value, placeholder: hint })
         .type(secret ? InputType.Password : InputType.Normal)
-        .fontSize(T.F_BODY)
+        .fontSize(T.fs(T.F_BODY))
         .textAlign(TextAlign.End)
         .backgroundColor(Color.Transparent)
         .layoutWeight(1)
@@ -465,7 +465,7 @@ export struct NetworkPage {
       Row({ space: 8 }) {
         ForEach(this.protoKeys, (k: string, i: number) => {
           Text(this.protoLabels[i])
-            .fontSize(T.F_SUB)
+            .fontSize(T.fs(T.F_SUB))
             .fontColor(this.protoKey === k
               ? $r('app.color.primary')
               : $r('app.color.text_secondary'))
@@ -511,7 +511,7 @@ export struct NetworkPage {
       });
 
       Text('密码留空表示沿用路由器里存着的那一个 —— 界面只显示掩码，把掩码提交回去会覆盖真密码。')
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_secondary'))
         .width('100%')
         .margin({ top: 4 });
@@ -520,7 +520,7 @@ export struct NetworkPage {
         .width('100%')
         .constraintSize({ minHeight: 44 })
         .padding({ top: 10, bottom: 10 })
-        .fontSize(T.F_BODY)
+        .fontSize(T.fs(T.F_BODY))
         .fontColor($r('app.color.on_primary'))
         .backgroundColor($r('app.color.primary'))
         .borderRadius(T.R_PILL)
@@ -635,7 +635,7 @@ export struct NetworkPage {
     Column() {
       if (this.fwOld) {
         Text('Agent 版本过旧，未提供防火墙摘要')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.text_secondary'))
           .width('100%')
           .padding({ top: 6, bottom: 6 });
@@ -659,7 +659,7 @@ export struct NetworkPage {
         Column() {
           ForEach(this.fwRisks, (r: string) => {
             Text('⚠ ' + r)
-              .fontSize(T.F_SUB)
+              .fontSize(T.fs(T.F_SUB))
               .fontColor($r('app.color.warn'))
               .width('100%')
               .padding({ left: 12, right: 12, top: 9, bottom: 9 })
@@ -685,30 +685,30 @@ export struct NetworkPage {
       Card() {
       Row() {
         Text('⚠')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.warn'));
         Text(this.pendExpired ? '正在还原改动…'
           : (this.pendNote.length > 0 ? this.pendNote : '改动等待确认'))
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .margin({ left: 6 })
           .layoutWeight(1);
         Text(this.pendExpired ? '请稍候' : (this.pendLeft + ' 秒'))
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.warn'));
       }
       .width('100%');
 
       Text('能连上就说明没问题。不点确认的话，时间一到路由器会自己还原。')
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_secondary'))
         .width('100%')
         .margin({ top: 5 });
 
       Row({ space: 10 }) {
         Text('撤销改动')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.text_secondary'))
           .textAlign(TextAlign.Center)
           .layoutWeight(1)
@@ -719,7 +719,7 @@ export struct NetworkPage {
             this.doRollback();
           });
         Text('确认，一切正常')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.on_primary'))
           .textAlign(TextAlign.Center)
@@ -781,7 +781,7 @@ export struct NetworkPage {
     Card({ gapTop: 0, gapBottom: 0 }) {
       Row({ space: 12 }) {
         Text('🌐')
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .width(30)
           .height(30)
           .textAlign(TextAlign.Center)
@@ -789,10 +789,10 @@ export struct NetworkPage {
           .backgroundColor($r('app.color.accent_soft'));
         Column({ space: 3 }) {
           Text('路由器网页端')
-            .fontSize(T.F_BODY)
+            .fontSize(T.fs(T.F_BODY))
             .fontColor($r('app.color.text_primary'));
           Text('改网段、端口转发、DDNS（App 内打开，已免登）')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'));
         }
         .alignItems(HorizontalAlign.Start)
@@ -820,7 +820,7 @@ export struct NetworkPage {
 
       if (this.err.length > 0) {
         Text('读取失败：' + this.err)
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.danger'))
           .width('100%');
       }
@@ -830,7 +830,7 @@ export struct NetworkPage {
         this.wanCardBody();
         Row() {
           Text('保存会重新拨号，期间全网断约 10 秒')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_tertiary'))
             .layoutWeight(1);
         }
@@ -842,7 +842,7 @@ export struct NetworkPage {
         CardHeader({ title: '局域网', sub: '内网网段与 DHCP' });
         this.lanCardBody();
         Text('修改 LAN 网段会导致 App 立即失联，请在路由器网页端操作')
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_tertiary'))
           .width('100%')
           .margin({ top: 8 });
@@ -881,13 +881,13 @@ export struct NetworkPage {
           });
 
           Text('网络')
-            .fontSize(T.F_H2)
+            .fontSize(T.fs(T.F_H2))
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'))
             .layoutWeight(1);
 
           Text(this.wanUp ? '外网已连接' : '外网未连接')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor(this.wanUp ? $r('app.color.text_secondary') : $r('app.color.warn'))
             .margin({ right: T.PAD });
         }
@@ -901,12 +901,12 @@ export struct NetworkPage {
           if (!this.showBack) {
             Row({ space: 8 }) {
               Text('网络')
-                .fontSize(T.F_TITLE)
+                .fontSize(T.fs(T.F_TITLE))
                 .fontWeight(FontWeight.Medium)
                 .fontColor($r('app.color.text_primary'))
                 .layoutWeight(1);
               Text(this.wanUp ? '外网已连接' : '外网未连接')
-                .fontSize(T.F_TINY)
+                .fontSize(T.fs(T.F_TINY))
                 .fontColor(this.wanUp ? $r('app.color.text_secondary') : $r('app.color.warn'));
             }
             .width('100%')

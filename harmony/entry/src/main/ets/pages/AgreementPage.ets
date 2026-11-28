@@ -57,7 +57,7 @@ struct AgreementPage {
         });
 
         Text(this.isPrivacy() ? '隐私政策' : '用户协议')
-          .fontSize(T.F_H1)
+          .fontSize(T.fs(T.F_H1))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1);
@@ -70,7 +70,7 @@ struct AgreementPage {
         Column() {
           Card({ gapBottom: T.GAP }) {
             Text(this.body())
-              .fontSize(T.F_SUB)
+              .fontSize(T.fs(T.F_SUB))
               .lineHeight(22)
               .fontColor($r('app.color.text_secondary'))
               .width('100%')

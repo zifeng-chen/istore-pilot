@@ -310,14 +310,14 @@ struct Index {
         .scale({ x: this.logoIn ? 1 : 0.86, y: this.logoIn ? 1 : 0.86 });
 
       Text('iStore Pilot')
-        .fontSize(T.F_HERO)
+        .fontSize(T.fs(T.F_HERO))
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.hero_fg'))
         .margin({ top: 18 })
         .opacity(this.nameIn ? 1 : 0);
 
       Text('家庭网络，一屏看完')
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontColor($r('app.color.hero_fg'))
         .opacity(this.tagIn ? 0.72 : 0)
         .margin({ top: 8 });
@@ -341,7 +341,7 @@ struct Index {
         .height(3);
 
         Text(this.splashTip)
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.hero_fg'))
           .opacity(0.6)
           .margin({ top: 10 });

@@ -213,18 +213,18 @@ export struct BackupsPage {
     Column() {
       Card() {
       Text('本机备份')
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontColor($r('app.color.text_secondary'))
         .width('100%');
       Text(this.loaded ? this.count + ' 份' : '—')
-        .fontSize(T.F_HERO)
+        .fontSize(T.fs(T.F_HERO))
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.text_primary'))
         .fontFeature("\"tnum\" on")
         .width('100%')
         .margin({ top: 6 });
         Text(this.count === 0 ? '还没有备份' : ('共占用 ' + Fmt.bytes(this.total)))
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.text_secondary'))
           .width('100%')
           .margin({ top: 4 });
@@ -240,13 +240,13 @@ export struct BackupsPage {
       Row() {
         Column() {
           Text(it.name.length > 0 ? it.name : it.id)
-            .fontSize(T.F_BODY)
+            .fontSize(T.fs(T.F_BODY))
             .fontColor($r('app.color.text_primary'))
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .width('100%');
           Text(Fmt.clock(it.ts) + '　·　' + it.files + ' 个文件' + (it.auto ? '　·　自动' : ''))
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'))
             .margin({ top: 3 });
         }
@@ -254,7 +254,7 @@ export struct BackupsPage {
         .layoutWeight(1);
 
         Text(this.busy === it.id ? '处理中…' : Fmt.bytes(it.size))
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.text_secondary'))
           .margin({ left: 10 });
       }
@@ -282,12 +282,12 @@ export struct BackupsPage {
 
         if (this.err.length > 0) {
           Text('读取失败：' + this.err)
-            .fontSize(T.F_SUB)
+            .fontSize(T.fs(T.F_SUB))
             .fontColor($r('app.color.danger'))
             .padding({ left: 16, right: 16, top: 8, bottom: 12 });
         } else if (this.items.length === 0) {
           Text(this.loaded ? '还没有备份。建议在动网络配置之前先建一份。' : '正在读取…')
-            .fontSize(T.F_SUB)
+            .fontSize(T.fs(T.F_SUB))
             .fontColor($r('app.color.text_secondary'))
             .width('100%')
             .padding({ left: 16, right: 16, top: 8, bottom: 12 });
@@ -312,7 +312,7 @@ export struct BackupsPage {
         this.listCard();
 
         Text('新建备份')
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.on_primary'))
           .textAlign(TextAlign.Center)
@@ -325,7 +325,7 @@ export struct BackupsPage {
           });
 
         Text('恢复前会先自动存一份「恢复前自动备份」，所以恢复错了也还能退回来。')
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_secondary'))
           .width('100%')
           .margin({ top: 10 });

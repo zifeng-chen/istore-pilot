@@ -52,11 +52,11 @@ export struct SideNav {
 
           Column() {
             Text('iStore Pilot')
-              .fontSize(T.F_BODY)
+              .fontSize(T.fs(T.F_BODY))
               .fontWeight(FontWeight.Medium)
               .fontColor($r('app.color.text_primary'));
             Text(this.hostname.length > 0 ? this.hostname : 'iStoreOS')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.text_secondary'))
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis });
@@ -79,7 +79,7 @@ export struct SideNav {
       Blank();
 
       Text('v' + (UI.agentVer.length > 0 ? UI.agentVer : '2.14.0'))
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_tertiary'))
         .padding({ left: 20, bottom: 16 });
     }
@@ -110,13 +110,13 @@ export struct SideNav {
 
       Column() {
         Text(item.label)
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .fontWeight(this.current === i ? FontWeight.Medium : FontWeight.Normal)
           .fontColor(this.current === i
             ? $r('app.color.primary')
             : $r('app.color.text_primary'));
         Text(item.hint)
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_secondary'))
           .margin({ top: 1 });
       }

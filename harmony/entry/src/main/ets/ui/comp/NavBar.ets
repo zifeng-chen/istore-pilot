@@ -73,7 +73,7 @@ export struct NavBar {
       .height(28);
 
       Text(item.label)
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontWeight(this.current === i ? FontWeight.Medium : FontWeight.Normal)
         .fontColor(this.current === i
           ? $r('app.color.primary')

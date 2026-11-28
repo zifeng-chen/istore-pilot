@@ -28,6 +28,25 @@ export class T {
   static readonly CARD_PAD: number = 16; // 卡片内边距
 
   // 字号
+  /**
+   * 字体缩放上限。
+   *
+   * 系统字体调到 2 倍时，卡片里的 11.5fp 会撑破布局、数字会换行。
+   * 这里把系统缩放「压」到最多 1.2 倍：既跟着用户走，又不至于崩版。
+   * 换算方式 —— 传进去的 fp 值先乘 min(s,1.2)/s，系统再乘 s，净效果就是 min(s,1.2)。
+   */
+  private static fontCap: number = 1;
+
+  static setFontScale(scale?: number): void {
+    const s: number = scale !== undefined && scale > 0 ? scale : 1;
+    T.fontCap = Math.min(s, 1.2) / s;
+  }
+
+  /** 所有字号都要经过这里，别直接用 F_* 常量 */
+  static fs(v: number): number {
+    return v * T.fontCap;
+  }
+
   static readonly F_DISPLAY: number = 44; // 极少数主数字（拦截率）
   static readonly F_TITLE: number = 33;  // 页面大标题
   static readonly F_HERO: number = 28;   // hero 大数字

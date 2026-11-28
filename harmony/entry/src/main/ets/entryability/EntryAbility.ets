@@ -6,6 +6,7 @@ import { UI } from '../core/UIState';
 import { Motion } from '../core/Motion';
 import { SystemBar } from '../core/SystemBar';
 import { Pal } from '../ui/Theme';
+import { T } from '../ui/Theme';
 
 const DOMAIN: number = 0x0001;
 const TAG: string = 'IStoreAbility';
@@ -14,6 +15,8 @@ export default class EntryAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     Motion.sync(this.context);
     hilog.info(DOMAIN, TAG, 'onCreate');
+    // 字号封顶 1.2 倍：系统字体调到很大时也不撑破布局
+    T.setFontScale(this.context.config.fontSizeScale);
 
     // 令牌失效统一走这里：置一个时间戳，Index 页监听后跳登录页。
     // 不在每个页面各自判断 401 —— 那会漏，而且会把跳转逻辑散在各处。
@@ -85,6 +88,7 @@ export default class EntryAbility extends UIAbility {
    * 配置一变必须清缓存，否则图表和环形还是上一套配色。
    */
   onConfigurationUpdate(newConfig: Configuration): void {
+    T.setFontScale(newConfig.fontSizeScale);
     hilog.info(DOMAIN, TAG, 'configuration updated');
     Pal.refresh();
     // 系统切深浅色：沉浸式下图标颜色不会自动跟着变，必须手动再刷一次，

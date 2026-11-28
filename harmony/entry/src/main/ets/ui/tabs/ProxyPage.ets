@@ -1131,7 +1131,7 @@ export struct ProxyPage {
       // 大标题固定在滚动区外
       Row() {
         Text('代理')
-          .fontSize(T.F_TITLE)
+          .fontSize(T.fs(T.F_TITLE))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1);
@@ -1265,11 +1265,11 @@ export struct ProxyPage {
           GlyphIcon({ kind: Glyph.PROXY, color: Pal.primary(), side: 22 });
           Column() {
             Text('还没有代理插件')
-              .fontSize(T.F_H2)
+              .fontSize(T.fs(T.F_H2))
               .fontWeight(FontWeight.Medium)
               .fontColor($r('app.color.text_primary'));
             Text('装一个才能在这里选节点、切模式')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.text_secondary'))
               .margin({ top: 3 });
           }
@@ -1307,11 +1307,11 @@ export struct ProxyPage {
       // 一键：省掉「选哪个」这一步决策
       Column() {
         Text('一键全部安装')
-          .fontSize(T.F_H2)
+          .fontSize(T.fs(T.F_H2))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.on_primary'));
         Text('两个都装 · 之后选一个启动')
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.on_primary'))
           .opacity(0.82)
           .margin({ top: 3 });
@@ -1326,7 +1326,7 @@ export struct ProxyPage {
       });
 
       Text('或者只装一个')
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_tertiary'))
         .width('100%')
         .textAlign(TextAlign.Center)
@@ -1347,14 +1347,14 @@ export struct ProxyPage {
       Row() {
         Column() {
           Text(this.labelOf(id))
-            .fontSize(T.F_H2)
+            .fontSize(T.fs(T.F_H2))
             .fontColor($r('app.color.text_primary'));
           Text(this.descOf(id))
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'))
             .margin({ top: 2 });
           Text(this.repoHint(id))
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor(this.repoOf(id) === 'no'
               ? $r('app.color.warn')
               : $r('app.color.text_tertiary'))
@@ -1364,7 +1364,7 @@ export struct ProxyPage {
         .layoutWeight(1);
 
         Text(this.repoOf(id) === 'yes' ? '安装' : '下载安装')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.primary'))
           .padding({ left: 12, right: 12, top: 5, bottom: 5 })
           .borderRadius(T.R_PILL)
@@ -1407,7 +1407,7 @@ export struct ProxyPage {
       .margin({ top: 14, bottom: 10 });
 
       Text('装第二个之前会等 opkg 锁释放，别退出')
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_tertiary'))
         .width('100%');
     }
@@ -1421,13 +1421,13 @@ export struct ProxyPage {
         Text(this.sheetMode === 'ask'
           ? (this.askTarget === 'all' ? '安装两个插件' : '安装 ' + this.labelOf(this.askTarget))
           : this.failTitle)
-          .fontSize(T.F_H1)
+          .fontSize(T.fs(T.F_H1))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
           .maxLines(2);
         Text('关闭')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.text_secondary'))
           .padding({ left: 8, top: 4, bottom: 4 })
           .onClick(() => {
@@ -1455,13 +1455,13 @@ export struct ProxyPage {
       Text(this.askTarget === 'all'
         ? '会把 OpenClash 和 Passwall 都装上（约 20 MB），装完选一个启动。'
         : '安装 ' + this.pkgOf(this.askTarget) + '，装完不会自动启动。')
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontColor($r('app.color.text_primary'))
         .lineHeight(20)
         .width('100%');
 
       Text('安装包会以 root 权限执行安装脚本，过程中请不要关闭 App 或重启路由器。')
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_secondary'))
         .lineHeight(18)
         .width('100%')
@@ -1469,7 +1469,7 @@ export struct ProxyPage {
 
       Row({ space: 10 }) {
         Text('取消')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
           .textAlign(TextAlign.Center)
@@ -1480,7 +1480,7 @@ export struct ProxyPage {
             this.showSheet = false;
           });
         Text('开始安装')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.on_primary'))
           .layoutWeight(1)
           .textAlign(TextAlign.Center)
@@ -1502,7 +1502,7 @@ export struct ProxyPage {
     Column() {
       if (this.failDetail.length > 0) {
         Text(this.failDetail)
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.text_primary'))
           .lineHeight(20)
           .width('100%');
@@ -1510,7 +1510,7 @@ export struct ProxyPage {
       Text(this.failCode === 'net_unreachable' || this.failCode === 'dns_failed'
         ? '路由器当前可能上不了外网，或软件源/官方发布页不可达。'
         : '可以重试一次；反复失败就先更新软件源，或手动下载 ipk 上传安装。')
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_secondary'))
         .lineHeight(18)
         .width('100%')
@@ -1518,7 +1518,7 @@ export struct ProxyPage {
 
       Row({ space: 10 }) {
         Text('仍然尝试')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
           .textAlign(TextAlign.Center)
@@ -1529,7 +1529,7 @@ export struct ProxyPage {
             this.doInstall(true);
           });
         Text('重试')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.on_primary'))
           .layoutWeight(1)
           .textAlign(TextAlign.Center)
@@ -1565,14 +1565,14 @@ export struct ProxyPage {
           .backgroundColor(this.anyRunning() ? Pal.heroOn() : Pal.heroOff())
           .margin({ right: 7 });
         Text(this.anyRunning() ? '运行中' : '都没在运行')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontWeight(FontWeight.Medium)
           .fontColor(Pal.heroFg());
         Blank();
         Text(this.anyRunning()
           ? this.activeLabel()
           : this.installedCount().toString() + ' 个已安装')
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor(Pal.heroFgSoft())
           .padding({ left: 9, right: 9, top: 3, bottom: 3 })
           .borderRadius(T.R_PILL)
@@ -1583,7 +1583,7 @@ export struct ProxyPage {
 
       // ② 大标题：运行中显示当前配置名，没跑写「未启用」
       Text(this.heroTitle())
-        .fontSize(T.F_HERO)
+        .fontSize(T.fs(T.F_HERO))
         .fontWeight(FontWeight.Medium)
         .fontColor(Pal.heroFg())
         .maxLines(1)
@@ -1593,7 +1593,7 @@ export struct ProxyPage {
 
       // ③ 说明行
       Text(this.heroSub())
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontColor(Pal.heroFgSoft())
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -1602,7 +1602,7 @@ export struct ProxyPage {
 
       // ④ 后端列表
       Text('代理后端 · 用右侧按钮启停')
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor(Pal.heroFgSoft())
         .width('100%')
         .margin({ top: 16, bottom: 2 });
@@ -1635,7 +1635,7 @@ export struct ProxyPage {
               Text(b.installed
                 ? (b.engine.length > 0 ? b.engine + ' · ' : '') + b.nodes + ' 个节点'
                 : '未安装')
-                .fontSize(T.F_TINY)
+                .fontSize(T.fs(T.F_TINY))
                 .fontColor(Pal.alpha(Pal.heroFg(), b.running ? 0.72 : 0.45))
                 .margin({ top: 3 });
             }
@@ -1648,14 +1648,14 @@ export struct ProxyPage {
             // 而且小屏上把名字挤得只剩几个字
             if (!b.installed) {
               Text('未安装')
-                .fontSize(T.F_TINY)
+                .fontSize(T.fs(T.F_TINY))
                 .fontColor(Pal.alpha(Pal.heroFg(), 0.6))
                 .padding({ left: 9, right: 9, top: 3, bottom: 3 })
                 .borderRadius(T.R_PILL)
                 .backgroundColor($r('app.color.hero_chip_weak'));
             } else {
               Text(this.busyBackend === b.id ? '处理中…' : (b.running ? '停止' : '启动'))
-                .fontSize(T.F_SUB)
+                .fontSize(T.fs(T.F_SUB))
                 .fontWeight(FontWeight.Medium)
                 .fontColor(b.running ? Pal.heroFg() : Pal.alpha(Pal.heroFg(), 0.9))
                 .padding({ left: 9, right: 9, top: 2, bottom: 2 })
@@ -1738,13 +1738,13 @@ export struct ProxyPage {
         Row({ space: 10 }) {
           Column() {
             Text(this.currentConfigName())
-              .fontSize(T.F_BODY)
+              .fontSize(T.fs(T.F_BODY))
               .fontWeight(FontWeight.Medium)
               .fontColor($r('app.color.text_primary'))
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis });
             Text(this.configs.length > 1 ? '当前使用 · 点一下切换' : '当前使用')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.text_secondary'))
               .margin({ top: 3 });
           }
@@ -1753,7 +1753,7 @@ export struct ProxyPage {
 
           if (this.configs.length > 1) {
             Text('切换')
-              .fontSize(T.F_SUB)
+              .fontSize(T.fs(T.F_SUB))
               .fontWeight(FontWeight.Medium)
               .fontColor($r('app.color.primary'))
               .padding({ left: 12, right: 12, top: 5, bottom: 5 })
@@ -1800,7 +1800,7 @@ export struct ProxyPage {
               Row({ space: 10 }) {
                 Column() {
                   Text(c.name)
-                    .fontSize(T.F_BODY)
+                    .fontSize(T.fs(T.F_BODY))
                     .fontWeight(c.current ? FontWeight.Medium : FontWeight.Normal)
                     .fontColor(c.current
                       ? $r('app.color.primary')
@@ -1808,7 +1808,7 @@ export struct ProxyPage {
                     .maxLines(1)
                     .textOverflow({ overflow: TextOverflow.Ellipsis });
                   Text(this.fmtSize(c.size) + (c.current ? ' · 使用中' : ''))
-                    .fontSize(T.F_TINY)
+                    .fontSize(T.fs(T.F_TINY))
                     .fontColor(c.current
                       ? $r('app.color.primary')
                       : $r('app.color.text_secondary'))
@@ -1855,7 +1855,7 @@ export struct ProxyPage {
         .borderRadius(T.R_PILL)
         .height(44)
         .width('100%')
-        .fontSize(T.F_BODY)
+        .fontSize(T.fs(T.F_BODY))
         .fontColor($r('app.color.text_primary'))
         .backgroundColor($r('app.color.surface_hi'))
         .margin({ top: 14 })
@@ -1874,7 +1874,7 @@ export struct ProxyPage {
   sheetHeader(title: string) {
     Row() {
       Text(title)
-        .fontSize(T.F_H1)
+        .fontSize(T.fs(T.F_H1))
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.text_primary'))
         .layoutWeight(1)
@@ -1930,11 +1930,11 @@ export struct ProxyPage {
           Text(this.comboBackend().length > 0
             ? '订阅管理 · ' + this.labelOf(this.comboBackend())
             : '订阅管理')
-            .fontSize(T.F_BODY)
+            .fontSize(T.fs(T.F_BODY))
             .fontColor($r('app.color.text_primary'))
             .layoutWeight(1);
           Text('›')
-            .fontSize(T.F_H1)
+            .fontSize(T.fs(T.F_H1))
             .fontColor($r('app.color.text_tertiary'));
         }
         .width('100%')
@@ -1948,7 +1948,7 @@ export struct ProxyPage {
         });
 
         Text(this.comboSub())
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_secondary'))
           .width('100%')
           .margin({ top: 2 });
@@ -1961,7 +1961,7 @@ export struct ProxyPage {
   @Builder
   comboChip(id: string, text: string) {
     Text(text)
-      .fontSize(T.F_SUB)
+      .fontSize(T.fs(T.F_SUB))
       .fontWeight(this.comboBackend() === id ? FontWeight.Medium : FontWeight.Normal)
       .fontColor(this.comboBackend() === id
         ? $r('app.color.text_primary')
@@ -2004,17 +2004,17 @@ export struct ProxyPage {
             Text(this.pkgTask.running
               ? '正在安装'
               : (this.uploading ? '正在上传' : '从本地文件或仓库安装'))
-              .fontSize(T.F_BODY)
+              .fontSize(T.fs(T.F_BODY))
               .fontColor($r('app.color.text_primary'));
             Text(this.pkgSub())
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.text_secondary'))
               .margin({ top: 2 });
           }
           .alignItems(HorizontalAlign.Start)
           .layoutWeight(1);
           Text('›')
-            .fontSize(T.F_H1)
+            .fontSize(T.fs(T.F_H1))
             .fontColor($r('app.color.text_tertiary'));
         }
         .width('100%')
@@ -2060,11 +2060,11 @@ export struct ProxyPage {
       Row() {
         Column() {
           Text('插件管理')
-            .fontSize(T.F_H1)
+            .fontSize(T.fs(T.F_H1))
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'));
           Text('装、重装或升级 OpenClash / Passwall')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'))
             .margin({ top: 3 });
         }
@@ -2113,13 +2113,13 @@ export struct ProxyPage {
 
               Column() {
                 Text(this.uploading ? '正在上传 ' + this.uploadName : '从本地文件安装')
-                  .fontSize(T.F_BODY)
+                  .fontSize(T.fs(T.F_BODY))
                   .fontWeight(FontWeight.Medium)
                   .fontColor($r('app.color.text_primary'))
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis });
                 Text('选 .run / .ipk，传完会自动问你要不要装')
-                  .fontSize(T.F_TINY)
+                  .fontSize(T.fs(T.F_TINY))
                   .fontColor($r('app.color.text_secondary'))
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -2142,7 +2142,7 @@ export struct ProxyPage {
 
             if (this.pkgMsg.length > 0) {
               Text(this.pkgMsg)
-                .fontSize(T.F_TINY)
+                .fontSize(T.fs(T.F_TINY))
                 .fontColor($r('app.color.warn'))
                 .width('100%')
                 .margin({ top: 8 })
@@ -2174,7 +2174,7 @@ export struct ProxyPage {
 
             if (this.installedList().length === 0) {
               Text('还没有安装代理插件，可以先从下面仓库装一个。')
-                .fontSize(T.F_BODY)
+                .fontSize(T.fs(T.F_BODY))
                 .fontColor($r('app.color.text_secondary'))
                 .width('100%')
                 .margin({ top: 10 });
@@ -2187,11 +2187,11 @@ export struct ProxyPage {
                   Row({ space: 8 }) {
                     Column() {
                       Text(b.label)
-                        .fontSize(T.F_BODY)
+                        .fontSize(T.fs(T.F_BODY))
                         .fontWeight(FontWeight.Medium)
                         .fontColor($r('app.color.text_primary'));
                       Text(this.pkgsSub(b))
-                        .fontSize(T.F_TINY)
+                        .fontSize(T.fs(T.F_TINY))
                         .fontColor($r('app.color.text_secondary'))
                         .margin({ top: 3 });
                     }
@@ -2202,7 +2202,7 @@ export struct ProxyPage {
                     // 升级入口只留这一处，免得同一件事两个按钮
                     if (this.pkgNewer(b.id)) {
                       Text(this.pkgConfirm === b.id ? '确认更新' : '更新')
-                        .fontSize(T.F_SUB)
+                        .fontSize(T.fs(T.F_SUB))
                         .fontColor($r('app.color.on_primary'))
                         .padding({ left: 12, right: 12, top: 5, bottom: 5 })
                         .borderRadius(T.R_PILL)
@@ -2217,7 +2217,7 @@ export struct ProxyPage {
                     }
 
                     Text('卸载')
-                      .fontSize(T.F_SUB)
+                      .fontSize(T.fs(T.F_SUB))
                       .fontColor($r('app.color.danger'))
                       .padding({ left: 12, right: 12, top: 5, bottom: 5 })
                       // 和「更新」「下载安装」一样用 12 的圆角，胶囊只留给状态标签
@@ -2249,11 +2249,11 @@ export struct ProxyPage {
             }) {
               if (this.pkgLoading) {
                 Text('读取中…')
-                  .fontSize(T.F_TINY)
+                  .fontSize(T.fs(T.F_TINY))
                   .fontColor($r('app.color.text_tertiary'));
               } else {
                 Text('刷新')
-                  .fontSize(T.F_TINY)
+                  .fontSize(T.fs(T.F_TINY))
                   .fontColor($r('app.color.primary'))
                   .constraintSize({ minHeight: 44, minWidth: 78 })
                   .textAlign(TextAlign.Center)
@@ -2265,7 +2265,7 @@ export struct ProxyPage {
 
             if (this.pkgItems.length === 0) {
               Text(this.pkgLoading ? '正在读取仓库…' : '没读到仓库清单')
-                .fontSize(T.F_BODY)
+                .fontSize(T.fs(T.F_BODY))
                 .fontColor($r('app.color.text_secondary'))
                 .width('100%')
                 .margin({ top: 10 });
@@ -2277,7 +2277,7 @@ export struct ProxyPage {
 
             if (this.pkgChans.length > 0) {
               Text('下载通道：' + this.chanLine())
-                .fontSize(T.F_TINY)
+                .fontSize(T.fs(T.F_TINY))
                 .fontColor($r('app.color.text_tertiary'))
                 .width('100%')
                 .margin({ top: 10 })
@@ -2303,7 +2303,7 @@ export struct ProxyPage {
   pkgProgress() {
     Column() {
       Text(this.pkgTask.step)
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_secondary'))
         .width('100%');
       Stack({ alignContent: Alignment.Start }) {
@@ -2325,7 +2325,7 @@ export struct ProxyPage {
       if (this.pkgTask.total > 0) {
         Text(this.fmtMB(this.pkgTask.got) + ' / ' + this.fmtMB(this.pkgTask.total)
           + (this.pkgTask.channel.length > 0 ? ' · ' + this.pkgTask.channel : ''))
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_tertiary'))
           .width('100%');
       }
@@ -2408,14 +2408,14 @@ export struct ProxyPage {
         Column() {
           Row() {
             Text(it.label)
-              .fontSize(T.F_BODY)
+              .fontSize(T.fs(T.F_BODY))
               .fontColor($r('app.color.text_primary'));
             Text('  ' + it.version)
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.text_tertiary'));
           }
           Text(this.pkgNote(it))
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor(it.newer || it.local.length === 0
               ? $r('app.color.text_secondary')
               : $r('app.color.text_tertiary'))
@@ -2427,7 +2427,7 @@ export struct ProxyPage {
         if (this.pkgConfirm === it.backend) {
           Row({ space: 8 }) {
             Text('取消')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.text_secondary'))
               .padding({ left: 10, right: 10, top: 5, bottom: 5 })
               .borderRadius(T.R_PILL)
@@ -2436,7 +2436,7 @@ export struct ProxyPage {
                 this.pkgConfirm = '';
               });
             Text('确认安装')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.on_primary'))
               .padding({ left: 12, right: 12, top: 5, bottom: 5 })
               .borderRadius(T.R_PILL)
@@ -2450,7 +2450,7 @@ export struct ProxyPage {
           // 本机已经有了：这一行只作「仓库里有什么」的信息展示，
           // 升级入口在「已安装」卡里，避免同一件事两个按钮
           Text('已安装')
-            .fontSize(T.F_SUB)
+            .fontSize(T.fs(T.F_SUB))
             .fontColor($r('app.color.text_tertiary'))
             .padding({ left: 12, right: 12, top: 5, bottom: 5 })
             .borderRadius(T.R_PILL)
@@ -2460,7 +2460,7 @@ export struct ProxyPage {
             .margin({ left: 8 });
         } else {
           Text('下载安装')
-            .fontSize(T.F_SUB)
+            .fontSize(T.fs(T.F_SUB))
             .fontColor($r('app.color.primary'))
             .padding({ left: 12, right: 12, top: 5, bottom: 5 })
             .borderRadius(T.R_PILL)
@@ -2514,7 +2514,7 @@ export struct ProxyPage {
             Text(this.hideTimeout
               ? (this.hiddenCount > 0 ? '隐藏 ' + this.hiddenCount : '隐藏中')
               : '隐藏超时')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.text_secondary'));
             Toggle({ type: ToggleType.Switch, isOn: this.hideTimeout })
               .selectedColor($r('app.color.primary'))
@@ -2552,7 +2552,7 @@ export struct ProxyPage {
         Text(this.groupsErr.length > 0
           ? this.groupsErr
           : (this.anyRunning() ? '节点分组还没读取到' : '没有可用的节点'))
-          .fontSize(T.F_H2)
+          .fontSize(T.fs(T.F_H2))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .width('100%');
@@ -2561,7 +2561,7 @@ export struct ProxyPage {
           : (this.anyRunning()
             ? '后端正在启动或刚切换过配置，这一块会自动重试，不用手动刷新'
             : '在上面选一个后端启动，节点分组和测速才会出现'))
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.text_secondary'))
           .width('100%')
           .margin({ top: 4 });
@@ -2626,14 +2626,14 @@ export struct ProxyPage {
     Column() {
       Row({ space: 6 }) {
         Text(this.groupType(g.type))
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_secondary'))
           .padding({ left: 6, right: 6, top: 2.5, bottom: 2.5 })
           .borderRadius(T.R_PILL)
           .backgroundColor($r('app.color.surface_hi'));
         Blank();
         Text('›')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_tertiary'))
           .textAlign(TextAlign.Center)
@@ -2645,7 +2645,7 @@ export struct ProxyPage {
       .width('100%');
 
       Text(g.name)
-        .fontSize(T.F_H2)
+        .fontSize(T.fs(T.F_H2))
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.text_primary'))
         .maxLines(1)
@@ -2655,7 +2655,7 @@ export struct ProxyPage {
       Blank();
 
       Text(g.now.length > 0 ? g.now : '未选择')
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontColor(g.now.length > 0
           ? $r('app.color.primary')
           : $r('app.color.text_tertiary'))
@@ -2664,7 +2664,7 @@ export struct ProxyPage {
 
       Row() {
         Text(g.members.length + ' 个节点')
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_tertiary'))
           .fontFeature("\"tnum\" on");
       }
@@ -2701,14 +2701,14 @@ export struct ProxyPage {
         Text(this.openIdx >= 0 && this.openIdx < this.groups.length
           ? this.groups[this.openIdx].name
           : '节点')
-          .fontSize(T.F_H1)
+          .fontSize(T.fs(T.F_H1))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis });
         Text(this.testingGroup.length > 0 ? '测速中…' : '测速')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor(this.testingGroup.length > 0
             ? $r('app.color.text_secondary')
             : $r('app.color.primary'))
@@ -2772,7 +2772,7 @@ export struct ProxyPage {
                       .height(16);
 
                       Text(m.name)
-                        .fontSize(T.F_BODY)
+                        .fontSize(T.fs(T.F_BODY))
                         .fontWeight(m.name === this.groups[this.openIdx].now
                           ? FontWeight.Medium
                           : FontWeight.Normal)
@@ -2785,11 +2785,11 @@ export struct ProxyPage {
 
                       if (this.busy === this.groups[this.openIdx].name + '/' + m.name) {
                         Text('切换中…')
-                          .fontSize(T.F_TINY)
+                          .fontSize(T.fs(T.F_TINY))
                           .fontColor($r('app.color.text_secondary'));
                       } else if (m.delay > 0) {
                         Text(m.delay + 'ms')
-                          .fontSize(T.F_TINY)
+                          .fontSize(T.fs(T.F_TINY))
                           .fontColor(this.delayHex(m.delay))
                           .padding({ left: 8, right: 8, top: 3, bottom: 3 })
                           .borderRadius(T.R_PILL)
@@ -2797,11 +2797,11 @@ export struct ProxyPage {
                           .fontFeature("\"tnum\" on");
                       } else if (m.name === this.groups[this.openIdx].now) {
                         Text('使用中')
-                          .fontSize(T.F_TINY)
+                          .fontSize(T.fs(T.F_TINY))
                           .fontColor($r('app.color.primary'));
                       } else {
                         Text('—')
-                          .fontSize(T.F_TINY)
+                          .fontSize(T.fs(T.F_TINY))
                           .fontColor($r('app.color.text_tertiary'));
                       }
                     }
@@ -2919,7 +2919,7 @@ export struct ProxyPage {
   @Builder
   modeChip(value: string, text: string) {
     Text(text)
-      .fontSize(T.F_BODY)
+      .fontSize(T.fs(T.F_BODY))
       .fontWeight(this.mode === value ? FontWeight.Medium : FontWeight.Normal)
       .fontColor(this.mode === value
         ? $r('app.color.primary')

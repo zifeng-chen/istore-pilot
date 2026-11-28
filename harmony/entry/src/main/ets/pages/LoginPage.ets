@@ -162,13 +162,13 @@ struct LoginPage {
             .shadow({ radius: 18, color: $r('app.color.shadow_2'), offsetX: 0, offsetY: 5 });
 
           Text('iStore Pilot')
-            .fontSize(T.F_HERO)
+            .fontSize(T.fs(T.F_HERO))
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'))
             .margin({ top: 18 });
 
           Text('连接你的 iStoreOS 路由器')
-            .fontSize(T.F_BODY)
+            .fontSize(T.fs(T.F_BODY))
             .fontColor($r('app.color.text_secondary'))
             .margin({ top: 6 });
         }
@@ -184,7 +184,7 @@ struct LoginPage {
         // 表单
         Column() {
           Text('服务器地址')
-            .fontSize(T.F_SUB)
+            .fontSize(T.fs(T.F_SUB))
             .fontColor($r('app.color.text_secondary'))
             .width('100%')
             .margin({ bottom: 6 });
@@ -194,7 +194,7 @@ struct LoginPage {
             .height(48)
             .borderRadius(T.R_PILL)
             .backgroundColor($r('app.color.surface_sunken'))
-            .fontSize(T.F_BODY)
+            .fontSize(T.fs(T.F_BODY))
             .fontColor($r('app.color.text_primary'))
             .placeholderColor($r('app.color.text_tertiary'))
             .onChange((v: string) => {
@@ -204,7 +204,7 @@ struct LoginPage {
             });
 
           Text('登录密码')
-            .fontSize(T.F_SUB)
+            .fontSize(T.fs(T.F_SUB))
             .fontColor($r('app.color.text_secondary'))
             .width('100%')
             .margin({ top: 16, bottom: 6 });
@@ -214,7 +214,7 @@ struct LoginPage {
             .height(48)
             .borderRadius(T.R_PILL)
             .backgroundColor($r('app.color.surface_sunken'))
-            .fontSize(T.F_BODY)
+            .fontSize(T.fs(T.F_BODY))
             .fontColor($r('app.color.text_primary'))
             .placeholderColor($r('app.color.text_tertiary'))
             .enterKeyType(EnterKeyType.Go)
@@ -228,14 +228,14 @@ struct LoginPage {
 
           if (this.err.length > 0) {
             Text(this.err)
-              .fontSize(T.F_SUB)
+              .fontSize(T.fs(T.F_SUB))
               .fontColor($r('app.color.danger'))
               .width('100%')
               .margin({ top: 10 });
           }
           if (this.probe.length > 0) {
             Text(this.probe)
-              .fontSize(T.F_SUB)
+              .fontSize(T.fs(T.F_SUB))
               .fontColor(this.probe.startsWith('已连接')
                 ? $r('app.color.primary')
                 : $r('app.color.text_secondary'))
@@ -255,19 +255,19 @@ struct LoginPage {
                 this.agreed = on;
               });
             Text('我已阅读并同意')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.text_secondary'));
             Text('《用户协议》')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.primary'))
               .onClick(() => {
                 this.openAgreement('terms');
               });
             Text('和')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.text_secondary'));
             Text('《隐私政策》')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.primary'))
               .onClick(() => {
                 this.openAgreement('privacy');
@@ -278,7 +278,7 @@ struct LoginPage {
 
           Row({ space: 10 }) {
             Button('测试连接')
-              .fontSize(T.F_H2)
+              .fontSize(T.fs(T.F_H2))
               .fontColor($r('app.color.text_primary'))
               .backgroundColor($r('app.color.surface_hi'))
               .borderRadius(T.R_PILL)
@@ -289,7 +289,7 @@ struct LoginPage {
               });
 
             Button(this.busy ? '登录中…' : '登录')
-              .fontSize(T.F_H2)
+              .fontSize(T.fs(T.F_H2))
               .fontWeight(FontWeight.Medium)
               .fontColor($r('app.color.hero_fg'))
               .backgroundColor($r('app.color.primary'))
@@ -306,7 +306,7 @@ struct LoginPage {
 
           // 第一次用的人卡在「路由器上还得先装东西」，入口放这里才有用
           Text('使用帮助：怎么装 Agent、怎么连上 →')
-            .fontSize(T.F_SUB)
+            .fontSize(T.fs(T.F_SUB))
             .fontColor($r('app.color.primary'))
             .width('100%')
             .textAlign(TextAlign.Center)
@@ -318,7 +318,7 @@ struct LoginPage {
           // 演示入口：没有路由器的人（评审、朋友、想先看看的人）不用卡在登录页。
           // 数据是打包在 App 里的示例，只读，不联网
           Text('没有路由器？先看看演示 →')
-            .fontSize(T.F_SUB)
+            .fontSize(T.fs(T.F_SUB))
             .fontColor($r('app.color.text_secondary'))
             .width('100%')
             .textAlign(TextAlign.Center)
@@ -339,7 +339,7 @@ struct LoginPage {
       Blank();
 
       Text('与手机端共用同一个 Agent · 口令一致')
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_tertiary'))
         .margin({ bottom: 28 });
     }

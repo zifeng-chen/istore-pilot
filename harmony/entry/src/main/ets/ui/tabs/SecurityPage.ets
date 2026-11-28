@@ -369,7 +369,7 @@ export struct SecurityPage {
       Blank();
 
       Text(title)
-        .fontSize(T.F_H2)
+        .fontSize(T.fs(T.F_H2))
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.text_primary'));
 
@@ -395,12 +395,12 @@ export struct SecurityPage {
           .backgroundColor($r('app.color.hero_fg'))
           .margin({ right: 7 });
         Text('局域网')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.hero_fg'))
           .layoutWeight(1);
         Text(this.adTakeover ? '拦截已接管' : (this.adInstalled ? '拦截未接管' : '拦截未装'))
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.hero_fg'))
           .opacity(0.86)
           .padding({ left: 9, right: 9, top: 4, bottom: 4 })
@@ -427,7 +427,7 @@ export struct SecurityPage {
         : (this.blocked > 0
           ? '共 ' + this.total + ' 台  ·  ' + this.blocked + ' 台已禁网'
           : '共 ' + this.total + ' 台'))
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontColor($r('app.color.hero_fg'))
         .opacity(0.8)
         .width('100%')
@@ -453,12 +453,12 @@ export struct SecurityPage {
       Row() {
         Column() {
           Text(d.name)
-            .fontSize(T.F_BODY)
+            .fontSize(T.fs(T.F_BODY))
             .fontColor($r('app.color.text_primary'))
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis });
           Text(d.ip.length > 0 ? d.ip : d.mac)
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'))
             .margin({ top: 3 });
         }
@@ -467,12 +467,12 @@ export struct SecurityPage {
 
         Column() {
           Text(d.bps < 1024 ? '空闲' : Fmt.bps(d.bps))
-            .fontSize(T.F_SUB)
+            .fontSize(T.fs(T.F_SUB))
             .fontColor(d.bps < 1024 ? $r('app.color.text_secondary') : $r('app.color.primary'))
             .fontFeature("\"tnum\" on");
           if (d.blocked) {
             Text('已禁网')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.danger'))
               .margin({ top: 2 });
           }
@@ -504,10 +504,10 @@ export struct SecurityPage {
 
       Column() {
         Text(title)
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .fontColor($r('app.color.text_primary'));
         Text(note)
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_secondary'))
           .margin({ top: 3 });
       }
@@ -557,14 +557,14 @@ export struct SecurityPage {
       Hairline({ indent: 0 });
 
       Text('最近活跃')
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_secondary'))
         .width('100%')
         .margin({ top: 10, bottom: 2 });
 
       if (this.recent.length === 0) {
         Text('还没有设备上线')
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .fontColor($r('app.color.text_tertiary'))
           .width('100%')
           .padding({ top: 10, bottom: 10 });
@@ -594,7 +594,7 @@ export struct SecurityPage {
           // 不用 Text('›')：这个字符依赖系统字体，换机型可能变方框，走路径图标
           Row({ space: 2 }) {
             Text('全部 ' + this.appRows.length + ' 个')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.primary'));
             GlyphIcon({ kind: Glyph.CHEVRON_RIGHT, color: Pal.primary(), side: 12 });
           }
@@ -606,7 +606,7 @@ export struct SecurityPage {
 
       if (this.appRows.length === 0) {
         Text('路由器按访问的域名归类 App，采样到之后这里会出排行')
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_secondary'))
           .width('100%')
           .margin({ top: 10 });
@@ -615,18 +615,18 @@ export struct SecurityPage {
           Row() {
             AppIcon({ name: a.name, side: 28 });
             Text(a.name)
-              .fontSize(T.F_SUB)
+              .fontSize(T.fs(T.F_SUB))
               .fontColor($r('app.color.text_primary'))
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
               .layoutWeight(1)
               .margin({ left: 9 });
             Text(Fmt.bytes(a.total))
-              .fontSize(T.F_SUB)
+              .fontSize(T.fs(T.F_SUB))
               .fontColor($r('app.color.text_primary'))
               .margin({ left: 8 });
             Text(Math.round(a.share) + '%')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.text_secondary'))
               .width(36)
               .textAlign(TextAlign.End);
@@ -670,10 +670,10 @@ export struct SecurityPage {
       Row() {
         Column() {
           Text(this.appDays > 1 ? '累计用量 · 已统计 ' + this.appDays + ' 天' : '累计用量')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'));
           Text(Fmt.bytes(this.appTotalBytes))
-            .fontSize(T.F_HERO)
+            .fontSize(T.fs(T.F_HERO))
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'))
             .margin({ top: 3 });
@@ -683,10 +683,10 @@ export struct SecurityPage {
 
         Column({ space: 5 }) {
           Text('↓ 下载 ' + Fmt.bytes(this.appDownBytes))
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'));
           Text('↑ 上传 ' + Fmt.bytes(this.appUpBytes))
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'));
         }
         .alignItems(HorizontalAlign.End);
@@ -713,7 +713,7 @@ export struct SecurityPage {
       }
 
       Text('按域名归类；认不出名字的连接归到「IP 直连」')
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_tertiary'))
         .margin({ top: 9 });
     }
@@ -737,7 +737,7 @@ export struct SecurityPage {
         Column() {
           Row() {
             Text(a.name)
-              .fontSize(T.F_BODY)
+              .fontSize(T.fs(T.F_BODY))
               .fontWeight(FontWeight.Medium)
               .fontColor($r('app.color.text_primary'))
               .maxLines(1)
@@ -754,7 +754,7 @@ export struct SecurityPage {
             }
             if (a.bps >= 1024) {
               Text(Fmt.bps(a.bps))
-                .fontSize(T.F_TINY)
+                .fontSize(T.fs(T.F_TINY))
                 .fontColor($r('app.color.primary'))
                 .margin({ left: 6 });
             }
@@ -764,7 +764,7 @@ export struct SecurityPage {
 
           Text((a.category.length > 0 && a.category !== '其他' ? a.category + ' · ' : '')
             + '↓ ' + Fmt.bytes(a.down) + '　↑ ' + Fmt.bytes(a.up))
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'))
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -776,11 +776,11 @@ export struct SecurityPage {
 
         Column() {
           Text(Fmt.bytes(a.total))
-            .fontSize(T.F_H2)
+            .fontSize(T.fs(T.F_H2))
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'));
           Text('占 ' + Math.round(a.share) + '%')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_tertiary'))
             .margin({ top: 4 });
         }
@@ -816,10 +816,10 @@ export struct SecurityPage {
   appEmpty() {
     Column({ space: 7 }) {
       Text('还没有捕获到应用流量')
-        .fontSize(T.F_BODY)
+        .fontSize(T.fs(T.F_BODY))
         .fontColor($r('app.color.text_secondary'));
       Text('路由器按访问的域名归类 App，联网一会儿再回来')
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_tertiary'));
     }
     .width('100%')
@@ -839,7 +839,7 @@ export struct SecurityPage {
         .backgroundColor($r('app.color.primary'))
         .margin({ top: 6 });
       Text(text)
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontColor($r('app.color.text_secondary'))
         .lineHeight(19)
         .layoutWeight(1);
@@ -881,7 +881,7 @@ export struct SecurityPage {
 
         if (this.adInstalling) {
           Text(this.adInstallStep + ' · ' + this.adInstallPct.toString() + '%')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'))
             .width('100%')
             .margin({ top: 14 });
@@ -905,14 +905,14 @@ export struct SecurityPage {
 
         if (this.adInstallErr.length > 0) {
           Text('失败：' + this.adInstallErr)
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.danger'))
             .width('100%')
             .margin({ top: 10 });
         }
 
         Text(this.adInstalling ? '正在安装…' : '安装 AdGuard Home')
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.on_primary'))
           .textAlign(TextAlign.Center)
@@ -930,14 +930,14 @@ export struct SecurityPage {
           });
 
         Text('约 6.6 MB · 需要路由器能上网')
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_tertiary'))
           .width('100%')
           .textAlign(TextAlign.Center)
           .margin({ top: 6 });
 
         Text('手动安装 / 去路由器网页')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.primary'))
           .width('100%')
           .textAlign(TextAlign.Center)
@@ -948,12 +948,12 @@ export struct SecurityPage {
       } else {
         Row() {
           Text(Fmt.count(this.adBlocked))
-          .fontSize(T.F_HERO)
+          .fontSize(T.fs(T.F_HERO))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .fontFeature("\"tnum\" on");
         Text('次拦截')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.text_secondary'))
           .margin({ left: 7, bottom: 5 });
       }
@@ -962,13 +962,13 @@ export struct SecurityPage {
       .margin({ top: 12 });
 
       Text('今日共查询 ' + Fmt.count(this.adQueries) + ' 次')
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontColor($r('app.color.text_secondary'))
         .width('100%')
         .margin({ top: 4 });
 
       Text(this.adPct > 0 ? '拦截率 ' + Math.round(this.adPct) + '%' : '今天还没有拦截记录')
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontColor($r('app.color.text_secondary'))
         .width('100%')
         .margin({ top: 2 });
@@ -976,10 +976,10 @@ export struct SecurityPage {
       Row() {
         Column() {
           Text('接管全网 DNS')
-            .fontSize(T.F_BODY)
+            .fontSize(T.fs(T.F_BODY))
             .fontColor($r('app.color.text_primary'));
           Text('关闭后所有设备改回运营商 DNS')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'))
             .margin({ top: 3 });
         }
@@ -1010,7 +1010,7 @@ export struct SecurityPage {
         Text('DNS 巡检触发过 ' + this.adGuardCount.toString() + ' 次自愈'
           + (this.adGuardReason.length > 0 ? ' · ' + this.adGuardReason : '')
           + '（53 没人应答时自动把 dnsmasq 放回去）')
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_tertiary'))
           .width('100%')
           .margin({ top: 8 });
@@ -1216,12 +1216,12 @@ export struct SecurityPage {
         // 大标题固定在滚动区外，跟着列表滚走的话划到下面就不知道在哪一页了
         Row() {
           Text('局域网')
-            .fontSize(T.F_TITLE)
+            .fontSize(T.fs(T.F_TITLE))
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'))
             .layoutWeight(1);
           Text(this.neverLoaded() ? '未连接' : this.online + ' 在线 / ' + this.total + ' 台')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'));
         }
         .width('100%')
@@ -1233,7 +1233,7 @@ export struct SecurityPage {
             Column() {
               if (this.err.length > 0 && this.total === 0) {
                 Text('读取失败：' + this.err)
-                  .fontSize(T.F_SUB)
+                  .fontSize(T.fs(T.F_SUB))
                   .fontColor($r('app.color.danger'))
                   .width('100%')
                   .margin({ bottom: 10 });
@@ -1313,7 +1313,7 @@ struct StatCell {
         .fontColor(this.unknown ? $r('app.color.text_tertiary') : this.tone)
         .fontFeature("\"tnum\" on");
       Text(this.label)
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_secondary'))
         .margin({ top: 3 });
     }

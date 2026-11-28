@@ -526,10 +526,10 @@ export struct ShieldPage {
 
         Column() {
           Text('卸载 AdGuard Home')
-            .fontSize(T.F_BODY)
+            .fontSize(T.fs(T.F_BODY))
             .fontColor($r('app.color.danger'));
           Text('会先退出 DNS 接管，配置与日志可选保留')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_tertiary'))
             .margin({ top: 2 });
         }
@@ -537,7 +537,7 @@ export struct ShieldPage {
         .layoutWeight(1);
 
         Text('›')
-          .fontSize(T.F_H1)
+          .fontSize(T.fs(T.F_H1))
           .fontColor($r('app.color.text_tertiary'));
       }
       .width('100%')
@@ -555,7 +555,7 @@ export struct ShieldPage {
     Column() {
       Row() {
         Text('卸载 AdGuard Home')
-          .fontSize(T.F_H1)
+          .fontSize(T.fs(T.F_H1))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1);
@@ -581,14 +581,14 @@ export struct ShieldPage {
       .alignItems(VerticalAlign.Center);
 
       Text('卸载前会先把 DNS 还给 dnsmasq，再停服务、删本体 —— 接管中的话也不会断网。')
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontColor($r('app.color.text_secondary'))
         .lineHeight(20)
         .width('100%')
         .margin({ top: 10 });
 
       Text('配置、规则与日志怎么处理？')
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_tertiary'))
         .width('100%')
         .margin({ top: 14 });
@@ -599,7 +599,7 @@ export struct ShieldPage {
         .constraintSize({ minHeight: 44 })
         .padding({ top: 10, bottom: 10 })
         .width('100%')
-        .fontSize(T.F_BODY)
+        .fontSize(T.fs(T.F_BODY))
         .fontColor($r('app.color.primary'))
         .backgroundColor($r('app.color.accent_soft'))
         .margin({ top: 8 })
@@ -614,7 +614,7 @@ export struct ShieldPage {
         .constraintSize({ minHeight: 44 })
         .padding({ top: 10, bottom: 10 })
         .width('100%')
-        .fontSize(T.F_BODY)
+        .fontSize(T.fs(T.F_BODY))
         .fontColor($r('app.color.on_primary'))
         .backgroundColor($r('app.color.danger'))
         .margin({ top: 10 })
@@ -624,7 +624,7 @@ export struct ShieldPage {
         });
 
       Text('「保留」会在 /etc/AdGuardHome 留下配置、规则缓存与查询历史，重装后直接接着用。')
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_tertiary'))
         .lineHeight(16)
         .width('100%')
@@ -632,7 +632,7 @@ export struct ShieldPage {
 
       if (this.uninstallErr.length > 0) {
         Text(this.uninstallErr)
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.danger'))
           .width('100%')
           .margin({ top: 10 });
@@ -676,7 +676,7 @@ export struct ShieldPage {
         sub: this.checks.length > 0 ? this.checks.length.toString() + ' 项检查' : '正在检查'
       }) {
         Text(this.preflightReady ? '全部就绪' : '有待处理')
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontWeight(FontWeight.Medium)
           .fontColor(this.preflightReady
             ? $r('app.color.primary')
@@ -691,7 +691,7 @@ export struct ShieldPage {
       Column() {
         if (this.checks.length === 0) {
           Text('读取中…')
-            .fontSize(T.F_SUB)
+            .fontSize(T.fs(T.F_SUB))
             .fontColor($r('app.color.text_secondary'))
             .padding({ left: 16, right: 16, top: 10, bottom: 14 });
         } else {
@@ -707,10 +707,10 @@ export struct ShieldPage {
                 .margin({ top: 6 });
               Column() {
                 Text(c.label)
-                  .fontSize(T.F_BODY)
+                  .fontSize(T.fs(T.F_BODY))
                   .fontColor($r('app.color.text_primary'));
                 Text(c.detail)
-                  .fontSize(T.F_TINY)
+                  .fontSize(T.fs(T.F_TINY))
                   .fontColor($r('app.color.text_tertiary'))
                   .margin({ top: 2 });
               }
@@ -743,7 +743,7 @@ export struct ShieldPage {
       }) {
         // 筛选开关做成小胶囊（标签语义），和下面「全部就绪」同一套
         Text(this.logOnlyBlocked ? '只看拦截' : '全部查询')
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontWeight(FontWeight.Medium)
           .fontColor(this.logOnlyBlocked
             ? $r('app.color.primary')
@@ -767,7 +767,7 @@ export struct ShieldPage {
       Column() {
         if (this.logItems.length === 0) {
           Text(this.logTotal > 0 ? '这段时间没有被拦截的记录' : '还没有查询记录')
-            .fontSize(T.F_SUB)
+            .fontSize(T.fs(T.F_SUB))
             .fontColor($r('app.color.text_secondary'))
             .padding({ left: 16, right: 16, top: 10, bottom: 14 });
         } else {
@@ -797,25 +797,25 @@ export struct ShieldPage {
   logRow(it: LogItem, i: number) {
     Row({ space: 8 }) {
       Text(it.clock)
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_tertiary'))
         .fontFeature("\"tnum\" on")
         .width(52);
       Text(it.domain)
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontColor($r('app.color.text_primary'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .layoutWeight(1);
       Text(it.client)
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_tertiary'))
         .maxLines(1)
         .width(76)
         .textAlign(TextAlign.End);
       if (it.blocked) {
         Text('拦')
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.danger'))
           .padding({ left: 5, right: 5, top: 1, bottom: 1 })
           .borderRadius(5)
@@ -832,12 +832,12 @@ export struct ShieldPage {
     Column() {
       Row() {
         Text('拦截')
-          .fontSize(T.F_TITLE)
+          .fontSize(T.fs(T.F_TITLE))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.hero_fg'))
           .layoutWeight(1);
         Text(this.modeLabel.length > 0 ? this.modeLabel : '状态未知')
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.hero_fg'))
           .padding({ left: 10, right: 10, top: 4, bottom: 4 })
           .borderRadius(T.R_PILL)
@@ -847,14 +847,14 @@ export struct ShieldPage {
       .alignItems(VerticalAlign.Top);
 
       Text(this.percent.toFixed(0) + '%')
-        .fontSize(T.F_DISPLAY)
+        .fontSize(T.fs(T.F_DISPLAY))
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.hero_fg'))
         .fontFeature("\"tnum\" on")
         .margin({ top: 12 });
 
       Text('的查询请求被拦截')
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontColor($r('app.color.hero_fg_soft'))
         .margin({ top: 2 });
 
@@ -906,12 +906,12 @@ export struct ShieldPage {
 
               Column() {
                 Text(h.title)
-                  .fontSize(T.F_BODY)
+                  .fontSize(T.fs(T.F_BODY))
                   .fontColor($r('app.color.text_primary'))
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis });
                 Text(h.detail)
-                  .fontSize(T.F_TINY)
+                  .fontSize(T.fs(T.F_TINY))
                   .fontColor($r('app.color.text_secondary'))
                   .maxLines(2)
                   .margin({ top: 2 });
@@ -952,7 +952,7 @@ export struct ShieldPage {
       });
       if (this.top.length === 0) {
         Text('还没有拦截记录')
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .fontColor($r('app.color.text_secondary'))
           .width('100%')
           .padding({ left: 16, right: 16, top: 10, bottom: 14 });
@@ -969,7 +969,7 @@ export struct ShieldPage {
             Row({ space: 10 }) {
               Stack() {
                 Text((i + 1).toString())
-                  .fontSize(T.F_TINY)
+                  .fontSize(T.fs(T.F_TINY))
                   .fontWeight(FontWeight.Medium)
                   .fontColor(i === 0 ? $r('app.color.hero_fg') : $r('app.color.text_secondary'));
               }
@@ -980,12 +980,12 @@ export struct ShieldPage {
 
               Column() {
                 Text(r.domain)
-                  .fontSize(T.F_BODY)
+                  .fontSize(T.fs(T.F_BODY))
                   .fontColor($r('app.color.text_primary'))
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis });
                 Text(r.list.length > 0 ? r.list : r.share.toFixed(1) + '% 的拦截量')
-                  .fontSize(T.F_TINY)
+                  .fontSize(T.fs(T.F_TINY))
                   .fontColor($r('app.color.text_secondary'))
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -995,7 +995,7 @@ export struct ShieldPage {
               .layoutWeight(1);
 
               Text(Fmt.count(r.count))
-                .fontSize(T.F_SUB)
+                .fontSize(T.fs(T.F_SUB))
                 .fontColor($r('app.color.text_secondary'))
                 .fontFeature("\"tnum\" on");
             }
@@ -1034,11 +1034,11 @@ export struct ShieldPage {
       Row() {
         Column() {
           Text('规则更新')
-            .fontSize(T.F_H2)
+            .fontSize(T.fs(T.F_H2))
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'));
           Text('自动更新开着的时候，「立即更新」只是提前补一次')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'))
             .margin({ top: 2 });
         }
@@ -1056,7 +1056,7 @@ export struct ShieldPage {
 
       // ---- 频率
       Text('自动更新频率')
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.text_secondary'))
         .width('100%')
@@ -1087,11 +1087,11 @@ export struct ShieldPage {
 
       Row() {
         Text('下次更新')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.text_secondary'));
         Blank();
         Text(this.ruleNext.length > 0 ? this.ruleNext : '—')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor(this.ruleAuto ? $r('app.color.text_primary') : $r('app.color.warn'))
           .fontFeature("\"tnum\" on");
       }
@@ -1105,7 +1105,7 @@ export struct ShieldPage {
           .borderRadius(T.R_PILL)
           .height(42)
           .width('100%')
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.primary'))
           .backgroundColor($r('app.color.accent_soft'))
@@ -1119,7 +1119,7 @@ export struct ShieldPage {
 
       if (this.ruleMsg.length > 0) {
         Text(this.ruleMsg)
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_secondary'))
           .width('100%')
           .padding({ left: 16, right: 16, top: 8 });
@@ -1138,7 +1138,7 @@ export struct ShieldPage {
             Row() {
               Column() {
                 Text(item.name)
-                  .fontSize(T.F_BODY)
+                  .fontSize(T.fs(T.F_BODY))
                   .fontWeight(FontWeight.Medium)
                   .fontColor(item.enabled
                     ? $r('app.color.text_primary')
@@ -1146,7 +1146,7 @@ export struct ShieldPage {
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis });
                 Text(this.ruleSub(item))
-                  .fontSize(T.F_TINY)
+                  .fontSize(T.fs(T.F_TINY))
                   .fontColor(item.err.length > 0
                     ? $r('app.color.danger')
                     : $r('app.color.text_secondary'))
@@ -1203,13 +1203,13 @@ struct ShieldStat {
   build() {
     Column() {
       Text(this.value)
-        .fontSize(T.F_H1)
+        .fontSize(T.fs(T.F_H1))
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.hero_fg'))
         .fontFeature("\"tnum\" on")
         .maxLines(1);
       Text(this.label)
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.hero_fg_soft'))
         .margin({ top: 2 });
     }

@@ -129,6 +129,21 @@ public final class Ui {
         }
     }
 
+    /**
+     * 字号缩放上限 1.2。
+     *
+     * Android 的 sp 会乘系统 fontScale，用户把字体调到 2 倍时，卡片里的
+     * 11.5sp 会撑破布局。这里改用 dp 单位自己乘一个封顶后的系数：
+     * 先算 min(scale, 1.2)，再以 dp 传入 —— 净效果就是「跟随但最多 1.2」。
+     */
+    private static float capFont(Context c) {
+        float s = c.getResources().getConfiguration().fontScale;
+        if (s <= 0f) {
+            s = 1f;
+        }
+        return Math.min(s, 1.2f);
+    }
+
     public static int dp(Context c, float v) {
         return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v,
                 c.getResources().getDisplayMetrics()));
@@ -156,7 +171,7 @@ public final class Ui {
     public static TextView text(Context c, CharSequence s, float sp, int colorRes) {
         TextView t = new TextView(c);
         t.setText(s);
-        t.setTextSize(sp);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_DIP, sp * capFont(c));
         t.setTextColor(color(c, colorRes));
         return t;
     }
@@ -687,7 +702,7 @@ public final class Ui {
         android.widget.EditText e = new android.widget.EditText(c);
         e.setText(value == null ? "" : value);
         e.setHint(hint == null ? "" : hint);
-        e.setTextSize(15f);
+        e.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15f * capFont(c));
         e.setTextColor(color(c, R.color.text_primary));
         e.setHintTextColor(color(c, R.color.text_tertiary));
         e.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);

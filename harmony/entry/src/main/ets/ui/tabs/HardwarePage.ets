@@ -105,7 +105,7 @@ export struct HardwarePage {
         if (this.err.length > 0) {
           Card({ gapBottom: T.GAP }) {
             Text('硬件信息读取失败：' + this.err)
-              .fontSize(T.F_SUB)
+              .fontSize(T.fs(T.F_SUB))
               .fontColor($r('app.color.danger'))
               .width('100%');
           }
@@ -194,13 +194,13 @@ export struct HardwarePage {
           .backgroundColor($r('app.color.hero_fg'))
           .margin({ right: 6 });
         Text(this.hw.obj('system').str('hostname', 'iStoreOS'))
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.hero_fg_soft'))
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .layoutWeight(1);
         Text('已运行 ' + this.upText)
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.hero_fg'))
           .maxLines(1)
           .padding({ left: 9, right: 9, top: 3, bottom: 3 })
@@ -212,7 +212,7 @@ export struct HardwarePage {
       .alignItems(VerticalAlign.Center);
 
       Text(this.title())
-        .fontSize(T.F_H1)
+        .fontSize(T.fs(T.F_H1))
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.hero_fg'))
         .maxLines(2)
@@ -224,7 +224,7 @@ export struct HardwarePage {
         + this.hw.obj('system').str('version', '') + '　·　内核 '
         + this.hw.obj('system').str('kernel', '—') + '　·　'
         + this.hw.obj('system').str('arch', '—'))
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.hero_fg_soft'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -277,14 +277,14 @@ export struct HardwarePage {
   sectionHead(title: string, trailing: string) {
     Row() {
       Text(title)
-        .fontSize(T.F_H2)
+        .fontSize(T.fs(T.F_H2))
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.text_primary'))
         .layoutWeight(1)
         .maxLines(1);
       if (trailing.length > 0) {
         Text(trailing)
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_secondary'))
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -303,11 +303,11 @@ export struct HardwarePage {
   cell(label: string, value: string) {
     Column() {
       Text(label)
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_tertiary'))
         .maxLines(1);
       Text(value)
-        .fontSize(T.F_BODY)
+        .fontSize(T.fs(T.F_BODY))
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.text_primary'))
         .fontFeature("\"tnum\" on")
@@ -332,7 +332,7 @@ export struct HardwarePage {
         // 型号独占一行：它是这一卡里最长也最该被看清的东西，
         // 塞进 Kv 的右侧值列会被挤成两行、还贴到卡片边
         Text(Fmt.orDash(this.hw.obj('cpu').str('model', '')))
-          .fontSize(T.F_H2)
+          .fontSize(T.fs(T.F_H2))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .maxLines(2)
@@ -377,7 +377,7 @@ export struct HardwarePage {
         .borderRadius(3)
         .backgroundColor(on ? $r('app.color.ok') : $r('app.color.text_tertiary'));
       Text(label)
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor(on ? $r('app.color.text_primary') : $r('app.color.text_secondary'));
     }
     .padding({ left: 9, right: 9, top: 5, bottom: 5 })
@@ -393,7 +393,7 @@ export struct HardwarePage {
 
         Text(Fmt.bytes(this.hw.obj('memory').num('used', 0)) + ' / '
           + Fmt.bytes(this.hw.obj('memory').num('total', 0)))
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .fontFeature("\"tnum\" on")
@@ -419,7 +419,7 @@ export struct HardwarePage {
 
         if (this.hw.obj('memory').arr('modules').length === 0) {
           Text('读不到内存条信息（部分主板不提供 SMBIOS Type 17）')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'))
             .margin({ top: 10 });
         } else {
@@ -438,13 +438,13 @@ export struct HardwarePage {
     Column() {
       Row({ space: 8 }) {
         Text(Fmt.orDash(m.str('size', '')))
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'));
         Text((m.str('type', '') + (m.num('speed', 0) > 0
           ? ' ' + m.num('speed', 0).toString() : '')
           + (m.str('form', '').length > 0 ? ' · ' + m.str('form', '') : '')).trim())
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_secondary'))
           .padding({ left: 7, right: 7, top: 2.5, bottom: 2.5 })
           .borderRadius(T.R_PILL)
@@ -457,7 +457,7 @@ export struct HardwarePage {
       .alignItems(VerticalAlign.Center);
 
       Text((m.str('vendor', '') + ' ' + m.str('part', '')).trim())
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontColor($r('app.color.text_secondary'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -465,7 +465,7 @@ export struct HardwarePage {
         .margin({ top: 4 });
 
       Text(m.str('slot', ''))
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_tertiary'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -485,7 +485,7 @@ export struct HardwarePage {
 
         if (this.hw.arr('disks').length === 0) {
           Text('没有检测到磁盘')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'))
             .margin({ top: 8 });
         } else {
@@ -494,11 +494,11 @@ export struct HardwarePage {
             Row() {
               Column() {
                 Text(d.str('name', '—'))
-                  .fontSize(T.F_BODY)
+                  .fontSize(T.fs(T.F_BODY))
                   .fontWeight(FontWeight.Medium)
                   .fontColor($r('app.color.text_primary'));
                 Text(d.str('model', '—') + '　·　' + d.str('transport', '—'))
-                  .fontSize(T.F_TINY)
+                  .fontSize(T.fs(T.F_TINY))
                   .fontColor($r('app.color.text_secondary'))
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -509,12 +509,12 @@ export struct HardwarePage {
 
               Column() {
                 Text(d.str('size_text', Fmt.bytes(d.num('size', 0))))
-                  .fontSize(T.F_SUB)
+                  .fontSize(T.fs(T.F_SUB))
                   .fontColor($r('app.color.text_primary'))
                   .fontFeature("\"tnum\" on");
                 if (d.num('temp', 0) > 0) {
                   Text(Fmt.temp(d.num('temp', 0)))
-                    .fontSize(T.F_TINY)
+                    .fontSize(T.fs(T.F_TINY))
                     .fontColor(d.num('temp', 0) > 60
                       ? $r('app.color.warn')
                       : $r('app.color.text_secondary'))
@@ -543,7 +543,7 @@ export struct HardwarePage {
 
         if (this.hw.arr('nics').length === 0) {
           Text('没有检测到物理网卡')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'))
             .margin({ top: 8 });
         } else {
@@ -553,7 +553,7 @@ export struct HardwarePage {
               Column() {
                 Row({ space: 6 }) {
                   Text(n.str('name', '—'))
-                    .fontSize(T.F_BODY)
+                    .fontSize(T.fs(T.F_BODY))
                     .fontWeight(FontWeight.Medium)
                     .fontColor(n.bool('up', false)
                       ? $r('app.color.text_primary')
@@ -565,7 +565,7 @@ export struct HardwarePage {
                 .width('100%');
 
                 Text(Fmt.orDash(n.str('chip', '')))
-                  .fontSize(T.F_TINY)
+                  .fontSize(T.fs(T.F_TINY))
                   .fontColor($r('app.color.text_secondary'))
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -573,7 +573,7 @@ export struct HardwarePage {
                   .margin({ top: 3 });
 
                 Text(n.str('mac', ''))
-                  .fontSize(T.F_TINY)
+                  .fontSize(T.fs(T.F_TINY))
                   .fontColor($r('app.color.text_tertiary'))
                   .width('100%')
                   .margin({ top: 2 });
@@ -583,7 +583,7 @@ export struct HardwarePage {
 
               if (n.str('driver', '').length > 0) {
                 Text(n.str('driver', ''))
-                  .fontSize(T.F_TINY)
+                  .fontSize(T.fs(T.F_TINY))
                   .fontColor($r('app.color.text_secondary'))
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -631,7 +631,7 @@ export struct HardwarePage {
 
         if (this.zonesText().length > 0) {
           Text(this.zonesText())
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'))
             .width('100%')
             .margin({ top: 10 });
@@ -645,12 +645,12 @@ export struct HardwarePage {
   tempBlock(label: string, c: number) {
     Column() {
       Text(c > 0 ? Fmt.temp(c) : '—')
-        .fontSize(T.F_H1)
+        .fontSize(T.fs(T.F_H1))
         .fontWeight(FontWeight.Medium)
         .fontColor(c > 75 ? $r('app.color.warn') : $r('app.color.text_primary'))
         .fontFeature("\"tnum\" on");
       Text(label)
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_secondary'))
         .margin({ top: 3 });
     }
@@ -693,13 +693,13 @@ export struct HardwarePage {
           Hairline({ indent: 0 });
           Column() {
             Text(p.str('name', '—'))
-              .fontSize(T.F_SUB)
+              .fontSize(T.fs(T.F_SUB))
               .fontColor($r('app.color.text_primary'))
               .maxLines(2)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
               .width('100%');
             Text(p.str('slot', '') + '　' + p.str('class', ''))
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.text_tertiary'))
               .width('100%')
               .margin({ top: 2 });

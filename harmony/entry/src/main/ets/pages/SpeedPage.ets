@@ -363,7 +363,7 @@ struct SpeedPage {
             if (this.dataTs > 0) {
               Text('数据时间 ' + this.clockText(this.dataTs)
                 + (this.staleHint ? ' · 未刷新（疑似被代理缓存）' : ''))
-                .fontSize(T.F_TINY)
+                .fontSize(T.fs(T.F_TINY))
                 .fontColor(this.staleHint ? $r('app.color.danger') : $r('app.color.text_tertiary'))
                 .width('100%');
             }
@@ -406,13 +406,13 @@ struct SpeedPage {
 
       Column() {
         Text('网络测速')
-          .fontSize(T.F_H1)
+          .fontSize(T.fs(T.F_H1))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'));
         Text(this.running ? '测速中 · 已 ' + this.elapsed.toString() + ' 秒'
           : (this.state === 'ready' || this.state === 'done' || this.down > 0
             ? 'FastNet · Ookla 节点' : '读取中…'))
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_secondary'))
           .margin({ top: 2 });
       }
@@ -433,10 +433,10 @@ struct SpeedPage {
         Row() {
           Column({ space: 2 }) {
             Text('测速节点')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.text_secondary'));
             Text(this.nodeLine())
-              .fontSize(T.F_BODY)
+              .fontSize(T.fs(T.F_BODY))
               .fontColor($r('app.color.text_primary'))
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis });
@@ -446,7 +446,7 @@ struct SpeedPage {
 
           Row() {
             Text(this.picking ? '收起' : '选择')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor(Pal.primary());
             GlyphIcon({ kind: Glyph.CHEVRON, color: Pal.primary(), side: 12, lineWidth: 1.9 });
           }
@@ -473,7 +473,7 @@ struct SpeedPage {
           .borderRadius(T.R_PILL)
           .height(46)
           .width('100%')
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .fontWeight(FontWeight.Medium)
           .backgroundColor($r('app.color.primary'))
           .fontColor($r('app.color.on_primary'))
@@ -520,11 +520,11 @@ struct SpeedPage {
       .width('100%');
 
       Row() {
-        Text(this.segState(0)).layoutWeight(1).fontSize(T.F_TINY).textAlign(TextAlign.Center)
+        Text(this.segState(0)).layoutWeight(1).fontSize(T.fs(T.F_TINY)).textAlign(TextAlign.Center)
           .fontColor(this.stage === 'speedtest' ? $r('app.color.primary') : $r('app.color.text_tertiary'));
-        Text(this.segState(1)).layoutWeight(1).fontSize(T.F_TINY).textAlign(TextAlign.Center)
+        Text(this.segState(1)).layoutWeight(1).fontSize(T.fs(T.F_TINY)).textAlign(TextAlign.Center)
           .fontColor(this.stage === 'download' ? $r('app.color.primary') : $r('app.color.text_tertiary'));
-        Text(this.segState(2)).layoutWeight(1).fontSize(T.F_TINY).textAlign(TextAlign.Center)
+        Text(this.segState(2)).layoutWeight(1).fontSize(T.fs(T.F_TINY)).textAlign(TextAlign.Center)
           .fontColor(this.stage === 'upload' ? $r('app.color.primary') : $r('app.color.text_tertiary'));
       }
       .width('100%');
@@ -532,15 +532,15 @@ struct SpeedPage {
       Row({ space: 12 }) {
         Column({ space: 2 }) {
           Text('延迟')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'));
           Row() {
             Text(this.ping > 0 ? this.ping.toFixed(0) : '—')
-              .fontSize(T.F_H2)
+              .fontSize(T.fs(T.F_H2))
               .fontWeight(FontWeight.Medium)
               .fontColor(this.ping > 0 ? $r('app.color.text_primary') : $r('app.color.text_tertiary'));
             Text(' ms')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.text_secondary'))
               .margin({ bottom: 2 });
           }
@@ -551,15 +551,15 @@ struct SpeedPage {
 
         Column({ space: 2 }) {
           Text('下行 ↓')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor(this.stage === 'download' ? $r('app.color.primary') : $r('app.color.text_secondary'));
           Row() {
             Text(this.downLiveText())
-              .fontSize(T.F_H2)
+              .fontSize(T.fs(T.F_H2))
               .fontWeight(FontWeight.Medium)
               .fontColor(this.stage === 'download' ? $r('app.color.primary') : $r('app.color.text_primary'));
             Text(' Mbps')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.text_secondary'))
               .margin({ bottom: 2 });
           }
@@ -570,15 +570,15 @@ struct SpeedPage {
 
         Column({ space: 2 }) {
           Text('上行 ↑')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor(this.stage === 'upload' ? $r('app.color.primary') : $r('app.color.text_secondary'));
           Row() {
             Text(this.upLiveText())
-              .fontSize(T.F_H2)
+              .fontSize(T.fs(T.F_H2))
               .fontWeight(FontWeight.Medium)
               .fontColor(this.stage === 'upload' ? $r('app.color.primary') : $r('app.color.text_primary'));
             Text(' Mbps')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.text_secondary'))
               .margin({ bottom: 2 });
           }
@@ -591,7 +591,7 @@ struct SpeedPage {
       .margin({ top: 2 });
 
       Text(this.progressHint())
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_tertiary'))
         .width('100%');
     }
@@ -677,22 +677,22 @@ struct SpeedPage {
   resultBlock() {
     Column({ space: 6 }) {
       Text(this.lastDown() > 0 || this.lastUp() > 0 ? '最近一次结果' : '还没有测过')
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_secondary'))
         .width('100%');
 
       Row({ space: 8 }) {
         Column({ space: 2 }) {
           Text('延迟')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'));
           Row() {
             Text(this.lastPing() > 0 ? this.lastPing().toFixed(0) : '—')
-              .fontSize(T.F_H2)
+              .fontSize(T.fs(T.F_H2))
               .fontWeight(FontWeight.Medium)
               .fontColor($r('app.color.text_primary'));
             Text(' ms')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.text_secondary'))
               .margin({ bottom: 2 });
           }
@@ -703,15 +703,15 @@ struct SpeedPage {
 
         Column({ space: 2 }) {
           Text('下行 ↓')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'));
           Row() {
             Text(this.lastDown() > 0 ? this.lastDown().toFixed(1) : '—')
-              .fontSize(T.F_H2)
+              .fontSize(T.fs(T.F_H2))
               .fontWeight(FontWeight.Medium)
               .fontColor($r('app.color.text_primary'));
             Text(' Mbps')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.text_secondary'))
               .margin({ bottom: 2 });
           }
@@ -722,15 +722,15 @@ struct SpeedPage {
 
         Column({ space: 2 }) {
           Text('上行 ↑')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'));
           Row() {
             Text(this.lastUp() > 0 ? this.lastUp().toFixed(1) : '—')
-              .fontSize(T.F_H2)
+              .fontSize(T.fs(T.F_H2))
               .fontWeight(FontWeight.Medium)
               .fontColor($r('app.color.text_primary'));
             Text(' Mbps')
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.text_secondary'))
               .margin({ bottom: 2 });
           }
@@ -769,16 +769,16 @@ struct SpeedPage {
 
         Row() {
           Text('时间 / 节点 / 延迟')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_tertiary'))
             .layoutWeight(1);
           Text('下行 ↓')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_tertiary'))
             .width(66)
             .textAlign(TextAlign.End);
           Text('上行 ↑')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_tertiary'))
             .width(66)
             .textAlign(TextAlign.End);
@@ -790,21 +790,21 @@ struct SpeedPage {
           Row() {
             Column({ space: 1 }) {
               Text(this.timeText(r.time))
-                .fontSize(T.F_SUB)
+                .fontSize(T.fs(T.F_SUB))
                 .fontColor($r('app.color.text_primary'));
               Text((r.server.length > 0 ? r.server : '自动') + ' · ' + r.ping.toFixed(0) + ' ms')
-                .fontSize(T.F_TINY)
+                .fontSize(T.fs(T.F_TINY))
                 .fontColor($r('app.color.text_tertiary'));
             }
             .alignItems(HorizontalAlign.Start)
             .layoutWeight(1);
             Text(r.down.toFixed(1))
-              .fontSize(T.F_SUB)
+              .fontSize(T.fs(T.F_SUB))
               .fontColor($r('app.color.text_primary'))
               .width(66)
               .textAlign(TextAlign.End);
             Text(r.up.toFixed(1))
-              .fontSize(T.F_SUB)
+              .fontSize(T.fs(T.F_SUB))
               .fontColor($r('app.color.text_primary'))
               .width(66)
               .textAlign(TextAlign.End);
@@ -834,12 +834,12 @@ struct SpeedPage {
       Column() {
         Row() {
           Text('选择测速节点')
-            .fontSize(T.F_BODY)
+            .fontSize(T.fs(T.F_BODY))
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'))
             .layoutWeight(1);
           Text('关闭')
-            .fontSize(T.F_SUB)
+            .fontSize(T.fs(T.F_SUB))
             .fontColor(Pal.textSecondary())
             .onClick(() => {
               this.picking = false;
@@ -875,10 +875,10 @@ struct SpeedPage {
     Row() {
       Column({ space: 1 }) {
         Text(name)
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .fontColor($r('app.color.text_primary'));
         Text(sub)
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_tertiary'));
       }
       .alignItems(HorizontalAlign.Start)
@@ -901,18 +901,18 @@ struct SpeedPage {
     Card() {
       Column({ space: 10 }) {
         Text('路由器上没有装测速组件')
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .fontColor($r('app.color.text_primary'))
           .width('100%');
         Text('FastNet 提供测速服务，约 8 MB，从软件源安装，装完自动启动。')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.text_secondary'))
           .width('100%');
         Button('安装测速组件')
           .type(ButtonType.Normal)
           .borderRadius(T.R_PILL)
           .height(40)
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .backgroundColor($r('app.color.primary'))
           .fontColor($r('app.color.on_primary'))
           .onClick(() => {
@@ -929,11 +929,11 @@ struct SpeedPage {
     Card() {
       Column({ space: 8 }) {
         Text('正在安装测速组件…')
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .fontColor($r('app.color.text_primary'))
           .width('100%');
         Text(this.installMsg.length > 0 ? this.installMsg : '更新软件源并安装')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.text_secondary'))
           .width('100%');
       }
@@ -946,7 +946,7 @@ struct SpeedPage {
   errCard() {
     Card() {
       Text(this.err)
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontColor($r('app.color.danger'))
         .width('100%');
     }

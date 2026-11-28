@@ -202,17 +202,17 @@ struct WebPage {
         .onClick(() => this.close());
         Column({ space: 2 }) {
           Text('路由器网页端')
-            .fontSize(T.F_BODY)
+            .fontSize(T.fs(T.F_BODY))
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'));
           Text(this.host)
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'));
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1);
         Text('刷新')
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .fontColor($r('app.color.primary'))
           .padding({ left: 10, right: 10, top: 6, bottom: 6 })
           .onClick(() => {
@@ -247,7 +247,7 @@ struct WebPage {
             .width(28)
             .color($r('app.color.primary'));
           Text('正在获取登录凭证…')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'));
         }
         .width('100%')
@@ -287,7 +287,7 @@ struct WebPage {
 
       if (this.err.length > 0) {
         Text(this.err)
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.danger'))
           .width('100%')
           .padding({ left: 16, right: 16, bottom: 12 });

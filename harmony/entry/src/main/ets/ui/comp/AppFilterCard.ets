@@ -197,16 +197,16 @@ export struct AppFilterCard {
       CardTitle({ pad: 16, glyph: Glyph.SECURITY, title: '应用过滤', sub: '按应用识别与拦截' });
 
       if (this.loading) {
-        Text('读取中…').fontSize(T.F_SUB).fontColor($r('app.color.text_tertiary'))
+        Text('读取中…').fontSize(T.fs(T.F_SUB)).fontColor($r('app.color.text_tertiary'))
           .padding({ left: 16, right: 16, top: 6, bottom: 10 });
       } else if (!this.installed) {
         Note({ text: this.err.length > 0 ? this.err : '路由器未安装 OpenAppFilter 插件' });
       } else {
         Row() {
           Column() {
-            Text('开启应用过滤').fontSize(T.F_BODY).fontColor($r('app.color.text_primary'));
+            Text('开启应用过滤').fontSize(T.fs(T.F_BODY)).fontColor($r('app.color.text_primary'));
             Text(this.running ? '内核已在运行' : '内核未运行')
-              .fontSize(T.F_TINY).fontColor($r('app.color.text_tertiary')).margin({ top: 2 });
+              .fontSize(T.fs(T.F_TINY)).fontColor($r('app.color.text_tertiary')).margin({ top: 2 });
           }.alignItems(HorizontalAlign.Start).layoutWeight(1);
 
           Toggle({ type: ToggleType.Switch, isOn: this.filterOn })
@@ -223,15 +223,15 @@ export struct AppFilterCard {
 
         Row() {
           Column() {
-            Text('特征库').fontSize(T.F_BODY).fontColor($r('app.color.text_primary'));
+            Text('特征库').fontSize(T.fs(T.F_BODY)).fontColor($r('app.color.text_primary'));
             Text(this.version.length > 0
               ? this.version + ' · ' + this.rules + ' 条规则' + (this.apps > 0 ? ' · ' + this.apps + ' 个应用' : '')
               : '未读取到版本')
-              .fontSize(T.F_TINY).fontColor($r('app.color.text_tertiary')).margin({ top: 2 });
+              .fontSize(T.fs(T.F_TINY)).fontColor($r('app.color.text_tertiary')).margin({ top: 2 });
           }.alignItems(HorizontalAlign.Start).layoutWeight(1);
 
           Button(this.busy ? '上传中…' : '升级')
-            .fontSize(T.F_SUB)
+            .fontSize(T.fs(T.F_SUB))
             .fontColor(Pal.primary())
             .backgroundColor($r('app.color.accent_soft'))
             .height(36)

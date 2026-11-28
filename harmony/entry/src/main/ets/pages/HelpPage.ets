@@ -40,7 +40,7 @@ struct HelpPage {
         });
 
         Text('使用帮助')
-          .fontSize(T.F_H1)
+          .fontSize(T.fs(T.F_H1))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1);
@@ -116,7 +116,7 @@ struct HelpPage {
         this.bullet('密码', '与路由器后台、SSH 是同一个，也就是安装时设的 AGENT_PASSWORD。');
 
         Text('连不上，按这个顺序查：')
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .fontColor($r('app.color.text_primary'))
           .width('100%')
           .margin({ top: 14, bottom: 2 });
@@ -181,7 +181,7 @@ struct HelpPage {
   step(n: number, title: string, detail: string) {
     Row() {
       Text(n.toString())
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.primary'))
         .textAlign(TextAlign.Center)
@@ -192,12 +192,12 @@ struct HelpPage {
 
       Column() {
         Text(title)
-          .fontSize(T.F_SUB + 1)
+          .fontSize(T.fs(T.F_SUB + 1))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .width('100%');
         Text(detail)
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.text_secondary'))
           .width('100%')
           .margin({ top: 3 });
@@ -215,12 +215,12 @@ struct HelpPage {
   bullet(mark: string, text: string) {
     Row() {
       Text(mark)
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.primary'))
         .width(34);
       Text(text)
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontColor($r('app.color.text_secondary'))
         .layoutWeight(1);
     }
@@ -233,7 +233,7 @@ struct HelpPage {
   @Builder
   code(text: string) {
     Text(text)
-      .fontSize(T.F_SUB)
+      .fontSize(T.fs(T.F_SUB))
       .fontColor($r('app.color.text_primary'))
       .lineHeight(19)
       .copyOption(CopyOptions.LocalDevice)

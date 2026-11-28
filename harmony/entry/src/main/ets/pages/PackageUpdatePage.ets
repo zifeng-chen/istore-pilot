@@ -338,14 +338,14 @@ struct PackageUpdatePage {
 
       Column() {
         Text('软件包更新')
-          .fontSize(T.F_H1)
+          .fontSize(T.fs(T.F_H1))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'));
         Text(this.firmware.length > 0
           ? 'iStoreOS ' + this.firmware + (this.items.length > 0
             ? ' · ' + this.items.length.toString() + ' 个可升级' : ' · 已是最新')
           : '读取中…')
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_secondary'))
           .margin({ top: 2 });
       }
@@ -366,7 +366,7 @@ struct PackageUpdatePage {
         TextInput({ text: this.q, placeholder: '搜索包名' })
           .placeholderColor($r('app.color.text_tertiary'))
           .placeholderFont({ size: T.F_BODY })
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .fontColor($r('app.color.text_primary'))
           .backgroundColor(Color.Transparent)
           .padding({ left: 6 })
@@ -377,7 +377,7 @@ struct PackageUpdatePage {
           });
         if (this.q.length > 0) {
           Text('×')
-            .fontSize(T.F_H1)
+            .fontSize(T.fs(T.F_H1))
             .fontColor($r('app.color.text_tertiary'))
             .padding({ left: 6, right: 10 })
             .onClick(() => {
@@ -394,7 +394,7 @@ struct PackageUpdatePage {
       .alignItems(VerticalAlign.Center);
 
       Text(this.refreshing ? '刷新中' : '刷新')
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontWeight(FontWeight.Medium)
         .fontColor(this.refreshing ? $r('app.color.text_tertiary') : $r('app.color.primary'))
         .padding({ left: 12, right: 12, top: 5, bottom: 5 })
@@ -419,7 +419,7 @@ struct PackageUpdatePage {
   stateCard(text: string) {
     Card({ gapBottom: T.GAP }) {
       Text(text)
-        .fontSize(T.F_BODY)
+        .fontSize(T.fs(T.F_BODY))
         .fontColor($r('app.color.text_secondary'))
         .width('100%')
         .textAlign(TextAlign.Center)
@@ -433,7 +433,7 @@ struct PackageUpdatePage {
       Row({ space: 8 }) {
         GlyphIcon({ kind: Glyph.STATUS_WARNING, color: Pal.warn(), side: 17, lineWidth: 1.9 });
         Text('读取失败')
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'));
       }
@@ -441,14 +441,14 @@ struct PackageUpdatePage {
       .alignItems(VerticalAlign.Center);
 
       Text(this.err)
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontColor($r('app.color.text_secondary'))
         .lineHeight(20)
         .width('100%')
         .margin({ top: 8 });
 
       Text('重新读取')
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontColor($r('app.color.primary'))
         .padding({ left: 14, right: 14, top: 6, bottom: 6 })
         .borderRadius(T.R_PILL)
@@ -479,7 +479,7 @@ struct PackageUpdatePage {
               }
             });
           Text(this.allPicked() ? '取消全选' : '全选')
-            .fontSize(T.F_SUB)
+            .fontSize(T.fs(T.F_SUB))
             .fontColor($r('app.color.text_primary'));
         }
         .constraintSize({ minHeight: 44 })
@@ -490,7 +490,7 @@ struct PackageUpdatePage {
         Blank();
 
         Text(this.items.length.toString() + ' 个可升级')
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_secondary'));
       }
       .width('100%')
@@ -511,7 +511,7 @@ struct PackageUpdatePage {
               });
             Column() {
               Text(it.name)
-                .fontSize(T.F_BODY)
+                .fontSize(T.fs(T.F_BODY))
                 .fontColor($r('app.color.text_primary'))
                 .maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -519,7 +519,7 @@ struct PackageUpdatePage {
               Text(it.current.length > 0
                 ? it.current + ' → ' + it.latest
                 : it.latest)
-                .fontSize(T.F_TINY)
+                .fontSize(T.fs(T.F_TINY))
                 .fontColor($r('app.color.text_tertiary'))
                 .maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -559,7 +559,7 @@ struct PackageUpdatePage {
             .backgroundColor($r('app.color.primary'))
             .margin({ right: 7 });
           Text('任务在路由器上跑，这一步可能几分钟')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'));
         }
         .width('100%')
@@ -570,7 +570,7 @@ struct PackageUpdatePage {
       if (this.logTail.length > 0) {
         Scroll() {
           Text(this.logTail)
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'))
             .fontFamily('monospace')
             .width('100%');
@@ -592,11 +592,11 @@ struct PackageUpdatePage {
     Row({ space: 10 }) {
       Column() {
         Text('已选 ' + this.picked.length.toString() + ' 个')
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'));
         Text('只升级勾选的包')
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_secondary'))
           .margin({ top: 2 });
       }
@@ -604,7 +604,7 @@ struct PackageUpdatePage {
       .layoutWeight(1);
 
       Text(this.starting ? '提交中…' : '升级选中')
-        .fontSize(T.F_BODY)
+        .fontSize(T.fs(T.F_BODY))
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.on_primary'))
         .padding({ left: 20, right: 20, top: 10, bottom: 10 })

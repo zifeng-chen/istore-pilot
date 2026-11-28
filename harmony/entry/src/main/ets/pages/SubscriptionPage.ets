@@ -261,7 +261,7 @@ struct SubscriptionPage {
       // 顶栏
       Row({ space: 6 }) {
         Text('‹')
-          .fontSize(T.F_HERO)
+          .fontSize(T.fs(T.F_HERO))
           .fontColor($r('app.color.primary'))
           .width(44)
           .height(44)
@@ -275,12 +275,12 @@ struct SubscriptionPage {
         Text(this.backend.length === 0
           ? '订阅管理'
           : '订阅管理 · ' + (this.backend === 'passwall' ? 'PassWall' : 'OpenClash'))
-          .fontSize(T.F_H1)
+          .fontSize(T.fs(T.F_H1))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1);
         Text('添加')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.primary'))
           .padding({ left: 14, right: 14, top: 4, bottom: 4 })
@@ -312,13 +312,13 @@ struct SubscriptionPage {
 
           if (this.loading) {
             Text('读取中…')
-              .fontSize(T.F_SUB)
+              .fontSize(T.fs(T.F_SUB))
               .fontColor($r('app.color.text_secondary'))
               .width('100%')
               .padding(20);
           } else if (this.items.length === 0) {
             Text('还没有订阅，点右上角「添加」')
-              .fontSize(T.F_SUB)
+              .fontSize(T.fs(T.F_SUB))
               .fontColor($r('app.color.text_secondary'))
               .width('100%')
               .padding(20);
@@ -350,14 +350,14 @@ struct SubscriptionPage {
                     Column() {
                       Row({ space: 6 }) {
                         Text(it.name)
-                          .fontSize(T.F_BODY)
+                          .fontSize(T.fs(T.F_BODY))
                           .fontWeight(FontWeight.Medium)
                           .fontColor($r('app.color.text_primary'))
                           .maxLines(1)
                           .textOverflow({ overflow: TextOverflow.Ellipsis });
                         if (it.inUse) {
                           Text('使用中')
-                            .fontSize(T.F_TINY)
+                            .fontSize(T.fs(T.F_TINY))
                             .fontColor($r('app.color.primary'))
                             .padding({ left: 6, right: 6, top: 1, bottom: 1 })
                             .borderRadius(T.R_PILL)
@@ -367,7 +367,7 @@ struct SubscriptionPage {
                       .width('100%');
 
                       Text(it.masked)
-                        .fontSize(T.F_TINY)
+                        .fontSize(T.fs(T.F_TINY))
                         .fontColor($r('app.color.text_tertiary'))
                         .maxLines(1)
                         .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -378,7 +378,7 @@ struct SubscriptionPage {
                     .layoutWeight(1);
 
                     Text(this.busy === it.id ? '更新中…' : '更新')
-                      .fontSize(T.F_TINY)
+                      .fontSize(T.fs(T.F_TINY))
                       .fontColor(it.inUse ? $r('app.color.primary') : $r('app.color.text_secondary'))
                       .padding({ left: 12, right: 12, top: 5, bottom: 5 })
                       .borderRadius(T.R_PILL)
@@ -467,7 +467,7 @@ struct SubscriptionPage {
         sub: this.clockText(this.logAt)
       }) {
         Text(this.logStateText())
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontWeight(FontWeight.Medium)
           .fontColor(this.logTone())
           .padding({ left: 9, right: 9, top: 3, bottom: 3 })
@@ -478,14 +478,14 @@ struct SubscriptionPage {
       Text(this.logSummary
         + (this.logSeconds > 0 && !this.logRunning
           ? '（' + this.logSeconds.toString() + ' 秒）' : ''))
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_secondary'))
         .width('100%')
         .margin({ top: 6 });
 
       if (this.logTail.length > 0) {
         Text(this.logOpen ? '收起日志' : '查看日志')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.primary'))
           .padding({ top: 8, bottom: 4 })
           .onClick(() => {
@@ -495,7 +495,7 @@ struct SubscriptionPage {
 
       if (this.logOpen && this.logTail.length > 0) {
         Text(this.logText())
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .lineHeight(16)
           .fontColor($r('app.color.text_secondary'))
           .fontFamily('monospace')
@@ -514,12 +514,12 @@ struct SubscriptionPage {
       Column() {
         Row() {
           Text(this.editId.length > 0 ? '编辑订阅' : '添加订阅')
-            .fontSize(T.F_H2)
+            .fontSize(T.fs(T.F_H2))
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'))
             .layoutWeight(1);
           Text('取消')
-            .fontSize(T.F_SUB)
+            .fontSize(T.fs(T.F_SUB))
             .fontColor($r('app.color.text_secondary'))
             .padding({ left: 10, top: 4, bottom: 4 })
             .onClick(() => {
@@ -530,13 +530,13 @@ struct SubscriptionPage {
         .margin({ bottom: 14 });
 
         Text('名称')
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_secondary'))
           .width('100%');
         TextInput({ text: this.nameDraft, placeholder: '给自己看的名字' })
           .width('100%')
           .height(38)
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .margin({ top: 4, bottom: 12 })
           .borderRadius(T.R_INNER)
           .backgroundColor($r('app.color.surface_sunken'))
@@ -545,13 +545,13 @@ struct SubscriptionPage {
           });
 
         Text('订阅地址')
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_secondary'))
           .width('100%');
         TextInput({ text: this.urlDraft, placeholder: 'https://…' })
           .width('100%')
           .height(38)
-          .fontSize(T.F_BODY)
+          .fontSize(T.fs(T.F_BODY))
           .margin({ top: 4 })
           .borderRadius(T.R_INNER)
           .backgroundColor($r('app.color.surface_sunken'))
@@ -562,7 +562,7 @@ struct SubscriptionPage {
         Row() {
           if (this.editId.length > 0) {
             Text('删除这条')
-              .fontSize(T.F_BODY)
+              .fontSize(T.fs(T.F_BODY))
               .fontColor($r('app.color.danger'))
               .padding({ left: 2, right: 16, top: 8, bottom: 8 })
               .constraintSize({ minHeight: 44 })
@@ -572,7 +572,7 @@ struct SubscriptionPage {
           }
           Blank();
           Text(this.busy === 'save' ? '保存中…' : '保存')
-            .fontSize(T.F_BODY)
+            .fontSize(T.fs(T.F_BODY))
             .fontColor($r('app.color.on_primary'))
             .padding({ left: 22, right: 22, top: 8, bottom: 8 })
             .borderRadius(T.R_PILL)

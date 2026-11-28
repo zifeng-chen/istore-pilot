@@ -260,12 +260,12 @@ export struct DevicesPage {
       Column() {
         Row() {
           Text('设备')
-            .fontSize(T.F_TITLE)
+            .fontSize(T.fs(T.F_TITLE))
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.text_primary'))
             .layoutWeight(1);
           Text(this.online.length + ' 在线 / ' + this.totalCount + ' 台')
-            .fontSize(T.F_SUB)
+            .fontSize(T.fs(T.F_SUB))
             .fontColor($r('app.color.text_secondary'));
         }
         .width('100%')
@@ -276,7 +276,7 @@ export struct DevicesPage {
         // 搜索：设备多的时候靠滚动找太慢，安卓/iOS 都有，这边补齐
         TextInput({ placeholder: '搜索名称、IP、MAC 或厂商', text: this.keyword })
           .height(38)
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .placeholderFont({ size: T.F_SUB })
           .backgroundColor($r('app.color.surface_sunken'))
           .borderRadius(T.R_INNER)
@@ -290,7 +290,7 @@ export struct DevicesPage {
         Row({ space: 8 }) {
           ForEach([0, 1, 2], (v: number) => {
             Text(v === 0 ? '全部' : (v === 1 ? '在线' : '离线'))
-              .fontSize(T.F_SUB)
+              .fontSize(T.fs(T.F_SUB))
               .fontWeight(this.filter === v ? FontWeight.Medium : FontWeight.Normal)
               .fontColor(this.filter === v
                 ? $r('app.color.primary')
@@ -312,7 +312,7 @@ export struct DevicesPage {
 
         if (this.blockedCount > 0) {
           Text(this.blockedCount + ' 台已禁网')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'))
             .width('100%')
             .margin({ bottom: 10 });
@@ -322,7 +322,7 @@ export struct DevicesPage {
 
         if (this.err.length > 0 && this.totalCount === 0) {
           Text('读取失败：' + this.err)
-            .fontSize(T.F_SUB)
+            .fontSize(T.fs(T.F_SUB))
             .fontColor($r('app.color.danger'))
             .width('100%')
             .padding(16);
@@ -367,7 +367,7 @@ export struct DevicesPage {
   onlineGroup(topGap: number) {
     if (this.filter !== 2 && this.online.length > 0) {
       Text('在线')
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontColor($r('app.color.text_secondary'))
         .width('100%')
         .margin({ top: topGap, bottom: 6, left: 4 });
@@ -384,7 +384,7 @@ export struct DevicesPage {
   offlineGroup(topGap: number) {
     if (this.filter !== 1 && this.offline.length > 0) {
       Text('离线')
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontColor($r('app.color.text_secondary'))
         .width('100%')
         .margin({ top: topGap, bottom: 6, left: 4 });
@@ -464,7 +464,7 @@ export struct DevicesPage {
             });
           } else {
             Text(d.badge)
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontWeight(FontWeight.Medium)
               .fontColor(this.badgeColor(d));
           }
@@ -481,14 +481,14 @@ export struct DevicesPage {
         Column() {
           Row({ space: 6 }) {
             Text(d.name)
-              .fontSize(T.F_H2)
+              .fontSize(T.fs(T.F_H2))
               .fontColor($r('app.color.text_primary'))
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
               .layoutWeight(1);
             if (d.blocked) {
               Text('禁网')
-                .fontSize(T.F_TINY)
+                .fontSize(T.fs(T.F_TINY))
                 .fontColor($r('app.color.danger'))
                 .padding({ left: 6, right: 6, top: 1, bottom: 1 })
                 .borderRadius(T.R_PILL)
@@ -498,7 +498,7 @@ export struct DevicesPage {
           .width('100%');
 
           Text(d.meta)
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'))
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -509,11 +509,11 @@ export struct DevicesPage {
 
         Column() {
           Text(d.online ? d.rate : '—')
-            .fontSize(T.F_SUB)
+            .fontSize(T.fs(T.F_SUB))
             .fontColor(d.online ? $r('app.color.primary') : $r('app.color.text_tertiary'))
             .fontFeature("\"tnum\" on");
           Text('累计 ' + d.total)
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_tertiary'))
             .fontFeature("\"tnum\" on")
             .margin({ top: 2 });
@@ -605,11 +605,11 @@ export struct DevicesPage {
     if (this.filter !== 2 && this.online.length > 0) {
       Row() {
         Text('在线')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.text_secondary'));
         Blank();
         Text(this.online.length + ' 台')
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_tertiary'))
           .fontFeature("\"tnum\" on");
       }
@@ -640,11 +640,11 @@ export struct DevicesPage {
     if (this.filter !== 1 && this.offline.length > 0) {
       Row() {
         Text('离线')
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.text_secondary'));
         Blank();
         Text(this.offline.length + ' 台')
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontColor($r('app.color.text_tertiary'))
           .fontFeature("\"tnum\" on");
       }
@@ -685,7 +685,7 @@ export struct DevicesPage {
           .borderRadius(3)
           .backgroundColor(d.online ? $r('app.color.primary') : $r('app.color.text_tertiary'));
         Text(d.shortName)
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontWeight(FontWeight.Medium)
           .fontColor(d.online ? $r('app.color.text_primary') : $r('app.color.text_secondary'))
           .maxLines(1)
@@ -694,7 +694,7 @@ export struct DevicesPage {
         // 角标 = 「点得进去」：方形卡放不下整行 chevron，右上角一枚小箭头就够
         if (d.blocked) {
           Text('禁')
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.danger'))
             .textAlign(TextAlign.Center)
@@ -704,7 +704,7 @@ export struct DevicesPage {
             .backgroundColor(Pal.accentSoft());
         } else {
           Text('›')
-            .fontSize(T.F_SUB)
+            .fontSize(T.fs(T.F_SUB))
             .fontWeight(FontWeight.Bold)
             .fontColor(d.online ? $r('app.color.primary') : $r('app.color.text_tertiary'))
             .textAlign(TextAlign.Center)
@@ -719,7 +719,7 @@ export struct DevicesPage {
       .width('100%');
 
       Text(d.meta)
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor(d.online ? $r('app.color.text_secondary') : $r('app.color.text_tertiary'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -735,7 +735,7 @@ export struct DevicesPage {
           });
         }
         Text(d.badge)
-          .fontSize(T.F_TINY)
+          .fontSize(T.fs(T.F_TINY))
           .fontWeight(FontWeight.Medium)
           .fontColor(this.badgeColor(d));
       }
@@ -750,13 +750,13 @@ export struct DevicesPage {
       Blank();
 
       Text(d.online ? d.rate : '—')
-        .fontSize(T.F_SUB)
+        .fontSize(T.fs(T.F_SUB))
         .fontWeight(FontWeight.Medium)
         .fontColor(d.online ? $r('app.color.primary') : $r('app.color.text_tertiary'))
         .fontFeature("\"tnum\" on")
         .maxLines(1);
       Text('共 ' + d.total)
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.text_tertiary'))
         .fontFeature("\"tnum\" on")
         .maxLines(1)

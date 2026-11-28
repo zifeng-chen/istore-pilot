@@ -86,7 +86,7 @@ export struct Kv {
   build() {
     Row() {
       Text(this.label)
-        .fontSize(T.F_BODY)
+        .fontSize(T.fs(T.F_BODY))
         .fontColor($r('app.color.text_secondary'))
         .flexShrink(0);
       Blank();
@@ -168,7 +168,7 @@ export struct HeroStat {
   build() {
     Column() {
       Text(this.label)
-        .fontSize(T.F_TINY)
+        .fontSize(T.fs(T.F_TINY))
         .fontColor($r('app.color.hero_fg_soft'))
         .maxLines(1);
       Text(this.value)
@@ -194,7 +194,7 @@ export struct Pill {
 
   build() {
     Text(this.text)
-      .fontSize(T.F_TINY)
+      .fontSize(T.fs(T.F_TINY))
       .fontWeight(FontWeight.Medium)
       .fontColor(this.tone.length > 0 ? this.tone : Pal.textSecondary())
       .padding({ left: 9, right: 9, top: 4, bottom: 4 })
@@ -212,12 +212,12 @@ export struct CardHeader {
   build() {
     Column() {
       Text(this.title)
-        .fontSize(T.F_H2)
+        .fontSize(T.fs(T.F_H2))
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.text_primary'));
       if (this.sub.length > 0) {
         Text(this.sub)
-          .fontSize(T.F_SUB)
+          .fontSize(T.fs(T.F_SUB))
           .fontColor($r('app.color.text_secondary'))
           .margin({ top: 3 });
       }
@@ -330,12 +330,12 @@ export struct CardTitle {
 
       Column() {
         Text(this.title)
-          .fontSize(T.F_H2)
+          .fontSize(T.fs(T.F_H2))
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.text_primary'));
         if (this.sub.length > 0) {
           Text(this.sub)
-            .fontSize(T.F_TINY)
+            .fontSize(T.fs(T.F_TINY))
             .fontColor($r('app.color.text_secondary'))
             .margin({ top: 2 });
         }
@@ -401,14 +401,14 @@ export struct SettingRow {
 
         Column() {
           Text(this.title)
-            .fontSize(T.F_BODY)
+            .fontSize(T.fs(T.F_BODY))
             .fontWeight(FontWeight.Medium)
             .fontColor(this.danger ? $r('app.color.danger') : $r('app.color.text_primary'))
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis });
           if (this.subtitle.length > 0) {
             Text(this.subtitle)
-              .fontSize(T.F_TINY)
+              .fontSize(T.fs(T.F_TINY))
               .fontColor($r('app.color.text_secondary'))
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -459,7 +459,7 @@ export struct Note {
 
   build() {
     Text(this.text)
-      .fontSize(T.F_TINY)
+      .fontSize(T.fs(T.F_TINY))
       .fontColor($r('app.color.text_secondary'))
       .lineHeight(17)
       .width('100%')
@@ -477,7 +477,7 @@ export struct Chip {
 
   build() {
     Text(this.label)
-      .fontSize(T.F_SUB)
+      .fontSize(T.fs(T.F_SUB))
       .fontWeight(FontWeight.Medium)
       .fontColor(this.on ? $r('app.color.primary') : $r('app.color.text_secondary'))
       .textAlign(TextAlign.Center)
